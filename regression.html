@@ -474,32 +474,15 @@ rm(list=ls(all=T))
 #install.packages(&quot;QuantPsyc&quot;)
 #install.packages(&quot;car&quot;)
 # pakete initialisieren
-library(QuantPsyc)</code></pre>
-<pre><code>## Loading required package: boot</code></pre>
-<pre><code>## Loading required package: MASS</code></pre>
-<pre><code>## 
-## Attaching package: &#39;QuantPsyc&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:base&#39;:
-## 
-##     norm</code></pre>
-<pre class="r"><code>library(car)</code></pre>
-<pre><code>## Loading required package: carData</code></pre>
-<pre><code>## 
-## Attaching package: &#39;car&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:carData&#39;:
-## 
-##     Adler, Blackmore, Guyer, UN, Vocab</code></pre>
-<pre><code>## The following object is masked from &#39;package:boot&#39;:
-## 
-##     logit</code></pre>
-<pre class="r"><code>library(ggplot2)
+library(QuantPsyc)
+library(car)
+library(ggplot2)
 source(&quot;http://martinschweinberger.de/docs/scripts/multiplot_ggplot2.r&quot;) # funktion um mehrere grafiken in einem fenster anzuzeigen
 source(&quot;http://martinschweinberger.de/docs/scripts/slr.summary.tb.r&quot;) # funktion zum erstellen von summary tabellen</code></pre>
 <p>Nachdem wir die notwendigen Pakete usw. in  eingelesen haben, können wir nun die Daten laden und uns einen ersten Eindruck über deren Struktur und Eigenschaften verschaffen.</p>
-<pre class="r"><code># laden der daten
+<pre class="r"><code># load data
 slr.data &lt;- read.delim(&quot;http://martinschweinberger.de/docs/data/slr.data.txt&quot;, header = TRUE)
-# wir attachen den datensatz, sodass wir nicht immer
-# den vollen namen nageben muessen
+# attach data
 attach(slr.data)
 # unnoetige spalten entfernen
 slr.data &lt;- as.data.frame(cbind(slr.data$datems, slr.data$P.ptw))
@@ -548,36 +531,85 @@ multiplot(p2, p3, cols = 2)</code></pre>
 <pre><code>## Loading required package: grid</code></pre>
 <pre><code>## `geom_smooth()` using method = &#39;loess&#39; and formula &#39;y ~ x&#39;</code></pre>
 <p><img src="regression_files/figure-html/plotting-1.png" width="672" /></p>
-
 <p>Bevor wir mit der Regression beginnen, werden wir die Jahreszahlen skalieren, d.h. wir ziehen vom jeweiligen Wert der Jahreszahl den Mittelwert der Jahreszahlen ab. Bei numerischen Variablen kann dies sehr hilfreich bei der Interpretation sein, denn wenn beispielsweise die numerische Variable  nicht skaliert werden würde, würde die Regression die Effekte im Jahr 0 angeben(!). Wenn eine Variable hingegen skaliert ist, dann werden die anderen Variablen nicht relativ zum Nullwert der Variable, sondern zu deren Mittelwert ins Verhältnis gesetzt, d.h. wir erhalten den Effekt der anderen Variablen, wenn die Variable  ihren Mittelwert annimmt.</p>
-
+<pre class="r"><code># scaling date
+slr.data$prep.ptw &lt;- slr.data$prep.ptw - mean(slr.data$prep.ptw)</code></pre>
 <p>Wir beginnen nun mit der Regression, indem wir eine erste Regression rechnen und anschließend deren Ergebnisse und diagnostische Plots betrachten.</p>
-
-
+<pre class="r"><code># create initial model
+prep.lm &lt;- lm(prep.ptw ~ year, data = slr.data)
+# inspect results
+summary(prep.lm)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = prep.ptw ~ year, data = slr.data)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -66.842 -13.523   1.183  14.086  65.117 
+## 
+## Coefficients:
+##               Estimate Std. Error t value Pr(&gt;|t|)  
+## (Intercept) -27.723706  10.863978  -2.552   0.0110 *
+## year          0.017128   0.006691   2.560   0.0107 *
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 21.11 on 601 degrees of freedom
+## Multiple R-squared:  0.01079,    Adjusted R-squared:  0.00914 
+## F-statistic: 6.553 on 1 and 601 DF,  p-value: 0.01071</code></pre>
+<pre class="r"><code># plot model: 3 plots per row in one window
+par(mfrow = c(1, 3))
+plot(resid(prep.lm))
+plot(rstandard(prep.lm))
+plot(rstudent(prep.lm))</code></pre>
+<p><img src="regression_files/figure-html/initialmodel-1.png" width="672" /></p>
+<pre class="r"><code>par(mfrow = c(1, 1)) # restroe default parameters</code></pre>
 <p>Die linke Grafik zeigt die Residuen des Modells (d.h. die Unterscheide zwischen den beobachteten und den durch das Modell vorhergesagten Werten). Das Problem bei diesem Plot ist, dass die Residuen nicht standardisiert sind und man sie so nicht mit den Residuen anderer Modelle vergleichen kann. Um diesen Mangel zu beheben standardisiert man die Residuen, indem man die Residuen durch deren Standartabweichung dividiert, und plottet sie gegen die beobachteten Werte (mittlerer Plot). Auf diese Weise erhält man nicht nur standardisierte Residuen, sondern die Werte der Residuen sind nun zu z-Werten geworden und man kann die z-Verteilung nutzen, um problematische Punkte zu finden. Es gibt drei Daumenregeln bezüglich des Findens problematischer Datenpunkte aufgrund von Residuen :</p>
-
-<p>Die rechte Grafik zeigt die , d.h. die angepassten vorhergesagten Werte jedes Datenpunkts werden durch den Standardfehler der Residuen dividiert. Auf diesem Weg ist es möglich die Student’s t-Verteilung zu nutzen, um unser Model zu diagnostizieren.</p>
+<ol style="list-style-type: decimal">
+<li>Punkte mit extremen Werten, d.h. Werten <span class="math inline">\(\ge\)</span> 3 (um genau zu sein, Werten <span class="math inline">\(\ge\)</span> 3.29), sollten aus den Daten entfernt werden.</li>
+<li>Falls mehr als 1% der Datenpunkte Werte <span class="math inline">\(\ge\)</span> 2.5 haben (2.58 um genau zu sein), dann sind die Fehler unseres Models zu groß.</li>
+<li>Falls mehr als 5% der Datenpunkte Werte <span class="math inline">\(\ge\)</span> 2 haben (1.96 um genau zu sein), dann sind die Fehler unseres Models ebenfalls zu groß.</li>
+</ol>
+<p>Die rechte Grafik zeigt die <em>studentized Residuen</em>, d.h. die angepassten vorhergesagten Werte jedes Datenpunkts werden durch den Standardfehler der Residuen dividiert. Auf diesem Weg ist es möglich die Student’s t-Verteilung zu nutzen, um unser Model zu diagnostizieren.</p>
 <p>Angepasste vorhergesagte Werte sind ebenfalls Residuen, aber einer besonderen Art: Das Model wird ohne einen Datenpunkt gerechnet und dann genutzt um diesen Datenpunkt vorherzusagen. Der Unterschied zwischen dem beobachteten Datenpunkt und dem vorhergesagten Datenpunkt wird dann angepasster vorhergesagter Wert genannt. Zusammenfassend kann gesagt werden, dass studentized Residuen sehr nützlich dahingehend sind, dass Sie einflussreiche Datenpunkte erkennen lassen.</p>
 <p>Die Plots zeigen, dass es zwei potentiell problematische Datenpunkte gibt (die Punkte ganz oben und ganz unten). diese zwei Punkte setzten sich deutlich von den anderen Punkten ab und können demnach Ausreißer (outlier) darstellen. Wir werden später testen, ob diese punkte entfernt werden müssen.</p>
 <p>Wir werden nun weitere modelldiagnostische Grafiken generieren.</p>
-
-
+<pre class="r"><code># generiere eine 2x2 matrize diagnostischer grafiken
+par(mfrow = c(2, 2))
+plot(prep.lm)</code></pre>
+<p><img src="regression_files/figure-html/diagnosticplots-1.png" width="672" /></p>
+<pre class="r"><code>par(mfrow = c(1, 1))</code></pre>
 <p>Die diagnostischen Grafiken sehen sehr gut aus und wir werden im Folgenden erklären warum. Die Grafik im oberen linken Panel ist nützlich, um (a) Oulier zu finden oder (b) die Korrelation zwischen Residuen und vorhergesagten Werten zu bestimmen: Wenn ein Trend in der Linie oder den Punkten sichtbar wird (bspw. ein aufsteigender Trend oder eine Zickzacklinie), dann hätte unser Model ein Problem und wir müssten wahrscheinlich Datenpunkte entfernen.</p>
 <p>Die Grafik im oberen rechten Panel zeigt an, ob die Residuen normal verteilt sind (was wünschenswert ist), ober ob die Residuen nicht einer Normalverteilung folgen. Liegen die Punkte auf der Linie, so folgen die Residuen einer Normalverteilung. Wenn die Punkte beispielsweise am oberen und unteren Ende nicht auf der Linie liegen, so zeigt dies, dass das Model kleine und große Werte nicht gut vorhersagt und daher nicht gut auf die Daten angepasst ist.</p>
 <p>Die Grafik im unteren linken Panel gibt Aufschluss über Homoskedastizität. Homoskedastizität bedeutet, dass die Varianz der Residuen konstant bleibt und nicht mit dem Wert der unabhängigen Variable korrelieren. In unproblematischen Fällen zeigt die Grafik eine flache Linie. Liegt eine Trend in der Linie vor, so haben wir es mit Heteroskedastizität, also mit einer Korrelation zwischen unabhängigen Variablen und den Residuen, zu tun, die für Regressionen sehr problematisch ist.</p>
 <p>Die Grafik im unteren rechten Panel zeigt problematische einflussreiche Datenpunkte, die die Regression überproportional beeinflussen (dies sollte nicht der Fall sein). Falls solche einflussreichen Datenpunkte vorliegen, so sollten diese entweder (a) gewichtet werden (robuste Regression) oder (b) entfernt werden. Die Grafik zeigt die Cookdistanz, welche zeigt, wie sich die Regression verändert, wenn ein Model ohne diesen Datenpunkt gerechnet wird. Die Cookdistanz zeigt also, welchen Einfluss ein Datenpunkt auf die Regression als ganzes hat. Datenpunkte, die eine Cookdistanz <span class="math inline">\(\ge\)</span> 1 haben sind problematisch .</p>
 <p>Die sogenannte Leverage ist ebenso ein Maß, das anzeigt, wie stark ein Datenpunkt die Genauigkeit der Regression beeinflusst. Leveragewerte liegen zwischen 0 (kein Einfluss) und 1 (starker Einfluss: suboptimal!). Um zu testen, ob ein spezifischer Datenpunkt einen hohen Leveragewert besitzt, muss man einen Cut-Off-Punkt berechnen, der anzeigt, ob die Leverage zu stark oder noch akzeptabel ist. Folgende zwei Formeln werden hierzu genutzt:</p>
-<span class="math display">\[\begin{equation}
-\frac{3(k + 1)}{n}
-\label{eq:lev1}
-\end{equation}\]</span>
+<p><span class="math inline">\(\frac{3(k + 1)}{n}\)</span></p>
 <p>oder</p>
-<span class="math display">\[\begin{equation}
-\frac{2(k + 1)}{n}
-\label{eq:lev2}
-\end{equation}\]</span>
+<p><span class="math inline">\(\frac{2(k + 1)}{n}\)</span></p>
 <p>Wir werden im Kontext der multiplen linearen regression genauer auf Leverage eingehen und nun nur noch eine Überblicktabelle der Ergebnisse der Regression generieren.</p>
-
+<pre class="r"><code># tabulate results
+slr.summary(prep.lm)</code></pre>
+<pre><code>##                                   Estimate Std. Beta Pearson&#39;s r
+## (Intercept)                         -27.72                      
+## year                                  0.02    0.1039         0.1
+## Model statistics                                                
+## Number of cases in model                                        
+## Residual standard error on 601 DF                               
+## Multiple R-squared                                              
+## Adjusted R-squared                                              
+## F-statistic (1, 601)                                            
+## Model p-value                                                   
+##                                   Std. Error t value Pr(&gt;|t|) P-value sig.
+## (Intercept)                            10.86   -2.55    0.011     p &lt; .05*
+## year                                    0.01    2.56   0.0107     p &lt; .05*
+## Model statistics                                                     Value
+## Number of cases in model                                               603
+## Residual standard error on 601 DF                                    21.11
+## Multiple R-squared                                                  0.0108
+## Adjusted R-squared                                                  0.0091
+## F-statistic (1, 601)                                                  6.55
+## Model p-value                                                       0.0107</code></pre>
 <p>Typischer weise werden die Ergebnisse von Regressionen in solchen Tabellen wiedergegeben, da diese aller wichtigen Kennzahlen der Modellgüte und die Signifikanz wie auch die Stärke der Effekte beinhalten. Die Tabelle ist hier noch einmal abgebildet.</p>
 
 <p>Zusätzlich sollten die Ergebnisse von einfachen linearen Regressionen schriftlich in etwa wie folgt zusammengefasst werden:\[.2cm]</p>

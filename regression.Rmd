@@ -54,7 +54,7 @@ Die folgende Ablauf ist typisch für Regressionsanalysen.
 
 Wir werden nun beginnen, dass Beispiel in \verb!R! zu implementieren. Im ersten Schritt leeren wir den gegenwärtigen Workspace, installieren und initialisieren/aktivieren notwendige Pakete und laden zusätzliche Funktionen.
 
-```{r libraries}
+```{r libraries, warnings = F, message=F}
 # entfernen aller objekte aus dem aktuellen workspace
 rm(list=ls(all=T))
 # installieren der notwendigen pakete (falls nicht schon geschehen)
@@ -73,10 +73,9 @@ source("http://martinschweinberger.de/docs/scripts/slr.summary.tb.r") # funktion
 Nachdem wir die notwendigen Pakete usw. in \verb!R! eingelesen haben, können wir nun die Daten laden und uns einen ersten Eindruck über deren Struktur und Eigenschaften verschaffen.
 
 ```{r loaddata}
-# laden der daten
+# load data
 slr.data <- read.delim("http://martinschweinberger.de/docs/data/slr.data.txt", header = TRUE)
-# wir attachen den datensatz, sodass wir nicht immer
-# den vollen namen nageben muessen
+# attach data
 attach(slr.data)
 # unnoetige spalten entfernen
 slr.data <- as.data.frame(cbind(slr.data$datems, slr.data$P.ptw))
@@ -115,52 +114,39 @@ geom_smooth(method = "lm") # with linear model smoothing!
 multiplot(p2, p3, cols = 2)
 ```
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/prep1.png}\\[.25cm]
-\caption{Scatterplots der Präpositionsdaten mit Regressionsgeraden}
-\label{fig:prep1}
-\end{figure}
-
 Bevor wir mit der Regression beginnen, werden wir die Jahreszahlen skalieren, d.h. wir ziehen vom jeweiligen Wert der Jahreszahl den Mittelwert der Jahreszahlen ab. Bei numerischen Variablen kann dies sehr hilfreich bei der Interpretation sein, denn wenn beispielsweise die numerische Variable \textquote{date} nicht skaliert werden würde, würde die Regression die Effekte im Jahr 0 angeben(!). Wenn eine Variable hingegen skaliert ist, dann werden die anderen Variablen nicht relativ zum Nullwert der Variable, sondern zu deren Mittelwert ins Verhältnis gesetzt, d.h. wir erhalten den Effekt der anderen Variablen, wenn die Variable \textquote{date} ihren Mittelwert annimmt.
 
-\begin{lstlisting}
-# skalieren der jahreszahlen
+
+```{r scaling}
+# scaling date
 slr.data$prep.ptw <- slr.data$prep.ptw - mean(slr.data$prep.ptw)
-\end{lstlisting}
+```
+
 
 Wir beginnen nun mit der Regression, indem wir eine erste Regression rechnen und anschließend deren Ergebnisse und diagnostische Plots betrachten.
 
-\begin{lstlisting}
-# Simples Lineares Regressionsmodel erstellen
+```{r initialmodel}
+# create initial model
 prep.lm <- lm(prep.ptw ~ year, data = slr.data)
-# ergebnisse betrachten
+# inspect results
 summary(prep.lm)
 
-# graphik parameter: 3 plots in einer reihe in einem fenster
+# plot model: 3 plots per row in one window
 par(mfrow = c(1, 3))
 plot(resid(prep.lm))
 plot(rstandard(prep.lm))
 plot(rstudent(prep.lm))
-par(mfrow = c(1, 1)) # wiederherstellen der originalparameter
-\end{lstlisting}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/prep2.png}\\[.25cm]
-\caption{Diagnostische Grafiken der Präpositionsdaten}
-\label{fig:prep2}
-\end{figure}
+par(mfrow = c(1, 1)) # restroe default parameters
+```
 
 Die linke Grafik zeigt die Residuen des Modells (d.h. die Unterscheide zwischen den beobachteten und den durch das Modell vorhergesagten Werten). Das Problem bei diesem Plot ist, dass die Residuen nicht standardisiert sind und man sie so nicht mit den Residuen anderer Modelle vergleichen kann. Um diesen Mangel zu beheben standardisiert man die Residuen, indem man die Residuen durch deren Standartabweichung dividiert, und plottet sie gegen die beobachteten Werte (mittlerer Plot). Auf diese Weise erhält man nicht nur standardisierte Residuen, sondern die Werte der Residuen sind nun zu z-Werten geworden und man kann die z-Verteilung nutzen, um problematische Punkte zu finden. Es gibt drei Daumenregeln bezüglich des Findens problematischer Datenpunkte aufgrund von Residuen \citep[268--269]{field2012discovering}:
 
-\begin{enumerate}
-\item Punkte mit extremen Werten, d.h. Werten $\ge$ 3 (um genau zu sein, Werten $\ge$ 3.29), sollten aus den Daten entfernt werden.
-\item Falls mehr als 1\% der Datenpunkte Werte $\ge$ 2.5 haben (2.58 um genau zu sein), dann sind die Fehler unseres Models zu groß.
-\item Falls mehr als 5\% der Datenpunkte Werte $\ge$ 2 haben (1.96 um genau zu sein), dann sind die Fehler unseres Models ebenfalls zu groß.
-\end{enumerate}
+1. Punkte mit extremen Werten, d.h. Werten $\ge$ 3 (um genau zu sein, Werten $\ge$ 3.29), sollten aus den Daten entfernt werden.
+2. Falls mehr als 1% der Datenpunkte Werte $\ge$ 2.5 haben (2.58 um genau zu sein), dann sind die Fehler unseres Models zu groß.
+3. Falls mehr als 5% der Datenpunkte Werte $\ge$ 2 haben (1.96 um genau zu sein), dann sind die Fehler unseres Models ebenfalls zu groß.
 
-Die rechte Grafik zeigt die \textit{studentized Residuen}, d.h. die angepassten vorhergesagten Werte jedes Datenpunkts werden durch den Standardfehler der Residuen dividiert. Auf diesem Weg ist es möglich die Student's t-Verteilung zu nutzen, um unser Model zu diagnostizieren.
+
+Die rechte Grafik zeigt die *studentized Residuen*, d.h. die angepassten vorhergesagten Werte jedes Datenpunkts werden durch den Standardfehler der Residuen dividiert. Auf diesem Weg ist es möglich die Student's t-Verteilung zu nutzen, um unser Model zu diagnostizieren.
 
 Angepasste vorhergesagte Werte sind ebenfalls Residuen, aber einer besonderen Art: Das Model wird ohne einen Datenpunkt gerechnet und dann genutzt um diesen Datenpunkt vorherzusagen. Der Unterschied zwischen dem beobachteten Datenpunkt und dem vorhergesagten Datenpunkt wird dann angepasster vorhergesagter Wert genannt. Zusammenfassend kann gesagt werden, dass studentized Residuen sehr nützlich dahingehend sind, dass Sie einflussreiche Datenpunkte erkennen lassen.
 
@@ -168,19 +154,12 @@ Die Plots zeigen, dass es zwei potentiell problematische Datenpunkte gibt (die P
 
 Wir werden nun weitere modelldiagnostische Grafiken generieren.
 
-\begin{lstlisting}
+```{r diagnosticplots}
 # generiere eine 2x2 matrize diagnostischer grafiken
 par(mfrow = c(2, 2))
 plot(prep.lm)
 par(mfrow = c(1, 1))
-\end{lstlisting}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/prep3.png}\\[.25cm]
-\caption{Weitere diagnostische Grafiken der Präpositionsdaten}
-\label{fig:prep3}
-\end{figure}
+```
 
 Die diagnostischen Grafiken sehen sehr gut aus und wir werden im Folgenden erklären warum. Die Grafik im oberen linken Panel ist nützlich, um (a) Oulier zu finden oder (b) die Korrelation zwischen Residuen und vorhergesagten Werten zu bestimmen: Wenn ein Trend in der Linie oder den Punkten sichtbar wird (bspw. ein aufsteigender Trend oder eine Zickzacklinie), dann hätte unser Model ein Problem und wir müssten wahrscheinlich Datenpunkte entfernen.
 
@@ -192,24 +171,18 @@ Die Grafik im unteren rechten Panel zeigt problematische einflussreiche Datenpun
 
 Die sogenannte Leverage ist ebenso ein Maß, das anzeigt, wie stark ein Datenpunkt die Genauigkeit der Regression beeinflusst. Leveragewerte liegen zwischen 0 (kein Einfluss) und 1 (starker Einfluss: suboptimal!). Um zu testen, ob ein spezifischer Datenpunkt einen hohen Leveragewert besitzt, muss man einen Cut-Off-Punkt berechnen, der anzeigt, ob die Leverage zu stark oder noch akzeptabel ist. Folgende zwei Formeln werden hierzu genutzt:
 
-\begin{equation}
-\frac{3(k + 1)}{n}
-\label{eq:lev1}
-\end{equation}
+$\frac{3(k + 1)}{n}$
 
 oder
 
-\begin{equation}
-\frac{2(k + 1)}{n}
-\label{eq:lev2}
-\end{equation}
+$\frac{2(k + 1)}{n}$
 
 Wir werden im Kontext der multiplen linearen regression genauer auf Leverage eingehen und nun nur noch eine Überblicktabelle der Ergebnisse der Regression generieren.
 
-\begin{lstlisting}
-# ergebnisse tabellieren
+```{r tabulate results}
+# tabulate results
 slr.summary(prep.lm)
-\end{lstlisting}
+```
 
 Typischer weise werden die Ergebnisse von Regressionen in solchen Tabellen wiedergegeben, da diese aller wichtigen Kennzahlen der Modellgüte und die Signifikanz wie auch die Stärke der Effekte beinhalten. Die Tabelle ist hier noch einmal abgebildet.
 
