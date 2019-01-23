@@ -1,389 +1,29 @@
 ---
-title: "Regression Modellling and ANOVAs"
+title: "Advanced Inferential Statistics: Regression Modelling and Random Forests"
 author: "UQ SLC Digital Team"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: html_document
 bibliography: bibliography.bib
 ---
-
-# Simple Linear Regression
- 
-This chapter focuses on a very widely used statistical method which is called regression. Regressions are used when we try to understand how independent variables correlate with a dependent or outcome variable. So if you want to investigate how certain criteria affect an outcome, then a regression is the way to go. We will have a look at two simple examples to understand what the concepts underlying a regression mean and how a regression works. After that, we will turn to a more compley case and we will implement a multiple linear regression. The `R`-Code, that we will use, is based on [@field2012discovering].
-
-## Introduction
-Although the basic logic underlying regressions is identical to the conceptual underpinnings of analysis of variance (ANOVA), a related method, sociolinguistists have traditionally favoured regression analysis in their studes while ANOVAs have been the method of choice in psycholinguistics. The preference for either method is grounded in historical happenstances and the culture of these subdisciplines rather than in methodological reasoning.
-
-A minor difference between regressions and ANOVA lies in the fact that regressions are based on the $t$-distribution while ANOVAs use the $F$-distribution (however, the $F$-value is merely t^2^). Both  $t$- and $F$-values report on the ratio between explained and unexplained variance.
-
-The idea behind regression analysis is expressed formaly in [equation](#eq:slm) and can best be described graphically: Imagine drawing a line through points in a scatterplot (Grafik \ref{fig:scat1} left panel).
-
-$f_{(x)} = \alpha + \beta_{1}x_{i} + \epsilon$ {#eq:slm}
-
-Regressions aim to find that line which has the minimal summed distance between points and the line (Grafik \ref{fig:scat1} center panel). Technically speaking, the aim of a regression is to find the line with the minimal deviance or the line with the minimal sum of residuals (variance) (Grafik \ref{fig:scat1} right panel). This means that the sum of the length of the lines between the points and the lines should be minimal. The slope of the line is called *coefficient* and the point where the line crosses the y-axis is called the *intercept*.
-
-```{r fig.width=10, fig.height=8, echo=FALSE, warning=FALSE, fig.cap="Scatterplots mit Regressionsgeraden (mitte) und Residuen (rechts)"}
-library(png)
-ima <- readPNG("resources/scat1.png")
-plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
-lim <- par()
-rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
 ```
 
-A word about standard errors (SE) is in order here because most commonly used statistics programs will provide SE values when reportigng regression models. The SE is a measure that tells us how much the coefficients were to vary if the same regression were applied to many samples from the same population. A relatively small SE value therefore indicates that the coefficients will ermain very stable if the same regression model is fitted to many different samples with identical parameters. In contrast, a large SE tells you that the model is volatile and not very stable or reliable as the coefficients vary substantially if the model is applied to many samples.  
+# Multiple Linear Regression
 
-## Simple Linear Regression: Preposition Use across Real-Time
+In contrast to simple linear regression, which estiamtes the effect of a single predictor, multiple linear regression estiamtes the effect of various predictor (cf. equation (\ref{eq:mlr})). A multiple linear regression can thus test the effects of various predictors simultaneously. 
 
-We will now turn to our first example. In this example, we will investiagte whether the frequency of prepositions has changed from Middle English to Late Modern English. The reasoning behind this example is that Old English was highly sythetic compared with Present-Day English which comparatively analytic. In other words, while Old English speakers used case to indicate syntactic relations, speakers of Present-Day English use word order and prepositions to indicate syntactic relationships. This means that the loss of case had to be compensated by different strategies and maybe these strategies continued to develop and incerase in frequency even after the change from synthetic to analytic had been mostly accomplished. And this prolonged change in compensatory strategies is what this example will focus on. 
+\begin{equation}
 
-The analysis is based on data extrcted from the *Penn Corpora of Historical English* (see http://www.ling.upenn.edu/hist-corpora/), that consistss of 603 texts written between 1125 and 1900. In preparation of this example, all elements that were part-of-speech tagged as prepositions were extracted from the PennCorpora. 
+f_{(x)} = \alpha + \beta_{1}x_{i} + \beta_{2}x_{i+1} + \dots + \beta_{n}x_{i+n} + \epsilon
 
-Then, the relative frequencies (per 1,000 words) of prepositions per text were calculated. This frequency of prepositions per 1,000 words represents our dependent variable. In a next step, the date when each letter had been written was extracted. The resulting two vectors were combined into a table which thus contained for each text, when it was written (independent variable) and its relative freqeuncy of prepositions (dependent or outcome variable).
+\end{equation}
 
-A regression analysis will follow the steps described below: 
-Die folgende Ablauf ist typisch für Regressionsanalysen.
-
-1. Extraction and processing of the  data
-2. Data visualization
-3. Applying the regression analysis to the data
-4. Diagnosing the regression model and checking whether or not basic model assumptions have been violated.
-
-### Implementation of a Simple Linear Regression in `R`
-In a first step, we prepare our session by cleaning the work space, installing libraries that we need for the analysis, and loading the libraries and fucntions.
-
-```{r libraries, warnings = F, message=F}
-# clean workspace
-rm(list=ls(all=T))
-# installing neccessary or helpful packages/libraries (if you have not sone so previously)
-# (remove the # sign to activate the code)
-#install.packages("QuantPsyc")
-#install.packages("car")
-# initialise packages/libraries
-library(QuantPsyc)
-library(car)
-library(ggplot2)
-# function which allows us to plot several plots in one window
-source("http://martinschweinberger.de/docs/scripts/multiplot_ggplot2.r")
-# function for summarizing simple linear regression models
-source("http://martinschweinberger.de/docs/scripts/slr.summary.tb.r") 
-```
-
-After perparing our session, we can now load and inspect the data to get a first implression of its properties.
-
-```{r loaddata}
-# load data
-slr.data <- read.delim("http://martinschweinberger.de/docs/data/slr.data.txt", header = TRUE)
-# attach data
-attach(slr.data)
-# unnoetige spalten entfernen
-slr.data <- as.data.frame(cbind(slr.data$datems, slr.data$P.ptw))
-# spaltennamen hinzufuegen
-colnames(slr.data) <- c("year", "prep.ptw")
-# entfernen unvollstaendiger datenpunkte
-slr.data <- slr.data[!is.na(slr.data$year) == T, ]
-# erste zeilen des datensatzes betrachten
-head(slr.data)
-
-# struktur des datensatzes betrachten
-str(slr.data)
-
-# eigenschaften des datensatzes betrachten
-summary(slr.data)
-```
-
-Inspecting the data is very important because it can happen that a data set may not load completely or that variables which should be numeric have been converted in charater variables. If unchecked, then such hidden data issues could go unnoticed and cause much trouble once you realize that the data you have been working with is different from what you had in mind.
-
-We will now plot the data to get a more thorough impression of the structure of the data.
-
-```{r plotting}
-# visualisieren der daten
-p2 <- ggplot(slr.data, aes(year, prep.ptw)) +
-geom_point() +
-labs(x = "Year") +
-labs(y = "Prepositions per 1,000 words") +
-geom_smooth()
-
-p3 <- ggplot(slr.data, aes(year, prep.ptw)) +
-geom_point() +
-labs(x = "Year") +
-labs(y = "Prepositions per 1,000 words") +
-geom_smooth(method = "lm") # with linear model smoothing!
-
-multiplot(p2, p3, cols = 2)
-```
-
-Bevor wir mit der Regression beginnen, werden wir die Jahreszahlen skalieren, d.h. wir ziehen vom jeweiligen Wert der Jahreszahl den Mittelwert der Jahreszahlen ab. Bei numerischen Variablen kann dies sehr hilfreich bei der Interpretation sein, denn wenn beispielsweise die numerische Variable \textquote{date} nicht skaliert werden würde, würde die Regression die Effekte im Jahr 0 angeben(!). Wenn eine Variable hingegen skaliert ist, dann werden die anderen Variablen nicht relativ zum Nullwert der Variable, sondern zu deren Mittelwert ins Verhältnis gesetzt, d.h. wir erhalten den Effekt der anderen Variablen, wenn die Variable \textquote{date} ihren Mittelwert annimmt.
-
-
-```{r scaling}
-# scaling date
-slr.data$prep.ptw <- slr.data$prep.ptw - mean(slr.data$prep.ptw)
-```
-
-
-Wir beginnen nun mit der Regression, indem wir eine erste Regression rechnen und anschließend deren Ergebnisse und diagnostische Plots betrachten.
-
-```{r initialmodel}
-# create initial model
-prep.lm <- lm(prep.ptw ~ year, data = slr.data)
-# inspect results
-summary(prep.lm)
-
-# plot model: 3 plots per row in one window
-par(mfrow = c(1, 3))
-plot(resid(prep.lm))
-plot(rstandard(prep.lm))
-plot(rstudent(prep.lm))
-par(mfrow = c(1, 1)) # restroe default parameters
-```
-
-Die linke Grafik zeigt die Residuen des Modells (d.h. die Unterscheide zwischen den beobachteten und den durch das Modell vorhergesagten Werten). Das Problem bei diesem Plot ist, dass die Residuen nicht standardisiert sind und man sie so nicht mit den Residuen anderer Modelle vergleichen kann. Um diesen Mangel zu beheben standardisiert man die Residuen, indem man die Residuen durch deren Standartabweichung dividiert, und plottet sie gegen die beobachteten Werte (mittlerer Plot). Auf diese Weise erhält man nicht nur standardisierte Residuen, sondern die Werte der Residuen sind nun zu z-Werten geworden und man kann die z-Verteilung nutzen, um problematische Punkte zu finden. Es gibt drei Daumenregeln bezüglich des Findens problematischer Datenpunkte aufgrund von Residuen \citep[268--269]{field2012discovering}:
-
-1. Punkte mit extremen Werten, d.h. Werten $\ge$ 3 (um genau zu sein, Werten $\ge$ 3.29), sollten aus den Daten entfernt werden.
-2. Falls mehr als 1% der Datenpunkte Werte $\ge$ 2.5 haben (2.58 um genau zu sein), dann sind die Fehler unseres Models zu groß.
-3. Falls mehr als 5% der Datenpunkte Werte $\ge$ 2 haben (1.96 um genau zu sein), dann sind die Fehler unseres Models ebenfalls zu groß.
-
-
-Die rechte Grafik zeigt die *studentized Residuen*, d.h. die angepassten vorhergesagten Werte jedes Datenpunkts werden durch den Standardfehler der Residuen dividiert. Auf diesem Weg ist es möglich die Student's t-Verteilung zu nutzen, um unser Model zu diagnostizieren.
-
-Angepasste vorhergesagte Werte sind ebenfalls Residuen, aber einer besonderen Art: Das Model wird ohne einen Datenpunkt gerechnet und dann genutzt um diesen Datenpunkt vorherzusagen. Der Unterschied zwischen dem beobachteten Datenpunkt und dem vorhergesagten Datenpunkt wird dann angepasster vorhergesagter Wert genannt. Zusammenfassend kann gesagt werden, dass studentized Residuen sehr nützlich dahingehend sind, dass Sie einflussreiche Datenpunkte erkennen lassen.
-
-Die Plots zeigen, dass es zwei potentiell problematische Datenpunkte gibt (die Punkte ganz oben und ganz unten). diese zwei Punkte setzten sich deutlich von den anderen Punkten ab und können demnach Ausreißer (outlier) darstellen. Wir werden später testen, ob diese punkte entfernt werden müssen.
-
-Wir werden nun weitere modelldiagnostische Grafiken generieren.
-
-```{r diagnosticplots}
-# generiere eine 2x2 matrize diagnostischer grafiken
-par(mfrow = c(2, 2))
-plot(prep.lm)
-par(mfrow = c(1, 1))
-```
-
-Die diagnostischen Grafiken sehen sehr gut aus und wir werden im Folgenden erklären warum. Die Grafik im oberen linken Panel ist nützlich, um (a) Oulier zu finden oder (b) die Korrelation zwischen Residuen und vorhergesagten Werten zu bestimmen: Wenn ein Trend in der Linie oder den Punkten sichtbar wird (bspw. ein aufsteigender Trend oder eine Zickzacklinie), dann hätte unser Model ein Problem und wir müssten wahrscheinlich Datenpunkte entfernen.
-
-Die Grafik im oberen rechten Panel zeigt an, ob die Residuen normal verteilt sind (was wünschenswert ist), ober ob die Residuen nicht einer Normalverteilung folgen. Liegen die Punkte auf der Linie, so folgen die Residuen einer Normalverteilung. Wenn die Punkte beispielsweise am oberen und unteren Ende nicht auf der Linie liegen, so zeigt dies, dass das Model kleine und große Werte nicht gut vorhersagt und daher nicht gut auf die Daten angepasst ist.
-
-Die Grafik im unteren linken Panel gibt Aufschluss über Homoskedastizität. Homoskedastizität bedeutet, dass die Varianz der Residuen konstant bleibt und nicht mit dem Wert der unabhängigen Variable korrelieren. In unproblematischen Fällen zeigt die Grafik eine flache Linie. Liegt eine Trend in der Linie vor, so haben wir es mit Heteroskedastizität, also mit einer Korrelation zwischen unabhängigen Variablen und den Residuen, zu tun, die für Regressionen sehr problematisch ist.
-
-Die Grafik im unteren rechten Panel zeigt problematische einflussreiche Datenpunkte, die die Regression überproportional beeinflussen (dies sollte nicht der Fall sein). Falls solche einflussreichen Datenpunkte vorliegen, so sollten diese entweder (a) gewichtet werden (robuste Regression) oder (b) entfernt werden. Die Grafik zeigt die Cookdistanz, welche zeigt, wie sich die Regression verändert, wenn ein Model ohne diesen Datenpunkt gerechnet wird. Die Cookdistanz zeigt also, welchen Einfluss ein Datenpunkt auf die Regression als ganzes hat. Datenpunkte, die eine Cookdistanz $\ge$ 1 haben sind problematisch \citep[269]{field2012discovering}.
-
-Die sogenannte Leverage ist ebenso ein Maß, das anzeigt, wie stark ein Datenpunkt die Genauigkeit der Regression beeinflusst. Leveragewerte liegen zwischen 0 (kein Einfluss) und 1 (starker Einfluss: suboptimal!). Um zu testen, ob ein spezifischer Datenpunkt einen hohen Leveragewert besitzt, muss man einen Cut-Off-Punkt berechnen, der anzeigt, ob die Leverage zu stark oder noch akzeptabel ist. Folgende zwei Formeln werden hierzu genutzt:
-
-$\frac{3(k + 1)}{n}$
-
-oder
-
-$\frac{2(k + 1)}{n}$
-
-Wir werden im Kontext der multiplen linearen regression genauer auf Leverage eingehen und nun nur noch eine Überblicktabelle der Ergebnisse der Regression generieren.
-
-```{r tabulate results}
-# tabulate results
-slr.summary(prep.lm)
-```
-
-Typischer weise werden die Ergebnisse von Regressionen in solchen Tabellen wiedergegeben, da diese aller wichtigen Kennzahlen der Modellgüte und die Signifikanz wie auch die Stärke der Effekte beinhalten. Die Tabelle ist hier noch einmal abgebildet.
-
-\begin{table}[H]
-\begin{minipage}{\textwidth}
-\begin{center}
-\begin{footnotesize}
-\begin{tabular}{l cccccc r}
-\hline
-& Estimate & Std. $\beta$ & Pearson's r & SE & t-value & Pr$(>|t|)$ & Sig.\\
-\hline
-(Intercept) & --27.72 & & & 10.86 & --2.55 & 0.011 & p$<$.05* \\
-year & 0.02 & 0.1039 & 0.1 & 0.01 & 2.56 & 0.0107 & p$<$.05* \\
-\hline
-Model statistics & & & & & & & Value \\
-\hline
-Number of cases & & & & & & & 603 \\
-Residual SE (601 DF) & & & & & & & 21.11 \\
-Multiple $R^{2}$ & & & & & & & 0.0108 \\
-Adjusted $R^{2}$ & & & & & & & 0.0091 \\
-F-statistic (1, 601) & & & & & & & 6.55 \\
-Model p-value & & & & & & & 0.0107 \\
-\hline
-\end{tabular}
-\end{footnotesize}
-\caption{Zusammenfassung der Ergebnisse der einfachen linearen Regression}
-\label{tab:slr1}
-\end{center}
-\end{minipage}
-\end{table}
-
-Zusätzlich sollten die Ergebnisse von einfachen linearen Regressionen schriftlich in etwa wie folgt zusammengefasst werden:\\[.2cm]
-
-\noindent Eine einfache lineare Regression wurde auf die Daten angepasst. Eine visuelle Begutachtung der modelldiagostischen Grafiken zeigten keine problematischen Datenpunkte (Ausreißer) oder überproportional einflussreiche Datenpunkte an und wiesen auf einen guten Modellfit hin. Das finale lineare Regressionsmodell basiert auf 603 Datenpunkten und korreliert hoch signifikant mit den Daten ($R^{2}$: 0.0108, F-Statistik (1, 601): 6.553, p-Wert: 0.0107\*) und bestätigt eine signifikante positive Korrelation zwischen dem Jahr in dem der Text geschrieben wurde und der relativen Häufigkeit von Präpositionen in den Texten nach (Koeffizient: .02, Std. $\beta$: 0.1039, SE: 0.01, t-Wert: 2.560, p-Wert: .0107*).
-
-## A practical example of a simple linear regression - teaching styles
-
-Im vorhergehenden Beispiel haben wir es mit zwei numerischen Variablen zu tun gehabt, während es sich in dem folgenden Beispiel um eine kategoriale und eine numerische abhängige Variable handelt. Die Eigenschaft, dass Regressionen mit sehr verschiedenen Variablenarten umgehen können, macht Regressionen zu einer weit verbreiteten und robusten Analysemethode.
-
-In diesem Beispiel haben wir es mit zwei Gruppen von Schülern zu tun, die zufällig einer Gruppe zugewiesen wurden und unterschiedlichen Lehrmethoden ausgesetzt waren. Beide Gruppen unterziehen sich im Anschluss an die Lehreinheit einem Sprachlerntest mit einer Höchstpunktzahl von 20 Punkten. Die Schüler der ersten Gruppen haben folgende Punktzahlen erreicht:
-
-* Gruppe A: 15, 12, 11, 18, 15, 15, 9, 19, 14, 13, 11, 12, 18, 15, 16, 14, 16, 17, 15, 17, 13, 14, 13, 15, 17, 19, 17, 18, 16, 14 (mean: 14,93)
-
-Die Schüler der zweiten Gruppe haben diese Punktzahlen erreicht.
-
-* Gruppe B: 11, 16, 14, 18, 6, 8, 9, 14, 12, 12, 10, 15, 12, 9, 13, 16, 17, 12, 8, 7, 15, 5, 14, 13, 13, 12, 11, 13, 11, 7 (mean: 11,77)
-
-Unsere Frage ist nun, ob Gruppe A wirklich besser ist oder ob das Ergebnis Zufall ist?
-
-Gehen wir nun dazu über, die Regression in `R` zu implementieren. Wie im vorherigen Beispiel leeren wir den gegenwärtigen Workspace, installieren und initialisieren/aktivieren notwendige Pakete und laden zusätzliche Funktionen.
-
-```{r reparation}
-# entfernen aller objekte aus dem aktuellen workspace
-rm(list=ls(all=T))
-# installieren der notwendigen pakete
-# (falls nicht schon geschehen)
-# (um die befehle zu aktivieren # entfernen)
-#install.packages("QuantPsyc")
-#install.packages("car")
-# pakete initialisieren
-library(QuantPsyc)
-library(car)
-library(ggplot2)
-source("http://martinschweinberger.de/docs/scripts/multiplot_ggplot2.r") # mehrere ggplots in einem fenster
-source("http://martinschweinberger.de/docs/scripts/slr.summary.tb.r") # funktion zum erstellen von summary tabellen
-```
-
-
-Nachdem die notwendigen Spezifikationen durchgeführt wurden, werden wir nun unser Datenset generieren und es anschließend betrachten.
-
-```{r createdata}
-# einladen der daten
-g1 <- c(15, 12, 11, 18, 15, 15, 9, 19, 14, 13, 11, 12, 18, 15, 16, 14, 16, 17, 15, 17, 13, 14, 13, 15, 17, 19, 17, 18, 16, 14)
-g2 <- c(11, 16, 14, 18, 6, 8, 9, 14, 12, 12, 10, 15, 12, 9, 13, 16, 17, 12, 8, 7, 15, 5, 14, 13, 13, 12, 11, 13, 11, 7)
-g <- c(rep("A", length(g1)), rep("B", length(g2)))
-sprtestdata <- data.frame(g, c(g1, g2))
-# spaltennamen hinzufuegen
-colnames(sprtestdata) <- c("gruppe", "punkte")
-# erste zeilen des datensatzes betrachten
-head(sprtestdata)
-
-# struktur des datensatzes betrachten
-str(sprtestdata)
-
-# eigenschaften des datensatzes betrachten
-summary(sprtestdata)
-```
-
-Nun stellen wir die Daten grafisch dar. In diesem Fall bietet sich ein Boxplot zur Visualisierung an.
-
-```{r boxplot, fig.cap="Darstellung der Sprachtestdaten"}
-# erstelle boxplot
-boxplot(punkte ~ gruppe,
-data = sprtestdata, # the data we want to display
-main = "", # you could specify a title here
-ylab = "Punkte", # titel der y-achse
-ylim = c(0, 20), # grenzen der y-achse festlegen
-xlab = c("Gruppen"), # titel der x-achse
-notch = T, # notches einfuegen
-col = c("lightgreen", "lightblue")) # box einfaerben
-# text darstellen
-text(1:2,
-c(4.0, 4.0),
-cex = 0.85,
-labels = paste("mean\n",
-c(round(as.vector(by(sprtestdata$punkte, sprtestdata$gruppe, mean))[1], 2),
-round(as.vector(by(sprtestdata$punkte, sprtestdata$gruppe, mean))[2], 2),
-sep = "")))
-rug(jitter(sprtestdata$punkte),
-side=4)
-grid()
-box()
-```
-
-Die Daten weisen darauf hin, dass Gruppe A signifikant besser abgeschnitten hat als Gruppe B. Wir werden diesen Eindruck dadurch testen, dass wir im nächsten Schritt das Regressionsmodell und erstellen die modelldiagnostischen Grafiken generieren.
-
-```{r create simple model}
-# Simples Lineares Regressionsmodel erstellen
-sprtest.lm <- lm(punkte ~ gruppe, data = sprtestdata)
-# ergebnisse betrachten
-summary(sprtest.lm)
-
-# graphik parameter setzen: 3 plots in einer reihe
-par(mfrow = c(1, 3))
-plot(resid(sprtest.lm))
-plot(rstandard(sprtest.lm))
-plot(rstudent(sprtest.lm))
-par(mfrow = c(1, 1)) # wiederherstellen der originalparameter
-```
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/sprtest1.png}\\[.25cm]
-\caption{Diagnostische Grafiken der Sprachtestdaten}
-\label{fig:sprtest1}
-\end{figure}
-
-Die Grafiken weisen nicht auf Ausreißer oder andere Probleme hin und wir können daher mit weiteren diagnostischen Grafiken fortfahren.
-
-```{r diagnostic plots}
-# generiere eine 2x2 matrize diagnostischer grafiken
-par(mfrow = c(2, 2))
-plot(sprtest.lm)
-par(mfrow = c(1, 1))
-```
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/sprtest2.png}\\[.25cm]
-\caption{Weitere diagnostische Grafiken der Sprachtestdaten}
-\label{fig:prep3}
-\end{figure}
-
-Auch diese Grafiken weisen auf keine Probleme hin. In diesem Fall können die Daten im nächsten Schritt zusammengefasst werden.
-
-```{r summarize results}
-# ergebnisse tabellieren
-slr.summary(sprtest.lm)
-```
-
-\begin{table}[H]
-\begin{minipage}{\textwidth}
-\begin{center}
-\begin{footnotesize}
-\begin{tabular}{l cccccc r}
-\hline
-& Estimate & Std. $\beta$ & Pearson's r & SE & t-value & Pr$(>|t|)$ & Sig.\\
-\hline
-(Intercept) & 14.93 & & & 0.53 & 27.94 & 0 & p$<$.001*** \\
-GruppeB & -3.17 & -0.4819 & 0.48 & 0.76 & -4.19 & 0 & p$<$.001*** \\
-\hline
-Model statistics & & & & & & & Value \\
-\hline
-Number of cases & & & & & & & 60 \\
-Residual SE (601 DF) & & & & & & & 2.93 \\
-Multiple $R^{2}$ & & & & & & & 0.2322 \\
-Adjusted $R^{2}$ & & & & & & & 0.219 \\
-F-statistic (1, 58) & & & & & & & 17.55 \\
-Model p-value & & & & & & & p$<$.001*** \\
-\hline
-\end{tabular}
-\end{footnotesize}
-\caption{Zusammenfassung der Ergebnisse der einfachen linearen Regression}
-\label{tab:slr1}
-\end{center}
-\end{minipage}
-\end{table}
-
-Die Ergebnisse dieser einfachen linearen Regressionen können wie folgt zusammengefasst werden:\\[.2cm]
-
-\noindent Eine einfache lineare Regression wurde auf die Daten angepasst. Eine visuelle Begutachtung der modelldiagostischen Grafiken zeigten keine problematischen Datenpunkte (Ausreißer) oder überproportional einflussreiche Datenpunkte an und wiesen auf einen guten Modellfit hin. Das finale lineare Regressionsmodell basiert auf 60 Datenpunkten und korreliert hoch signifikant mit den Daten ($R^{2}$: 0.2322, $F$-Statistik (1, 58): 2.93, p-Wert $<$.001***) und bestätigt, dass Gruppe A signifikant besser bei dem Sprachlerntest abgeschnitten hat als Gruppe B (Koeffizient: -3.17, Std. $\beta$: -0.4819, SE: 0.48, t-Wert: -4.19, p-Wert $<$.001***).
-
-
-# (Multiple) Linear Regression
-
-Im Gegensatz zu der einfachen linearen Regression, die den Zusammenhang zwischen einer unabhängigen und einer abhängigen Variable testet, kann eine multiple lineare Regression den Einfluss mehrerer unterschiedlicher unabhängiger Variablen und deren Interaktionen auf die abhängige Variable bestimmen (vgl. Formel (\ref{eq:mlr})). Eine einfache lineare Regression kann somit nicht gleichzeitig den Einfluss mehrerer Variablen oder derer Interaktionen bestimmen.
-
-$f_{(x)} = \alpha + \beta_{1}x_{i} + \beta_{2}x_{i+1} + \dots + \beta_{n}x_{i+n} + \epsilon$
-
-Es gibt ausgiebige Fachliteratur zu multiplen Regressionen und den zugrundeliegenden Konzepten. Insbesondere seien hier \citet{achen1982interpreting}, \citet{bortz2006statistik}, \citet{crawley2005statistics}, \citet{faraway2002practical}, \citet{field2012discovering} (mein persönlicher Favorit!), und \citet{wilcox2009basic} zu nennen. Sehr gute Einführungen dazu, wie Regressionen in `R` implementiert werden können, finden sich u.a. in \citet{baayen2008analyzing}, \citet{crawley2012r} oder \citet{gries2009statistics}.
+There exists a wealth of literture focusing on multiple linear regressions and the concepts it is based on.  For insatnce, there are  [@achen1982interpreting], [@bortz2006statistik], [@crawley2005statistics], [@faraway2002practical], [@field2012discovering] (my personal favorite), and [@wilcox2009basic] to name just a few. Introductions to regression modeling in `R` are  [@baayen2008analyzing], [@crawley2012r], or [@gries2009statistics].
 
 Eine weitere Anmerkung vorweg: Die modelldiagnostischen Verfahren werden teilweise identisch sein mit denen, die im Kapitel zur einfachen linearen Regression besprochen wurden und sie werden daher nur dann ausgiebiger erläutert, insofern dies nicht bereits geschehen ist.
 
-Eine letzte Anmerkung betrifft die Stichprobengröße, die notwendig ist um eine Regression zu rechnen. Obwohl die Angabe, dass 25 Datenpunkte pro Gruppe ausreichen weit verbreitet ist, ist diese Angabe nicht korrekt, da sich die benötigte Stichprobengröße nach der Größe des Effekts, der bestimmt werden soll, und nach der Anzahl der untersuchten Variablen richtet. Gehen viele unabhängige Variablen in die Regression ein und die Effektstärke der zu testenden Variable(n) ist sehr klein, dann kann man von einer Mindestgröße der Stichprobe von 600 Datenpunkten ausgehen. \citet[273--275]{field2012discovering} geben zur Mindestgröße der benötigten Stichprobe Daumenregeln an die Hand (k = Anzahl der Prädikatoren; kategorische Prädikatoren mit mehr als 2 Levels sollten in Dummy-variablen transformiert werden):
+Eine letzte Anmerkung betrifft die Stichprobengröße, die notwendig ist um eine Regression zu rechnen. Obwohl die Angabe, dass 25 Datenpunkte pro Gruppe ausreichen weit verbreitet ist, ist diese Angabe nicht korrekt, da sich die benötigte Stichprobengröße nach der Größe des Effekts, der bestimmt werden soll, und nach der Anzahl der untersuchten Variablen richtet. Gehen viele unabhängige Variablen in die Regression ein und die Effektstärke der zu testenden Variable(n) ist sehr klein, dann kann man von einer Mindestgröße der Stichprobe von 600 Datenpunkten ausgehen. [@field2012discovering] (273-275) geben zur Mindestgröße der benötigten Stichprobe Daumenregeln an die Hand (k = Anzahl der Prädikatoren; kategorische Prädikatoren mit mehr als 2 Levels sollten in Dummy-variablen transformiert werden):
 
 * Ist man nur an dem allgemeinen Modell-fit interessiert (ein Fall, der mir persönlich noch nie vorgekommen ist), sollte die Stichprobe mindestens 50 + k umfassen.
 *  Wenn man nur am Einfluss spezifischer Variablen interessiert ist, sollte die Stichprobe mindestens 104 + k umfassen.
@@ -392,11 +32,11 @@ Eine letzte Anmerkung betrifft die Stichprobengröße, die notwendig ist um eine
 
 %Grafik \citet[275]{field2012discovering} einfügen. XXX
 
-Sie werden im \verb!R!-code sehen, dass hierzu eine Funktion existiert, die testet, ob die Stichprobe für die Untersuchung angemessen war.
+Sie werden im `R`-code sehen, dass hierzu eine Funktion existiert, die testet, ob die Stichprobe für die Untersuchung angemessen war.
 
 Hinsichtlich der Modellanpassung wird nur auf step-wise step-down Prozeduren, die auf dem AIC (Akaike information criterion) beruhen, eingegangen werden. Es gibt eine Vielzahl von möglichen Prozeduren, die genutzt werden können forced entry, stepwise, hierarchical) und innerhalb dieser Prozeduren gibt es Unterklassen, sodass eine Diskussion den Rahmen dieser Sektion sprengen würde.
 
-## Practical example of a multiple linear regression - presents
+## Example: Gifts and Availability
 
 In diesem Beispiel werden wir untersuchen, ob der Geldbetrag, den Männer für Geschenke ausgeben, mit der Attraktivität und dem Beziehungsstatus der Frauen, für die Geschenke gekauft wurden, korreliert. Das Beispiel ist \citet{field2012discovering} entnommen. Wir werden nun das Beispiel in \verb!R! implementieren und leeren dazu, wie üblich, den gegenwärtigen Workspace, installieren und initialisieren/aktivieren notwendige Pakete und laden zusätzliche Funktionen.
 
@@ -422,20 +62,20 @@ library(car)
 library(QuantPsyc)
 library(boot)
 library(ggplot2)
-source("http://martinschweinberger.de/docs/scripts/multiplot_ggplot2.r")
-source("http://martinschweinberger.de/docs/scripts/mlinr.summary.r")
-source("http://martinschweinberger.de/docs/scripts/SampleSizeMLR.r")
-source("http://martinschweinberger.de/docs/scripts/ExpR.r")
+source("rscripts/multiplot_ggplot2.r")
+source("rscripts/mlinr.summary.r")
+source("rscripts/SampleSizeMLR.r")
+source("rscripts/ExpR.r")
 # optionen festlegen
 options("scipen" = 100, "digits" = 4)
 ```
 
 
-Nachdem wir die notwendigen Pakete usw. in \verb!R! eingelesen haben, können wir nun die Daten laden und uns einen ersten Eindruck über deren Struktur und Eigenschaften verschaffen.
+Nachdem wir die notwendigen Pakete usw. in `R` eingelesen haben, können wir nun die Daten laden und uns einen ersten Eindruck über deren Struktur und Eigenschaften verschaffen.
 
 ```{r load data}
 # daten laden
-mlrdata <- read.delim("http://martinschweinberger.de/docs/data/mlrdata.txt", header = TRUE)
+mlrdata <- read.delim("data/mlrdata.txt", header = TRUE)
 # ersten zeilen der daten betrachten
 head(mlrdata)
 
@@ -448,8 +88,8 @@ summary(mlrdata)
 
 Wir haben nun den Datensatz eingelesen und seine Struktur betrachtet. Im nächsten Schritt werden wir die Daten visualisieren, um einen Eindruck der Daten und der Verteilungen der Variablen zu gewinnen. Wir werden vier Grafiken erstellen und diese dann in einem Fenster darstellen.
 
-```{r plot data}
-p1 <- ggplot(mlrdata, aes(status, money)) +
+```{r echo=T, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(status, money)) +
 geom_boxplot(notch = T, aes(fill = factor(status))) +
 scale_fill_brewer() +
 theme_bw() + # backgroud white(inactive to default grey)
@@ -458,7 +98,10 @@ labs(y = "Money spent on present (Euro)") +
 coord_cartesian(ylim = c(0, 250)) +
 guides(fill = FALSE) +
 ggtitle("Status")
-p2 <- ggplot(mlrdata, aes(attraction, money)) +
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(attraction, money)) +
 geom_boxplot(notch = T, aes(fill = factor(attraction))) +
 scale_fill_brewer() +
 theme_bw() + # backgroud white(inactive to default grey)
@@ -467,12 +110,18 @@ labs(y = "Money spent on present (Euro)") +
 coord_cartesian(ylim = c(0, 250)) +
 guides(fill = FALSE) +
 ggtitle("Attraction")
-p3 <- ggplot(mlrdata, aes(x = money)) +
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(x = money)) +
 geom_histogram(aes(y=..density..),
 binwidth = 10,
 colour = "black", fill = "white") +
 geom_density(alpha=.2, fill = "#FF6666") # Overlay with transparent density plot
-p4 <- ggplot(mlrdata, aes(status, money)) +
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(status, money)) +
 geom_boxplot(notch = F, aes(fill = factor(status))) +
 scale_fill_brewer(palette="Paired") +
 facet_wrap(~ attraction, nrow = 1) +
@@ -481,8 +130,6 @@ labs(x = "") +
 labs(y = "Money spent on present (Euro)") +
 coord_cartesian(ylim = c(0, 250)) +
 guides(fill = FALSE)
-# Plot the plots
-multiplot(p1, p3, p2, p4, cols = 2)
 ```
 
 \begin{figure}[H]
@@ -496,14 +143,18 @@ Die Grafik im oberen linken Panel scheint anzudeuten, dass Männer mehr Geld fü
 
 Gehen wir nun dazu über mit der Regression zu beginnen. Im ersten Schritt erzeugen wir vier Baselinemodelle: Zwei minimale Modelle, die nur den Gesamtmittelwert (Intercept) als Prädiktor beinhalten und zwei gesättigte Modelle (saturated models), die alle möglichen Prädikatoren und Interaktionen beinhalten.
 
-```{r generate minimal model}
+
+
+```{r echo = T, message=FALSE, warning=FALSE}
 # generieren der minimalen baselinemodelle, die nur den
 # intercept (mittelwert) als unabh. variable beinhalten
 m0.mlr = lm(money ~ 1, data = mlrdata) # baseline model
 m0.glm = glm(money ~ 1, family = gaussian, data = mlrdata)
-# ergebnisse betrachten
-summary(m0.mlr)
 
+summary(m0.mlr)  # inspect model
+```
+
+```{r echo = T, message=FALSE, warning=FALSE}
 # ergebnisse betrachten
 summary(m0.glm)
 
@@ -519,17 +170,19 @@ summary(m1.mlr)
 summary(m1.glm)
 ```
 
-Nachdem wir die Baselinemodelle generiert haben, werden wir nun mit dem Modellanpassung (model fitting)beginnen. Modellanpassung bezeichnet den Prozess mit dem man zu demjenigen Modell gelangt, dass das Maximum an Varianz mit einem Minimum an Variablen erklärt. Das zugrunde liegende Prinzip ist daher das \textit{Parsimonie-} oder \textit{Sparsamkeitsprinzip}, welches im Englischen häufig als Ockham's Rasiermesser bezeichnet wird.
+Nachdem wir die Baselinemodelle generiert haben, werden wir nun mit dem Modellanpassung (model fitting)beginnen. Modellanpassung bezeichnet den Prozess mit dem man zu demjenigen Modell gelangt, dass das Maximum an Varianz mit einem Minimum an Variablen erklärt. Das zugrunde liegende Prinzip ist daher das *Parsimonie-* oder *Sparsamkeitsprinzip*, welches im Englischen häufig als Ockham's Rasiermesser bezeichnet wird.
 
 Wir werden einen automatischen step-wise step-down Prozess bei der Modellanpassung nutzen, der dasjenige Modell mit dem niedrigsten AIC (Akaike information criterion) Wert sucht.
 Das AIC berechnet sich nach Formel (\ref{eq:aic}) und ist ein Maß der Sparsamkeit, dass einen Wert dafür bildet, wie viel Varianz mit wie vielen Variablen erklärt werden kann [cf. @field2012discovering 318]. Um so niedriger der AIC-Wert, umso besser die Balance zwischen erklärter Varianz und der Anzahl der dafür nötigen Variablen. Die AIC-Werte können nun zwischen Modellen verglichen werden, die auf die selben Datenpunkte angepasst sind ($LL$ steht für LogLikelihood und $k$ für die Anzahl der unabhängigen Variablen im Modell).
 
-$-2LL + 2k$
+\begin{equation}
+-2LL + 2k
 \label{eq:aic}
 \end{equation}
 
-Beginnen wir nun mit der Modellanpassung.
-```{r model fitting}
+We will not begin fitting the model.
+
+```{r echo=T, message=FALSE, warning=FALSE}
 # automatisches modelfitting
 # kriterium: AIC (um so kleiner umso besser)
 step(m1.mlr, direction = "both")
@@ -544,32 +197,27 @@ summary(m2.mlr)
 
 Basierend auf dem Modell mit dem kleinsten AIC-Wert haben wir das minimale adäquate Modell (minimal adequate model) generiert und anschließend haben wir die Zusammenfassung der Ergebnisse des Modells auswerfen lassen. Im Folgenden werden wir den Output, d.h. die Zusammenfassung der Ergebnisse des minimalen adäquaten Modells beleuchten und die verschiedenen Konzepte erläutern.
 
-Das erste Objekt, was die Zusammenfassung berichtet ist der \textit{Call}, d.h. die Formel des des minimalen adäquaten Modells. Daran anschließend wird die Verteilung der Residuen, also der Unterschiede zwischen den vorhergesagten und beobachteten Werten, berichtet. Dann folgt das wichtigste Element der Modellzusammenfassung: Die Tabelle mit den Koeffizienten der Prädikatoren des Modells (dies sind die Koeffizienten der Fixed Effects). Wir werden uns mit dieser Tabelle später genauer beschäftigen. Nach der Tabelle folgen die Modellstatistiken, die Aufschluss darüber geben, wie gut das Modell die Daten modelliert, d.h. wie gut das Modell den beobachteten Daten entspricht. Der Unterschied zwischen diesen Werten und der Tabelle mit den Koeffizienten besteht darin, dass die Modellstatistiken über die Gesamtgüte des Modells berichten, während die Tabelle mit den Koeffizienten nur etwas über die individuellen Faktoren aussagt.
+Das erste Objekt, was die Zusammenfassung berichtet ist der *Call*, d.h. die Formel des des minimalen adäquaten Modells. Daran anschließend wird die Verteilung der Residuen, also der Unterschiede zwischen den vorhergesagten und beobachteten Werten, berichtet. Dann folgt das wichtigste Element der Modellzusammenfassung: Die Tabelle mit den Koeffizienten der Prädikatoren des Modells (dies sind die Koeffizienten der Fixed Effects). Wir werden uns mit dieser Tabelle später genauer beschäftigen. Nach der Tabelle folgen die Modellstatistiken, die Aufschluss darüber geben, wie gut das Modell die Daten modelliert, d.h. wie gut das Modell den beobachteten Daten entspricht. Der Unterschied zwischen diesen Werten und der Tabelle mit den Koeffizienten besteht darin, dass die Modellstatistiken über die Gesamtgüte des Modells berichten, während die Tabelle mit den Koeffizienten nur etwas über die individuellen Faktoren aussagt.
 
-Der multiple $R^{2}$-Wert gibt an, wie viel Varianz das Modell erklärt. Ein Wert von 0 würde bedeuten, dass das Modell gar keine Varianz erklärt, während ein Wert von 1 bedeuten würde, dass das Modell 100\% der Varianz erklärt und somit die Vorhersage des Modells genau den beobachteten Daten entspricht. Dies bedeutet, dass, wenn man den $R^{2}$-Wert mit 100 multipliziert, man den Prozentwert der Varianz erhält, den das Modell erklärt. In unserem Fall sagt der multiple $R^{2}$-Wert von 0.852 also aus, dass unser minimales adäquates Modell 85.2\% der Varianz erklärt. Modelle, die einen multiplen $R^{2}$-Wert von $ge$.05 haben, gelten als substantiell signifikant (substantially significant) \citep[55]{szmrecsanyi2006morphosyntactic}. Manche gehen soweit zu sagen, dass Modelle mindestens einen $R^{2}$-Wert von $\ge$.05 haben müssen, aber dies ist problematisch, da es durchaus vorkommen kann, dass man an sehr schwachen (aber signifikanten) Effekten interessiert ist, die aber zu einem sehr kleinen $R^{2}$-Wert führen. Wichtiger ist, dass das Modell insgesamt signifikant ist, da dies aussagt, dass das Modell zu signifikant besseren Vorhersagen kommt, als es durch Zufall der Fall wäre.
+Der multiple R^2^-Wert gibt an, wie viel Varianz das Modell erklärt. Ein Wert von 0 würde bedeuten, dass das Modell gar keine Varianz erklärt, während ein Wert von 1 bedeuten würde, dass das Modell 100 percent der Varianz erklärt und somit die Vorhersage des Modells genau den beobachteten Daten entspricht. Dies bedeutet, dass, wenn man den R$^{2}$-Wert mit 100 multipliziert, man den Prozentwert der Varianz erhält, den das Modell erklärt. In unserem Fall sagt der multiple R$^{2}$-Wert von 0.852 also aus, dass unser minimales adäquates Modell 85.2 percent der Varianz erklärt. Modelle, die einen multiplen R$^{2}$-Wert von $ge$.05 haben, gelten als substantiell signifikant (substantially significant) [@szmrecsanyi2006morphosyntactic] 55). Manche gehen soweit zu sagen, dass Modelle mindestens einen $R^{2}$-Wert von $\ge$.05 haben müssen, aber dies ist problematisch, da es durchaus vorkommen kann, dass man an sehr schwachen (aber signifikanten) Effekten interessiert ist, die aber zu einem sehr kleinen $R^{2}$-Wert führen. Wichtiger ist, dass das Modell insgesamt signifikant ist, da dies aussagt, dass das Modell zu signifikant besseren Vorhersagen kommt, als es durch Zufall der Fall wäre.
 
-Der angepasste $R^{2}$-Wert (adjusted $R^{2}$) berücksichtigt die Anzahl der Prädikatoren. Darüber hinaus gibt der angepasste $R^{2}$-Wert darüber Aufschluss, wie gut sich das Modell eignet, um Aussagen über die Population (und nicht nur über die Stichprobe) zu tätigen. Wenn der Unterschied zwischen
-dem multiplen $R^{2}$-Wert und dem angepassten $R^{2}$-Wert sehr gering ist, dann bedeutet dies, dass sich das Modell dazu eignet Aussagen über die Population als Ganzes zu machen. Wenn der Unterschied allerdings relativ groß ist, dann bedeutet dies, dass das Modell instabil ist und die Datenstruktur, auf die das Modell angepasst wurde, eine suboptimale Verteilung aufweist, z.B. wegen Ausreißern. In anderen Worten bedeutet der Unterschied, dass wenn die Regression auf die Population anstatt der Stichprobe angewandt worden wäre, dann würde sie .5\% weniger Varianz (85.2-84.7) erklären.
+Der angepasste $R^{2}$-Wert (adjusted $R^{2}$) berücksichtigt die Anzahl der Prädikatoren. Darüber hinaus gibt der angepasste $R^{2}$-Wert darüber Aufschluss, wie gut sich das Modell eignet, um Aussagen über die Population (und nicht nur über die Stichprobe) zu tätigen. Wenn der Unterschied zwischen dem multiplen $R^{2}$-Wert und dem angepassten $R^{2}$-Wert sehr gering ist, dann bedeutet dies, dass sich das Modell dazu eignet Aussagen über die Population als Ganzes zu machen. Wenn der Unterschied allerdings relativ groß ist, dann bedeutet dies, dass das Modell instabil ist und die Datenstruktur, auf die das Modell angepasst wurde, eine suboptimale Verteilung aufweist, z.B. wegen Ausreißern. In anderen Worten bedeutet der Unterschied, dass wenn die Regression auf die Population anstatt der Stichprobe angewandt worden wäre, dann würde sie .5 perecnt weniger Varianz (85.2-84.7) erklären.
 
-Kommen wir nun zu der Tabelle mit den Koeffizienten zurück. Alle Haupteffekte und eine Interaktion zwischen \textquote{status} und \textquote{attraction} sind signifikant. Eine Interaktion besteht dann, wenn die Korrelation zwischen einer unabhängigen und der abhängigen variable von einer anderen unabhängigen variable beeinflusst wird. In unserem Szenario geben Männer nur dann mehr Geld für ein Geschenk für eine Frau aus, wenn sie an ihr (a) interessiert sind und (b) sie Single ist. Die Korrelation zwischen \textquote{money} und \textquote{attraction} wird also von einer anderen Variable \textquote{status} beeinflusst. Wir haben es also mit einer Interaktion zwischen \textquote{attraction} und \textquote{status} zu tun.
+Kommen wir nun zu der Tabelle mit den Koeffizienten zurück. Alle Haupteffekte und eine Interaktion zwischen "*status*" und "*attraction*" sind signifikant. Eine Interaktion besteht dann, wenn die Korrelation zwischen einer unabhängigen und der abhängigen variable von einer anderen unabhängigen variable beeinflusst wird. In unserem Szenario geben Männer nur dann mehr Geld für ein Geschenk für eine Frau aus, wenn sie an ihr (a) interessiert sind und (b) sie Single ist. Die Korrelation zwischen "*money*" und "*attraction*" wird also von einer anderen Variable "*status*" beeinflusst. Wir haben es also mit einer Interaktion zwischen "*attraction*" und "*status*" zu tun.
 
 Hinsichtlich der Interpretation dieser Ergebnisse ist festzuhalten, dass man Haupteffekte, die an Interaktionen beteiligt sind, nicht interpretieren sollte, da nicht klar ist, wie sich der Anteil an erklärter Varianz zwischen dem Haupteffekten und den Interaktionen aufteilt. Zusätzlich ist festzuhalten, dass, insofern nur Haupteffekte signifikant sind, die Koeffizienten die Korrelation zwischen der abhängigen und der unabhängigen Variable abbilden, wenn die anderen Variablen einen Wert von 0 oder das jeweilige Baseline-Level annehmen.
 
 Bevor wir die Tabelle mit den Koeffizienten weiter interpretieren, werden wir noch die Konfidenzintervalle berechnen und das Baselinemodell mit dem minimalen adäquaten Modell vergleichen, um zu schauen, ob das minimale adäquate Modell zu signifikant besseren Vorhersagen kommt als das Baselinemodell.
 
-```{r confindence}
-# konfidenzintervalle der koeffizineten
-confint(m2.mlr)
-
-# vergleich zwiscehn dem baseline-modell und dem minimal adequate model
-anova(m0.mlr, m2.mlr)
-
-Anova(m0.mlr, m2.mlr, type = "III")
+```{r echo=T, message=FALSE, warning=FALSE}
+confint(m2.mlr)       # extract confidence intervals of the coeficients
+anova(m0.mlr, m2.mlr) # compare baseline- and minimal adequate model
+Anova(m0.mlr, m2.mlr, type = "III") # compare baseline- and minimal adequate model
 ```
 
 Der Vergleich der Modelle zeigt eindeutig, dass das minimale adäquate Modell zu signifikant besseren Vorhersagen kommt als das Baselinemodell. Wir werden nun mit der Modelldiagnose fortfahren, indem wir schauen, ob Datenpunkte entfernt werden sollten, da sie die Passgenauigkeit des Modells (modelfit) überproportional verschlechtern.
 
-```{r finding outliers}
+```{r echo=T, message=FALSE, warning=FALSE}
 # suche nach problematischen datenpunkten
 # erzeugen diagnostischer grafiken
 par(mfrow = c(3, 2))
@@ -589,18 +237,13 @@ par(mfrow = c(1, 1))
 \caption{Diagnistische Grafiken des multiplen linearen Regressionsmodells}
 \label{fig:mlr2}
 \end{figure}
-Die Grafiken deuten darauf hin, dass drei Datenpunkte potentiell problematisch sind (Datenpunkte 52, 64, 83). Wir werden nun diesen Eindruck statistisch evaluieren und die Datenpunkte, falls nötig entfernen.
 
-```{r inspecting outliers}
-# entfernen zu einflussreicher datenpunkte
-# um dies zu tun extrahieren wir diagnostische
-# werte zu allen datenpunkten und addieren die
-# spalten mit diesen werten zu unserem
-# datensatz hinzu
-infl <- influence.measures(m2.mlr)
 
-# addieren der einflussstatistiken zu dem datensatz
-mydata <- data.frame(mlrdata, infl[[1]], infl[[2]])
+The graphs indicate that data points  52, 64, and 83 may be problematic. We will tehrefore statistically evaluate whether these data points need to be removed. In order to find out which data points require removal, we extract the influence measure statistics and add them to out data set. 
+
+```{r echo=T, message=FALSE, warning=FALSE}
+infl <- influence.measures(m2.mlr)                   # extarct influence statistics
+mydata <- data.frame(mlrdata, infl[[1]], infl[[2]])  # add infl. statistics to data
 head(mydata)
 
 # zu einflussreiche datenpunkte erkennen
@@ -622,18 +265,16 @@ nrow(mlrdata)
 
 Die Zeilenzahl weist darauf hin, dass zwei potentielle Problemfälle entfernt wurden, da deren Werte inakzeptabel waren, während einer der Punkte im Modell verbleiben durfte. Da wir es nun mit einem veränderten Datensatz zu tun haben, müssen wir die bisherigen Schritte wiederholen. Die einzelnen wiederholten Schritte werden nun nicht weiter erläutert, insofern die Erläuterungen mit den bereits oben ausgeführten weitgehend identisch wäre.
 
-```{r generate new minimal model}
-# generieren der minimalen baselinemodelle, die nur den
-# intercept (mittelwert) als unabh. variable beinhalten
-m0.mlr = lm(money ~ 1, data = mlrdata) # baseline model
-m0.glm = glm(money ~ 1, family = gaussian, data = mlrdata)
-# ergebnisse betrachten
-summary(m0.mlr)
+```{r echo=F, message=FALSE, warning=FALSE}
+m0.mlr = lm(money ~ 1, data = mlrdata) # baseline lm model 
+m0.glm = glm(money ~ 1, family = gaussian, data = mlrdata) # baseline glm model 
+summary(m0.mlr) # inspect model results
 
-# ergebnisse betrachten
-summary(m0.glm)
+summary(m0.glm) # inspect model results
+```
 
-#############################
+
+```{r echo=T, message=FALSE, warning=FALSE}
 # generieren der saturated models, die alle
 # unabh. variablen und interaktionen beinhalten
 m1.mlr = lm(money ~ (status + attraction)^2, data = mlrdata)
@@ -644,8 +285,13 @@ summary(m1.mlr)
 # ergebnisse betrachten
 summary(m1.glm)
 
-#############################
-# automatisches modelfitting
+```
+
+## Automatic Model Fitting
+
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
 # kriterium: AIC (um so kleiner umso besser)
 step(m1.mlr, direction = "both")
 
@@ -664,8 +310,14 @@ anova(m0.mlr, m2.mlr)
 
 Anova(m0.mlr, m2.mlr, type = "III")
 
-# suche nach problematischen datenpunkten
-# erzeugen diagnostischer grafiken
+
+```
+
+## Outlier Detection
+
+In a next step, we cerate diagnostic plots in order to check whether there are potentially problematic data points.
+
+```{r echo=F, message=FALSE, warning=FALSE}
 par(mfrow = c(3, 2))
 plot(m2.mlr)
 qqPlot(m2.mlr, main="QQ Plot")
@@ -682,9 +334,11 @@ par(mfrow = c(1, 1))
 \caption{Diagnistische Grafiken des neuen multiplen linearen Regressionsmodells}
 \label{fig:mlr3}
 \end{figure}
-Die diagnostischen Grafiken zeigen nun zwar weitere potentiell problematische Datenpunkte an, allerdings weichen diese Punkte weitaus weniger vom allgemeinen Trend ab, als dies bei den entfernten Punkten der Fall war. Wir berechnen dennoch diagnostische Statistiken und fügen diese zum Datensatz hinzu, um sicher zu gehen, dass nun alle Datenpunkte akzeptabel sind.
 
-```{r generate diagnostic plots}
+Although the diagnosic plots indicate that additional points may be problematic, but these data points deviate substantially less from the trend than was the case with the data points that have already been removed. To make sure that retaining the data points that are deemed potentially problematic by the diagnostoc plots, is acceptable, we extarct diagnostoic statistics and add them to the data.  
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
 # addieren von modelldiagnostiken zum datasatz
 mlrdata$residuals <- resid(m2.mlr)
 mlrdata$standardized.residuals <- rstandard(m2.mlr)
@@ -696,24 +350,35 @@ mlrdata$covariance.ratios <- covratio(m2.mlr)
 mlrdata$fitted <- m2.mlr$fitted.values
 ```
 
-Wir nutzen nun die hinzugefügten Diagnosewerte um neue diagnostische Grafiken zu erstellen.
+We can now use these diagnostic statistics to create more precise diagnostic plots. 
 
-```{r generate new diagnostic plots}
-# erstellen diagnostischer grafiken
-# (drei grafiken in einem fenster)
-p1 <- histogram<-ggplot(mlrdata, aes(studentized.residuals)) +
-theme(legend.position = "none") +
-geom_histogram(aes(y=..density..),
-binwidth = 1,
-colour="black",
-fill="white") +
-labs(x = "Studentized Residual", y = "Density")
-p2 <- histogram + stat_function(fun = dnorm, args = list(mean = mean(mlrdata$studentized.residuals, na.rm = TRUE), sd = sd(mlrdata$studentized.residuals, na.rm = TRUE)), colour = "red", size = 1)
-p3 <- scatter <- ggplot(mlrdata, aes(fitted, studentized.residuals))
-p4 <- scatter + geom_point() + geom_smooth(method = "lm", colour = "Red")+ labs(x = "Fitted Values", y = "Studentized Residual")
-p5 <- qqplot.resid <- qplot(sample = mlrdata$studentized.residuals, stat="qq") + labs(x = "Theoretical Values", y = "Observed Values")
-p6 <- qqplot.resid
-multiplot(p2, p4, p6, cols=3)
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(studentized.residuals)) +
+  theme(legend.position = "none") +
+  geom_histogram(aes(y=..density..),
+                 binwidth = 1,
+                 colour="black",
+                 fill="white") +
+  labs(x = "Studentized Residual", y = "Density") + 
+  stat_function(fun = dnorm, 
+                args = list(mean = mean(mlrdata$studentized.residuals, na.rm = TRUE), 
+                            sd = sd(mlrdata$studentized.residuals, na.rm = TRUE)), 
+                colour = "red", size = 1)
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(fitted, studentized.residuals)) +
+  geom_point() + 
+  geom_smooth(method = "lm", colour = "Red")+ 
+  labs(x = "Fitted Values", 
+       y = "Studentized Residual")
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+qplot(sample = mlrdata$studentized.residuals, stat="qq") + 
+  labs(x = "Theoretical Values", 
+       y = "Observed Values")
 ```
 
 \begin{figure}[H]
@@ -722,28 +387,30 @@ multiplot(p2, p4, p6, cols=3)
 \caption{Diagnistische Grafiken des neuen multiplen linearen Regressionsmodells}
 \label{fig:mlr4}
 \end{figure}
-Die Grafiken zeigen keine auffälligen Ausreißer. Wir überprüfen diesen Eindruck dennoch statistisch. Hierzu lässt sich folgendes sagen:
 
-* Datenpunkte mit standardisierten Residuenwerten > 3.29 sollten entfernt werden [@field2012discovering 269]
+The new diagnistic plots do not indicate outliers that require removal. With respect to such data points the following parameters should be considered:
 
-* Wenn mehr als 1\% der Datenpunkte standardisierte Residuenwerte $\ge$ 2.58, so ist der Fehleranteil des Modells inakzeptabel [@field2012discovering 269]
+* Data points with standardised residuals > 3.29 should be removed [@field2012discovering 269]
 
-*Wenn mehr als 5\% der Datenpunkte standardisierte Residuenwerte $\ge$ 1.96 haben, so ist der Fehleranteil des Modells inakzeptabel [@field2012discovering 269]
+* If more than 1 percent of data points have standardized residuals exceeding values  $\ge$ 2.58, then the errorrate of the model is inacceptable  [@field2012discovering 269].
 
-* Zusätzlich sollten Datenpunkte mit Cooks D-Werten $\ge$ 1 entfernt werden\citep[269]{field2012discovering}
+* If more than 5 percent of data points have standardized residuals exceeding values   $\ge$ 1.96, then the errorrate of the model is inacceptable [@field2012discovering 269]
 
-* Schließlich sollten Leveragewerte $3(k + 1)/n$ (k = Anzahl der Prädikatoren, N = Anzahl der Datenpunkte) nicht überschreiten \citep[270]{field2012discovering}
+* In addition, data points with Cook's D-values  $\ge$ 1 should be removed [@field2012discovering 269]
 
-* Es sollte keine Autokorrelation innerhalb der unabhängigen Variablen vorliegen, d.h. eine Variable darf nicht mit sich selbst korrelieren (ist dies der Fall muss ein Repeated Measures Design oder ein hierarchisches Regressionsmodell genutzt werden)
+* Also, data points with leverage values $3(k + 1)/n$ (k = Number of predictors, N = Number of cases in model) should be removed [@field2012discovering 270]
 
-* Unabhängige Variablen dürfen untereinander nicht stark korrelieren (Multikollinearität). Daher gilt, dass Datenpunkte mit Varianzinflationsfaktorenwerten (VIF) $\ge$ 10 entfernt werden sollten [@myers1990classical]. Es können aber bereits Werte von 2.5 problematisch sein [@szmrecsanyi2006morphosyntactic 215]!
+* There should not be (any) autocorrelation among predictors. This means that independent variables cannot be correlated with itself (for instance, because data points come from the same subject). If there is autocorrelation among predictots, then a Repeated Measures Design or a (hierarchical) mixed-effects model should be implemented instead.
 
-* Datenpunkte mit 1/VIF Werten $<$ .1 müssen entfernt werden (ab .2 gelten die Datenpunkte als problematisch) [@menard1995applied]
+* Predictors cannot substantiatlly correlate with each other (multicollinearity). If a model contains perdictors that have variance inflation factors (VIF) $\ge$ 10 the model is completely unreliable [@myers1990classical] and predictors causing such VIFs should be removed. Indeed, even VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215] and [@zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed!
 
-* Der Mittelwert der VIFs sollte $<$ 1 sein [@bowerman1990linear]
+* Data points with 1/VIF values $<$ .1 must be removed (data points with values above .2 are considered problematic) [@menard1995applied].
 
+* The mean value of VIFs should be $<$ 1  [@bowerman1990linear].
 
-```{r more diagnostics}
+## Model Diagnostics
+
+```{r echo=F, message=FALSE, warning=FALSE}
 # 1: optimal = 0
 # (aufgelistete datenpunkte sollten entfernt werden)
 which(mlrdata$standardized.residuals > 3.29)
@@ -782,7 +449,7 @@ vif(m2.mlr)
 mean(vif(m2.mlr))
 ```
 
-Bis auf den Mittelwert der VIFs, der $<$ 1 sein sollte, tatsächlich aber 2.307 beträgt, sind alle diagnostischen Werte völlig akzeptabel. Wir werden nun testen, ob die Stichprobengröße in unserer Untersuchung ausreicht. Basierend auf [@green1991many] geben [@field2012discovering 273-274] zur Mindestgröße der benötigten Stichprobe Daumenregeln an die Hand (k = Anzahl der Prädikatoren; kategorische Prädikatoren mit mehr als 2 Levels sollten in Dummy-variablen transformiert werden):
+Except for the mean VIF value (2.307) which should not exceed 1, all diagnostics are acceptable. We will now test whether the sample size is sufficient for our model. With respect to the minimal sample size and based on [@green1991many], [@field2012discovering 273-274] offer the following rules of thumb  (k = number of predictors; categorical predictors with more than two levels shuld be recoded as dummy variables):
 
 * Ist man nur an dem allgemeinen Modell-fit interessiert (ein Fall, der mir persönlich noch nie vorgekommen ist), sollte die Stichprobe mindestens 50 + k umfassen.
 
@@ -793,7 +460,9 @@ Bis auf den Mittelwert der VIFs, der $<$ 1 sein sollte, tatsächlich aber 2.307 
 
 Zusätzlich werden wir prüfen, wie groß der Wert für `R` basierend auf einer Zufallsstichprobe wäre, um abschätzen zu können, wie groß die Wahrscheinlichkeit eines $\beta$-Fehlers bei der vorliegenden Stichprobengröße ist [vgl. @field2012discovering 274]. Bei $\beta$-Fehlern handelt es sich um die Annahme, ein Prädikator ist nicht signifikant, obwohl er tatsächlich einen signifikanten Einfluss hat (siehe Sektion \ref{fehler}). Die Prüfgröße schwankt zwischen 0 und 1. Umso kleiner der Wert ist, umso besser. Wenn der Wert $\ge$ 1 liegt, dann gibt es Grund zur Sorge und es sollte eine größere Stichprobe gezogen werden.
 
-```{r diagnostics: sample size}
+## Evaluation of Sample Size
+
+```{r echo=F, message=FALSE, warning=FALSE}
 # ist die stichprobe ausreichend gross
 smplesz(m2.mlr)
 
@@ -849,339 +518,1645 @@ Eine multiple lineare Regression wurde mit AIC-basierter (Akaike's Information C
 
 Das finale minimale adäquate Modell basiert auf 98 Datenpunkten und korreliert hoch signifikant mit dem Datensatz (Multipler $R^{2}$: .857, Angepasster $R^{2}$: .853, F-statistic (3, 94): 154.4, AIC: 850.4, BIC: 863.32, p$<.001***$). Das finale minimale adäquate Modell enthält sowohl \textquote{attraction} und \textquote{status} als signifikante Haupteffekte. Der Status von Geschenk\-empfängern korreliert hoch signifikant positiv mit dem Geldbetrag, der für ihre Geschenke ausgegeben wird (SE: 5.14, $t$-Wert: 10.87, p$<.001***$). Dies zeigt, dass wenn eine Person single ist, ihr Geschenk \euro{55,85} mehr wert ist, verglichen mit dem Fall, dass sie in einer Beziehung ist (in diesem Fall ist das Geschenk \euro{99.15}, wenn der Schenker nicht an der Beschenkten interessiert ist. Der Faktor \textquote{attraction} korreliert ebenfalls hoch signifikant positiv mit dem Geldbetrag, der für ihre Geschenke ausgegeben wird (SE: 5.09, $t$-Wert: -9.37, p$<.001***$). Falls der Schenkende nicht an der Beschenkten interessiert ist, dann gibt er \euro{-47.66} weniger für ein Geschenk aus, verglichen mit dem Fall, dass er sie attraktiv findet (vorausgesetzt die Beschenkte ist in einer Beziehung). Schließlich weist das finale minimale adäquate Modell eine hoch signifikante Interaktion zwischen \textquote{status} und \textquote{attraction} nach (SE: 7.27, $t$-Wert: -8.18, p$<$.001***): Wenn die Beschenkte ein Single ist, aber der Schenker nicht an ihr interessiert ist, dann gibt der Schenker \euro{59,46} weniger für ein Geschenk aus, verglichen mit dem Fall, dass er an der Beschenkten interessiert ist (vgl. Figure \ref{fig:mlr1}).
 
-\pagebreak
-\subsection*{Aufgaben}
-\begin{enumerate}
-\item Laden sich sich den Datensatz \verb!exdatamlr! herunter von \\\verb!http://martinschweinberger.de/docs/data/exdatamlr.txt! und wenden Sie das Gelernte an, indem Sie eine multiple lineare Regression durchführen, um herauszufinden, ob sich Bewegung (move) und Essgewohnheiten (food) auf das Gewicht auswirkt (weight).
-\end{enumerate}
+## Exercises
 
-\newpage
-\subsection{Ausblick: Mixed-Effects Modelle}\label{mem}
-Ohne es genauer zu spezifizieren haben wir bisher nur mit Fixed-Effects gearbeitet, d.h. alle Datenpunkte werden so betrachtet, als ob sie auf der gleichen Hierarchieebene liegen. Häufig ist es aber so, dass Datenpunkte keine flache, sondern eine hierarchische Struktur haben, da beispielsweise mehrere Datenpunkte von demselben Sprecher stammen. Um der hierarchischen Struktur Rechnung zu tragen, muss man diese auch modellieren, was mit Hilfe von \textit{Random Effekte} geschehen kann.
+1.  Download the data set called `exdatamlr` from `http://martinschweinberger.de/docs/data/exdatamlr.txt` and apply what you have learned by implementing a multiple linear regression model so that you can answer how movement (move) and food intake (food) affect weight (given the data at hand).
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/mem02.png}\\[.25cm]
-\caption{Scatterplots mit einer Regressionsgeraden (links), random intercepts (mitte links), random slopes (mitte rechts) und random intercepts und random slopes (rechts)}
-\label{fig:mem02}
-\end{figure}
 
-\textit{Random Effekte} haben zwei Ausprägungen: \textit{Random Slopes} (rechtes Panel Grafik \ref{fig:mem02}) und \textit{Random Intercepts} (mittleres Panel Grafik \ref{fig:mem02}). Wir werden uns im Folgenden auf \textit{Random Interecpts} konzentrieren, da dies die weitaus gebräuchlichere Variante ist. Um zu beschreiben, worum es sich bei \textit{Random Intercepts} handelt, fokussieren wir uns auf Grafik \ref{fig:mem01}.
+# Multiple Linear Regression
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{images/mem01.png}\\[.25cm]
-\caption{Scatterplots mit einer Regressionsgeraden (mitte) und Random Intencepts (rechts)}
-\label{fig:mem01}
-\end{figure}
+
+```{r mlr2, message=FALSE, warning=FALSE}
+# pakete initialisieren
+library(car)
+library(QuantPsyc)
+library(boot)
+library(ggplot2)
+# load functions
+source("rscripts/multiplot_ggplot2.R")
+source("rscripts/mlinr.summary.r")
+source("rscripts/SampleSizeMLR.r")
+source("rscripts/ExpR.r")
+# optionen festlegen
+options("scipen" = 100, "digits" = 4)
+# daten laden
+mlrdata <- read.delim("data/mlrdata.txt", header = TRUE)
+# ersten zeilen der daten betrachten
+head(mlrdata)
+
+# struktur der daten betrachten
+str(mlrdata)
+
+# zusammenfassung der daten betrachten
+summary(mlrdata)
+
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(status, money)) +
+ geom_boxplot(notch = T, aes(fill = factor(status))) +
+ scale_fill_brewer() +
+ theme_bw() + # backgroud white(inactive to default grey)
+ labs(x = "") +
+ labs(y = "Money spent on present (Euro)") +
+ coord_cartesian(ylim = c(0, 250)) +
+ guides(fill = FALSE) +
+ ggtitle("Status")
+```
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(attraction, money)) +
+ geom_boxplot(notch = T, aes(fill = factor(attraction))) +
+ scale_fill_brewer() +
+ theme_bw() + # backgroud white(inactive to default grey)
+ labs(x = "") +
+ labs(y = "Money spent on present (Euro)") +
+ coord_cartesian(ylim = c(0, 250)) +
+ guides(fill = FALSE) +
+ ggtitle("Attraction")
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(x = money)) +
+ geom_histogram(aes(y=..density..),
+ binwidth = 10,
+ colour = "black", fill = "white") +
+ geom_density(alpha=.2, fill = "#FF6666") # Overlay with transparent density plot
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mlrdata, aes(status, money)) +
+ geom_boxplot(notch = F, aes(fill = factor(status))) +
+ scale_fill_brewer(palette="Paired") +
+ facet_wrap(~ attraction, nrow = 1) +
+ theme_bw() + # backgroud white(inactive to default grey)
+ labs(x = "") +
+ labs(y = "Money spent on present (Euro)") +
+ coord_cartesian(ylim = c(0, 250)) +
+ guides(fill = FALSE)
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# generieren der minimalen baselinemodelle, die nur den
+# intercept (mittelwert) als unabh. variable beinhalten
+m0.mlr = lm(money ~ 1, data = mlrdata) # baseline model
+m0.glm = glm(money ~ 1, family = gaussian, data = mlrdata)
+# ergebnisse betrachten
+summary(m0.mlr)
+
+# ergebnisse betrachten
+summary(m0.glm)
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# generieren der saturated models, die alle
+# unabh. variablen und interaktionen beinhalten
+m1.mlr = lm(money ~ (status + attraction)^2, data = mlrdata)
+m1.glm = glm(money ~ status * attraction, family = gaussian, data = mlrdata)
+# ergebnisse betrachten
+summary(m1.mlr)
+
+# ergebnisse betrachten
+summary(m1.glm)
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# automatisches modelfitting
+# kriterium: AIC (um so kleiner umso besser)
+step(m1.mlr, direction = "both")
+
+# minimales adequates modell generieren
+m2.mlr = lm(money ~ (status + attraction)^2, data = mlrdata)
+m2.glm = glm(money ~ (status + attraction)^2, family = gaussian, data = mlrdata)
+
+# zusammenfassugn der modellergebnisse betrachten
+summary(m2.mlr)
+
+# konfidenzintervalle der koeffizineten
+confint(m2.mlr)
+
+# vergleich zwiscehn dem baseline-modell und dem minimal adequate model
+anova(m0.mlr, m2.mlr)
+
+Anova(m0.mlr, m2.mlr, type = "III")
+
+# suche nach problematischen datenpunkten
+# erzeugen diagnostischer grafiken
+par(mfrow = c(3, 2))
+plot(m2.mlr)
+qqPlot(m2.mlr, main="QQ Plot")
+# Cooks D plot
+# D-werte > 4/(n-k-1) sind problematisch
+cutoff <- 4/((nrow(mlrdata)-length(m2.mlr$coefficients)-2))
+plot(m2.mlr, which=4, cook.levels = cutoff)
+par(mfrow = c(1, 1))
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+# entfernen zu einflussreicher datenpunkte
+# um dies zu tun extrahieren wir diagnostische
+# werte zu allen datenpunkten und addieren die
+# spalten mit diesen werten zu unserem
+# datensatz hinzu
+infl <- influence.measures(m2.mlr)
+
+# addieren der einflussstatistiken zu dme datensatz
+mydata <- data.frame(mlrdata, infl[[1]], infl[[2]])
+head(mydata)
+
+# zu einflussreiche datenpunkte erkennen
+remove <- apply(infl$is.inf, 1, function(x) {
+ ifelse(x == TRUE, return("remove"), return("keep")) } )
+
+# informationen zu den zu einflussreichen datenpunkten
+# zum datensatz hinzuaddieren
+mlrdata <- data.frame(mlrdata, remove)
+# zeilenzahl des alten datensatzes anzeigen
+nrow(mydata)
+
+outs <- mlrdata[mlrdata$remove == "remove", ]
+mlrdata <- mlrdata[mlrdata$remove == "keep", ]
+# zeilenzahl des neuen datensatzes anzeigen
+nrow(mlrdata)
+
+# generieren der minimalen baselinemodelle, die nur den
+# intercept (mittelwert) als unabh. variable beinhalten
+m0.mlr = lm(money ~ 1, data = mlrdata) # baseline model
+m0.glm = glm(money ~ 1, family = gaussian, data = mlrdata)
+# ergebnisse betrachten
+summary(m0.mlr)
+
+# ergebnisse betrachten
+summary(m0.glm)
+
+#############################
+# generieren der saturated models, die alle
+# unabh. variablen und interaktionen beinhalten
+m1.mlr = lm(money ~ (status + attraction)^2, data = mlrdata)
+m1.glm = glm(money ~ status * attraction, family = gaussian, data = mlrdata)
+# ergebnisse betrachten
+summary(m1.mlr)
+
+# ergebnisse betrachten
+summary(m1.glm)
+
+#############################
+# automatisches modelfitting
+# kriterium: AIC (um so kleiner umso besser)
+step(m1.mlr, direction = "both")
+
+# minimales adequates modell generieren
+m2.mlr = lm(money ~ (status + attraction)^2, data = mlrdata)
+m2.glm = glm(money ~ (status + attraction)^2, family = gaussian, data = mlrdata)
+
+# zusammenfassung der modellergebnisse betrachten
+summary(m2.mlr)
+
+# konfidenzintervalle der koeffizineten
+confint(m2.mlr)
+
+# vergleich zwiscehn dem baseline-modell und dem minimal adequate model
+anova(m0.mlr, m2.mlr)
+
+Anova(m0.mlr, m2.mlr, type = "III")
+
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+# suche nach problematischen datenpunkten
+# erzeugen diagnostischer grafiken
+par(mfrow = c(3, 2))
+plot(m2.mlr)
+qqPlot(m2.mlr, main="QQ Plot")
+# Cooks D plot
+# D-werte > 4/(n-k-1) sind problematisch
+cutoff <- 4/((nrow(mlrdata)-length(m2.mlr$coefficients)-2))
+plot(m2.mlr, which=4, cook.levels = cutoff)
+par(mfrow = c(1, 1))
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# addieren von modelldiagnostiken zum datasatz
+mlrdata$residuals <- resid(m2.mlr)
+mlrdata$standardized.residuals <- rstandard(m2.mlr)
+mlrdata$studentized.residuals <- rstudent(m2.mlr)
+mlrdata$cooks.distance <- cooks.distance(m2.mlr)
+mlrdata$dffit <- dffits(m2.mlr)
+mlrdata$leverage <- hatvalues(m2.mlr)
+mlrdata$covariance.ratios <- covratio(m2.mlr)
+mlrdata$fitted <- m2.mlr$fitted.values
+
+# erstellen diagnostischer grafiken
+# (drei grafiken in einem fenster)
+histogram<-ggplot(mlrdata, aes(studentized.residuals)) +
+ theme(legend.position = "none") +
+ geom_histogram(aes(y=..density..),
+ binwidth = 1,
+ colour="black",
+ fill="white") +
+ labs(x = "Studentized Residual", y = "Density")
+```
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+histogram + stat_function(fun = dnorm, args = list(mean = mean(mlrdata$studentized.residuals, na.rm = TRUE), sd = sd(mlrdata$studentized.residuals, na.rm = TRUE)), colour = "red", size = 1)
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+scatter <- ggplot(mlrdata, aes(fitted, studentized.residuals))
+scatter + geom_point() + geom_smooth(method = "lm", colour = "Red")+ labs(x = "Fitted Values", y = "Studentized Residual")
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+qplot(sample = mlrdata$studentized.residuals, stat="qq") + labs(x = "Theoretical Values", y = "Observed Values")
+```
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# 1: optimal = 0
+# (aufgelistete datenpunkte sollten entfernt werden)
+which(mlrdata$standardized.residuals > 3.29)
+
+# 2: optimal = 1
+# (aufgelistete datenpunkte sollten entfernt werden)
+stdres_258 <- as.vector(sapply(mlrdata$standardized.residuals, function(x) {
+ ifelse(sqrt((x^2)) > 2.58, 1, 0) } ))
+(sum(stdres_258) / length(stdres_258)) * 100
+
+# 3: optimal = 5
+# (aufgelistete datenpunkte sollten entfernt werden)
+stdres_196 <- as.vector(sapply(mlrdata$standardized.residuals, function(x) {
+ ifelse(sqrt((x^2)) > 1.96, 1, 0) } ))
+(sum(stdres_196) / length(stdres_196)) * 100
+
+# 4: optimal = 0
+# (aufgelistete datenpunkte sollten entfernt werden)
+which(mlrdata$cooks.distance > 1)
+
+# 5: optimal = 0
+# (datenpunkte sollten entfernt werden, wenn cooks distanz nahe 1 ist)
+which(mlrdata$leverage >= (3*mean(mlrdata$leverage)))
+
+# 6: checking autocorrelation:
+# Durbin-Watson test (optimal: grosser p-wert)
+dwt(m2.mlr)
+
+# 7: multicolliniaritaet testen 1 : optimal 2.5, ok bis 4, ab 10 geht gar nicht
+vif(m2.mlr)
+
+# 8: multicolliniaritaet testen 2 . wert sollte unter 1 liegen
+1/vif(m2.mlr)
+
+# 9: mittlerer vif wert sollte nicht groesser als 1 sein
+mean(vif(m2.mlr))
+
+# ist die stichprobe ausreichend gross
+smplesz(m2.mlr)
+
+# gefahr von beta-fehlern
+expR(m2.mlr)
+
+# ergebnisse der mlr betrachten
+mlr.summary(m2.mlr, m2.glm, ia = T)
+```
+
+# Linear Mixed-Effects Regression Models \label{mem}
+The following focuses on an extension of ordinary multiple regressions: mixed-effects regression models.
+
+## Introduction 
+
+So far, the regression models that we have used only had fixed-effects. having only fixed-effecst measn that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common, that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristsi. In such cases, the data is consiederd hierarchical and statistical models should incororate such structiral features of the data they work upon. With respect to regression modelling, hierarchical structures are incorporated by what is called  *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope, while mixed effects models have intercepts for each level of a random effect. If the randon effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and or slope for each speaker. 
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# random intercepts and random slops
+x <- 0:10
+y = 0:10
+# start plot
+par(mfrow = c(1, 4))
+# intercepts
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(0, 1, lty = 1, col ="black")
+mtext("Fixed-Effects Model:\n1 Intercept + 1 Slope", 1, 2, cex = .6)
+box()
+# random intercepts
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(4, 1, lty = 2, col ="black")
+abline(2, 1, lty = 2, col ="black")
+abline(2, 1, lty = 2, col ="black")
+abline(0, 1, lty = 2, col ="black")
+abline(-1, 1, lty = 2, col ="black")
+abline(-2, 1, lty = 2, col ="black")
+abline(-4, 1, lty = 2, col ="black")
+mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope", 1, 3, cex = .6)
+box()
+# random slopes
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(0, 1.75, lty = 2, col ="black")
+abline(0, 1.5, lty = 2, col ="black")
+abline(0, 1.25, lty = 2, col ="black")
+abline(0, 0, lty = 2, col ="black")
+abline(0, -.25, lty = 2, col ="black")
+abline(0, -.5, lty = 2, col ="black")
+abline(0, -.75, lty = 2, col ="black")
+mtext("Mixed-Effects Model:\n1 Intercept\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
+box()
+# random slopesund random intercepts
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(2, 1.75, lty = 2, col ="black")
+abline(-1, 1.5, lty = 2, col ="black")
+abline(1, 1.25, lty = 2, col ="black")
+abline(4, 0, lty = 2, col ="black")
+abline(-4, -.25, lty = 2, col ="black")
+abline(0, -.5, lty = 2, col ="black")
+abline(-1, -.75, lty = 2, col ="black")
+mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
+box()
+# restore original graphic's parameters
+par(mfrow = c(1, 1))
+```
+
+
+*Random Effects* have two parameters: the intercept (the point where the regression line cross the y-axis) and the slope (the acclivity of the regression line). In contrast to fixed-effects models have only 1 intercept and one slope (left panel of the Figure above) while mixed-effects models can have various *random intercepts* (center left panel \ref{fig:mem02}) or various *random slopes* (center right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the follwoing, we will onyl focus on models with random interecpts becasue this is the by far more common method and because including both random incetrcepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+
+```{r echo=F, message=FALSE, warning=FALSE}
+Height <- c(169, 176, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
+Weight <- c(68, 72, 65, 62, 60, 80, 75, 70, 85, 92, 88, 92, 85, 82, 80) # plot scatterplot and the regression line
+z <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
+tb <- data.frame(Height,Weight, z)
+a <- tb[z == "a", ]
+a <- a[, 1:2]
+b <- tb[z == "b", ]
+b <- b[, 1:2]
+c <- tb[z == "c", ]
+c <- c[, 1:2]
+d <- tb[, 1:2]
+# plot
+par(mfrow = c(1, 3))
+# plot 1
+plot(a, xlim = c(150, 200), ylim = c(50, 100))
+text(b[,1], b[,2], "+")
+text(c[,1], c[,2], "*")
+# plot 2
+plot(a, xlim = c(150, 200), ylim = c(50, 100))
+mod0 <- lm(d$Weight ~ d$Height, data = d)
+abline(mod0, lty=1, col = "black")
+text(b[,1], b[,2], "+")
+text(c[,1], c[,2], "*")
+# plot 3
+plot(a, xlim = c(150, 200), ylim = c(50, 100))
+grid()
+mod1 <- lm(a$Weight ~ a$Height, data = a)
+abline(mod0, lty=1, col = "black")
+abline(mod0[[1]][[1]]+10, mod0[[1]][[2]], lty = 2, col = "red")
+abline(mod0[[1]][[1]]-10, mod0[[1]][[2]], lty = 3, col = "blue")
+abline(mod0[[1]][[1]]-1, mod0[[1]][[2]], lty = 4, col = "green")
+text(b[,1], b[,2], "+")
+text(c[,1], c[,2], "*")
+par(mfrow = c(1, 1))
+```
+
+
+caption{Scatterplots mit einer Regressionsgeraden (mitte) und Random Intencepts (rechts)}
+label{fig:mem01}
+
 
 Im mittleren Panel von Grafik \ref{fig:mem01} wird genau eine Regressionsgrade genutzt, um Werte vorherzusagen. Wenn wir \textit{Random Slopes} für die drei Gruppen einführen, so entsteht für jede Ausprägung des \textit{Random Effekte}, d.h. für jede Gruppe, eine eigene Regressionsgerade.
 
 Nachdem Random Slopes eingeführt sind, werden, wie bei der multiplen Regression, Prädiktoren (Ffixed Effekte) hinzugefügt, d.h. Mixed-Effects Modelle werden Mixed-Effects Modelle genannt, weil Sie sowohl Random Effekte (meistens Random Intercepts) und einfache Prädiktoren (Fixed Effekte) beinhalten.
 
-Was die Vorgehensweise betrifft, so lässt sich sagen, dass zuerst die Random Effektstruktur eingebaut und evaluiert wird und erst im Anschluß die Fixed Effekte in das Model aufgenommen werden \citep[vgl.][]{field2012discovering}. Man testet, ob das Einfügen von Random Effekten berechtigt ist, indem man ein Model, das nur den Intercept als Prädiktoren hat gegen ein Model, welches nur die Random Intercepts als Prädiktoren hat. Ist die Varianz bei dem Random Effects Modell geringer, so war das Einfügen der Random Intercepts berechtigt.
+Was die Vorgehensweise betrifft, so lässt sich sagen, dass zuerst die Random Effektstruktur eingebaut und evaluiert wird und erst im Anschluß die Fixed Effekte in das Model aufgenommen werden [vgl.@field2012discovering]. Man testet, ob das Einfügen von Random Effekten berechtigt ist, indem man ein Model, das nur den Intercept als Prädiktoren hat gegen ein Model, welches nur die Random Intercepts als Prädiktoren hat. Ist die Varianz bei dem Random Effects Modell geringer, so war das Einfügen der Random Intercepts berechtigt.
 
-%\begin{lstlisting}
-%# vorbereiten der analyse
-%# workspace leeren
-%rm(list=ls(all=T))
-%# pakcete installieren, die bei mixed-effects modellen hilfreich sind
-%# (# entfernen um den code zu aktivieren)
-%#install.packages("rms")
-%#install.packages("glmulti")
-%#install.packages("lmtest")
-%#install.packages("MASS")
-%#install.packages("QuantPsyc")
-%#install.packages("car")
-%#install.packages("lme4")
-%#install.packages("nlme")
-%# packete aktivieren
-%#library(rms)
-%#library(glmulti)
-%#library(lmtest)
-%#library(MASS)
-%library(RLRsim)
-%library(car)
-%library(QuantPsyc)
-%library(boot)
-%library(ggplot2)
-%library(nlme)
-%#detach(package:nlme)
-%library(lme4)
-%library(ez)
-%library(ggplot2)
-%source("http://martinschweinberger.de/docs/scripts/multiplot_ggplot2.R")
+## Example: Preposition Use across Time by Genre
 
-%# setzen der optionen
-%options("scipen" = 100, "digits" = 4)
-%options(stringsAsFactors = F)
-%# grafikpfad festlegen
-%imageDirectory<-"C:\\01-University\\03-Lehre\\00-Workshops\\StatzforLinguistiswithR\\images"
-%\end{lstlisting}
-%
-%Nachdem die Sitzung nun vorbereitet ist, kann mit dem Einlesen der Daten begonnen werden. Es ist allerdings unbedingt zu bedenken, dass, um de folgenden Code nutzen zu können, eine aktive Internetverbindung benötigt wird und, dass die
-%Pfade auf den eigenen Rechner angepasst werden müssen!
+To explore how to implement a mixed-effects model in `R` we revisit the preposition data that contains relative frequencies of prepositions in English texts written between 1150 and 1913. As a first step, and to prepare our analysis, we load neccessary `R` packages, specify oprions, and load as well as provide an overview of the data.
 
-%\begin{lstlisting}
-%# daten einlesen
-%mydata <- read.delim("http://martinschweinberger.de/docs/data/lmemdata.txt", header = TRUE)
-%# convertiere date in eine numerische variable
-%mydata$date <- as.numeric(mydata$date)
-%# inspiziere den neuen datensatz
-%head(mydata); str(mydata); summary(mydata)
-%
-%# visualisieren der variablen (2 panele pro reihe)
-%# 3 panele in 1 fenster
-%def.par <- par(no.readonly = TRUE)
-%nf <- layout(matrix(c(1, 1, 2, 3), 2, 2, byrow = T))
-%plot(mydata$pptw ~ mydata$date, ylab = "Frequency", xlab = "year of publication")
-%abline(lm(mydata$pptw ~ mydata$date), lty = 3, lwd = 2, col = "red")
-%lines(lowess(mydata$date, mydata$pptw), lty = 1, lwd = 2, col = "blue")
-%# vergroessern der raender, sodass die label passen
-%par(mar = c(11, 4, 1, 2) + 0.1)
-%# reorder genre by median
-%genrebymedian <- with(mydata, reorder(genre, -pptw, median))
-%# plots generieren
-%plot(mydata$pptw ~ genrebymedian,
-% col = "lightgrey",
-% ylab = "Frequency",
-% xlab = "",
-% las = 2,
-% cex = .5)
-%# re-set margins
-%par(mar = c(5, 4, 1, 2) + 0.1)
-%x = mydata$pptw
-%h = hist(mydata$pptw,
-% ylim =c(0, 150),
-% xlim = c(50, 200),
-% xlab = "prepositions per text",
-% col = "lightgrey",
-% main = "")
-%xfit <- seq(min(mydata$pptw), max(mydata$pptw), length = 40)
-%yfit <- dnorm(xfit, mean = mean(mydata$pptw),sd = sd(mydata$pptw))
-%yfit <- yfit*diff(h$mids[1:2])*length(x)
-%lines(xfit, yfit, lty = 2, lwd=2)
-%# restore original graphic's parameters
-%par(def.par)
-%
-%# plot erstellen
-%p1 <- ggplot(mydata, aes(date, pptw)) +
-% geom_point() +
-% labs(x = "Year") +
-% labs(y = "Prepositions per 1,000 words") +
-% geom_smooth()
-%imageFile <- paste(imageDirectory,"Prepositions over time (lowess smother).png",sep="/")
-%ggsave(file = imageFile)
-%# plot erstellen
-%p2 <- ggplot(mydata, aes(date, pptw)) +
-% geom_point() +
-% labs(x = "Year") +
-% labs(y = "Prepositions per 1,000 words") +
-% geom_smooth(method = "lm") # with linear model smoothing!
-%multiplot(p1, p2, cols = 2)
-%imageFile <- paste(imageDirectory,"Prepositions over time (regression line).png",sep="/")
-%ggsave(file = imageFile)
-%# genre einfuegen(lowess)
-%p3 <- ggplot(mydata, aes(date, pptw)) +
-% geom_point() +
-% facet_wrap(~ genre, nrow = 4) +
-% geom_smooth() +
-% theme_bw() +
-% labs(x = "Year") +
-% labs(y = "Prepositions per 1,000 words") +
-% coord_cartesian(ylim = c(0, 220))
-%imageFile <- paste(imageDirectory,"Prepositions over time across genres (lowess smoothers).png",sep="/")
-%ggsave(file = imageFile)
-%p3
-%
-%# genre einfuegen(lm)
-%p4 <- ggplot(mydata, aes(date, pptw)) +
-% geom_point() +
-% facet_wrap(~ genre, nrow = 4) +
-% geom_smooth(method = "lm") +
-% theme_bw() +
-% labs(x = "Year") +
-% labs(y = "Prepositions per 1,000 words") +
-% coord_cartesian(ylim = c(0, 220))
-%imageFile <- paste(imageDirectory,"Prepositions over time across genres (regression lines).png",sep="/")
-%ggsave(file = imageFile)
-%p4
-%
-%\end{lstlisting}
-%Wie bereits bei edr einfachen linearen Regression werden wir die numerischen Variablen skalieren. Skalieren bedeutet, dass der Mittelwert der numerischen Variable von jedem Wert dieser Variable abgezogen wird.
-%
-%\begin{lstlisting}
-%mydata$date <- scale(mydata$date)
-%head(mydata)
-%
-%str(mydata)
-%
-%################################################################################
-%# generate a glm baseline model
-%m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
-%# generate a lm base-line model
-%m0.lm <- lm(pptw ~ 1, data = mydata)
-%# set up first lme model including only the random effect specifying the random intercepts
-%m0.lme = lme(pptw ~ 1, random = ~1|genre, data = mydata, method = "ML")
-%# set up first lmer model including only the random effect specifying the random intercepts
-%m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
-%# compare the base-line mdoel without intercept to the model with intercept
-%# WARNING: set REML = T because REML provides better estimates for the random
-%# effects part of the model (cf. Field, Miles & Field 2012:879)
-%x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
-%x2 <- x2 <- x2[[1]]
-%test.ran.eff <- list(x2, pchisq(x2, df=2, lower.tail=F))
-%# set up m0 model but using the lmer function from the lme4 package
-%# WARNING: REML must be FALSE OR method = "ML" (depending on the function)
-%# when using anova to compare models!!! (cf. Field, Miles & Field 2012:)
-%# "ML produces more accurate estimates of fixed regression parameters, whereas
-%# REML produces more accurate estimates of random variances (Twisk 2006). [...]
-%# Also, if you want to compare models you must use ML." (Field, Miles & Field 2012:879).
-%m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
-%m0.lmer2 <- lmer(pptw ~ (1|genre/date) + 1, data = mydata, REML = T)
-%anova(m0.lmer1, m0.lmer2)
-%
-%# the model with the random effect structure (1|genre/date) performs
-%# significantly better (also it has a much lower AIC and deviance)
-%# therefore, m0.lmer2 is our new m0 model
-%m0.lmer <- m0.lmer2
-%# test if including the random effect is permitted by applying a restricted likelihood ratio test
-%# WARNING: this test can only take simple random effect (1|genre) but not
-%# (1|genre/date)
-%exactRLRT(m0.lmer1)
-%
-%# there is another way to comper model with and without random effects: see below!
-%
-%# create a second model with date as a fixed effect
-%# m1.lme <- lme(m0.lme, .~. + date) # alternative way to update the model
-%m1.lme = lme(pptw ~ date, random = ~1|genre/date, data = mydata, method = "ML")
-%# set up m1 model but using the lmer function from the lme4 package
-%m1.lmer = lmer(pptw ~ (1|genre/date) + date, data = mydata, REML = F)
-%
-%# compare the models to see if including date has improved the model
-%# the difference between the modesl is the effect (size) of date!
-%anova(m0.lme, m1.lme)
-%
-%# m1.lme is the better model (sig. p-value & lower AIC)
-%# date correlates significantly with pptw (X2(1) = 8.81, p = .003);
-%# X2 = L.Ratio;
-%# df = subtract df smaller from df larger model
-%# inspect results
-%summary(m1.lme)
-%
-%# alternative display of the results
-%anova(m1.lme)
-%
-%# test if date is significant
-%anova(m0.lmer, m1.lmer)
-%
-%# extract estimates and sd for fixed and random effects
-%intervals(m1.lme)
-%
-%# include random slopes
-%# ERROR: m2.lme <- lme(pptw ~ date, random = ~1+genre|genre, data = mydata, method = "ML")
-%# ERROR: m2.lmer <- lmer(pptw ~ (1+genre|genre) + date, data = mydata)
-%
-%# diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
-%plot(m1.lme, genre ~ resid(.), abline = 0 )
-%
-%# the plot shows that there are some outliers (points outside the boxes) and
-%# that the variability within letters is greater than in other genres
-%# we therefore examine the genres in isolation
-%# standardized residuals versus fitted values
-%plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
-%
-%# the plot showing the standardized residuals versus fitted values
-%# confirms that there are outliers in the letters
-%# because there are obviously differences in the variance, we create a new model
-%# which uses weights to compensate variance heterogeneiety of variance
-%# (cf. Pinheiro & Bates 2000:177)
-%m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
-%# test if m2.lme is more appropriate for the data than m1.lme
-%anova(m1.lme, m2.lme)
-%
-%# the heteroscedastitic model (i.e. m2.lme which uses weights to account for
-%# unequal variance is performing significantly better than the homoscedastistic
-%# model m1.lme
-%
-%# inspect results
-%summary(m2.lme)
-%
-%# alternative display of the results
-%anova(m2.lme)
-%
-%# test if date is significant
-%anova(m0.lme, m2.lme)
-%
-%# extract estimates and sd for fixed and random effects
-%intervals(m2.lme)
-%
-%# extract effect sizes (in the example: the effect size of date)
-%# calculate effect size (this effect size measure works for all fixed effects)
-%# to calculate the effect size, take the square root of the t-value squared divided
-%# by the t-value squared plus the degrees of freedom: r = sqrt(t^2/(t^2+df))
-%# WARNING: only apply this function to main effecst not involved in interactions
-%# or higher level interactions but not to the main effects involved in
-%# interactions as they are meaningless (cf. Field, Miles & Field 2012:641)
-%ef.lme <- function(x) {
-% df <- summary(x)[[20]][6]
-% t <- summary(x)[[20]][8]
-% #df <- summary(x)$tTable[, 3]
-% #t <- summary(x)$tTable[, 4]
-% r <- sqrt((t^2)/((t^2)+df))
-% return(paste("Pearson's r = ", round(r, 3)))
-% }
-%ef.lme(m2.lme)
-%
-%
-%# set up m1 model but using the lmer function from the lme4 package
-%#m2.lmer = lmer(pptw ~ (1|genre) + date, data = mydata, REML = F)
-%
-%# How to calculate the variance explained when only a simple random effect is involved:
-%# m2.lmer = lmer(pptw ~ (1|genre) + date, data = mydata, REML = F)
-%# summary(m2.lmer)
-%# variance of random effect (148) devided by variance of random effect plus
-%# residual variance (148+228) times 100 gives the variance explained by the random effect:
-%#(148/(148+228))*100 # percentage of variance explained by random effect
-%
-%# craete lmer with complex random effect structure
-%m2.lmer = lmer(pptw ~ (1|genre/date) + date, data = mydata, REML = F)
-%# an alternative for testing if including the random intercepts is permitted
-%# WARNING: this method is not as good as applying a restricted likelihood
-%# ratio test(!) because the p-value is only an approximation
-%# IMPORTANT: the second model is a glm object
-%2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)
-%
-%####################################################################
-%### --- model diagnostics
-%####################################################################
-%# diagnostic plot (Pinheiro & Bates 2000:11, 182)
-%# what we wish to see: a cloud of dots in the middle of the window without structure
-%# what we do not want to see: a funnel-shaped cloud because this indicates an increase
-%# of the errors/residuals with an increase of the predictor(s) (because this would indicate
-%# heteroscedasticity)
-%# in short: observed valuesagainst fitted values (cf. Pinheiro & Bates 2000:182)
-%plot(m2.lme)
-%
-%# diagnostic plot (Pinheiro & Bates 2000:21)
-%plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | genre, abline = 0)
-%
-%# diagnostic plot: residuals of fitted values against observed values (cf. Pinheiro & Bates 2000:182)
-%qqnorm(m2.lme)
-%
-%# normal plot of the estimated date %in% genre random effects
-%qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))
-%
-%# diagnostic plot: normal plots of the residuals by genre (cf. Pinheiro & Bates 2000:22, 179)
-%qqnorm(m2.lme, ~resid(.) | genre )
-%
-%# inspect the observed responses versus the within-group fitted values
-%# (cf. Pinheiro & Bates 2000:178)
-%plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
-%
-%summary(m2.lmer)
-%
-%\end{lstlisting}
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# activate packages
+library(RLRsim)
+#library(car)
+#library(QuantPsyc)
+#library(boot)
+library(nlme)
+library(lme4)
+#library(ez)
+library(ggplot2)
+# set options
+options("scipen" = 100, "digits" = 4)      # supress scientific notation
+options(stringsAsFactors = F)              # do not convert strings into factors
+mydata <- read.delim("data/lmemdata.txt", header = TRUE) # read in data
+mydata$date <- as.numeric(mydata$date)     # convert date into a numeric variable
+head(mydata); nrow(mydata)                 # inspect updated data set
+```
+
+The data set contains the date when the text was written (`date`), the genre of the text (`genre`), the name of the text (`text`), the relative frequency of prepositions in the text (`pptw`), and the region in which the text was written (`region`). We now plot the data to get a first impression of its structure.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# visualize variables (2 plots per row)
+# 3 plots in 1 window
+def.par <- par(no.readonly = TRUE)
+nf <- layout(matrix(c(1, 1, 2, 3), 2, 2, byrow = T))
+plot(mydata$pptw ~ mydata$date, ylab = "Frequency", xlab = "year of publication")
+abline(lm(mydata$pptw ~ mydata$date), lty = 3, lwd = 2, col = "red")
+# re-set margins to fit the labels
+par(mar = c(7.2, 4, 1, 2) + 0.1)
+# reorder genre by median
+genrebymedian <- with(mydata, reorder(genre, -pptw, median))
+#	generate plots
+plot(mydata$pptw ~ genrebymedian,
+  col = "lightgrey",
+  ylab = "Frequency",
+  xlab = "",
+  las = 2,
+  cex.axis = .7,
+  cex = .5)
+# re-set margins
+par(mar = c(5, 4, 1, 2) + 0.1)
+x = mydata$pptw
+h = hist(mydata$pptw,
+	ylim =c(0, 150),
+	xlim = c(50, 200),
+	xlab = "prepositions per text",
+	col = "lightgrey",
+	main = "")
+xfit <- seq(min(mydata$pptw), max(mydata$pptw), length = 40)
+yfit <- dnorm(xfit, mean = mean(mydata$pptw),sd = sd(mydata$pptw))
+yfit <- yfit*diff(h$mids[1:2])*length(x)
+lines(xfit, yfit, lty = 2, lwd=2)
+# restore original graphic's parameters
+par(def.par)
+```
+
+The scatter plot in the upper panel indicates that the use of prepositions has moderattely increased over time while the boxplots in the lower left panel show show that the gernres differ quite substantailly with respect to their median frequencies of preositions per text. Finally, the histogram in the lower right panel show that preposition use is distributed normally with a mean of 132.2 prepositions per text. 
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mydata, aes(date, pptw)) +
+  geom_point() +
+  labs(x = "Year") +
+  labs(y = "Prepositions per 1,000 words") +
+  geom_smooth(method = "lm")  + 
+  theme_set(theme_bw(base_size = 20))
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mydata, aes(region, pptw)) +
+  geom_boxplot() +
+  labs(x = "Region") +
+  labs(y = "Prepositions per 1,000 words") +
+  geom_smooth(method = "lm") # with linear model smoothing!
+# include genre (lowess)
+```
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+ggplot(mydata, aes(date, pptw)) +
+  geom_point() +
+  facet_wrap(~ genre, nrow = 4) +
+  geom_smooth(method = "lm") +
+  theme_bw() +
+  labs(x = "Year") +
+  labs(y = "Prepositions per 1,000 words") +
+  coord_cartesian(ylim = c(0, 220))
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+################################################################################
+# centering numeric variables is useful for later interpretation of regression models:
+# if our numeric date variable was not centered, the regression would show the
+# effects of variables at year 0(!). if a variable is scaled, other variables are
+# variables are considered relative not to 0 but to the mean of year in our data.
+# centering simply means that the mean of the numeric vairbale is subtracted from
+# each value.
+mydata$date <- scale(mydata$date, scale = F)
+head(mydata)
+
+str(mydata)
+
+################################################################################
+# generate a glm baseline model
+m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
+# generate a lm base-line model
+m0.lm <- lm(pptw ~ 1, data = mydata)
+# set up first lme model including only the random effect specifying the random intercepts
+m0.lme = lme(pptw ~ 1, random = ~1|genre, data = mydata, method = "ML")
+# set up first lmer model including only the random effect specifying the random intercepts
+m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
+#  compare the base-line mdoel without intercept to the model with intercept
+# WARNING: set REML = T because REML provides better estimates for the random
+# effects part of the model (cf. Field, Miles & Field 2012:879)
+x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
+x2 <- x2 <- x2[[1]]
+test.ran.eff <- list(x2, pchisq(x2, df=2, lower.tail=F))
+test.ran.eff
+
+# set up m0 model but using the lmer function from the lme4 package
+# WARNING: REML must be FALSE OR method = "ML" (depending on the function)
+# when using anova to compare models!!! (cf. Field, Miles & Field 2012:)
+# "ML produces more accurate estimates of fixed regression parameters, whereas
+# REML produces more accurate estimates of random variances (Twisk 2006). [...]
+# Also, if you want to compare models you must use ML." (Field, Miles & Field 2012:879).
+m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
+m0.lmer2 <- lmer(pptw ~ (1|region) + 1, data = mydata, REML = T)
+m0.lmer3 <- lmer(pptw ~ (1|genre/region) + 1, data = mydata, REML = T)
+anova(m0.lmer1, m0.lmer2, m0.lmer3)
+
+# the model with the random effect structure (1|genre/region) performs
+# significantly better (also it has a much lower AIC and deviance)
+# therefore, m0.lmer3 is our new m0 model
+m0.lmer <- m0.lmer3
+# test if including the random effect is permitted by applying a restricted likelihood ratio test
+# WARNING: this test can only take simple random effect (1|genre) but not
+# (1|genre/date)
+exactRLRT(m0.lmer1)
+
+# there is another way to comper model with and without random effects: see below!
+
+# create a second model with date as a fixed effect
+# m1.lme <- lme(m0.lme, .~. + date) # alternative way to update the model
+m1.lme = lme(pptw ~ date, random = ~1|genre/region, data = mydata, method = "ML")
+# set up m1 model but using the lmer function from the lme4 package
+m1.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+
+# compare the models  to see if including date has improved the model
+# the difference between the modesl is the effect (size) of date!
+anova(m0.lme, m1.lme)
+
+# m1.lme is the better model (sig. p-value & lower AIC)
+# date correlates significantly with pptw (X2(1) = 8.81, p = .003);
+# X2 = L.Ratio;
+# df = subtract df smaller from df larger model
+# inspect results
+summary(m1.lme)
+
+# alternative display of the results
+anova(m1.lme)
+
+# test if date is significant
+anova(m0.lmer, m1.lmer)
+
+# extract estimates and sd for fixed and random effects
+intervals(m1.lme)
+
+# diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
+plot(m1.lme, genre ~ resid(.), abline = 0 )
+
+# the plot shows that there are some outliers (points outside the boxes) and
+# that the variability within letters is greater than in other genres
+# we therefore examine the genres in isolation
+# standardized residuals versus fitted values
+plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
+
+# the plot showing the standardized residuals versus fitted values
+# confirms that there are outliers in the letters
+# because there are obviously differences in the variance, we create a new model
+# which uses weights to compensate variance heterogeneiety of variance
+# (cf. Pinheiro & Bates 2000:177)
+m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
+# test if m2.lme is more appropriate for the data than m1.lme
+anova(m1.lme, m2.lme)
+
+# the heteroscedastitic model (i.e. m2.lme which uses weights to account for
+# unequal variance is performing significantly better than the homoscedastistic
+# model m1.lme
+
+# inspect results
+summary(m2.lme)
+
+# alternative display of the results
+anova(m2.lme)
+
+# test if date is significant
+anova(m0.lme, m2.lme)
+
+# extract estimates and sd for fixed and random effects
+intervals(m2.lme)
+
+# extract effect sizes (in the example: the effect size of date)
+# calculate effect size (this effect size measure works for all fixed effects)
+# to calculate the effect size, take the square root of the t-value squared divided
+# by the t-value squared plus the degrees of freedom: r = sqrt(t^2/(t^2+df))
+# WARNING: only apply this function to main effecst not involved in interactions
+# or higher level interactions but not to the main effects involved in
+# interactions as they are meaningless (cf. Field, Miles & Field 2012:641)
+ef.lme <- function(x) {
+  df <- summary(x)[[20]][6]
+  t <-  summary(x)[[20]][8]
+  #df <- summary(x)$tTable[, 3]
+  #t <- summary(x)$tTable[, 4]
+  r <- sqrt((t^2)/((t^2)+df))
+  return(paste("Pearson's r = ", round(r, 3)))
+  }
+ef.lme(m2.lme)
+
+# set up m1 model but using the lmer function from the lme4 package
+m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+
+# How to calculate the variance explained when only a simple random effect is involved:
+m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+summary(m2.lmer)
+# variance of random effect (145.2) devided by variance of random effect plus
+# residual variance (145.2+224.1) times 100 gives the variance explained by the random effect:
+#(145.2/(145.2+2284.1))*100 # percentage of variance explained by random effect
+
+# craete lmer with complex random effect structure
+m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+# an alternative for testing if including the random intercepts is permitted
+# WARNING: this method is not as good as applying a restricted likelihood
+# ratio test(!) because the p-value is only an approximation
+# IMPORTANT: the second model is a glm object
+2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)
+
+####################################################################
+### --- model diagnostics
+####################################################################
+# diagnostic plot (Pinheiro & Bates 2000:11, 182)
+# what we wish to see: a cloud of dots in the middle of the window without structure
+# what we do not want to see: a funnel-shaped cloud because this indicates an increase
+# of the errors/residuals with an increase of the predictor(s) (because this would indicate
+# heteroscedasticity)
+# in short: observed valuesagainst fitted values (cf. Pinheiro & Bates 2000:182)
+plot(m2.lme)
+
+# diagnostic plot (Pinheiro & Bates 2000:21)
+plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | genre, abline = 0)
+
+# diagnostic plot: residuals of fitted values against observed values (cf. Pinheiro & Bates 2000:182)
+qqnorm(m2.lme)
+
+# normal plot of the estimated date %in% genre random effects
+qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))
+
+# diagnostic plot: normal plots of the residuals by genre (cf. Pinheiro & Bates 2000:22, 179)
+qqnorm(m2.lme, ~resid(.) | genre )
+
+# inspect the observed responses versus the within-group fitted values
+# (cf. Pinheiro & Bates 2000:178)
+plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
+
+# TO DO
+# summary function for lme!
+
+summary(m2.lmer)
+```
+
+# Multiple Binomial Logistic Regression
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# Initiate the packages
+library(sjPlot)
+library(visreg)
+library(mlogit)
+library(plyr)
+library(rms)
+library(ggplot2)
+library(effects)
+source("rscripts/multiplot_ggplot2.R")
+source("rscripts/blr.summary.R")
+###########################################################################
+### Load and manipulate data
+###########################################################################
+# set options
+options("scipen" = 100, "digits" = 4)
+# read in existing s´data set mblrdata.txt
+mydata <- read.table("data/blrdata.txt", comment.char = "", quote = "", sep = "\t", header = T)
+# convert age, sex, and ethnicity into factors
+mydata$age <- as.factor(mydata$age)
+mydata$sex <- as.factor(mydata$sex)
+mydata$ethnicity <- as.factor(mydata$ethnicity)
+mydata$suf.eh <- as.numeric(mydata$suf.eh)
+# relevel factors age & ethnicity
+mydata$age <- relevel(mydata$age, "young")
+mydata$ethnicity <- relevel(mydata$ethnicity, "Pakeha")
+# provide an overview of the data
+head(mydata); str(mydata); summary(mydata)
+
+###########################################################################
+p1 <- ggplot(mydata, aes(sex, suf.eh, color = sex)) +
+  scale_fill_brewer() +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  labs(x = "Sex", y = "Mean frequency of EH")
+p2 <- ggplot(mydata, aes(age, suf.eh, color = age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Age", y = "Mean frequency of EH") +
+  scale_color_manual(values = c("darkblue", "lightblue"))
+p3 <- ggplot(mydata, aes(ethnicity, suf.eh, colour = ethnicity)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Ethnicity", y = "Mean frequency of EH", colour = "ethnicity") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+p4 <- ggplot(mydata, aes(ethnicity, suf.eh, colour = sex)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= sex)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Ethnicity", y = "Mean frequency of EH", colour = "sex")
+p5 <- ggplot(mydata, aes(sex, suf.eh, colour = age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= age)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Sex", y = "Mean frequency of EH", colour = "age") +
+  scale_color_manual(values = c("darkblue", "lightblue"))
+p6 <- ggplot(mydata, aes(age, suf.eh, colour = ethnicity)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= ethnicity)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Age", y = "Mean frequency of EH", colour = "ethnicity") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+# display the plots
+multiplot(p1, p4, p2, p5, p3, p6, cols = 3)
+
+###########################################################################
+p7 <- ggplot(mydata, aes(age, suf.eh, colour = sex)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ ethnicity, nrow = 1) +
+  coord_cartesian(ylim = c(0, 0.75)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "", y = "Mean frequency of EH", colour = "sex")
+p8 <- ggplot(mydata, aes(age, suf.eh, colour = ethnicity)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group = ethnicity)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ sex, nrow = 1) +
+  coord_cartesian(ylim = c(0, 0.75)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "", y = "Mean frequency of EH", colour = "ethnicity") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+p9 <- ggplot(mydata, aes(ethnicity, suf.eh, colour = age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group = age)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ sex, nrow = 1) +
+  coord_cartesian(ylim = c(0, 0.75)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "", y = "Mean frequency of EH", colour = "age") +
+  scale_color_manual(values = c("darkblue", "lightblue"))
+# display the plots
+multiplot(p7, p8, p9, cols = 1)
+
+###########################################################################
+### --- Model Building
+###########################################################################
+# set options
+options(contrasts  =c("contr.treatment", "contr.poly"))
+mydata.dist <- datadist(mydata)
+options(datadist = "mydata.dist")
+# a few words on glm vs lrm: Baayen (2008:196-197) states that lrm should be
+# the function of choice in cases where each row contains
+# exactly 1 success OR failure (1 or 0) while glm is preferrable if there are two
+# columns holding the number of successes and the number of failures
+# respectively. i have tried it both ways and both functions work fine if
+# each row contains exactly 1 success OR failure but only glm can handle the
+# latter case.
+# generate initial saturated regression model including
+# all variables and their interactions
+m0.glm = glm(suf.eh ~ 1, family = binomial, data = mydata) # baseline model glm
+m0.lrm = lrm(suf.eh ~ 1, data = mydata, x = T, y = T) # baseline model lrm
+# inspect results
+summary(m0.glm)
+
+###########################################################################
+# create saturated model
+m1.glm = glm(suf.eh ~ age*sex*ethnicity, family = binomial, data = mydata)
+m1.lrm = lrm(suf.eh ~ age*sex*ethnicity, data = mydata, x = T, y = T)
+# inspect results
+summary(m1.glm)
+
+###########################################################################
+# model fitting
+# fit the model to find the "best" model, i.e. the minimal adequate model
+# we will use a step-wise step down procedure
+#	manual modelfitting
+m2.glm <- update(m1.glm, . ~ . -age:sex:ethnicity)
+anova(m1.glm, m2.glm, test = "Chi")
+
+summary(m2.glm)
+
+m3.glm <- update(m2.glm, . ~ . -sex:ethnicity)
+anova(m2.glm, m3.glm, test = "Chi")
+
+summary(m3.glm)
+
+m4.glm <- update(m3.glm, . ~ . -age:sex)
+anova(m3.glm, m4.glm, test = "Chi")
+
+summary(m4.glm)
+
+m5.glm <- update(m4.glm, . ~ . -age:ethnicity)
+anova(m4.glm, m5.glm, test = "Chi")
+
+summary(m5.glm)
+
+m6.glm <- update(m5.glm, . ~ . -ethnicity)
+anova(m5.glm, m6.glm, test = "Chi")
+
+summary(m6.glm)
+
+m6.lrm <- lrm(suf.eh ~ age+sex, data = mydata, x = T, y = T, linear.predictors = T)
+m6.lrm
+
+anova(m6.lrm)
+
+# validate model (this shows how many predictors are retained if the sample is
+# re-selected with the same size but with placing back the drwan data point
+validate(m1.lrm, bw = T, B = 200)
+
+# the validate function shows that retaining 4 predictors is the best option
+
+# determine penalty
+pentrace(m6.lrm, seq(0, 0.8, by = 0.05))
+# the pentrace function proposes a penaty of .8 but the values are so similar
+# that a penalty is unneccessary
+
+# rename final minimal adeqaute model
+lr.glm <- m6.glm
+lr.lrm <- m6.lrm
+###########################################################################
+# calculate model x^2 manually (reported in lr.lrm as Model Likelihood Ratio Test
+modelChi <- lr.glm$null.deviance - lr.glm$deviance
+chidf <- lr.glm$df.null - lr.glm$df.residual
+chisq.prob <- 1 - pchisq(modelChi, chidf)
+modelChi; chidf; chisq.prob
+
+# calculate pseudo R^2
+# number of cases
+ncases <- length(fitted(lr.glm))
+R2.hl <- modelChi/lr.glm$null.deviance
+R.cs <- 1 - exp ((lr.glm$deviance - lr.glm$null.deviance)/ncases)
+R.n <- R.cs /( 1- ( exp (-(lr.glm$null.deviance/ ncases))))
+# function for extracting pseudo-R^2
+logisticPseudoR2s <- function(LogModel) {
+  dev <- LogModel$deviance
+	nullDev <- LogModel$null.deviance
+	modelN <-  length(LogModel$fitted.values)
+	R.l <-  1 -  dev / nullDev
+	R.cs <- 1- exp ( -(nullDev - dev) / modelN)
+	R.n <- R.cs / ( 1 - ( exp (-(nullDev / modelN))))
+	cat("Pseudo R^2 for logistic regression\n")
+	cat("Hosmer and Lemeshow R^2  ", round(R.l, 3), "\n")
+	cat("Cox and Snell R^2        ", round(R.cs, 3), "\n")
+	cat("Nagelkerke R^2           ", round(R.n, 3),    "\n") }
+logisticPseudoR2s(lr.glm)
+
+# extract the confidence intervalls for the coefficients
+confint(lr.glm)
+
+#Compute odds ratio
+exp(lr.glm$coefficients)
+
+exp(confint(lr.glm))
+
+# compare the initial saturated model to the minimal adeqaute model
+#anova(m0.glm, m6.glm)
+anova(m0.glm, lr.glm, test = "Chi")
+
+##########################################################################
+# convert data into a by.speaker format
+mydata.by.spk <- table(mydata$file.speaker.id, mydata$suf.eh)
+mydata.by.spk <- data.frame(rownames(mydata.by.spk), mydata.by.spk[, 1], mydata.by.spk[, 2])
+names(mydata.by.spk) <- c("file.speaker.id", "no.eh", "eh")
+rownames(mydata.by.spk) <- 1:length(mydata.by.spk[,1])
+# add biodata
+mydata.by.spk <- join(mydata.by.spk, mydata, by = "file.speaker.id", type = "left", match = "first")
+# remove suf.eh
+mydata.by.spk$suf.eh <- NULL
+head(mydata.by.spk)
+
+# check accuracy of the model
+# use by.spk data to fit another model which we will use to test the accuracy of the model
+lr.glm.spk <- glm(cbind(eh, no.eh) ~ age*sex + ethnicity + age: ethnicity, data = mydata.by.spk, family = binomial)
+correct <- sum(mydata.by.spk$eh * (predict(lr.glm.spk, type = "response") >= 0.5)) + sum(mydata.by.spk$no.eh * (predict(lr.glm.spk, type="response") < 0.5))
+tot <- sum(mydata.by.spk$eh) + sum(mydata.by.spk$no.eh)
+predict.acc <- (correct/tot)*100
+predict.acc
+
+# 66.28% accuracy! WOW -but wait a second... ;)
+
+# check accuracy of base line model
+lr.glm.spk.base <- glm(cbind(eh, no.eh) ~ 1, data = mydata.by.spk, family = binomial)
+correct.b <- sum(mydata.by.spk$eh * (predict(lr.glm.spk.base, type = "response") >= 0.5)) + sum(mydata.by.spk$no.eh * (predict(lr.glm.spk.base, type="response") < 0.5))
+tot.b <- sum(mydata.by.spk$eh) + sum(mydata.by.spk$no.eh)
+predict.acc.base <- (correct.b/tot.b)*100
+predict.acc.base
+
+# 66.28% accuracy - hm... why that? because both models always preditc no.eh(!)
+# because the probability of eh occurring is so low!
+# test this with:
+#which(lr.glm.spk$fitted > .5)
+#which(lr.glm.spk.base$fitted > .5)
+##########################################################################
+# plot effects using the visreg package (cf. Breheny & Burchett 2013)
+par(mfrow = c(2, 2))
+visreg(lr.glm, "age", xlab = "Age", ylab = "Log odds (eh)", ylim = c(-7, 0))
+visreg(lr.glm, "sex", xlab = "Sex", ylab = "Log odds (eh)", ylim = c(-7, 0))
+
+# visualize effects using sjPlot
+# (cf. http://strengejacke.wordpress.com/2013/03/22/plotting-lm-and-glm-models-with-ggplot-rstats/)
+#library(sjPlot)
+#sjp.glm(lr.glm, axisLabels.y = c("Sex:Male", "Age:Old"), gridBreaksAt = 0.5)
+par(mfrow = c(1, 1))
+##########################################################################
+### --- model diagnostics
+##########################################################################
+# checking for multicollinearity
+# checking multicolliniarity:
+# extract variance inflation factors (VIF) (values greater 10 should/must be
+# excluded; cf Myers 1990)
+#
+# "generally, VIF > 10 ! absence of absolute collinearity in the model cannot
+# be claimed.
+#
+# VIF > 4 are usually already problematic but,
+# for large data sets, even VIFs > 2 can lead inflated standard errors"
+# (Jaeger 2013:http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&do=view&target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf).
+vif(lr.glm)
+
+# checking multicolliniarity: tolerance is 1/VIF
+# values smaller than .01 should/must be excluded
+# Menard 1995 states that values smaller than .2 are problematic
+1/vif(lr.glm)
+
+# mean VIF: should not be greater than 1 (Bowerman & O'Connell 1990)
+mean(vif(lr.glm))
+
+##########################################################################
+# add diagnostic parameters to mydata
+# we add some informational columns to our data set
+# extract case wise diagnostics and add them to the data set
+infl <- influence.measures(lr.glm)
+
+# add influence statistics to data
+mydata <- data.frame(mydata, infl[[1]], infl[[2]])
+head(mydata)
+
+##########################################################################
+# continue diagnostics
+# checking sample size (Green 1991)
+# if you are interested in the overall model: 50 + 8k (k = number of predictors)
+# if you are interested in individual predictors: 104 + k
+# if you are interesetd in both: take the higher value!
+smplesz <- function(x) {
+  ifelse((length(x$fitted) < (104 + ncol(summary(x)$coefficients)-1)) == TRUE,
+    return(
+      paste("Sample too small: please increase your sample by ",
+      104 + ncol(summary(x)$coefficients)-1 - length(x$fitted),
+      " data points", collapse = "")),
+    return("Sample size sufficient")) }
+smplesz(lr.glm)
+
+###########################################################################
+# summarize regression analysis
+blrm.summary(lr.glm, lr.lrm, predict.acc)
+
+```
+
+## Model Fit Parameters
+
+
+### R2 (Hosmer & Lemeshow)
+ "Rt is the proportional reduction in the absolute value of the log-likelihood
+ measure and as such it is a measure of how much the badness of fit improves
+ as a result of the inclusionof the predictor variables. It can vary between 0
+(indicating that the predictors are useless at predicting the outcome variable)
+ and 1 (indicating that the model predicts the outcome variable perfectly)"
+([@field2012discovering 317]).
+
+### R2 (Cox & Snell)
+ "Cox and Snell's R~s (1989) is based on the deviance of the model (-2LL(new»)
+ and the deviance of the baseline model (-2LL(baseline), and the sample size,
+ n [...]. However, this statistic never reaches its theoretical maximum of 1.
+
+### R2 (Nagelkerke)
+ Since R2 (Cox & Snell) never reaches its theoretical maximum of 1,
+ Nagelkerke (1991) suggested Nagelkerke's R^2. (Field, Miles & Field 2012:317-318).
+
+### Somers’ Dxy
+ Somers’ Dxy is a rank correlation between predicted probabilities and observed
+ responses ranges between 0 (randomness) and 1 (perfect prediction). (cf. [@baayen2008analyzing 204]).
+
+### C
+ C is an index of concordance between the predicted probability and the
+ observed response. When C takes the value 0.5, the predictions are random,
+ when it is 1, prediction is perfect. A value above 0.8 indicates that the
+ model may have some real predictive capacity (cf. [@baayen2008analyzing 204]).
+
+### Akaike information criteria (AIC)
+ Akaike information criteria (AlC = -2LL + 2k) provide a value that reflects a ratio between the number of predictors in the model and the variance that is explained by these predictors. Changes in AIC can serve as a measure of whether the inclusion of a variable leads to a significant incerase in the amount of variance that is explained by the model. "You can think of this as the price you pay for something: you get a better  value of R2, but you pay a higher price, and was that higher price worth it?  These information criteria help you to decide.model. The BIC is the same as  the AIC but adjusts the penalty included in the AlC (i.e., 2k) by the number  of cases: BlC = -2LL + 2k x log(n) in which n is the number of cases in the  model" ([@field2012discovering 318]).
+
+# Mixed Effects Binomial Logistic Regression
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# Initiate the packages
+library(Hmisc)
+library(RLRsim)
+library(sjPlot)
+library(visreg)
+library(mlogit)
+library(plyr)
+library(rms)
+library(ggplot2)
+library(effects)
+library(lme4)
+library(languageR)
+#library(nlme)
+source("rscripts/multiplot_ggplot2.R")
+source("rscripts/PseudoR2lmerBinomial.R")
+source("rscripts/meblr.summary.R")
+###########################################################################
+### Load and manipulate data
+###########################################################################
+# set options
+options("scipen" = 100, "digits" = 4)
+# read in existing s´data set mblrdata.txt
+mydata <- read.table("data/blrdata.txt", comment.char = "", quote = "", sep = "\t", header = T)
+# convert age, sex, and ethnicity into factors
+mydata$age <- as.factor(mydata$age)
+mydata$sex <- as.factor(mydata$sex)
+mydata$ethnicity <- as.factor(mydata$ethnicity)
+mydata$suf.eh <- as.numeric(mydata$suf.eh)
+# relevel factors age & ethnicity
+mydata$age <- relevel(mydata$age, "young")
+mydata$ethnicity <- relevel(mydata$ethnicity, "Pakeha")
+# provide an overview of the data
+head(mydata); str(mydata); summary(mydata)
+
+###########################################################################
+p1 <- ggplot(mydata, aes(sex, suf.eh, color = sex)) +
+  scale_fill_brewer() +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  labs(x = "Sex", y = "Mean frequency of EH")
+p2 <- ggplot(mydata, aes(age, suf.eh, color = age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Age", y = "Mean frequency of EH") +
+  scale_color_manual(values = c("darkblue", "lightblue"))
+p3 <- ggplot(mydata, aes(ethnicity, suf.eh, colour = ethnicity)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Ethnicity", y = "Mean frequency of EH", colour = "ethnicity") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+p4 <- ggplot(mydata, aes(ethnicity, suf.eh, colour = sex)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= sex)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Ethnicity", y = "Mean frequency of EH", colour = "sex")
+p5 <- ggplot(mydata, aes(sex, suf.eh, colour = age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= age)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Sex", y = "Mean frequency of EH", colour = "age") +
+  scale_color_manual(values = c("darkblue", "lightblue"))
+p6 <- ggplot(mydata, aes(age, suf.eh, colour = ethnicity)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= ethnicity)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Age", y = "Mean frequency of EH", colour = "ethnicity") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+# display the plots
+multiplot(p1, p4, p2, p5, p3, p6, cols = 3)
+
+###########################################################################
+p7 <- ggplot(mydata, aes(age, suf.eh, colour = sex)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ ethnicity, nrow = 1) +
+  coord_cartesian(ylim = c(0, 0.75)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "", y = "Mean frequency of EH", colour = "sex")
+p8 <- ggplot(mydata, aes(age, suf.eh, colour = ethnicity)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group = ethnicity)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ sex, nrow = 1) +
+  coord_cartesian(ylim = c(0, 0.75)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "", y = "Mean frequency of EH", colour = "ethnicity") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+p9 <- ggplot(mydata, aes(ethnicity, suf.eh, colour = age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group = age)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  facet_wrap(~ sex, nrow = 1) +
+  coord_cartesian(ylim = c(0, 0.75)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "", y = "Mean frequency of EH", colour = "age") +
+  scale_color_manual(values = c("darkblue", "lightblue"))
+# display the plots
+multiplot(p7, p8, p9, cols = 1)
+
+###########################################################################
+# test if all cells are filled: none of the cells can hold values of 0!
+table(mydata$suf.eh, mydata$age, mydata$sex, mydata$ethnicity)
+```
+
+## Model Building
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# set options
+options(contrasts  =c("contr.treatment", "contr.poly"))
+mydata.dist <- datadist(mydata)
+options(datadist = "mydata.dist")
+# a few words on glm vs lrm: Baayen (2008:196-197) states that lrm should be
+# the function of choice in cases where each row contains
+# exactly 1 success OR failure (1 or 0) while glm is preferrable if there are two
+# columns holding the number of successes and the number of failures
+# respectively. i have tried it both ways and both functions work fine if
+# each row contains exactly 1 success OR failure but only glm can handle the
+# latter case.
+# generate initial saturated regression model including
+# all variables and their interactions
+m0.glm = glm(suf.eh ~ 1, family = binomial, data = mydata) # baseline model glm
+m0.lrm = lrm(suf.eh ~ 1, data = mydata, x = T, y = T) # baseline model lrm
+# inspect results
+summary(m0.glm)
+
+m0.lrm
+
+###########################################################################
+# create model with a random intercept for file.speaker.id
+#m1.lmer <- lmer(suf.eh ~ (1|file.speaker.id), data = mydata, family = binomial)
+# Baayen (2008:278-284) uses the call above but the this call is now longer
+# up-to-date because the "family" parameter is deprecated
+# we switch to glmer (suggested by R) instead but we will also
+# create a lmer object of the final minimal adequate model as some functions
+# will not (yet) work on glmer
+m0.glmer = glmer(suf.eh ~ (1|file.speaker.id), data = mydata, family = binomial)
+
+# results of the lmer object
+print(m0.lmer, corr = F)
+
+# check if including the random effect is permitted by comparing the aic from the glm to aic from the glmer model
+aic.glmer <- AIC(logLik(m0.glmer))
+aic.glm <- AIC(logLik(m0.glm))
+aic.glmer; aic.glm
+
+# the aic of the glmer object is smaller which shows that including the random
+# intercepts is justified
+
+# inspect results
+summary(m0.glm)
+
+summary(m0.glmer)
+
+```
+
+## Model Fitting
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+
+# fit the model to find the "best" model, i.e. the minimal adequate model
+# we will use a step-wise step down procedure
+# step-wise step up, i.e. forward, would be much easier but the problem with stepwise step up
+# is that the likelyhood of type II errors is much higher than with step-wise
+# step down, i.e. backward elimination(cf. Field, Miles & Field 2012:265)
+# we need to add "control = glmerControl(optimizer = "bobyqa")" because otherwise R fails to converge
+#	manual modelfitting
+m0.glmer <- glmer(suf.eh ~ 1+ (1|file.speaker.id), family = binomial, data = mydata, control=glmerControl(optimizer="bobyqa"))
+m1.glmer <- glmer(suf.eh ~ age+ (1|file.speaker.id), family = binomial, data = mydata, control=glmerControl(optimizer="bobyqa"))
+m2.glmer <- glmer(suf.eh ~ age+sex+ (1|file.speaker.id), family = binomial, data = mydata, control=glmerControl(optimizer="bobyqa"))
+m3.glmer <- glmer(suf.eh ~ age+sex+ethnicity+ (1|file.speaker.id), family = binomial, data = mydata, control = glmerControl(optimizer="bobyqa"))
+m4.glmer <- glmer(suf.eh ~ age+sex+ethnicity+age:sex+ (1|file.speaker.id), family = binomial, data = mydata, control = glmerControl(optimizer = "bobyqa"))
+m5.glmer <- glmer(suf.eh ~ age+sex+ethnicity+age:sex+age:ethnicity+ (1|file.speaker.id), family = binomial, data = mydata, control = glmerControl(optimizer = "bobyqa"))
+m6.glmer <- glmer(suf.eh ~ age+sex+ethnicity+age:sex+age:ethnicity+sex:ethnicity+ (1|file.speaker.id), family = binomial, data = mydata, control = glmerControl(optimizer = "bobyqa"))
+m7.glmer <- glmer(suf.eh ~ age+sex+ethnicity+age:sex+age:ethnicity+sex:ethnicity+age:sex:ethnicity+ (1|file.speaker.id), family = binomial, data = mydata, control = glmerControl(optimizer = "bobyqa"))
+
+# test which models are the most adequate
+# we compare all models because this way, we get an overview of model paramerets
+# and can check which model has the lowerst AIC, BIC, and the highest X^2 value
+anova(m0.glmer, m1.glmer, m2.glmer, m3.glmer, m4.glmer, m5.glmer, m6.glmer, m7.glmer, test = "Chi")
+
+# based on the overview, we expext m5.glmer to be the best model.
+# we confirm this hypothesis by testing if deleting a variable significantly
+# decreases model fit (if the models differ significantly then the deletion is
+# not permitted and the effect has to remain in the model
+# we begin by comparing the model with all main effects and all interactions to
+# a model without the three-way-interaction and continue to delete insig. interactions and finally main effects
+anova(m0.glmer, m1.glmer, test = "Chi") # m1 is better than m0 and they do not differ significantly thus we proceed with m2
+
+anova(m1.glmer, m2.glmer, test = "Chi") # m2 is better than m1 and they do not differ significantly thus we proceed with m2
+
+anova(m2.glmer, m3.glmer, test = "Chi") # m3 is NOT better than m2 and they do not differ significantly thus we proceed with m2
+
+anova(m2.glmer, m4.glmer, test = "Chi") # m4 is NOT better than m2 and they do not differ significantly thus we proceed with m2
+
+anova(m2.glmer, m5.glmer, test = "Chi") # m5 is NOT better than m2 and they do not differ significantly thus we proceed with m2
+
+anova(m2.glmer, m6.glmer, test = "Chi") # m6 is NOT better than m2 and they do not differ significantly thus we proceed with m2
+
+anova(m2.glmer, m7.glmer, test = "Chi") # m7 is NOT better than m2 and they do not differ significantly thus we proceed with m2
+
+# m2.glmer is our final model!
+# rename final minimal adeqaute model
+mlr.glmer <- m2.glmer
+
+# test if the final minimal adequate model performs better than the base-line model
+anova(mlr.glmer, m0.glmer, test = "Chi")
+
+# inspect results of the final minimal adequate model
+print(mlr.glmer, corr = F)
+
+# alternative result display (anova)
+anova(mlr.glmer)
+
+# extract the parameters of the fixed effects for the report
+# to do that, we compare the model with only the random effect to a model with
+# the random effect and the fixed effect for age
+anova(m0.glmer, m1.glmer, test = "Chi") # effect of age
+
+# we now test the effect of sex by adding sex as a fixed effect
+anova(m1.glmer, m2.glmer, test = "Chi") # effect of sex
+
+```
+
+## Extracting Model Fit Parameters
+
+
+We now create a lmr object equivalent to the final minimal adequate model but without the random effect.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+mlr.lrm <- lrm(suf.eh ~ age + sex, data = mydata, x = T, y = T)
+m1.glm = glm(suf.eh ~ age + sex, family = binomial, data = mydata) # baseline model glm
+# we now create a lmer object equivalent to the final minimal adequate model
+mlr.lmer <- lmer(suf.eh ~ age + sex+ (1|file.speaker.id), data = mydata, family = binomial)
+
+# now we check if the fixed effects of the lrm and the lmer model correlate (cf Baayen 2008:281)
+cor.test(coef(mlr.lrm), fixef(mlr.lmer))
+
+# the fixed effects do not correlate strongly - this is not good as it suggests that
+# the coefficient estimates are not very stable
+
+# we activate the package Hmisc (if not already active)
+library(Hmisc)
+# we now extract model fit parameters (cf Baayen 2008:281)
+probs = 1/(1+exp(-fitted(mlr.lmer)))
+probs = binomial()$linkinv(fitted(mlr.lmer))
+somers2(probs, as.numeric(mydata$suf.eh))
+
+# the model fit values indicate a very good fit:
+# C
+# "The measure named C is an index of concordance between the predicted
+# probability and the observed response. [...] When C takes the value 0.5, the
+# predictions are random, when it is 1, prediction is perfect. A value above
+# 0.8 indicates that the model may have some real predictive capacity."
+# (Baayen 2008:204)
+# "Somers’ Dxy,
+# a rank correlation between predicted probabilities and observed responses, [...]
+# ranges between 0 (randomness) and 1 (perfect prediction)." (Baayen 2008:204)
+
+```
+
+## Model Diagnostics
+
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# model diagnostics: plot fitted against residuals
+plot(mlr.glmer)
+
+# plot residuals against fitted
+plot(mlr.glmer, form = resid(., type = "response") ~ fitted(.) | file.speaker.id, abline = 0, cex = .5,id = 0.05, adj = -0.3)
+
+# diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
+plot(mlr.glmer, file.speaker.id ~ resid(.), abline = 0 , cex = .5)
+
+# summarize final model
+meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mydata$suf.eh)
+
+
+```
+
+# Conditional Inference Trees
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# load libraries
+library(Rling)
+# set options
+options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.prAmplified=10000)
+###############################################################
+# load data
+reallyaus <- read.table("data/ampaus05_statz.txt", sep = "\t", header = T)
+# inspect data
+str(reallyaus)
+
+# remove superfluous columns
+reallyaus$FileSpeaker <- NULL
+reallyaus$Occupation <- NULL
+reallyaus$very <- NULL
+# inspect colnames
+colnames(reallyaus)
+
+# define vector for data inspection
+clfct <- c("Age", "Adjective", "Function", "Priming", "Gender", "ConversationType", 
+          "AudienceSize", "really", "Gradabilty", "SemanticCategory", "Emotionality")
+# factorize data
+reallyaus[clfct] <- lapply(reallyaus[clfct], factor)
+# inspect data
+str(reallyaus)
+
+```
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+library(partykit)
+# create data
+citd <- reallyaus
+# set.seed
+set.seed(111) 
+# apply bonferroni correction (1 minus alpha multiplied by n of predictors)
+control = ctree_control(mincriterion = 1-(.05*14))
+# create initial conditional inference tree model
+citd.ctree <- ctree(really ~ Age + Adjective + Function + Priming + Gender + 
+                      ConversationType + AudienceSize +  Freq + 
+                      Gradabilty + SemanticCategory + Emotionality,
+                    data = citd)
+# plot final ctree
+png("images/final_ctree.png",  width = 680, height = 480) 
+plot(citd.ctree, gp = gpar(fontsize = 8))
+dev.off()
+# test prediction accuracy
+ptb <- table(predict(citd.ctree), citd$really)
+(((ptb[1]+ptb[4])+(ptb[2]+ptb[3]))/sum(table(predict(citd.ctree), citd$really)))*100
+##100
+
+# determine baseline
+(table(citd$really)[[2]]/sum(table(citd$really)))*100
+## 41.08
+
+```
+#  Random Forests
+
+## Example 1:
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+# prepare data
+rfd <- reallyaus
+# convert really into a factor
+rfd$really <- as.factor(rfd$really)
+# start with random forest
+# set seed
+set.seed(222)
+# partition data for evaluating rf 
+id <- sample(2, nrow(rfd), replace = T, prob = c(.7, .3))
+train <- rfd[id == 1, ]
+test <- rfd[id == 2,]
+# load library
+library(randomForest)
+# create initial model
+reallyaus_rf1 <- randomForest(really~., data = train)
+# inspect model
+print(reallyaus_rf1)
+
+# inspect attibutes
+attributes(reallyaus_rf1)
+
+# start model evaluation
+# install package
+#source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
+#install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
+#                                      "http://cran.rstudio.com/", dependencies=TRUE))
+#install.packages("dimRed", dependencies = TRUE)
+#install.packages('caret', dependencies = TRUE)
+
+# load caret library
+library(caret) # because initially caret did not work, the libraries above had to be installed
+# extract prediction for training data
+ptrain1 <- predict(reallyaus_rf1, train)
+# inspect predictions
+head(ptrain1); head(train$really)
+
+# create confusionMatrix
+confusionMatrix(ptrain1, train$really)
+
+# extract prediction for test data
+ptest1 <- predict(reallyaus_rf1, test)
+# create confusionMatrix
+confusionMatrix(ptest1, test$really)
+
+# determine errorrate of random forest model
+plot(reallyaus_rf1, main = "")
+
+# tune model
+reallyaus_rf2 <- tuneRF(train[, !colnames(train)== "really"], train[, colnames(train)== "really"], 
+                        stepFactor = .5, # for most values 6 appears to be optimal
+                        plot = T,
+                        ntreeTry = 200,
+                        trace = T,
+                        improve = .05
+)
+# create improved model
+reallyaus_rf2 <- randomForest(really~., data = train, 
+                              ntree = 200,
+                              ntry = 6,
+                              importance= T,
+                              proximity = T)
+# inspect model
+print(reallyaus_rf2)
+
+# predict based on improved model
+ptrain2 <- predict(reallyaus_rf2, train)
+# create confusionMatrix
+confusionMatrix(ptrain2, train$really)
+
+# extract prediction for test data
+ptest2 <- predict(reallyaus_rf2, test)
+# create confusionMatrix
+confusionMatrix(ptest2, test$really)
+
+# inspect number of nodes for trees
+hist(treesize(reallyaus_rf2), main = "", col = "lightgray")
+
+# check variable importance
+varImpPlot(reallyaus_rf2, main = "", pch = 20) 
+# left plot (Accuracy): how much accuracy decreases if factor is left out
+# left plot (Gini/Pureness): how much more unpure (ambigious) the distributions become if fector is left out
+# extract variable importance values
+#importance(reallyaus_rf2)
+
+#which variables have been used in the trees
+varUsed(reallyaus_rf2)
+
+# partial dependence plot
+partialPlot(reallyaus_rf2, train, Freq, 1)
+
+partialPlot(reallyaus_rf2, train, ConversationType, 1)
+
+partialPlot(reallyaus_rf2, train, Function, 1)
+
+partialPlot(reallyaus_rf2, train, SemanticCategory, 1)
+
+partialPlot(reallyaus_rf2, train, Gender, 1)
+
+
+# extract tree
+getTree(reallyaus_rf2, 1, labelVar = T)
+
+# mds plot
+MDSplot(reallyaus_rf2, test$really)
+
+
+```
+
+## Example 2:
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+# detach partykit
+detach("package:partykit", unload=TRUE)
+# load package party
+library(party)
+# prepare data
+rfd <- reallyaus
+# set seed
+set.seed(333)
+
+# create initial model
+reallyaus.rf <- cforest(really ~ Age + Adjective + Function + Priming + Gender + 
+                          ConversationType + AudienceSize +  Freq + 
+                          Gradabilty + SemanticCategory + Emotionality,
+                        data = rfd, controls = cforest_unbiased(ntree = 50, mtry = 3))
+# determine importance of factors
+reallyaus.varimp <- varimp(reallyaus.rf, conditional = T)
+round(reallyaus.varimp, 3)
+
+# plot result
+dotchart(sort(reallyaus.varimp), pch = 20, main = "Conditional importance of variables")
+# load library
+library(Hmisc)
+# evaluate random forst
+reallyaus.rf.pred <- unlist(treeresponse(reallyaus.rf))[c(FALSE,TRUE)]
+somers2(reallyaus.rf.pred, as.numeric(rfd$really) - 1)
+##     C         Dxy           n     Missing 
+##0.8119422   0.6238843 314.0000000   0.0000000 
+
+
+```
+
+
+## Example 3:
+
+```{r echo=F, message=FALSE, warning=FALSE}
+
+#                     RANDOM FOREST III
+# load library
+library(party)
+# create data
+randomforestdata <- reallyaus
+
+cf1 <- cforest(really ~ . , data= randomforestdata, control=cforest_unbiased(mtry=2,ntree=100)) # fit the random forest
+varimp(cf1) # get variable importance, based on mean decrease in accuracy
+
+varimp(cf1, conditional=TRUE) # conditional=True, adjusts for correlations between predict
+
+varimpAUC(cf1)  # more robust towards class imbalance.
+par(mar = c(5, 8, 4, 2) + 0.1)
+plot(y = 1:length(varimpAUC(cf1)), x = varimpAUC(cf1)[order(varimpAUC(cf1))], 
+     axes = F, ann = F, pch = 20, xlim = c(-0.01, 0.05), main = "Predictor Importance")
+axis(1, at = seq(-0.01, 0.05, 0.005), seq(-0.01, 0.05, 0.005))
+axis(2, at = 1:length(varimpAUC(cf1)), names(varimpAUC(cf1))[order(varimpAUC(cf1))], las = 2)
+grid()
+box()
+par(mar = c(5, 4, 4, 2) + 0.1)
+
+
+```
+
+# Boruta
+
+```{r echo=F, message=FALSE, warning=FALSE}
+# load library
+library(Boruta)
+# create dada for boruta
+borutadata <- reallyaus
+# run 1
+boruta.ampaus <- Boruta(really~.,data=borutadata)
+print(boruta.ampaus)
+
+getConfirmedFormula(boruta.ampaus)
+
+plot(boruta.ampaus, cex = .75)
+
+
+plotImpHistory(boruta.ampaus)
+
+# remove superfluous variables
+borutadata$Emotionality <- NULL
+borutadata$Priming <- NULL
+borutadata$Age <- NULL
+borutadata$SemanticCategory <- NULL
+# run2
+boruta.ampaus <- Boruta(really~.,data=borutadata)
+print(boruta.ampaus)
+
+getConfirmedFormula(boruta.ampaus)
+
+plot(boruta.ampaus, cex = .75)
+
+plotImpHistory(boruta.ampaus)
+
+getConfirmedFormula(boruta.ampaus)
+par(mar = c(18, 8, 4, 2) + 0.1)
+plot(boruta.ampaus, cex.axis=2, las=2, xlab="", ylab = "", cex = 2, 
+     col = c("grey50", "grey50", "grey50",  "grey50", "grey50", "grey50", "grey50","grey90","grey90","grey90"))
+abline(v = 3.5, lty = "dashed")
+mtext("Predictors", 1, line = 16, at = 7, cex = 3)
+mtext("Control", 1, line = 16, at = 2, cex = 3)
+mtext("Importance", 2, line = 2.5, at = 2.5, cex = 3, las = 0)
+
+par(mar = c(5, 4, 4, 2) + 0.1)
+plot(boruta.ampaus)
+
+plotImpHistory(boruta.ampaus)
+
+
+```
 
 # References
 

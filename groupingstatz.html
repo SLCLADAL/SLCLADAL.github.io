@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+<meta name="author" content="UQ SLC Digital Team" />
+
+<meta name="date" content="2019-01-23" />
+
+<title>Statistics: Pattern-Detection</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-5.0.13/css/fa-svg-with-js.css" rel="stylesheet" />
+<script src="site_libs/font-awesome-5.0.13/js/fontawesome-all.min.js"></script>
+<script src="site_libs/font-awesome-5.0.13/js/fa-v4-shims.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+  padding-left: 25px;
+  text-indent: 0;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">LADAL</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-play-circle"></span>
+     
+    Basics
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Basics</li>
+    <li>
+      <a href="introquant.html">Introduction To Quantitative Reasoning</a>
+    </li>
+    <li>
+      <a href="researchdesigns.html">Research Designs</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-gear"></span>
+     
+    Data Processing
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Data Processing</li>
+    <li>
+      <a href="intror.html">Basics: Getting started with R</a>
+    </li>
+    <li>
+      <a href="loading.html">Loading and saving data</a>
+    </li>
+    <li>
+      <a href="introtables.html">Tabulating data</a>
+    </li>
+    <li>
+      <a href="webcrawling.html">Web Crawling</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-bar-chart"></span>
+     
+    Visualization
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Visualization</li>
+    <li>
+      <a href="basicgraphs.html">Basic Visualization Techniques</a>
+    </li>
+    <li>
+      <a href="advancedgraphs.html">Advanced Visualization Techniques</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-eye"></span>
+     
+    Statistics
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Statistics</li>
+    <li>
+      <a href="descriptives.html">Descriptive Statistics</a>
+    </li>
+    <li>
+      <a href="basicstatz.html">Basic Interential Statistics</a>
+    </li>
+    <li>
+      <a href="advancedstatz.html">Advanced Interential Statistics</a>
+    </li>
+    <li>
+      <a href="groupingstatz.html">Clustering</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-bars"></span>
+     
+    Text Analysis/Corpus Linguistics
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Text Analysis and Corpus Linguistics</li>
+    <li>
+      <a href="page-c.html">Network Analysis</a>
+    </li>
+    <li>
+      <a href="page-c.html">Topic Modeling</a>
+    </li>
+    <li class="divider"></li>
+    <li>
+      <a href="corplingr.html">Corpus Linguistics in R</a>
+    </li>
+    <li>
+      <a href="corplingantconcexcel.html">Corpus Linguistics with AntConc, TextPad and Excel</a>
+    </li>
+    <li>
+      <a href="available.html">Available Software</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="about.html">
+    <span class="fa fa-info"></span>
+     
+    Contact
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Statistics: Pattern-Detection</h1>
+<h4 class="author"><em>UQ SLC Digital Team</em></h4>
+<h4 class="date"><em>2019-01-23</em></h4>
+
+</div>
+
+
+<p><img src="images/uq1.jpg" width="100%" /></p>
+<div id="introduction" class="section level1">
+<h1><span class="header-section-number">1</span> Introduction</h1>
+<p>This section deals with methods that are used to find groups or patterns in data.</p>
+</div>
+<div id="cluster-analysis" class="section level1">
+<h1><span class="header-section-number">2</span> Cluster Analysis</h1>
+<p>The most common method in linguistics that is sued to detect groups in data are cluster analyses. Cluster analyses are common in linguistics because they not only detect commonalities based on the frequency or occurrence of featutres but they also allow to visualize when splits between groups have occurred and are thus the method of choice in historical linguistics to determine and show genealogical relationships.</p>
+<div id="underlying-concepts" class="section level2">
+<h2><span class="header-section-number">2.1</span> Underlying Concepts</h2>
+<p>The next section focuses on the basic idea that underlies all cluster analyses. WE will have a look at some very basic examples to highlight and discuss the principles that cluster analyses rely on.</p>
+<p>The underlying idea of cluster analysis is very simple and rather intuitive as we ourselves perform cluster analyses everyday in our our lives. This is so because we group things together under certain lables and into concepts. The first example to exemplyfy this deals with types of trees and how we group these types of trees based on their outward appearance.</p>
+<p>Imagine you see six trees representing different types of trees: a pine tree, a fir tree, an oak tree, a beech tree, a phoenix palm tree, and a nikau palm tree. Now, you were asked to group these trees accroing to similarity. Have a look at the plot below and see whether you would have come up with a similar type of grouping.</p>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-1-1.png" width="672" /></p>
+<p>An alternative way to group the trees would be the follwoing.</p>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<p>In this display, conifers and broad-leaf trees are grouped together because their are more similar to each other compared to palm trees. This poses the question of what is meant by similarity. Consider the display below.</p>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<p>Are the red and the blue line more similar because they have the same shape or are the red and the black line more similar becaus etheir are closer together? Ther is no single correct answer here. Rather the plot indends to raise awarness about the fact that how cluster analyses group data depends on how similarity is defined in the respective algorithm.</p>
+<p>Let’s consider another example to better understand how cluster analyses determine which data points should be merged when. Imagine you have five students adn want to group them togehter based on their overall performance in school. The data that you rely on are their grades in math, music, and biology (with 1 being the best grade and 6 being the worst).</p>
+<table>
+<caption>Sample of five students and their grades in math, music, and biology</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">Math</th>
+<th align="right">Music</th>
+<th align="right">Biology</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>StudentA</td>
+<td align="right">2</td>
+<td align="right">3</td>
+<td align="right">2</td>
+</tr>
+<tr class="even">
+<td>StudentB</td>
+<td align="right">1</td>
+<td align="right">3</td>
+<td align="right">2</td>
+</tr>
+<tr class="odd">
+<td>StudentC</td>
+<td align="right">1</td>
+<td align="right">2</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td>StudentD</td>
+<td align="right">2</td>
+<td align="right">4</td>
+<td align="right">4</td>
+</tr>
+<tr class="odd">
+<td>StudentE</td>
+<td align="right">3</td>
+<td align="right">4</td>
+<td align="right">3</td>
+</tr>
+</tbody>
+</table>
+<p>The first step in determining the similarity among students is to cerate a distance matrix.</p>
+<pre class="r"><code>diststudents &lt;- dist(students, method = &quot;manhattan&quot;)</code></pre>
+<p>The distance matrix below shows that Student A and Student B only differ by one grade. Student B and Student C differ by 2 grades. Student A and Student C differ by 3 grades and so on.</p>
+<pre><code>     StudentA StudentB StudentC StudentD</code></pre>
+<p>StudentB 1<br />
+StudentC 3 2<br />
+StudentD 3 4 6<br />
+StudentE 3 4 6 2</p>
+<p>Based on this distance matrix, we can now implement a cluster analysis in <code>R</code>.</p>
+</div>
+</div>
+<div id="cluster-analysis-numeric-data" class="section level1">
+<h1><span class="header-section-number">3</span> Cluster Analysis: Numeric Data</h1>
+<pre class="r"><code># load libraries
+library(&quot;cluster&quot;)
+library(&quot;factoextra&quot;)</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre><code>## Welcome! Related Books: `Practical Guide To Cluster Analysis in R` at https://goo.gl/13EFCZ</code></pre>
+<pre class="r"><code>library(&quot;seriation&quot;)</code></pre>
+<pre><code>## Warning: package &#39;seriation&#39; was built under R version 3.5.2</code></pre>
+<pre class="r"><code>library(&quot;NbClust&quot;)
+library(&quot;pvclust&quot;)
+clusterstudents &lt;- hclust(diststudents, method=&quot;ward.D&quot;)    # create cluster object (ward.D linkage)
+# plot result as dendrogram
+plot(clusterstudents, hang = 0)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<pre><code>     Cluster1 StudentC StudentD</code></pre>
+<p>StudentC 2.5<br />
+StudentD 3.5 6.0<br />
+StudentE 3.5 6.0 2.0 Cluster1 StudentC StudentC 2.5<br />
+Cluster2 3.5 6.0</p>
+</div>
+<div id="distances" class="section level1">
+<h1><span class="header-section-number">4</span> Distances</h1>
+<p>To understand how a cluster analysis determines to which cluster a given data points belongs, we need to understand what different distance measures represent.</p>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<pre class="r"><code># generate data
+ire &lt;- round(sqrt((rnorm(10, 9.5, .5))^2), 3)
+sce &lt;- round(sqrt((rnorm(10, 9.3, .4))^2), 3)
+bre &lt;- round(sqrt((rnorm(10, 6.4, .7))^2), 3)
+aus &lt;- round(sqrt((rnorm(10, 6.6, .5))^2), 3)
+nze &lt;- round(sqrt((rnorm(10, 6.5, .4))^2), 3)
+ame &lt;- round(sqrt((rnorm(10, 4.6, .8))^2), 3)
+can &lt;- round(sqrt((rnorm(10, 4.5, .7))^2), 3)
+jam &lt;- round(sqrt((rnorm(10, 1.4, .2))^2), 3)
+phi &lt;- round(sqrt((rnorm(10, 1.5, .4))^2), 3)
+ind &lt;- round(sqrt((rnorm(10, 1.3, .5))^2), 3)
+clus &lt;- data.frame(ire, nze, can, ame, phi, jam, bre, sce, aus, ind)
+# add row names
+rownames(clus) &lt;- c(&quot;nae_neg&quot;, &quot;like&quot;, &quot;clefts&quot;, &quot;tags&quot;, &quot;youse&quot;, &quot;soitwas&quot;, &quot;dt&quot;, &quot;nsr&quot;, &quot;invartag&quot;, &quot;wh_cleft&quot;)
+# inspect data
+clus</code></pre>
+<pre><code>        ire   nze   can   ame   phi   jam   bre    sce   aus   ind</code></pre>
+<p>nae_neg 8.609 6.788 4.691 5.079 1.624 1.467 7.212 9.592 6.298 0.931 like 9.872 6.510 4.207 4.969 1.527 1.381 5.894 9.503 7.087 1.140 clefts 10.062 7.263 5.513 5.215 2.189 1.480 7.039 8.996 6.639 1.700 tags 9.198 6.636 4.452 5.210 1.196 1.326 5.967 8.731 7.007 1.067 youse 8.783 6.220 5.270 3.605 1.404 1.531 6.497 9.915 7.422 1.441 soitwas 9.555 6.653 5.106 4.617 1.367 1.271 6.633 8.529 6.964 1.252 dt 9.478 6.681 4.067 5.031 1.627 1.272 6.057 9.288 7.226 1.087 nsr 9.746 6.792 3.136 5.217 1.566 1.422 7.313 9.388 5.915 1.327 invartag 9.307 6.596 3.449 4.336 1.774 1.298 6.562 10.177 5.209 1.593 wh_cleft 9.336 6.385 5.968 5.107 0.915 1.300 7.095 9.592 7.330 1.760</p>
+<pre class="r"><code>str(clus)</code></pre>
+<p>‘data.frame’: 10 obs. of 10 variables: $ ire: num 8.61 9.87 10.06 9.2 8.78 … $ nze: num 6.79 6.51 7.26 6.64 6.22 … $ can: num 4.69 4.21 5.51 4.45 5.27 … $ ame: num 5.08 4.97 5.21 5.21 3.6 … $ phi: num 1.62 1.53 2.19 1.2 1.4 … $ jam: num 1.47 1.38 1.48 1.33 1.53 … $ bre: num 7.21 5.89 7.04 5.97 6.5 … $ sce: num 9.59 9.5 9 8.73 9.91 … $ aus: num 6.3 7.09 6.64 7.01 7.42 … $ ind: num 0.931 1.14 1.7 1.067 1.441 …</p>
+<pre class="r"><code>summary(clus)</code></pre>
+<pre><code>  ire              nze             can             ame       </code></pre>
+<p>Min. : 8.609 Min. :6.220 Min. :3.136 Min. :3.605<br />
+1st Qu.: 9.225 1st Qu.:6.532 1st Qu.:4.102 1st Qu.:4.705<br />
+Median : 9.407 Median :6.644 Median :4.572 Median :5.055<br />
+Mean : 9.395 Mean :6.652 Mean :4.586 Mean :4.839<br />
+3rd Qu.: 9.698 3rd Qu.:6.761 3rd Qu.:5.229 3rd Qu.:5.184<br />
+Max. :10.062 Max. :7.263 Max. :5.968 Max. :5.217<br />
+phi jam bre sce<br />
+Min. :0.915 Min. :1.271 Min. :5.894 Min. : 8.529<br />
+1st Qu.:1.376 1st Qu.:1.298 1st Qu.:6.167 1st Qu.: 9.069<br />
+Median :1.546 Median :1.353 Median :6.598 Median : 9.445<br />
+Mean :1.519 Mean :1.375 Mean :6.627 Mean : 9.371<br />
+3rd Qu.:1.626 3rd Qu.:1.456 3rd Qu.:7.081 3rd Qu.: 9.592<br />
+Max. :2.189 Max. :1.531 Max. :7.313 Max. :10.177<br />
+aus ind<br />
+Min. :5.209 Min. :0.931<br />
+1st Qu.:6.383 1st Qu.:1.100<br />
+Median :6.986 Median :1.290<br />
+Mean :6.710 Mean :1.330<br />
+3rd Qu.:7.191 3rd Qu.:1.555<br />
+Max. :7.422 Max. :1.760</p>
+<pre class="r"><code># clean data
+clust &lt;- t(clus)            # transpose data
+clust &lt;- na.omit(clust)     # remove missing values
+#clusts &lt;- scale(clust)     # standardize variables
+clusts &lt;- as.matrix(clust)  # convert into matrix</code></pre>
+<p>We now assess if data is clusterable by testing whether or not the data includes nonrandom structures. To means to determine whether the data conatins nonrandomness, we calculate the Hopkins statistic which informs how similar the data is to a random distribution. If the values of the Hopkins are higher than 0.5 then this indicates that the data is random and that there are no inherent clusters. However, if the Hopkins statistic is close to 0, then the data is clusterable. In addition, we will test the optimal number of clusters.</p>
+<pre class="r"><code>get_clust_tendency(clusts, n = 8, gradient = list(low = &quot;steelblue&quot;,  high = &quot;white&quot;))</code></pre>
+<p>$hopkins_stat [1] 0.1943282</p>
+<p>$plot <img src="groupingstatz_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<p>In addition, we will test the optimal number of clusters.</p>
+<pre class="r"><code># create distance matrix
+clustd &lt;- dist(clusts, method = &quot;euclidean&quot;)   # create a distance object with eucledian (!) distance
+# display distance matrix
+round(clustd, 2)</code></pre>
+<pre><code>  ire   nze   can   ame   phi   jam   bre   sce   aus</code></pre>
+<p>nze 8.75<br />
+can 15.54 7.15<br />
+ame 14.49 5.87 3.35<br />
+phi 24.94 16.25 10.19 10.65<br />
+jam 25.40 16.71 10.50 11.08 1.05<br />
+bre 9.02 1.52 7.07 6.01 16.25 16.68<br />
+sce 2.40 8.83 15.51 14.58 24.89 25.33 8.92<br />
+aus 8.87 2.55 7.03 6.51 16.65 17.01 3.11 8.94<br />
+ind 25.54 16.87 10.60 11.26 1.41 0.90 16.82 25.47 17.18</p>
+<pre class="r"><code># distplot: if the plot shows different regions (non random, non uniform grey
+# areas) then clustering is permitable
+dissplot(clustd)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-15-1.png" width="672" /></p>
+<pre class="r"><code># create distance matrix
+clustd &lt;- dist(clusts, method = &quot;euclidean&quot;) # create distance matrix (eucledian method: not good when dealing with many dimensions)
+#clustd &lt;- dist(clusts, method = &quot;maximum&quot;)   # create distance matrix (maximum method: here the difference between points dominates)
+#clustd &lt;- dist(clusts, method = &quot;manhattan&quot;) # create distance matrix (manhattan method: most popular choice)
+#clustd &lt;- dist(clusts, method = &quot;canberra&quot;)  # create distance matrix (canberra method: for count data - focuses on small differences and neglects larger differences)
+#clustd &lt;- dist(clusts, method = &quot;binary&quot;)    # create distance matrix (binary method: for binary data only!)
+#clustd &lt;- dist(clusts, method = &quot;minkowski&quot;) # create distance matrix (minkowski method: is not a true distance measure)
+
+# distance method for words: daisy(data, method = &quot;euclidean&quot;) # other possible distances are &quot;manhattan&quot; and &quot;gower&quot;
+
+#cd &lt;- hclust(clustd, method=&quot;single&quot;)    # create cluster object (single linkage)    : cluster with nearest data point
+#cd &lt;- hclust(clustd, method=&quot;ward.D&quot;)    # create cluster object (ward.D linkage)
+cd &lt;- hclust(clustd, method=&quot;ward.D2&quot;)   # create cluster object (ward.D2 linkage)   : cluster in a way to achieve minimum variance
+#cd &lt;- hclust(clustd, method=&quot;average&quot;)   # create cluster object (average linkage)   : cluster with closest mean
+#cd &lt;- hclust(clustd, method=&quot;mcquitty&quot;)  # create cluster object (mcquitty linkage)
+#cd &lt;- hclust(clustd, method=&quot;median&quot;)    # create cluster object (median linkage)    : cluster with closest median
+#cd &lt;- hclust(clustd, method=&quot;centroid&quot;)  # create cluster object (centroid linkage)  : cluster with closest prototypical point of target cluster
+#cd &lt;- hclust(clustd, method=&quot;complete&quot;)  # create cluster object (complete linkage)  : cluster with nearest furthest data point of target cluster
+
+# plot result as dendrogram
+plot(cd, hang = -1)              # display dendogram</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-16-1.png" width="672" /></p>
+<pre class="r"><code># determine optimal number of clusters
+# silhouette width: shows internal similarity of clusters vs similarity between clusters
+optclus &lt;- sapply(2:8, function(x) summary(silhouette(cutree(cd, k = x), clustd))$avg.width)
+# inspect results
+optclus # values lower than .2 indicate that clustering is not appropriate (Levshina 2015: 311)</code></pre>
+<p>[1] 0.6297443 0.6738933 0.7041123 0.5968685 0.5053608 0.3595336 0.2676748</p>
+<pre class="r"><code>        # the silhouette values display the silhouette width of 2 to 8 clusters
+        # the highest value 0.75 is provided for 4 clusters
+# cut tree into 4 clusters
+groups &lt;- cutree(cd, k=4)</code></pre>
+<pre class="r"><code># plot result as dendrogram
+plot(cd, hang = -1)              # display dendogram
+rect.hclust(cd, k=4, border=&quot;red&quot;) # draw red borders around clusters</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-18-1.png" width="672" /></p>
+<pre class="r"><code># which factors are particularly important
+celtic &lt;- clusts[c(1,8),]
+others &lt;- clusts[-c(1,8),]
+# calculate column means
+celtic.cm &lt;- colMeans(celtic)
+others.cm &lt;- colMeans(others)
+# calcualte difference between celtic and other englishes
+diff &lt;- celtic.cm - others.cm
+sort(diff, decreasing = F)</code></pre>
+<p>soitwas nae_neg tags clefts wh_cleft youse dt nsr 4.809125 4.839250 4.856875 4.899250 4.981500 5.175250 5.252000 5.481000 like invartag 5.598125 5.889875</p>
+<pre class="r"><code>plot(sort(diff), 1:length(diff), type= &quot;n&quot;, xlab =&quot;cluster 2 (others) &lt;-&gt; cluster 1 (celtic)&quot;, yaxt = &quot;n&quot;, ylab = &quot;&quot;)
+text(sort(diff), 1:length(diff), names(sort(diff)), cex = 1)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-20-1.png" width="672" /></p>
+<pre class="r"><code># which factors are particularly important
+nam &lt;- clusts[c(3,4),]
+others &lt;- clusts[-c(3,4),]
+# calculate column means
+nam.cm &lt;- colMeans(nam)
+others.cm &lt;- colMeans(others)
+# calcualte difference between celtic and other englishes
+diff &lt;- nam.cm - others.cm
+sort(diff, decreasing = F)</code></pre>
+<p>invartag nsr youse dt like nae_neg soitwas -1.422000 -1.257125 -0.964125 -0.790500 -0.776250 -0.430125 -0.416500 tags clefts wh_cleft -0.310000 -0.307000 0.073375</p>
+<pre class="r"><code>plot(sort(diff), 1:length(diff), type= &quot;n&quot;, xlab =&quot;cluster 2 (others) &lt;-&gt; cluster 1 (nam)&quot;, yaxt = &quot;n&quot;, ylab = &quot;&quot;)
+text(sort(diff), 1:length(diff), names(sort(diff)), cex = 1)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-22-1.png" width="672" /></p>
+<pre class="r"><code># we see that wh-clefts and the frequency of like is typical for other varieties
+# and that the use of youse as 2nd pl pronoun and inveáriant tags are typical for
+# celtic englishes
+
+# validate clustering
+# compute pvclust to check how reliable our clusters are
+res.pv &lt;- pvclust(clus, method.dist=&quot;euclidean&quot;, method.hclust=&quot;ward.D2&quot;, nboot = 100)</code></pre>
+<pre><code>## Bootstrap (r = 0.5)... Done.
+## Bootstrap (r = 0.6)... Done.
+## Bootstrap (r = 0.7)... Done.
+## Bootstrap (r = 0.8)... Done.
+## Bootstrap (r = 0.9)... Done.
+## Bootstrap (r = 1.0)... Done.
+## Bootstrap (r = 1.1)... Done.
+## Bootstrap (r = 1.2)... Done.
+## Bootstrap (r = 1.3)... Done.
+## Bootstrap (r = 1.4)... Done.</code></pre>
+<pre class="r"><code># plot (provides Approximately Unbiased p-value and Bootstrap Probability value, cf. Levshina 2015: 316)
+plot(res.pv, cex = 1)
+pvrect(res.pv)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-24-1.png" width="672" /></p>
+<pre class="r"><code># load package ape; to install type: install.packages(&quot;ape&quot;)
+library(ape)
+# plot basic tree
+plot(as.phylo(cd), cex = 0.9, label.offset = 1)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-25-1.png" width="672" /></p>
+<pre class="r"><code># plot as unrooted tree
+plot(as.phylo(cd), type = &quot;unrooted&quot;)</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-26-1.png" width="672" /></p>
+</div>
+<div id="cluster-analysis-nominal-data" class="section level1">
+<h1><span class="header-section-number">5</span> Cluster Analysis: Nominal Data</h1>
+<pre class="r"><code># generate data
+ire &lt;- c(1,1,1,1,1,1,1,1,1,1)
+sce &lt;- c(1,1,1,1,1,1,1,1,1,1)
+bre &lt;- c(0,1,1,1,0,0,1,0,1,1)
+aus &lt;- c(0,1,1,1,0,0,1,0,1,1)
+nze &lt;- c(0,1,1,1,0,0,1,0,1,1)
+ame &lt;- c(0,1,1,1,0,0,0,0,1,0)
+can &lt;- c(0,1,1,1,0,0,0,0,1,0)
+jam &lt;- c(0,0,1,0,0,0,0,0,1,0)
+phi &lt;- c(0,0,1,0,0,0,0,0,1,0)
+ind &lt;- c(0,0,1,0,0,0,0,0,1,0)
+clus &lt;- data.frame(ire, nze, can, ame, phi, jam, bre, sce, aus, ind)
+# add row names
+rownames(clus) &lt;- c(&quot;nae_neg&quot;, &quot;like&quot;, &quot;clefts&quot;, &quot;tags&quot;, &quot;youse&quot;, &quot;soitwas&quot;, &quot;dt&quot;, &quot;nsr&quot;, &quot;invartag&quot;, &quot;wh_cleft&quot;)
+# convert into factors
+clus &lt;- apply(clus, 1, function(x){
+  x &lt;- as.factor(x) })
+# inspect data
+clus</code></pre>
+<pre><code>nae_neg like clefts tags youse soitwas dt  nsr invartag wh_cleft</code></pre>
+<p>ire “1” “1” “1” “1” “1” “1” “1” “1” “1” “1”<br />
+nze “0” “1” “1” “1” “0” “0” “1” “0” “1” “1”<br />
+can “0” “1” “1” “1” “0” “0” “0” “0” “1” “0”<br />
+ame “0” “1” “1” “1” “0” “0” “0” “0” “1” “0”<br />
+phi “0” “0” “1” “0” “0” “0” “0” “0” “1” “0”<br />
+jam “0” “0” “1” “0” “0” “0” “0” “0” “1” “0”<br />
+bre “0” “1” “1” “1” “0” “0” “1” “0” “1” “1”<br />
+sce “1” “1” “1” “1” “1” “1” “1” “1” “1” “1”<br />
+aus “0” “1” “1” “1” “0” “0” “1” “0” “1” “1”<br />
+ind “0” “0” “1” “0” “0” “0” “0” “0” “1” “0”</p>
+<pre class="r"><code># clean data
+clusts &lt;- as.matrix(clus)
+# create distance matrix
+clustd &lt;- dist(clusts, method = &quot;binary&quot;)   # create a distance object with binary (!) distance
+# display distance matrix
+round(clustd, 2)</code></pre>
+<pre><code>##      ire  nze  can  ame  phi  jam  bre  sce  aus
+## nze 0.40                                        
+## can 0.60 0.33                                   
+## ame 0.60 0.33 0.00                              
+## phi 0.80 0.67 0.50 0.50                         
+## jam 0.80 0.67 0.50 0.50 0.00                    
+## bre 0.40 0.00 0.33 0.33 0.67 0.67               
+## sce 0.00 0.40 0.60 0.60 0.80 0.80 0.40          
+## aus 0.40 0.00 0.33 0.33 0.67 0.67 0.00 0.40     
+## ind 0.80 0.67 0.50 0.50 0.00 0.00 0.67 0.80 0.67</code></pre>
+<pre class="r"><code># create cluster object (ward.D2 linkage)   : cluster in a way to achieve minimum variance
+cd &lt;- hclust(clustd, method=&quot;ward.D2&quot;)
+# plot result as dendrogram
+plot(cd, hang = -1)              # display dendogram</code></pre>
+<p><img src="groupingstatz_files/figure-html/unnamed-chunk-29-1.png" width="672" /></p>
+<pre class="r"><code># create factor with celtic varieties on one hand and other varieties on other
+cluster &lt;- as.factor(ifelse(as.character(rownames(clusts)) == &quot;ire&quot;, &quot;1&quot;,
+  ifelse(as.character(rownames(clusts)) == &quot;sce&quot;, &quot;1&quot;, &quot;0&quot;)))
+# load library
+library(vcd)
+clsts.df &lt;- as.data.frame(clusts)
+# determine significance
+library(exact2x2)
+pfish &lt;- fisher.exact(table(cluster, clsts.df$youse))
+pfish[[1]]</code></pre>
+<pre><code>## [1] 0.02222222</code></pre>
+<pre class="r"><code># determine effect size
+assocstats(table(cluster, clsts.df$youse))</code></pre>
+<pre><code>##                     X^2 df  P(&gt; X^2)
+## Likelihood Ratio 10.008  1 0.0015586
+## Pearson          10.000  1 0.0015654
+## 
+## Phi-Coefficient   : 1 
+## Contingency Coeff.: 0.707 
+## Cramer&#39;s V        : 1</code></pre>
+<pre class="r"><code>assocstats(table(cluster, clsts.df$like))</code></pre>
+<pre><code>##                     X^2 df P(&gt; X^2)
+## Likelihood Ratio 1.6323  1  0.20139
+## Pearson          1.0714  1  0.30062
+## 
+## Phi-Coefficient   : 0.327 
+## Contingency Coeff.: 0.311 
+## Cramer&#39;s V        : 0.327</code></pre>
+</div>
+<div id="references" class="section level1">
+<h1><span class="header-section-number">6</span> References</h1>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
