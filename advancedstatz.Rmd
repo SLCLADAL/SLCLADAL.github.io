@@ -460,7 +460,15 @@ Furthermore, the final minimal adequate regression model reports a highly signif
 1.  Download the data set called `exdatamlr` from `http://martinschweinberger.de/docs/data/exdatamlr.txt` and apply what you have learned by implementing a multiple linear regression model so that you can answer how movement (move) and food intake (food) affect weight (given the data at hand).
 
 # Linear Mixed-Effects Regression Models \label{mem}
-The following focuses on an extension of ordinary multiple linear regressions: mixed-effects regression linear regression.
+The following focuses on an extension of ordinary multiple linear regressions: mixed-effects regression linear regression. Mixed-effects models have the follwoing advantages over simpler statistical tests: 
+
+* Mixed-effects models are multivariate, i.e. they test the effect of several predictors simultaneously while controlling for the effect of all other predictors. 
+
+* Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical data structures. 
+
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+
+Major disadvantages of Mixed-effetcs regression modelling are that they are prone to producing β-errors (cf. Johnson 2009) and that they require rather large data sets. 
 
 ## Introduction 
 
@@ -676,23 +684,23 @@ m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
 
 ## Testing Random Effects
 
+As a first step in the modelling process, we now need to determine whether or not including a random effect structure is justified. We do so by  comparing the base-line model without random intercepts to the model with random intercepts using a Likelihood Ratio Test. A short word of warning is in order here regarding the specific of the model: we need to set `REML = T` because Relative Estimate Maximum Likelihood (REML) provides better estimates for the random effects part of the model compared with the simpler Maximum Likelihood (ML) specification (cf. Field, Miles & Field 2012:879). 
+
+
 ```{r echo=F, message=FALSE, warning=FALSE}
-
-
-#  compare the base-line mdoel without intercept to the model with intercept
-# WARNING: set REML = T because REML provides better estimates for the random
-# effects part of the model (cf. Field, Miles & Field 2012:879)
 x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
 x2 <- x2 <- x2[[1]]
-test.ran.eff <- list(x2, pchisq(x2, df=2, lower.tail=F))
-test.ran.eff
+list(x2, pchisq(x2, df=2, lower.tail=F))
+```
 
-# set up m0 model but using the lmer function from the lme4 package
-# WARNING: REML must be FALSE OR method = "ML" (depending on the function)
-# when using anova to compare models!!! (cf. Field, Miles & Field 2012:)
-# "ML produces more accurate estimates of fixed regression parameters, whereas
-# REML produces more accurate estimates of random variances (Twisk 2006). [...]
-# Also, if you want to compare models you must use ML." (Field, Miles & Field 2012:879).
+The inclusion of a random effect structure with random intercepts is justified based on the Likelihood Ratio Test. 
+
+However, we also want to test which random effects structure is the best. We therefore create several models with different random effect structures and compare these models to see which
+random effect structure has the highest explanatory power.
+
+We generate a m0.lmer model but using the `lmer` function from the `lme4` package. When we compare models, the REML specification must be FALSE or set to `method = "ML"` (Maximum Likelihood) (depending on the function) when we use ANOVAs to compare models (cf. Field, Miles & Field 2012:). This is because "`ML` produces more accurate estimates of fixed regression parameters, whereas `REML`  produces more accurate estimates of random variances (Twisk 2006). [...] Also, if you want to compare models you must use ML" (Field, Miles & Field 2012:879).
+
+```{r echo=F, message=FALSE, warning=FALSE}
 m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
 m0.lmer2 <- lmer(pptw ~ (1|region) + 1, data = mydata, REML = T)
 m0.lmer3 <- lmer(pptw ~ (1|genre/region) + 1, data = mydata, REML = T)
@@ -739,49 +747,48 @@ intervals(m1.lme)
 
 ## Model Diagnostics
 
-
-
- diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
+We can now evealuate the goodness of fit of the model and check if mathematical requirements and assumptions have beeen violated. In a firts step, we generate diagnostic plots that focus on the random effect structure.
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 plot(m1.lme, genre ~ resid(.), abline = 0 ) # generate diagnostic plots
 ```
 
-The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres  we therefore examine the genres in isolation standardized residuals versus fitted values
+The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres  we therefore examine the genres in isolation standardized residuals versus fitted values  (Pinheiro & Bates 2000:175).
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
-
 ```
 
-The plot showing the standardized residuals versus fitted values confirms that there are outliers in the letters because there are obviously differences in the variance, we create a new model which uses weights to compensate variance heterogeneiety of variance (cf. Pinheiro & Bates 2000:177)
+The plot showing the standardized residuals versus fitted values confirms that there are outliers in the letters because there are obviously differences in the variance, we create a new model which uses weights to compensate variance heterogeneiety of variance (cf. Pinheiro & Bates 2000:177).
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
 # test if m2.lme is more appropriate for the data than m1.lme
 anova(m1.lme, m2.lme)
+```
 
-# the heteroscedastitic model (i.e. m2.lme which uses weights to account for
-# unequal variance is performing significantly better than the homoscedastistic
-# model m1.lme
+The heteroscedastitic model (i.e. m2.lme which uses weights to account for unequal variance) is performing significantly better than the homoscedastistic model m1.lme. We therefore onspect the results of the new heteroscedastitic model.
 
-# inspect results
-summary(m2.lme)
+```{r echo=F, message=FALSE, warning=FALSE}
+summary(m2.lme)        # inspect results
+```
 
-# alternative display of the results
-anova(m2.lme)
 
-# test if date is significant
-anova(m0.lme, m2.lme)
+```{r echo=F, message=FALSE, warning=FALSE}
+anova(m2.lme)          # ANOVA display of the results
+```
 
-# extract estimates and sd for fixed and random effects
-intervals(m2.lme)
+```{r echo=F, message=FALSE, warning=FALSE}
+anova(m0.lme, m2.lme)  # test if date is significant
+```
 
+```{r echo=F, message=FALSE, warning=FALSE}
+intervals(m2.lme)      # extract estimates and sd for fixed and random effects
 ```
 
 ## Effect Sizes
 
-Extract effect sizes (in the example: the effect size of date) calculate effect size (this effect size measure works for all fixed effects)to calculate the effect size, take the square root of the t-value squared divided by the t-value squared plus the degrees of freedom: r = sqrt(t^2/(t^2+df)) WARNING: only apply this function to main effecst not involved in interactions or higher level interactions but not to the main effects involved in interactions as they are meaningless (cf. Field, Miles & Field 2012:641)
+We will now  extract effect sizes (in the example: the effect size of date) and calculate normalized effect size measures (this effect size measure works for all fixed effects). To calculate the effect size, take the square root of the  squared t-value divided by the t-value squared plus the degrees of freedom: `r = sqrt(t^2/(t^2+df))`. A bried word of wraning is in order here: only apply this function to main effects not involved in interactions  as they are meaningless because the amount of variance explained by amin effects involved in interactions is unclear (cf. Field, Miles & Field 2012:641).
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 ef.lme <- function(x) {
@@ -795,23 +802,16 @@ ef.lme <- function(x) {
 ef.lme(m2.lme)
 ```
 
-Set up m1 model but using the lmer function from the lme4 package
+We now generate another m1 model but we use the `lmer` function from the `lme4`  package rather than the `glmer` function.
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
-```
-
-How to calculate the variance explained when only a simple random effect is involved:
-
-
-```{r echo=F, message=FALSE, warning=FALSE}
 summary(m2.lmer)
-
 ```
 
-Variance of random effect (145.2) devided by variance of random effect plus residual variance (145.2+224.1) times 100 gives the variance explained by the random effect:(145.2/(145.2+2284.1))*100 # percentage of variance explained by random effect
+We now calculate the variance explained when only a simple random effect is involved. This is done by dividing the variance of the random effect (145.2) by variance of random effect plus residual variance (145.2+224.1) times 100. The results represents the percentage of variance explained by the random effect: `(145.2/(145.2+2284.1))*100`.
 
-Craete lmer with complex random effect structure
+Create lmer with complex random effect structure
 
 An alternative for testing if including the random intercepts is permitted.
 
@@ -1194,7 +1194,7 @@ logisticPseudoR2s(lr.glm)
 
 ```
 
-The low pseudo-R^2^values show that our model has very low explanatory power as it only accounts for apprximately 2.6 to 4.6 percent of the variance in the data. Next, we extract the confidence intervalls for the coefficients of the model.
+The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for apprximately 2.6 to 4.6 percent of the variance in the data. Next, we extract the confidence intervalls for the coefficients of the model.
 
 ```{r echo=T, message=FALSE, warning=FALSE}
 # extract the confidence intervalls for the coefficients
@@ -1377,11 +1377,17 @@ blrmsummary[, -c(4:5)] # remove columns with confidence intervals
 
  Akaike information criteria (AlC = -2LL + 2k) provide a value that reflects a ratio between the number of predictors in the model and the variance that is explained by these predictors. Changes in AIC can serve as a measure of whether the inclusion of a variable leads to a significant incerase in the amount of variance that is explained by the model. "You can think of this as the price you pay for something: you get a better  value of R2, but you pay a higher price, and was that higher price worth it?  These information criteria help you to decide.model. The BIC is the same as  the AIC but adjusts the penalty included in the AlC (i.e., 2k) by the number  of cases: BlC = -2LL + 2k x log(n) in which n is the number of cases in the  model" ([@field2012discovering 318]).
 
-
-
 # Mixed Effects Binomial Logistic Regression
 
-We now turn to an extension of binomial logistic regression: mixed-effecst binomial logistic regression. 
+We now turn to an extension of binomial logistic regression: mixed-effecst binomial logistic regression. As is the case with linear mixed-effects models logistic mixed effecst models have the follwoing advantages over simpler statistical tests: 
+
+* Mixed-effects models are multivariate, i.e. they test the effect of several predictors simultaneously while controlling for the effect of all other predictors. 
+
+* Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical data structures. 
+
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+
+Major disadvantages of regression modelling are that they are prone to producing β-errors (cf. Johnson 2009) and that they require rather large data sets. 
 
 ## Introduction 
 
@@ -1528,6 +1534,21 @@ mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor) # factorize variables
 mblrdata$Age <- relevel(mblrdata$Age, "Young") # relevel Age (Young = Reference)
 ```
 
+Before continuing, we check if speakers need to be collapsed because they nest too few data points. As a general rule of thumb, random effecst should ahve a minimum of 20 data points per level.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
+     ylim = c(0,150),
+      cex = .5)
+```
+
+The plot indicates that the vast majority of speakers represent more than 20 cases. However, we will collapse speakers that represent fewer data points.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+collapsespeaker <- table(mblrdata$ID)[which(table(mblrdata$ID) < 21)]
+mblrdata$ID <- ifelse(mblrdata$ID %in% collapsespeaker, "Other", mblrdata$ID)
+```
+
 After preparing the data, we have a look at the first six lines of the data set.
 
 ```{r echo=F, message=FALSE, warning=FALSE}
@@ -1595,7 +1616,7 @@ p6 <- ggplot(mblrdata, aes(Gender, SUFlike, colour = ConversationType)) +
 multiplot(p1, p3, p5, p2, p4, p6, cols = 2)
 ```
 
-The upper left panel in the Figure above indicates that men sue discourse like more frequently than women. The center right panel suggests that priming significantly incerases the likelihood of discourse like being used and the lower right panel indicates the existence between gender and conversation type as women appear to use discourse like less frequntly in same gender conversations while the conversation type does not seem to have an effect on men. After visualizing the data we will now turn to the model building process.
+The upper left panel in the Figure above indicates that men sue discourse like more frequently than women. The center right panel suggests that priming significantly incerases the likelihood of discourse like being used. The center left panel suggests that speakers use discourse like more frequently in mixed-gender conversations.  However, the lower right panel indicates an interaction between gender and conversation type as women appear to use discourse like less frequntly in same gender conversations while the conversation type does not seem to have an effect on men. After visualizing the data we will now turn to the model building process.
 
 ## Model Building
 
@@ -1652,7 +1673,6 @@ During each step of the fitting procedure, we test whether cerain assumptions on
 # add Priming
 ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m1.glm <- update(m0.glm, .~.+Priming)
-ifelse(max(vif(m1.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
 m1.glmer <- update(m0.glmer, .~.+Priming)
 anova(m1.glmer, m0.glmer, test = "Chi") # SIG (p<.001***) 
 ```
@@ -1666,7 +1686,7 @@ ifelse(min(ftable(mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information
 m2.glm <- update(m1.glm, .~.+Age)
 ifelse(max(vif(m2.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
 m2.glmer <- update(m1.glmer, .~.+Age)
-anova(m2.glmer, m1.glmer, test = "Chi") # not sig (p=.51)  
+anova(m2.glmer, m1.glmer, test = "Chi") #mar sig (p=.0.61) BUT BIC inflation  
 ```
 
 ```{r echo=T, message=FALSE, warning=FALSE}
@@ -1693,14 +1713,14 @@ ifelse(min(ftable(mblrdata$Priming, mblrdata$Age, mblrdata$SUFlike)) == 0, "inco
 m5.glm <- update(m4.glm, .~.+Priming*Age)
 ifelse(max(vif(m5.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
 m5.glmer <- update(m4.glmer, .~.+Priming*Age)
-anova(m5.glmer, m4.glmer, test = "Chi") # not sig (p=0.79)  
+anova(m5.glmer, m4.glmer, test = "Chi") # not sig (p=0.6)  
 ```
 
 ```{r echo=T, message=FALSE, warning=FALSE}
 # add Priming*Gender
 ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m6.glm <- update(m4.glm, .~.+Priming*Gender)
-ifelse(max(vif(m6.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m6.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1709,7 +1729,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Priming*ConversationType
 ifelse(min(ftable(mblrdata$Priming, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m7.glm <- update(m4.glm, .~.+Priming*ConversationType)
-ifelse(max(vif(m7.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m7.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1718,7 +1738,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Age*Gender
 ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m8.glm <- update(m4.glm, .~.+Age*Gender)
-ifelse(max(vif(m8.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m8.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1728,6 +1748,8 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m9.glm <- update(m4.glm, .~.+Age*ConversationType)
 ifelse(max(vif(m9.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+m9.glmer <- update(m4.glmer, .~.+Age*ConversationType)
+anova(m9.glmer, m4.glmer, test = "Chi") # not sig (p=0.3)  
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1736,7 +1758,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Gender*ConversationType
 ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m10.glm <- update(m4.glm, .~.+Gender*ConversationType)
-ifelse(max(vif(m10.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m10.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1745,7 +1767,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Priming*Age*Gender
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m11.glm <- update(m4.glm, .~.+Priming*Age*Gender)
-ifelse(max(vif(m11.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m11.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1754,7 +1776,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Priming*Age*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m12.glm <- update(m4.glm, .~.+Priming*Age*ConversationType)
-ifelse(max(vif(m12.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m12.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1763,7 +1785,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Priming*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m13.glm <- update(m4.glm, .~.+Priming*Gender*ConversationType)
-ifelse(max(vif(m13.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m13.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1772,7 +1794,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m14.glm <- update(m4.glm, .~.+Age*Gender*ConversationType)
-ifelse(max(vif(m14.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m14.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the the next model.
@@ -1781,7 +1803,7 @@ Because the VIFs exceed values of 3 the degree of multicollinearity is unaccepta
 # add Priming*Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m15.glm <- update(m4.glm, .~.+Priming*Age*Gender*ConversationType)
-ifelse(max(vif(m15.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m15.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
 ```
 
 In a next step, we test which models are the most adequate by comparing all models to get an overview of model paramerets. This way it is possible to check which model has the lowerst AIC, BIC, and the highest $\chi$^2^ value
@@ -1792,9 +1814,10 @@ m1.m0 <- anova(m1.glmer, m0.glmer, test = "Chi")
 m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi") 
 m3.m1 <- anova(m3.glmer, m1.glmer, test = "Chi") 
 m4.m3 <- anova(m4.glmer, m3.glmer, test = "Chi") 
-m5.m4 <- anova(m5.glmer, m4.glmer, test = "Chi")  
+m5.m4 <- anova(m5.glmer, m4.glmer, test = "Chi") 
+m9.m4 <- anova(m9.glmer, m4.glmer, test = "Chi") 
 # create a list of the model comparisons
-mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4)
+mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m9.m4)
 # load function for summary
 source("rscripts/ModelFittingSummarySWSU.R") # for GLMEM (step-wise step-up)
 mdlft <- mdl.fttng.swsu(mdlcmp)
@@ -1841,80 +1864,85 @@ mlr.lrm <- lrm(SUFlike ~ Priming + Gender + ConversationType, data = mblrdata, x
 m1.glm = glm(SUFlike ~ Priming + Gender + ConversationType, family = binomial, data = mblrdata) # baseline model glm
 # we now create a lmer object equivalent to the final minimal adequate model
 mlr.lmer <- lmer(SUFlike ~ Age + Gender + ConversationType + (1|ID), data = mblrdata, family = binomial)
+```
 
-# now we check if the fixed effects of the lrm and the lmer model correlate (cf Baayen 2008:281)
+
+We now check on the lmer object if the fixed effects of the `lrm` and of the `lmer` model correlate (cf Baayen 2008:281).
+
+```{r echo=F, messAge=FALSE, warning=FALSE}
 cor.test(coef(mlr.lrm), fixef(mlr.lmer))
+```
 
-# the fixed effects do not correlate strongly - this is not good as it suggests that
-# the coefficient estimates are not very stable
+The fixed effects correlate strongly (.8827) which is a good indicator as it suggests that the coefficient estimates are sufficiently stable. We now activate the `Hmisc` package  (if not already active) to extract model fit parameters (cf Baayen 2008:281).
 
-# we activate the packAge Hmisc (if not already active)
-library(Hmisc)
-# we now extract model fit parameters (cf Baayen 2008:281)
+```{r echo=F, messAge=FALSE, warning=FALSE}
+library(Hmisc)   # activate Hmisc library
 probs = 1/(1+exp(-fitted(mlr.lmer)))
 probs = binomial()$linkinv(fitted(mlr.lmer))
-somers2(probs, as.numeric(mblrdata$suf.eh))
-
-# the model fit values indicate a very good fit:
-# C
-# "The measure named C is an index of concordance between the predicted
-# probability and the observed response. [...] When C takes the value 0.5, the
-# predictions are random, when it is 1, prediction is perfect. A value above
-# 0.8 indicates that the model may have some real predictive capacity."
-# (Baayen 2008:204)
-# "Somers’ Dxy,
-# a rank correlation between predicted probabilities and observed responses, [...]
-# ranges between 0 (randomness) and 1 (perfect prediction)." (Baayen 2008:204)
-
+somers2(probs, as.numeric(mblrdata$SUFlike))
 ```
+
+The model fit parameters indicate a sufficient but not very good fit. The C-value indicates a goodness of fit between predicted and observed responses (occurrences of SUFlike).  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values  above 0.8 indicates real predictive capacity (Baayen 2008:204).
+
+Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction (Baayen 2008:204). This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.
 
 ## Model Diagnostics
 
-
+We begin the model diagnostics by generating a diagnostic that plots the fitted or predicted values against the residuals.
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
-# model diagnostics: plot fitted against residuals
 plot(mlr.glmer)
 ```
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
 # plot residuals against fitted
-plot(mlr.glmer, form = resid(., type = "response") ~ fitted(.) | file.speaker.id, abline = 0, cex = .5,id = 0.05, adj = -0.3)
+stripParams <- list(cex=.3, lines=1.5)
+plot(mlr.glmer, form = resid(., type = "response") ~ fitted(.) | ID, abline = 0, par.strip.text = stripParams,cex = .3,id = 0.05, adj = -0.3)
 ```
 
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
 # diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
-plot(mlr.glmer, file.speaker.id ~ resid(.), abline = 0 , cex = .5)
+plot(mlr.glmer, ID ~ resid(.), abline = 0 , cex = .5)
 ```
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
 # summarize final model
-meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$suf.eh)
+mblrmtb <- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
+mblrmtb <- mblrmtb[, -c(4:5)]
+library(knitr)    # load library
+kable(mblrmtb, caption = "Results of a Mixed-Effects Binomial Logistic Regression Model.")
+
 ```
+
+
+
 
 # Conditional Inference Trees
 
-```{r echo=F, messAge=FALSE, warning=FALSE}
-# load libraries
-library(Rling)
-# set options
-options(stringsAsFactors = F)
-options(scipen = 999)
-options(max.prAmplified=10000)
-###############################################################
-# load data
-reallyaus <- read.table("data/ampaus05_statz.txt", sep = "\t", header = T)
-# inspect data
-str(reallyaus)
+We now turn to tree-structure models, the most basic of which we will be dealing with here are conditional inference trees. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. Tree-structure models are particularly intersting for linguists because they can handle moderate smaple sizes and many high-order interactions better then regression modles. The tree structure represents recursive partitioning of the data to minimize residual deviance.  
 
+```{r echo=F, messAge=FALSE, warning=FALSE}
+#install.packages(Rling)       # install Rling library (remove # to activate)
+library(Rling)                 # activate Rling library
+options(stringsAsFactors = F)  # set options: do not convert strings
+options(scipen = 999)          # set options: supress math. notation
+options(max.prAmplified=10000) # set options
+```
+
+
+```{r echo=F, messAge=FALSE, warning=FALSE}
+reallyaus <- read.table("data/ampaus05_statz.txt", # load data
+                        sep = "\t",                # data is tab separated 
+                        header = T)                # data has headers 
+str(reallyaus)          # inspect data
+```
+
+```{r echo=F, messAge=FALSE, warning=FALSE}
 # remove superfluous columns
 reallyaus$FileSpeaker <- NULL
 reallyaus$Occupation <- NULL
 reallyaus$very <- NULL
-# inspect colnames
-colnames(reallyaus)
-
 # define vector for data inspection
 clfct <- c("Age", "Adjective", "Function", "Priming", "Gender", "ConversationType", 
           "AudienceSize", "really", "Gradabilty", "SemanticCategory", "Emotionality")
@@ -1941,9 +1969,7 @@ citd.ctree <- ctree(really ~ Age + Adjective + Function + Priming + Gender +
                       Gradabilty + SemanticCategory + Emotionality,
                     data = citd)
 # plot final ctree
-png("imAges/final_ctree.png",  width = 680, height = 480) 
 plot(citd.ctree, gp = gpar(fontsize = 8))
-dev.off()
 # test prediction accuracy
 ptb <- table(predict(citd.ctree), citd$really)
 (((ptb[1]+ptb[4])+(ptb[2]+ptb[3]))/sum(table(predict(citd.ctree), citd$really)))*100
@@ -1954,50 +1980,63 @@ ptb <- table(predict(citd.ctree), citd$really)
 ## 41.08
 
 ```
+
+
 #  Random Forests
+
+Random Forests are an extension of Conditional Inference Trees. Like Conditional Inference Trees, Random Forests represent a non-parametric partitioning method that is particularly useful when dealing with reltively small sample sizes and many predictors (including interactions). 
 
 ## Example 1:
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
+rfd <- reallyaus                     # prepare data
+rfd$really <- as.factor(rfd$really)  # convert really into a factor
+set.seed(222)                       # set seed
+```
 
-# prepare data
-rfd <- reallyaus
-# convert really into a factor
-rfd$really <- as.factor(rfd$really)
-# start with random forest
-# set seed
-set.seed(222)
+After the data perparation, we can now start with the random forest analysis.
+
+```{r echo=T, messAge=FALSE, warning=FALSE}
 # partition data for evaluating rf 
 id <- sample(2, nrow(rfd), replace = T, prob = c(.7, .3))
 train <- rfd[id == 1, ]
 test <- rfd[id == 2,]
+```
+
+```{r echo=T, messAge=FALSE, warning=FALSE}
 # load library
 library(randomForest)
 # create initial model
 reallyaus_rf1 <- randomForest(really~., data = train)
 # inspect model
 print(reallyaus_rf1)
+```
 
+```{r echo=T, messAge=FALSE, warning=FALSE}
 # inspect attibutes
 attributes(reallyaus_rf1)
 
 # start model evaluation
-# install packAge
+# install package
 #source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
-#install.packAges("Biobase", repos=c("http://rstudio.org/_packAges", "http://cran.rstudio.com", 
+#install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
 #                                      "http://cran.rstudio.com/", dependencies=TRUE))
-#install.packAges("dimRed", dependencies = TRUE)
-#install.packAges('caret', dependencies = TRUE)
+#install.packages("dimRed", dependencies = TRUE)
+#install.packages('caret', dependencies = TRUE)
 
+```
+
+```{r echo=T, messAge=FALSE, warning=FALSE}
 # load caret library
 library(caret) # because initially caret did not work, the libraries above had to be installed
-# extract prediction for training data
-ptrain1 <- predict(reallyaus_rf1, train)
-# inspect predictions
-head(ptrain1); head(train$really)
 
-# create confusionMatrix
-confusionMatrix(ptrain1, train$really)
+ptrain1 <- predict(reallyaus_rf1, train) # extract prediction for training data
+head(ptrain1); head(train$really)         # inspect predictions
+```
+
+```{r echo=T, messAge=FALSE, warning=FALSE}
+
+confusionMatrix(ptrain1, train$really)  # create confusionMatrix
 
 # extract prediction for test data
 ptest1 <- predict(reallyaus_rf1, test)
@@ -2009,9 +2048,9 @@ plot(reallyaus_rf1, main = "")
 ```
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
-
 # tune model
-reallyaus_rf2 <- tuneRF(train[, !colnames(train)== "really"], train[, colnames(train)== "really"], 
+reallyaus_rf2 <- tuneRF(train[, !colnames(train)== "really"], 
+                        train[, colnames(train)== "really"], 
                         stepFactor = .5, # for most values 6 appears to be optimal
                         plot = T,
                         ntreeTry = 200,
@@ -2090,8 +2129,8 @@ MDSplot(reallyaus_rf2, test$really)
 ```{r echo=F, messAge=FALSE, warning=FALSE}
 
 # detach partykit
-detach("packAge:partykit", unload=TRUE)
-# load packAge party
+detach("package:partykit", unload=TRUE)
+# load package party
 library(party)
 # prepare data
 rfd <- reallyaus
@@ -2158,6 +2197,27 @@ par(mar = c(5, 4, 4, 2) + 0.1)
 ```
 
 # Boruta
+
+Boruta (Kursa & Rudnicki 2010, 2018) is a variable selection procedure and it represents an extension of random forest analyses (cf. Breiman 2001; Tagliamonte & Baayen 2012). The name “Boruta” is derived from a demon in Slavic mythology who dwelled in pine forests. Boruta is an alternative to regression modeling that is better equipped to handle small data sets because it uses a distributional approach during which hundreds of (random) forests are grown from permutated data sets. This means that Boruta outperforms random forest analyses because it does not provide merely a single value for each predictor but a distribution of values leading to higher reliability.
+
+The Boruta analysis consists out of five steps. 
+
+* In a first step, the Boruta algorithm copies the data set and adds randomness to the data by (re-)shuffling data points and thereby creating randomized variables. These randomized variables are referred to as shadow features. 
+
+* Secondly, a random forest classifier is trained on the extended data set. 
+
+* In a third step, a feature importance measure (Mean Decrease Accuracy represented by z-scores) is calculated to determine the relative importance of all predictors (both original or real variables and the randomized shadow features). 
+
+* In the next step, it is checked at each iteration of the process whether a real predictor has a higher importance compared with the best shadow feature. The algorithm keeps track of the performance of the original variables by storing whether they outperformed the best shadow feature or not in a vector. 
+
+* In the fifth step, predictors that did not outperform the best shadow feature are removed and the process continues without them. After a set number of iterations, or if all the variables have been either confirmed as outperforming the best shadow feature, the algorithm stops. 
+
+Despite its obvious advantages of Boruta over random forest analyses and regression modelling, it can neither handle multicollinearity not hierarchical data structures where data points are nested or grouped by a given predictor (as is the case in the present analysis as data points are grouped by adjective type). As Boruta is a variable selection procedure, it is also limited in the sense that it provides information on which predictors to include and how good these predictors are (compared to the shadow variables) while it is neither able to take hierarchical data structure into account, nor does it provide information about how one level of a factor compares to other factors. In other words, Boruta shows that a predictor is relevant and how strong it is but it does not provide information on how the likelihood of an outcome being used differs between variable levels, for instance between men and women. 
+
+# Boruta in `R`
+
+We begin by preparing the session. In a frist setp, we load the necessary library and the data.
+
 
 ```{r echo=T, messAge=FALSE, warning=FALSE}
 # load library
