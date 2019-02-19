@@ -1926,41 +1926,133 @@ kable(mblrmtb, caption = "Results of a Mixed-Effects Binomial Logistic Regressio
 
 # Conditional Inference Trees
 
-We now turn to tree-structure models, the most basic of which we will be dealing with here are conditional inference trees. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.
+We now turn to tree-structure models, the most basic of which we will be dealing with here are conditional inference trees. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. In addition, tree-structure models are very useful because they can deal with different types of variables. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.
 
 Before we implement a conditional inference tree in R, we will have a look at how it works. We will do this in more detail here as random forests and Boruta anlyses are extensions of conditional inference trees and are therefore based on the same concepts.
 
-Below is a conditional inference tree of the iris-data set. The conditional inference tree shows that we only need one predictor toclassify all flowers as either being an example of the species "setosa" or another species. If the petal of a flower in the data set is shorter than 1.9, then the flower is a setosa, while it is not if the petal length is greater than 1.9.
+Below is a conditional inference tree of the iris-data set. All conditional inference trees answer a simple question, namely "How do we classify elements based on the given predictors?". The answer that conditional inference trees provide is the classification of the elements based on the levels of the predictors. If predictors are not significant or all elements can be classified correctly without them (i.e. if these predictors are unneccessary), then they are not included in the decision tree.  The conditional inference tree shows that the best predictor for discourse *like* use is age as it is the highest node. we only need one predictor to classify all flowers as either being an example of the species "setosa" or another species. If the petal of a flower in the data set is shorter than 1.9, then the flower is a setosa, while it is not if the petal length is greater than 1.9.
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 library(partykit)    # activate library
 library(dplyr)       # activate library
-rm(iris)
-citd <- iris
-citd$Species <- ifelse(citd$Species == "setosa", 1, 0)
+citdata <- read.delim("data/citdata.txt", header = T, sep = "\t")
+attach(citdata)
 set.seed(111)        # set.seed
 # apply bonferroni correction (1 minus alpha multiplied by n of predictors)
-control = ctree_control(mincriterion = 1-(.05*ncol(citd)-1))
+control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
 # create initial conditional inference tree model
-citd.ctree <- ctree(Species ~ Sepal.Length + Sepal.Width + Petal.Length + Petal.Width,
-                    data = citd)
+citd.ctree <- ctree(LikeUser ~ Age + Gender + SocialStatus,
+                    data = citdata)
 plot(citd.ctree, gp = gpar(fontsize = 8)) # plot final ctree
 ```
 
-Let us imagine, we are dealing with a very small data set that consits of only four cases and four variables. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. This ficticious data set is displayed in the table below:
+The top of the decision tree is called "root" or "root node", the categories at the end of branches are called "leaves" or "leaf nodes". Nodes that are in-between the root and leaves are called "internal nodes" or just "nodes". The root node has only arrows or lines pointing away from it, internal nodes have lines going to and from them, while leaf nodes only have lines pointing towards them.
+
+Let us imagine, we are dealing with a very small data set that consits of only four cases and four variables. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. The first six lines of this ficticious data set are displayed in the table below:
 
 ```{r echo=F, message=FALSE, warning=FALSE}
 library(knitr)                 # activate library for tabulating
-citdata <- matrix(c("Man", "Woman", "Woman", "Man", "Young", "Old", "Young", "Young", "High", "Low", "Low", "High", "Yes", "No", "No", "?"), nrow = 4, byrow = F)
-colnames(citdata) <- c("Gender", "Age", "SocialStatus", "LikeUser")
+citdata <- read.delim("data/citdata.txt", header = T, sep = "\t")
+attach(citdata)
 kable(head(citdata), caption = "Example data set to illustrate conditional inference trees.")
 ```
 
+In a first step, it need to be determined, what the root of the decision tree should be. In order to do so, we tabulate for each variable level, how many speakers of that level have used discourse *like* (LikeUsers) and how many have not used discourse *like* (NonLikeUsers).
 
 
+```{r echo=T, message=FALSE, warning=FALSE}
+# tabulate data
+table(citdata$LikeUser, citdata$Gender)
 
+table(citdata$LikeUser, citdata$Age)
 
+table(citdata$LikeUser, citdata$SocialStatus)
+```
 
+None of the predictors is perfect (the perdictors are therefore refered to as "impure"). To determine which variable is the root, we will caluculate the degree of "impurity" for each variable - the variable which has the lowest impurity value will be the root.
+
+The most common measure of impurity in the conext of conditional inference trees is called "Gini". For each level we apply the following equation to determine the impuruty value:
+
+\begin{equation}
+
+$G_{x} = 1 - ( p_{1} )^{2} - ( p_{0} )^{2}$
+
+\begin{equation}
+
+For the node for men, this would mean the following:
+
+\begin{equation}
+
+$G_{men} = 1-(\frac{34} {34+125})^{2} - (\frac{125} {34+125})^{2} = .3362209$
+
+\begin{equation}
+
+For women, we caculate G or Gini as follows:
+
+\begin{equation}
+
+$G_{women} = 1-(\frac{105} {105+39})^{2} - (\frac{39} {39+105})^{2} = .3949653$
+
+\begin{equation}
+
+To calculate the Gini value of Gender, we need to calculate the weighted avergage leaf node impurity (weighted because the number of speakers is different in each group). We calculate the weighted avergage leaf node impurity using the forluar below. 
+
+\begin{equation}
+
+$G_{Gender} = \frac{N_{men}} {N_{Total}} \times G_{men} +  \frac{N_{women}} {N_{Total}} \times G_{women}$
+
+$G_{Gender} = \frac{159} {303} \times .336 +  \frac{144} {303} \times .395 = .364139$
+
+\begin{equation}
+
+We would now have to calculate the Gini values for all predictors in our data set. 
+The values we get are:
+
+\begin{equation}
+
+$G_{Gender} = .364$
+
+$G_{Age} = .360$
+
+$G_{SocialStatus} = .381$
+
+\begin{equation}
+
+Age has the lowest Gini impurity value and therefore separets LikeUsers from NonLikeUsers better than Gender or Social Status. Therefore, age will be the root of our tree.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(grid)
+library(Gmisc)
+grid.newpage()
+# set some parameters to use repeatedly
+leftx <- .25
+midx <- .5
+rightx <- .75
+width <- .4
+gp <- gpar(fill = "lightgrey")
+# create boxes
+(rando <- boxGrob("Age", 
+ x=midx, y=.9, box_gp = gp, width = width))
+# connect boxes like this
+(g1 <- boxGrob("Old\n NonLikeUsers  LikeUsers \n 127                  37", 
+ x=leftx, y=.5, box_gp = gp, width = width))
+(g2 <- boxGrob("Young\n  NonLikeUsers  LikeUsers \n 33                 100", 
+ x=rightx, y=.5, box_gp = gp, width = width))
+connectGrob(rando, g1, "N")
+connectGrob(rando, g2, "N")
+```
+
+In a next step, we need to find out which of the remaining variables best separates the speakers who use discourse *like* from those that do not under the first node. In order to do so, we calculate the Gini values for Gender and SocialStatus for the "Old" node.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+old <- citdata[citdata$Age == "Old",]
+table(old$LikeUser, old$Gender)
+
+table(old$LikeUser, old$SocialStatus)      
+
+```
+
+If we calculate the Gini value, we get 0.3 for SocialStatus.
 
 
 ```{r echo=T, message=FALSE, warning=FALSE}
