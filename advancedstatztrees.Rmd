@@ -1,0 +1,733 @@
+---
+title: "Tree-Based Models"
+author: "UQ SLC Digital Team"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Conditional Inference Trees
+
+We now turn to tree-structure models, the most basic of which we will be dealing with here are conditional inference trees. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. In addition, tree-structure models are very useful because they can deal with different types of variables. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.
+
+Before we implement a conditional inference tree in R, we will have a look at how it works. We will do this in more detail here as random forests and Boruta anlyses are extensions of conditional inference trees and are therefore based on the same concepts.
+
+Below is a conditional inference tree of the iris-data set. All conditional inference trees answer a simple question, namely "How do we classify elements based on the given predictors?". The answer that conditional inference trees provide is the classification of the elements based on the levels of the predictors. If predictors are not significant or all elements can be classified correctly without them (i.e. if these predictors are unneccessary), then they are not included in the decision tree.  The conditional inference tree shows that the best predictor for discourse *like* use is age as it is the highest node. Among young speakers, those with high status use like more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(partykit)              # activate partykit library
+library(dplyr)                 # activate dplyr library
+options(stringsAsFactors = T)  # set options: do not convert strings
+citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+set.seed(111)        # set.seed
+# apply bonferroni correction (1 minus alpha multiplied by n of predictors)
+control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
+# create initial conditional inference tree model
+citd.ctree <- ctree(LikeUser ~ Age + Gender + Status,
+                    data = citdata)
+plot(citd.ctree, gp = gpar(fontsize = 8)) # plot final ctree
+```
+
+Before going through how this conditional decision tree is generated, let us first go over some basic concepts. The top of the decision tree is called "root" or "root node", the categories at the end of branches are called "leaves" or "leaf nodes". Nodes that are in-between the root and leaves are called "internal nodes" or just "nodes". The root node has only arrows or lines pointing away from it, internal nodes have lines going to and from them, while leaf nodes only have lines pointing towards them.
+
+Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. The first six lines of this ficticious data set are displayed in the table below:
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)                 # activate library for tabulating
+citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+attach(citdata)
+kable(head(citdata), caption = "Example data set to illustrate conditional inference trees.")
+```
+
+In a first step, it need to be determined, what the root of the decision tree should be. In order to do so, we tabulate for each variable level, how many speakers of that level have used discourse *like* (LikeUsers) and how many have not used discourse *like* (NonLikeUsers).
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# tabulate data
+table(citdata$LikeUser, citdata$Gender)
+
+table(citdata$LikeUser, citdata$Age)
+
+table(citdata$LikeUser, citdata$Status)
+```
+
+None of the predictors is perfect (the perdictors are therefore refered to as "impure"). To determine which variable is the root, we will caluculate the degree of "impurity" for each variable - the variable which has the lowest impurity value will be the root.
+
+The most common measure of impurity in the conext of conditional inference trees is called "Gini". For each level we apply the following equation to determine the impuruty value:
+
+\begin{equation}
+
+G_{x} = 1 - ( p_{1} )^{2} - ( p_{0} )^{2}
+
+\end{equation}
+
+For the node for men, this would mean the following:
+
+\begin{equation}
+
+G_{men} = 1-(\frac{42} {42+75})^{2} - (\frac{91} {91+43})^{2} = 0.4602235
+
+\end{equation}
+
+For women, we caculate G or Gini as follows:
+
+\begin{equation}
+
+G_{women} = 1-(\frac{105} {105+39})^{2} - (\frac{39} {39+105})^{2} = 0.4358432
+
+\end{equation}
+
+To calculate the Gini value of Gender, we need to calculate the weighted average leaf node impurity (weighted because the number of speakers is different in each group). We calculate the weighted avergage leaf node impurity using the forluar below. 
+
+\begin{equation}
+
+G_{Gender} = \frac{N_{men}} {N_{Total}} \times G_{men} +  \frac{N_{women}} {N_{Total}} \times G_{women}
+
+G_{Gender} = \frac{159} {303} \times 0.4602235 +  \frac{144} {303} \times 0.4358432 = 0.4611915
+
+\end{equation}
+
+In R, we would do the calculations like below.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# Gini: men
+gini_men <- 1-(42/(42+75))^2 - (75/(42+75))^2
+# Gini: women
+gini_women <- 1-(91/(91+43))^2 - (43/(91+43))^2
+# Weighted Average of Gini: Gender
+gini_gender <- 42/(42+75)* gini_men +  91/(91+43) * gini_women
+gini_gender
+```
+
+We would now have to calculate the Gini values for all predictors in our data set. 
+See below for the how to perform the calculations in R:
+
+```{r echo=T, message=FALSE, warning=FALSE}
+gini_young <- 1-(92/(92+34))^2 - (34/(92+34))^2  # Gini: young
+gini_old <- 1-(41/(41+84))^2 - (84/(41+84))^2    # Gini: old
+# Weighted Average of Gini: Gender
+gini_age <- 92/(92+34)* gini_young +  41/(41+84) * gini_old
+gini_age
+
+### Status
+gini_high <- 1-(73/(33+73))^2 - (33/(33+73))^2   # Gini: high
+gini_low <- 1-(60/(60+85))^2 - (85/(60+85))^2    # Gini: low
+# Weighted Average of Gini: Status
+gini_status <- 73/(33+73)* gini_high +  60/(60+85) * gini_low
+gini_status
+
+```
+
+\begin{equation} 
+
+G_{Gender} = 0.4611915
+
+G_{Age} = 0.4323148
+
+G_{Status} = 0.4960521
+
+\end{equation}
+
+Age has the lowest Gini impurity value and therefore separates LikeUsers from NonLikeUsers better than Gender or Social Status. Therefore, age will be the root of our tree.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(grid)
+library(Gmisc)
+grid.newpage()
+# set some parameters to use repeatedly
+leftx <- .25
+midx <- .5
+rightx <- .75
+width <- .4
+gp <- gpar(fill = "lightgrey")
+# create boxes
+(rando <- boxGrob("Age", 
+ x=midx, y=.9, box_gp = gp, width = width))
+# connect boxes like this
+(g1 <- boxGrob("15-40\n NonLikeUsers  LikeUsers \n 34                  92", 
+ x=leftx, y=.5, box_gp = gp, width = width))
+(g2 <- boxGrob("41-80\n  NonLikeUsers  LikeUsers \n 84                 41", 
+ x=rightx, y=.5, box_gp = gp, width = width))
+connectGrob(rando, g1, "N")
+connectGrob(rando, g2, "N")
+```
+
+In a next step, we need to find out which of the remaining variables best separates the speakers who use discourse *like* from those that do not under the first node. In order to do so, we calculate the Gini values for Gender and SocialStatus for the "15-40" node.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+### 2nd node: gender
+young <- citdata[citdata$Age == "15-40",]
+tbyounggender <- table(young$LikeUser, young$Gender)
+# Gini: men
+gini_youngmen <- 1-(tbyounggender[2,2]/sum(tbyounggender[,2]))^2 - (tbyounggender[1,2]/sum(tbyounggender[,2]))^2
+# Gini: women
+gini_youngwomen <- 1-(tbyounggender[2,1]/sum(tbyounggender[,1]))^2 - (tbyounggender[1,1]/sum(tbyounggender[,1]))^2
+# Weighted Average of Gini: Gender
+gini_younggender <- sum(tbyounggender[,2])/sum(tbyounggender)* gini_youngmen +  sum(tbyounggender[,1])/sum(tbyounggender) * gini_youngwomen
+gini_younggender
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+### 2nd node: status
+young <- citdata[citdata$Age == "15-40",]
+tbyoungstatus <- table(young$LikeUser, young$Status)
+# Gini: low
+gini_younglow <- 1-(tbyoungstatus[2,2]/sum(tbyoungstatus[,2]))^2 - (tbyoungstatus[1,2]/sum(tbyoungstatus[,2]))^2
+# Gini: high
+gini_younghigh <- 1-(tbyoungstatus[2,1]/sum(tbyoungstatus[,1]))^2 - (tbyoungstatus[1,1]/sum(tbyoungstatus[,1]))^2
+# Weighted Average of Gini: Gender
+gini_youngstatus <- sum(tbyoungstatus[,2])/sum(tbyoungstatus)* gini_younglow +  sum(tbyoungstatus[,1])/sum(tbyoungstatus) * gini_younghigh
+gini_youngstatus
+
+```
+
+As "Status" has a lower Gini value, we have determined "Status" as the next split. Next, we check whether we need to include another split by "Gender".
+
+```{r echo=T, message=FALSE, warning=FALSE}
+### 3nd node: gender
+younghigh <- citdata %>%
+  filter(Age == "15-40") %>%
+  filter(Status == "high")
+tbyounghighgender <- table(younghigh$LikeUser, younghigh$Gender)
+# Gini: men
+gini_younghighmen <- 1-(tbyounghighgender[2,2]/sum(tbyounghighgender[,2]))^2 - (tbyounghighgender[1,2]/sum(tbyounghighgender[,2]))^2
+# Gini: women
+gini_younghighwomen <- 1-(tbyounghighgender[2,1]/sum(tbyounghighgender[,1]))^2 - (tbyounghighgender[1,1]/sum(tbyounghighgender[,1]))^2
+# Weighted Average of Gini: Gender
+gini_younghighgender <- sum(tbyounghighgender[,2])/sum(tbyounghighgender)* gini_younghighmen +  sum(tbyounghighgender[,1])/sum(tbyounghighgender) * gini_younghighwomen
+gini_younghighgender
+
+# compare with younghigh
+gini_younghigh
+```
+
+Because the Gini value of Status:high among young speakers is lower than the Gini value that results if we include "Gender", we do not include another split. This means that the left branch is finished.
+
+Now, we focus on the right branch. Again, we determine whether to include a split for "Gender" or for "Status". As a first step, we calculate the Gini value for "Gender.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+### 3rd node: gender
+old <- citdata[citdata$Age == "41-80",]
+tboldgender <- table(old$LikeUser, old$Gender)
+# Gini: men
+gini_oldmen <- 1-(tboldgender[2,2]/sum(tboldgender[,2]))^2 - (tboldgender[2,1]/sum(tboldgender[,2]))^2
+# Gini: women
+gini_oldwomen <- 1-(tboldgender[2,1]/sum(tboldgender[,1]))^2 - (tboldgender[2,1]/sum(tboldgender[,1]))^2
+# Weighted Average of Gini: Gender
+gini_oldgender <- sum(tboldgender[,2])/sum(tboldgender)* gini_oldmen +  sum(tboldgender[,1])/sum(tboldgender) * gini_oldwomen
+gini_oldgender
+```
+
+Now, we calclate the Gini value for Status.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+### 3rd node: status
+tboldstatus <- table(old$LikeUser, old$Status)
+# Gini: low
+gini_oldlow <- 1-(tboldstatus[2,2]/sum(tboldstatus[,2]))^2 - (tboldstatus[2,1]/sum(tboldstatus[,2]))^2
+# Gini: high
+gini_oldhigh <- 1-(tboldstatus[2,1]/sum(tboldstatus[,1]))^2 - (tboldstatus[2,1]/sum(tboldstatus[,1]))^2
+# Weighted Average of Gini: Gender
+gini_oldstatus <- sum(tboldstatus[,2])/sum(tboldstatus)* gini_oldlow +  sum(tboldstatus[,1])/sum(tboldstatus) * gini_oldhigh
+gini_oldstatus
+
+# compare with gini gender
+gini_oldgender
+```
+
+Since the Gini value for "Gender" is lower, we include a "Gender" node.
+
+Now, we determine, wehther we also need to include a split for "Status".
+
+```{r echo=T, message=FALSE, warning=FALSE}
+### 3nd node: gender
+oldfemale <- citdata %>%
+  filter(Age == "41-80") %>%
+  filter(Gender == "female")
+tboldfemalestatus <- table(oldfemale$LikeUser, oldfemale$Status)
+# Gini: low
+gini_oldfemalelow <- 1-(tboldfemalestatus[2,2]/sum(tboldfemalestatus[,2]))^2 - (tboldfemalestatus[1,2]/sum(tboldfemalestatus[,2]))^2
+# Gini: high
+gini_oldfemalehigh <- 1-(tboldfemalestatus[2,1]/sum(tboldfemalestatus[,1]))^2 - (tboldfemalestatus[1,1]/sum(tboldfemalestatus[,1]))^2
+# Weighted Average of Gini: Status
+gini_oldgenderstatus <- sum(tboldfemalestatus[,2])/sum(tboldfemalestatus)* gini_oldfemalelow +  sum(tboldfemalestatus[,1])/sum(tboldfemalestatus) * gini_oldfemalehigh
+gini_oldgenderstatus
+
+# compare with younghigh
+gini_oldgender
+```
+
+Because the Gini value for Status is higher than the value for Gender, we do not include another split. This means that our conditional inference tree is finished.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+#install.packages(Rling)       # install Rling library (remove # to activate)
+library(Rling)                 # activate Rling library
+library(partykit)              # activate partykit library
+library(dplyr)                 # activate dplyr library
+options(stringsAsFactors = T)  # set options: do not convert strings
+options(scipen = 999)          # set options: supress math. notation
+options(max.prAmplified=10000) # set options
+# load data
+citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+head(citdata)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+set.seed(111)        # set.seed
+# apply bonferroni correction (1 minus alpha multiplied by n of predictors)
+control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
+# create initial conditional inference tree model
+citd.ctree <- ctree(LikeUser ~ Age + Gender + Status,
+                    data = citdata)
+plot(citd.ctree, gp = gpar(fontsize = 8)) # plot final ctree
+```
+
+In addition to simply plotting the conditional inference tree, we can also check its accuracy. In a first step, we calculate the percentage of correct predictions made by our tree.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# test prediction accuracy
+ptb <- table(predict(citd.ctree), citdata$LikeUser)
+(((ptb[1]+ptb[4])+(ptb[2]+ptb[3]))/sum(table(predict(citd.ctree), citdata$LikeUser)))*100
+```
+
+Next, we calculate the baseline accuracy, so see how much better the conditional decision tree performs compared with a chance distribution.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# determine baseline
+(table(citdata$LikeUser)[[2]]/sum(table(citdata$LikeUser)))*100
+```
+
+## Splitting numeric, ordinal, and true categorical variables
+
+While it is rather straight forward to calculate the Gini values for categorical variables, it may not seem quite as apparent how to calculate splits for numeric or ordinal variables. To illustrate how the algorithm works on such variables, consider the example data set shown below.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)                 # activate library for tabulating
+citdata <- read.delim("data/numerictreedata.txt", header = T, sep = "\t")
+kable(citdata, caption = "Example data set to illustrate numeric splits in conditional inference trees.")
+```
+
+In a first step, we order the numeric variable so that we arrive at the follwoing table.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)                 # activate library for tabulating
+library(dplyr)                 # activate library for tabulating
+citdata2 <- read.delim("data/numerictreedata.txt", header = T, sep = "\t")
+citdata2 <- citdata2 %>%
+  arrange(Age)
+kable(citdata2, caption = "Ordered data set to illustrate numeric splits in conditional inference trees.")
+```
+
+Next, we calculate the means for each level of "Age".
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)                 # activate library for tabulating
+library(dplyr)                 # activate library for tabulating
+Age <- c(15, ((15+22)/2), 22, ((22+27)/2), 27, ((27+37)/2), 37, ((37+42)/2), 42, ((42+63)/2), 63)
+LikeUser <- c("yes", "", "yes", "", "yes", "", "no", "", "yes", "", "no")
+citdata3 <- data.frame(Age, LikeUser)
+kable(citdata3, caption = "Ordered data set with mean age levels to illustrate numeric splits in conditional inference trees.")
+```
+
+Now, we calculate the Gini values for each average level of age.
+
+\begin{equation}
+
+G_{x} = 1 - ( p_{1} )^{2} - ( p_{0} )^{2}
+
+\end{equation}
+
+For an age smaller than 18.5 this would mean:
+
+\begin{equation}
+
+G_{youngerthan18.5} = 1-(\frac{1} {1+0})^{2} - (\frac{0} {1+0})^{2} = 0.0
+
+\end{equation}
+
+For an age greater than 18.5, we caculate G or Gini as follows:
+
+\begin{equation}
+
+G_{olerthan18.5} = 1-(\frac{2} {2+3})^{2} - (\frac{3} {2+3})^{2} = 0.48
+
+\end{equation}
+
+ Now, we calculate the Gini for that split as we have done above.
+ 
+\begin{equation}
+
+G_{split18.5} = \frac{N_{youngerthan18.5}} {N_{Total}} \times G_{youngerthan18.5} +  \frac{N_{olderthan18.5}} {N_{Total}} \times G_{olderthan18.5}
+
+G_{split18.5} = \frac{1} {6} \times 0.0 +  \frac{5} {6} \times 0.48 = 0.4
+
+\end{equation}
+
+We now have to calculate the Gini values for all possible age splits which yields the follwoing results:
+
+```{r echo=F, eval = F, message=FALSE, warning=FALSE, results='hide'}
+# 18.5
+1-(1/(1+0))^2 - (0/(1+0))^2
+1-(2/(2+3))^2 - (3/(2+3))^2
+1/6 * 0.0 +  5/6 * 0.48
+# 24.4
+1-(2/(2+0))^2 - (0/(2+0))^2
+1-(3/(3+1))^2 - (2/(3+1))^2
+2/6 * 0.0 +  4/6 * 0.1875
+# 32
+1-(3/(3+0))^2 - (0/(3+0))^2
+1-(1/(1+2))^2 - (2/(1+2))^2
+3/6 * 0.0 +  3/6 * 0.4444444
+# 39.5
+1-(3/(3+1))^2 - (1/(3+1))^2
+1-(1/(1+1))^2 - (1/(1+1))^2
+4/6 * 0.375 +  2/6 * 0.5
+# 52.5
+1-(4/(4+1))^2 - (1/(4+1))^2
+1-(0/(0+1))^2 - (1/(0+1))^2
+5/6 * 0.32 +  1/6 * 0.0
+```
+
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)                 # activate library for tabulating
+library(dplyr)                 # activate library for tabulating
+AgeSplit <- c(((15+22)/2), ((22+27)/2), ((27+37)/2), ((37+42)/2), ((42+63)/2))
+Gini <- c(0.4, 0.5,0.444, 0.41, 0.267)
+citdata3 <- data.frame(AgeSplit, Gini)
+kable(citdata3, caption = "Possible age splits and their associated Gini values.")
+```
+
+The split at 52.5 years of age has the lowest Gini value. Accordingly, we would split the data between speakers who are younger than 52.5 and speakers who are older than 52.5 years of age. The lowest Gini value for any age split would also be the Gini value that would be compared to other variables. 
+
+The same procedure that we have used to determine potential splits for a numeric variable would apply to an ordinal variable with only two differences:
+
+* The Gini values are calculated for the actual levels and not the means between variable levels. 
+* The Gini value is nor calculated for the lowest and highest level as the calculation of the Gini values is impissble for extreme values. Extreme levels can, therefore, not serve as a potential split locations. 
+
+When dealing with categorical variables with more than two levels, the situation is slightly more complex as we would also have to calculate the Gini values for combinations of variable levels. While the calculations are, in principle, analogous to the ones performed for binary of nominal categorical variables, we would also have to check if combinations would lead to improved splits. For instance, imagine we have a variable with categories "A", "B", and "C". In such cases we would not only have to calculate the Gini scores for "A", "B", and "C" but also for "A plus B", "A plus C", and "B plus C". Note that we ignore the combination "A plus B plus C" as this combination would include all other portential combinations. 
+
+## Problems of Conditional Inference Trees
+
+Conditional Inference Trees are very intuitive, multivariate, non-parametric, they do not reuire large datasets and they are easy to implement. However, they are prone to overfitting and do not perform well why they are applied to new data. An extension which remedies these problems is to grow many varied trees - this is called a Random Forest Analysis and will will have a look at how Random Forests work and how to implement them in R in the next section. 
+
+#  Random Forests
+
+Random Forests are an extension of Conditional Inference Trees. Like Conditional Inference Trees, Random Forests represent a multivariate, non-parametric partitioning method that is particularly useful when dealing with relatively small sample sizes and many predictors (including interactions). Random Forests outperform CITs in that they are substantially less prone to overfitting and they perform much better when applied to new data.
+
+**Bootstrapped Data**
+
+Random Forests do not work on one-and-the-same data set (as CITs do) but in Random Forest analyses, many samples (with replacement) are drawn from the original data set. This generation of new data set based on an existing data set is called "bootstrapping". Bootstrapping allows us to produce many trees based on variations of the original data set rather than dealing with only a single, fixed data set that would produce only a single tree. Therefore, because the data is different each time, the individual CITs are also different. 
+
+Imagine, we are dealing with a very small data set to which we want to apply a Random Forest Analysis. The original data set is displayed below. 
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)               # activate knitr library
+library(dplyr)               # activate dplyr library
+citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+citdata <- head(citdata)
+citdata$ID <- 1:nrow(citdata)
+citdata <- citdata %>%
+  dplyr::select(ID, Age, Gender, Status, LikeUser)
+kable(citdata, caption = "Example data set to illustrate Random Forests.")
+```
+
+We now draw a sample from this data set and receive the following data set.
+
+```{r echo=F, message=FALSE, warning=FALSE}
+citdata <- citdata[c(6, 3, 4, 1, 2, 2),] 
+kable(citdata, caption = "Bootstrapped data set to illustrate Random Forests.")
+```
+
+As you can see, the bootstrapped data contains the second row twice while the fifth row is missing.
+
+**Random Variable Selection**
+
+Random Forests also differ from simple CITs in that at each step, not all possible variables are considered for a node, but only a subset. For example, we have a data set with five predicting independent variables and one dependent variable. When generating a CIT, all possible variables (variables that do not represent a node further up in the tree) are consiederd as splitting candidates. In Random Forests, only a fixed number (typically the square-root of the number of independent variables) are considered as candidates for a node. So at each potential split, a fixed number of randomly selected variables is considered potential node candidates.
+
+
+## Example 1
+
+```{r echo=T, message=FALSE, warning=FALSE}
+library(knitr)               # activate knitr library
+library(dplyr)               # activate dplyr library
+rfd <- read.delim("data/treedata.txt", header = T, sep = "\t")
+set.seed(222)                       # set seed
+```
+
+After the data preparation, we can now start with the random forest analysis.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# partition data for evaluating rf 
+id <- sample(2, nrow(rfd), replace = T, prob = c(.7, .3))
+train <- rfd[id == 1, ]
+test <- rfd[id == 2,]
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# load library
+library(randomForest)
+# create initial model
+like_rf1 <- randomForest(LikeUser~., data = train)
+# inspect model
+print(like_rf1)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# inspect attibutes
+attributes(like_rf1)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# start model evaluation
+# install package
+#source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
+#install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
+#                                      "http://cran.rstudio.com/", dependencies=TRUE))
+#install.packages("dimRed", dependencies = TRUE)
+#install.packages('caret', dependencies = TRUE)
+# load caret library
+library(caret) # because initially caret did not work, the libraries above had to be installed
+ptrain1 <- predict(like_rf1, train) # extract prediction for training data
+head(ptrain1); head(train$LikeUser)         # inspect predictions
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# generate confusion matrix
+confusionMatrix(ptrain1, train$LikeUser)  
+# extract prediction for test data
+ptest1 <- predict(like_rf1, test)
+# create confusionMatrix
+confusionMatrix(ptest1, test$LikeUser)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# determine errorrate of random forest model
+plot(like_rf1, main = "")
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# tune model
+like_rf2 <- tuneRF(train[, !colnames(train)== "LikeUser"], 
+                        train[, colnames(train)== "LikeUser"], 
+                        stepFactor = 3, # for most values 3 appears to be optimal
+                        plot = T,
+                        ntreeTry = 200,
+                        trace = T,
+                        improve = .05
+)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# create improved model
+like_rf2 <- randomForest(LikeUser~., data = train, 
+                              ntree = 200,
+                              ntry = 6,
+                              importance= T,
+                              proximity = T)
+# inspect model
+print(like_rf2)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# predict based on improved model
+ptrain2 <- predict(like_rf2, train)
+# create confusionMatrix
+confusionMatrix(ptrain2, train$LikeUser)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# extract prediction for test data
+ptest2 <- predict(like_rf2, test)
+# create confusionMatrix
+confusionMatrix(ptest2, test$LikeUser)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# inspect number of nodes for trees
+hist(treesize(like_rf2), main = "", col = "lightgray")
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# check variable importance
+varImpPlot(like_rf2, main = "", pch = 20) 
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# left plot (Accuracy): how much accuracy decreases if factor is left out
+# left plot (Gini/Pureness): how much more unpure (ambiguous) the distributions become if factor is left out
+# extract variable importance values
+importance(like_rf2)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+#which variables have been used in the trees
+varUsed(like_rf2)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# partial dependence plot
+partialPlot(like_rf2, train, Age)
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# extract tree
+getTree(like_rf2, 1, labelVar = T)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# mds plot
+MDSplot(like_rf2, test$LikeUser)
+```
+
+## Example 2
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# detach partykit
+#detach("package:partykit", unload=TRUE)
+# load package party
+library(party)
+# set seed
+set.seed(333)
+# create initial model
+like.rf <- cforest(LikeUser ~ Age + Gender + Status,
+                        data = rfd, controls = cforest_unbiased(ntree = 50, mtry = 3))
+# determine importance of factors
+like.varimp <- varimp(like.rf, conditional = T)
+round(like.varimp, 3)
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# plot result
+dotchart(sort(like.varimp), pch = 20, main = "Conditional importance of variables")
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# load library
+library(Hmisc)
+# evaluate random forst
+like.rf.pred <- unlist(treeresponse(like.rf))[c(FALSE,TRUE)]
+somers2(like.rf.pred, as.numeric(rfd$LikeUser) - 1)
+```
+
+
+## Example 3
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# load library
+library(party)
+cf1 <- cforest(LikeUser ~ . , data= rfd, control=cforest_unbiased(mtry=2,ntree=100)) # fit the random forest
+varimp(cf1) # get variable importance, based on mean decrease in accuracy
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# conditional=True, adjusts for correlations between predict
+varimp(cf1, conditional=TRUE) 
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
+varimpAUC(cf1)  # more robust towards class imbalance.
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+par(mar = c(5, 8, 4, 2) + 0.1)
+plot(y = 1:length(varimpAUC(cf1)), x = varimpAUC(cf1)[order(varimpAUC(cf1))], 
+     axes = F, ann = F, pch = 20, xlim = c(-0.01, 0.2), main = "Predictor Importance")
+axis(1, at = seq(-0.01, 0.2, 0.05), seq(-0.01, 0.2, 0.05))
+axis(2, at = 1:length(varimpAUC(cf1)), names(varimpAUC(cf1))[order(varimpAUC(cf1))], las = 2)
+grid()
+box()
+par(mar = c(5, 4, 4, 2) + 0.1)
+```
+
+# Boruta
+
+Boruta (Kursa & Rudnicki 2010, 2018) is a variable selection procedure and it represents an extension of random forest analyses (cf. Breiman 2001; Tagliamonte & Baayen 2012). The name “Boruta” is derived from a demon in Slavic mythology who dwelled in pine forests. Boruta is an alternative to regression modelling that is better equipped to handle small data sets because it uses a distributional approach during which hundreds of (random) forests are grown from permutated data sets. This means that Boruta outperforms random forest analyses because it does not provide merely a single value for each predictor but a distribution of values leading to higher reliability.
+
+The Boruta analysis consists out of five steps. 
+
+* In a first step, the Boruta algorithm copies the data set and adds randomness to the data by (re-)shuffling data points and thereby creating randomized variables. These randomized variables are referred to as shadow features. 
+
+* Secondly, a random forest classifier is trained on the extended data set. 
+
+* In a third step, a feature importance measure (Mean Decrease Accuracy represented by z-scores) is calculated to determine the relative importance of all predictors (both original or real variables and the randomized shadow features). 
+
+* In the next step, it is checked at each iteration of the process whether a real predictor has a higher importance compared with the best shadow feature. The algorithm keeps track of the performance of the original variables by storing whether they outperformed the best shadow feature or not in a vector. 
+
+* In the fifth step, predictors that did not outperform the best shadow feature are removed and the process continues without them. After a set number of iterations, or if all the variables have been either confirmed as outperforming the best shadow feature, the algorithm stops. 
+
+Despite its obvious advantages of Boruta over random forest analyses and regression modelling, it can neither handle multicollinearity not hierarchical data structures where data points are nested or grouped by a given predictor (as is the case in the present analysis as data points are grouped by adjective type). As Boruta is a variable selection procedure, it is also limited in the sense that it provides information on which predictors to include and how good these predictors are (compared to the shadow variables) while it is neither able to take hierarchical data structure into account, nor does it provide information about how one level of a factor compares to other factors. In other words, Boruta shows that a predictor is relevant and how strong it is but it does not provide information on how the likelihood of an outcome being used differs between variable levels, for instance between men and women. 
+
+# Boruta in R
+
+We begin by preparing the session. In a first step, we load the necessary library and the data.
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+#install.packages(Boruta)       # install Boruta library (remove # to activate)
+library(Boruta)                # activate Boruta library
+options(stringsAsFactors = T)  # set options: do not convert strings
+options(scipen = 999)          # set options: supress math. notation
+options(max.prAmplified=10000) # set options
+# load data
+borutadata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+head(borutadata)
+```
+
+Now that we have loaded the data, we will start our initial analysis.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# initial run
+boruta1 <- Boruta(LikeUser~.,data=borutadata)
+print(boruta1)
+
+getConfirmedFormula(boruta1)
+```
+```{r echo=T, message=FALSE, warning=FALSE}
+plot(boruta1, cex = .5)
+```
+
+We now have a look at the importance history to see if any variables can be removed from the analysis.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+plotImpHistory(boruta1)
+```
+
+After inspecting the importance history, we see that our predictors performed consistently better than chance and the Boruta parameters tehrefore do not need to be modified and we also do not need to remove insignificant variables which do not consistently perform better than the shadow variable. If perdictors do perform worse than the best shadow variable, then these variables should be excludde and the Boruta analysis should be re-run on the dataset that does no longer contain the superfluous variable.  
+
+Now, we print the confirmed formular to check which predictors should be included in the model.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+getConfirmedFormula(boruta1)
+```
+
+As a last step, we customize the results plot of the Boruta analysis.
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+par(mar = c(8, 8, 4, 2) + 0.1)
+plot(boruta1, cex.axis=.75, las=2, xlab="", ylab = "", cex = .75, 
+     col = c("grey50", "grey50", "grey50","grey90","grey90","grey90"))
+abline(v = 3.5, lty = "dashed")
+mtext("Predictors", 1, line = 6, at = 5, cex = 1)
+mtext("Control", 1, line = 6, at = 2, cex = 1)
+mtext("Importance", 2, line = 2.5, at = 20, cex = 1, las = 0)
+par(mar = c(5, 4, 4, 2) + 0.1)
+```
+
+
+# References
+
