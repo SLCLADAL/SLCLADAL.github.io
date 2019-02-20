@@ -13,7 +13,7 @@ knitr::include_graphics("images/uq1.jpg")
 
 # Conditional Inference Trees
 
-We now turn to tree-structure models, the most basic of which we will be dealing with here are conditional inference trees. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. In addition, tree-structure models are very useful because they can deal with different types of variables. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.
+This section deals with tree-structure models, the most basic type is a conditional inference tree. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. In addition, tree-structure models are very useful because they can deal with different types of variables. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.
 
 Before we implement a conditional inference tree in R, we will have a look at how it works. We will do this in more detail here as random forests and Boruta anlyses are extensions of conditional inference trees and are therefore based on the same concepts.
 
@@ -163,6 +163,7 @@ In a next step, we need to find out which of the remaining variables best separa
 ### 2nd node: gender
 young <- citdata[citdata$Age == "15-40",]
 tbyounggender <- table(young$LikeUser, young$Gender)
+tbyounggender
 # Gini: men
 gini_youngmen <- 1-(tbyounggender[2,2]/sum(tbyounggender[,2]))^2 - (tbyounggender[1,2]/sum(tbyounggender[,2]))^2
 # Gini: women
@@ -177,6 +178,7 @@ gini_younggender
 ### 2nd node: status
 young <- citdata[citdata$Age == "15-40",]
 tbyoungstatus <- table(young$LikeUser, young$Status)
+tbyoungstatus
 # Gini: low
 gini_younglow <- 1-(tbyoungstatus[2,2]/sum(tbyoungstatus[,2]))^2 - (tbyoungstatus[1,2]/sum(tbyoungstatus[,2]))^2
 # Gini: high
@@ -195,6 +197,7 @@ younghigh <- citdata %>%
   filter(Age == "15-40") %>%
   filter(Status == "high")
 tbyounghighgender <- table(younghigh$LikeUser, younghigh$Gender)
+tbyounghighgender
 # Gini: men
 gini_younghighmen <- 1-(tbyounghighgender[2,2]/sum(tbyounghighgender[,2]))^2 - (tbyounghighgender[1,2]/sum(tbyounghighgender[,2]))^2
 # Gini: women
@@ -215,8 +218,9 @@ Now, we focus on the right branch. Again, we determine whether to include a spli
 ### 3rd node: gender
 old <- citdata[citdata$Age == "41-80",]
 tboldgender <- table(old$LikeUser, old$Gender)
+tboldgender
 # Gini: men
-gini_oldmen <- 1-(tboldgender[2,2]/sum(tboldgender[,2]))^2 - (tboldgender[2,1]/sum(tboldgender[,2]))^2
+gini_oldmen <- 1-(tboldgender[2,2]/sum(tboldgender[,2]))^2 - (tboldgender[1,2]/sum(tboldgender[,2]))^2
 # Gini: women
 gini_oldwomen <- 1-(tboldgender[2,1]/sum(tboldgender[,1]))^2 - (tboldgender[2,1]/sum(tboldgender[,1]))^2
 # Weighted Average of Gini: Gender
@@ -229,6 +233,7 @@ Now, we calclate the Gini value for Status.
 ```{r echo=T, message=FALSE, warning=FALSE}
 ### 3rd node: status
 tboldstatus <- table(old$LikeUser, old$Status)
+tboldstatus
 # Gini: low
 gini_oldlow <- 1-(tboldstatus[2,2]/sum(tboldstatus[,2]))^2 - (tboldstatus[2,1]/sum(tboldstatus[,2]))^2
 # Gini: high
@@ -251,19 +256,23 @@ oldfemale <- citdata %>%
   filter(Age == "41-80") %>%
   filter(Gender == "female")
 tboldfemalestatus <- table(oldfemale$LikeUser, oldfemale$Status)
+tboldfemalestatus
+```
+
+```{r echo=T, message=FALSE, warning=FALSE}
 # Gini: low
 gini_oldfemalelow <- 1-(tboldfemalestatus[2,2]/sum(tboldfemalestatus[,2]))^2 - (tboldfemalestatus[1,2]/sum(tboldfemalestatus[,2]))^2
 # Gini: high
 gini_oldfemalehigh <- 1-(tboldfemalestatus[2,1]/sum(tboldfemalestatus[,1]))^2 - (tboldfemalestatus[1,1]/sum(tboldfemalestatus[,1]))^2
 # Weighted Average of Gini: Status
 gini_oldgenderstatus <- sum(tboldfemalestatus[,2])/sum(tboldfemalestatus)* gini_oldfemalelow +  sum(tboldfemalestatus[,1])/sum(tboldfemalestatus) * gini_oldfemalehigh
-gini_oldgenderstatus
-
-# compare with younghigh
-gini_oldgender
+gini_oldgenderstatus   # gini of status for old plus female
+gini_oldgender         # compare with younghigh
 ```
 
 Because the Gini value for Status is higher than the value for Gender, we do not include another split. This means that our conditional inference tree is finished.
+
+Below you see, how to implement a conditional inference tree in R. First, we prepare the session by activating the libraries that we will need (and installing them in case we have not done so before). Then, we set the options and read in the data.
 
 ```{r echo=T, message=FALSE, warning=FALSE}
 #install.packages(Rling)       # install Rling library (remove # to activate)
@@ -442,11 +451,16 @@ kable(citdata, caption = "Example data set to illustrate Random Forests.")
 We now draw a sample from this data set and receive the following data set.
 
 ```{r echo=F, message=FALSE, warning=FALSE}
-citdata <- citdata[c(6, 3, 4, 1, 2, 2),] 
+citdata <- citdata[c(6, 3, 4, 1, 2, 2),]
+rownames(citdata) <- NULL
 kable(citdata, caption = "Bootstrapped data set to illustrate Random Forests.")
 ```
 
 As you can see, the bootstrapped data contains the second row twice while the fifth row is missing.
+
+**Out-Of-Bag data**
+
+Because the data is reshuffeled for every new tree, a part of the data (on average about 30%) remains unused fro a given tree. The dat that is not used is called Out-Of-Bag data or OOB. The OOB is importnat because the quality of teh overall performance of the random forest can be assessed by applying the resulting tree-model to the data that it was not fit to. The quality of that tree is then measured in the OOB error, which is the error rate of the respective tree if applied to the OOB data.
 
 **Random Variable Selection**
 
