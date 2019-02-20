@@ -1,0 +1,331 @@
+---
+title: "Simple Linear Regression"
+author: "UQ SLC Digital Team"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Simple Linear Regression
+ 
+This section focuses on a very widely used statistical method which is called regression. Regressions are used when we try to understand how independent variables correlate with a dependent or outcome variable. So, if you want to investigate how certain criteria affect an outcome, then a regression is the way to go. We will have a look at two simple examples to understand what the concepts underlying a regression mean and how a regression works. After that, we will turn to a more complex case and we will implement a multiple linear regression. The `R`-Code, that we will use, is based on [@field2012discovering].
+
+## Introduction
+
+Although the basic logic underlying regressions is identical to the conceptual underpinnings of analysis of variance (ANOVA), a related method, sociolinguistists have traditionally favoured regression analysis in their studies while ANOVAs have been the method of choice in psycholinguistics. The preference for either method is grounded in historical happenstances and the culture of these subdisciplines rather than in methodological reasoning.
+
+A minor difference between regressions and ANOVA lies in the fact that regressions are based on the $t$-distribution while ANOVAs use the $F$-distribution (however, the $F$-value is merely t^2^). Both  $t$- and $F$-values report on the ratio between explained and unexplained variance.
+
+The idea behind regression analysis is expressed formally in [equation](#eq:slm) and can best be described graphically: Imagine drawing a line through points in a scatterplot (Grafik \ref{fig:scat1} left panel).
+
+$f_{(x)} = \alpha + \beta_{1}x_{i} + \epsilon$ {#eq:slm}
+
+Regressions aim to find that line which has the minimal summed distance between points and the line (Figure \ref{fig:scat1} centre panel). Technically speaking, the aim of a regression is to find the line with the minimal deviance or the line with the minimal sum of residuals (variance) (Figure \ref{fig:scat1} right panel). This means that the sum of the length of the lines between the points and the lines should be minimal. The slope of the line is called *coefficient* and the point where the line crosses the y-axis is called the *intercept*.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# Scatterplot with lines from the regression line to the dots
+x <- c(173, 169, 176, 166, 161, 164, 160, 158, 180, 187)
+y <- c(80, 68, 72, 75, 70, 65, 62, 60, 85, 92) # plot scatterplot and the regression line
+mod1 <- lm(y ~ x)
+
+par(mfrow=c(1, 3)) # plot window: 1plot/row and 3 plots/column
+plot(x, y, xlim=c(min(x)-5, max(x)+5), ylim=c(min(y)-10, max(y)+10))
+plot(x, y, xlim=c(min(x)-5, max(x)+5), ylim=c(min(y)-10, max(y)+10))
+abline(mod1, lwd=2)
+plot(x, y, xlim=c(min(x)-5, max(x)+5), ylim=c(min(y)-10, max(y)+10))
+abline(mod1, lwd=2)
+
+# calculate residuals and predicted values
+res <- signif(residuals(mod1), 5)
+pre <- predict(mod1) # plot distances between points and the regression line
+segments(x, y, x, pre, col="red")
+# add labels (res values) to points
+library(calibrate)
+textxy(x, y, round(res,1), cex=1)
+par(mfrow=c(1, 1)) # restore original graphics parameters
+```
+
+A word about standard errors (SE) is in order here because most commonly used statistics programs will provide SE values when reporting regression models. The SE is a measure that tells us how much the coefficients were to vary if the same regression were applied to many samples from the same population. A relatively small SE value therefore indicates that the coefficients will remain very stable if the same regression model is fitted to many different samples with identical parameters. In contrast, a large SE tells you that the model is volatile and not very stable or reliable as the coefficients vary substantially if the model is applied to many samples.  
+
+## Example 1: Preposition Use across Real-Time
+
+We will now turn to our first example. In this example, we will investigate whether the frequency of prepositions has changed from Middle English to Late Modern English. The reasoning behind this example is that Old English was highly synthetic compared with Present-Day English which comparatively analytic. In other words, while Old English speakers used case to indicate syntactic relations, speakers of Present-Day English use word order and prepositions to indicate syntactic relationships. This means that the loss of case had to be compensated by different strategies and maybe these strategies continued to develop and increase in frequency even after the change from synthetic to analytic had been mostly accomplished. And this prolonged change in compensatory strategies is what this example will focus on. 
+
+The analysis is based on data extracted from the *Penn Corpora of Historical English* (see http://www.ling.upenn.edu/hist-corpora/), that consists of 603 texts written between 1125 and 1900. In preparation of this example, all elements that were part-of-speech tagged as prepositions were extracted from the PennCorpora. 
+
+Then, the relative frequencies (per 1,000 words) of prepositions per text were calculated. This frequency of prepositions per 1,000 words represents our dependent variable. In a next step, the date when each letter had been written was extracted. The resulting two vectors were combined into a table which thus contained for each text, when it was written (independent variable) and its relative frequency of prepositions (dependent or outcome variable).
+
+A regression analysis will follow the steps described below: 
+1. Extraction and processing of the data
+2. Data visualization
+3. Applying the regression analysis to the data
+4. Diagnosing the regression model and checking whether or not basic model assumptions have been violated.
+
+### Simple Linear Regression in `R`
+
+In a first step, we prepare our session by cleaning the work space, installing libraries that we need for the analysis, and loading the libraries and functions.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+rm(list=ls(all=T))             # clean workspace
+#install.packages("car")       # install car package (remove # to activate)
+#install.packages("ggplot2")   # install ggplot2 package (remove # to activate)
+#install.packages("QuantPsyc") # install QuantPsyc package (remove # to activate)
+library(car)                   # activate car package
+library(ggplot2)               # activate ggplot2 package
+library(QuantPsyc)             # activate QuantPsyc package
+source("rscripts/multiplot_ggplot2.r") # load multiplot function
+source("rscripts/slr.summary.tb.r")    # load regression summary function
+```
+
+After preparing our session, we can now load and inspect the data to get a first impression of its properties.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+slrdata <- read.delim("data/slrdata.txt", header = TRUE) # load data
+attach(slrdata)                                          # attach data
+slrdata <- as.data.frame(cbind(datems, pptw))  # remove superfluous columns
+colnames(slrdata) <- c("year", "prep.ptw")     # add column names
+slrdata <- slrdata[!is.na(slrdata$year) == T,] # remove NAs from data
+str(slrdata)                                   # inspect structure of the data
+```
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(knitr)                 # activate library for tabulating
+kable(head(slrdata), caption = "First six lines of the data set.")
+```
+
+Inspecting the data is very important because it can happen that a data set may not load completely or that variables which should be numeric have been converted in character variables. If unchecked, then such hidden data issues could go unnoticed and cause much trouble once you realize that the data you have been working with is different from what you had in mind.
+
+We will now plot the data to get a more thorough impression of the structure of the data.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+ggplot(slrdata, aes(year, prep.ptw)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Year") +
+  labs(y = "Prepositions per 1,000 words") +
+  geom_smooth()
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+ggplot(slrdata, aes(year, prep.ptw)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Year") +
+  labs(y = "Prepositions per 1,000 words") +
+  geom_smooth(method = "lm") # with linear model smoothing!
+```
+
+Before beginning with the regression analysis, we will scale the year. We scale by subtracting each value from the mean of year. This can be useful when dealing with numeric variables because if we did not scale year, we would get estimated values for year 0 (a year when English did not even exist yet). If a variable is scaled, the regression provides estimates of the model refer to the mean of that numeric variable. In other words, scaling can eb very helpful, especially with respect to the interpretation of the results that regression models report.
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+slrdata$prep.ptw <- slrdata$prep.ptw - mean(slrdata$prep.ptw) # scaling date
+```
+
+We will now begin the regression analysis by generating a first regression model. Once the regression model is generated, we will inspect its results and check if certain mathematical assumptions have been violated or whether the data contains outliers. diagnostic plots.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# create initial model
+prep.lm <- lm(prep.ptw ~ year, data = slrdata)
+# inspect results
+summary(prep.lm)
+
+# plot model: 3 plots per row in one window
+par(mfrow = c(1, 3))
+plot(resid(prep.lm))
+plot(rstandard(prep.lm))
+plot(rstudent(prep.lm))
+par(mfrow = c(1, 1)) # restore default parameters
+```
+
+The left graph shows the residuals of the model (i.e., the differences between the observed and the values predicted by the regression model). The problem with this plot is that the residuals are not standardized and so they cannot be compared to the residuals of other models. To remedy this deficiency, residuals are normalized by dividing the residuals by their standard deviation. Then, the normalized residuals can be plotted against the observed values (centre panel). In this way, not only are standardized residuals obtained, but the values of the residuals are transformed into z-values, and one can use the z-distribution to find problematic data points. There are three rules of thumb regarding finding problematic data points through standardized residuals [@field2012discovering 268-269]:
+
+* Points with values higher than 3.29 should be removed from the data.
+*  If more than 1% of the data points have values higher than 2.58, then the error rate of our model is too high.
+*  If more than 5% of the data points have values greater than 1.96, then the error rate of our model is too high.
+
+
+The right panel shows the * studentized residuals* (adjusted predicted values: each data point is divided by the standard error of the residuals). In this way, it is possible to use Student's t-distribution to diagnose our model.
+
+Adjusted predicted values are residuals of a special kind: the model is calculated without a data point and then used to predict this data point. The difference between the observed data point and its predicted value is then called the adjusted predicted value. In summary, studentized residuals are very useful because they allow us to identify influential data points.
+
+The plots show that there are two potentially problematic data points (the top-most and bottom-most point). These two points are clearly different from the other data points and may therefore be outliers. We will test later if these points need to be removed.
+
+We will now generate more diagnostic plots.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+par(mfrow = c(2, 2)) # plot window: 2 plots/row, 2 plots/column
+plot(prep.lm)        # generate diagnostic plots
+par(mfrow = c(1, 1)) # restore normal plot window
+```
+
+The diagnostic plots are very positive and we will go through why this is so for each panel. The graph in the upper left panel is useful for finding outliers or for determining the correlation between residuals and predicted values: when a trend becomes visible in the line or points (e.g., a rising trend or a zigzag line), then this would indicate that the model would be problematic (in such cases, it can help to remove data points that are too influential (outliers)).
+
+The graphic in the upper right panel indicates whether the residuals are normally distributed (which is desirable) or whether the residuals do not follow a normal distribution. If the points lie on the line, the residuals follow a normal distribution. For example, if the points are not on the line at the top and bottom, it shows that the model does not predict small and large values well and that it therefore does not have a good fit.
+
+The graphic in the lower left panel provides information about *homoscedasticity*. Homoscedasticity means that the variance of the residuals remains constant and does not correlate with any independent variable. In unproblematic cases, the graphic shows a flat line. If there is a trend in the line, we are dealing with heteroscedasticity, that is, a correlation between independent variables and the residuals, which is very problematic for regressions.
+
+The graph in the lower right panel shows problematic influential data points that disproportionately affect the regression (this would be problematic). If such influential data points are present, they should be either weighted (one could generate a robust rather than a simple linear regression) or they must be removed. The graph displays Cook's distance, which shows how the regression changes when a model without this data point is calculated. The cook distance thus shows the influence a data point has on the regression as a whole. Data points that have a Cook's distance value greater than 1 are problematic [@field2012discovering, pp. 269].
+
+The so-called leverage is also a measure that indicates how strongly a data point affects the accuracy of the regression. Leverage values range between 0 (no influence) and 1 (strong influence: suboptimal!). To test whether a specific data point has a high leverage value, we calculate a cut-off point that indicates whether the leverage is too strong or still acceptable. The following two formulas are used for this:
+
+\begin{equation}
+
+\frac{3(k + 1)}{n}
+
+\end{equation}
+
+or
+
+\begin{equation}
+
+\frac{2(k + 1)}{n}
+
+\end{equation}
+
+We will look more closely at leverage in the context of multiple linear regression and will therefore end the current analysis by summarizing the results of the regression analysis in a table.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+slrtb <- slr.summary(prep.lm)  # tabulate results
+library(knitr)                 # activate library for tabulating
+kable(slrtb, caption = "Results of a simple linear regression analysis.")
+```
+
+Typically, the results of regression analyses are presented in such tables as they include all important measures of model quality and significance, as well as the magnitude of the effects. 
+In addition, the results of simple linear regressions should be summarized in writing. An example of how the results of a regression analysis can be written up is provided below.
+
+A simple linear regression has been fitted to the data. A visual assessment of the model diagnostic graphics did not indicate any problematic data points (outliers) or disproportionately influential data points and pointed to a good model fit. The final linear regression model is based on 603 data points and correlates highly significantly with the data (R^2^: 0.0108, F-statistic (1, 601): 6,553, p-value: 0.0107\*) and confirms a significant and positive correlation between the year in which the text was written and the relative frequency of prepositions  (coefficient: .02, standardized $\beta$: 0.1039, SE: 0.01, t-value: 2.560, p-value:. 0107\*).
+
+## Example 2: Teaching Styles
+
+In the previous example, we dealt with two numeric variables, while the following example deals with a categorical independent variable and a numeric dependent variable. The ability for regressions to handle very different types of variables makes regressions a widely used and robust method of analysis.
+
+In this example, we are dealing with two groups of students that have been randomly assigned to groups which are exposed to different teaching methods. Both groups undergo a language learning test after the lesson with a maximum score of 20 points. 
+
+The students of the first group (group A) have reached the following scores:
+
+* Group A: 15, 12, 11, 18, 15, 15, 9, 19, 14, 13, 11, 12, 18, 15, 16, 14, 16, 17, 15, 17, 13, 14, 13, 15, 17, 19, 17, 18, 16, 14 (mean: 14,93)
+
+The students of the second group (group B) have reached the following scores:
+
+* Group B: 11, 16, 14, 18, 6, 8, 9, 14, 12, 12, 10, 15, 12, 9, 13, 16, 17, 12, 8, 7, 15, 5, 14, 13, 13, 12, 11, 13, 11, 7 (mean: 11,77)
+
+Our question is whether group A has performed significantly better than group B which would indicate that the teaching method to which group A was exposed works better than the teaching method to which group B was exposed.
+
+
+Let's move on to implementing the regression in `R`. As in the previous example we empty the current workspace, install and activate necessary packages and load additional functions.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+rm(list=ls(all=T))             # clean workspace
+#install.packages("car")       # install car package (remove # to activate)
+#install.packages("ggplot2")   # install ggplot2 package (remove # to activate)
+#install.packages("QuantPsyc") # install QuantPsyc package (remove # to activate)
+library(car)                   # activate car package
+library(ggplot2)               # activate ggplot2 package
+library(QuantPsyc)             # activate QuantPsyc package
+source("rscripts/multiplot_ggplot2.r") # load multiplot function
+source("rscripts/slr.summary.tb.r")    # load regression summary function
+```
+
+After the necessary specifications have been carried out, we generate the data set and inspect its structure.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# generate data
+g1 <- c(15, 12, 11, 18, 15, 15, 9, 19, 14, 13, 11, 12, 18, 15, 16, 14, 16, 17, 15, 17, 13, 14, 13, 15, 17, 19, 17, 18, 16, 14)
+g2 <- c(11, 16, 14, 18, 6, 8, 9, 14, 12, 12, 10, 15, 12, 9, 13, 16, 17, 12, 8, 7, 15, 5, 14, 13, 13, 12, 11, 13, 11, 7)
+g <- c(rep("A", length(g1)), rep("B", length(g2))) # generate a grouping factor
+sprtestdata <- data.frame(g, c(g1, g2))            # combine into a data frame
+colnames(sprtestdata) <- c("group", "score")       # add column names
+library(knitr)                                     # load library
+kable(head(sprtestdata), caption = "First six line of the data set for testing differences between groups using a simple linear regression analysis.")
+```
+
+Now, we graphically display the data. In this case, a boxplot represents a good way to visualize the data.
+
+```{r boxplot, fig.cap="Darstellung der Sprachtestdaten"}
+boxplot(score ~ group,               # create box plot
+data = sprtestdata,                  # the data we want to display
+main = "",                           # empty title
+ylab = "Score",                      # y-axis label
+ylim = c(0, 20),                     # y-axis rage
+xlab = c("Group"),                   # x-axis albel
+notch = T,                           # show notches 
+col = c("lightgreen", "lightblue"))  # define colours
+text(1:2,                            # add text
+c(4.0, 4.0),                         # y-axis position
+cex = 0.85,                          # font size
+labels = paste("mean\n",
+c(round(as.vector(by(sprtestdata$score, sprtestdata$group, mean))[1], 2),
+round(as.vector(by(sprtestdata$score, sprtestdata$group, mean))[2], 2),
+sep = "")))
+rug(jitter(sprtestdata$score),
+side=4)
+box()
+```
+
+The data indicate that group A did significantly better than group B. We will test this impression by generating the regression model and creating the model diagnostic graphics in the next step.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+sprtest.lm <- lm(score ~ group, data = sprtestdata) # generate regression model
+summary(sprtest.lm)                                 # inspect results
+```
+
+
+```{r echo=T, message=FALSE, warning=FALSE}
+par(mfrow = c(1, 3))        # plot window: 1 plot/row, 3 plots/column
+plot(resid(sprtest.lm))     # generate diagnostic plot
+plot(rstandard(sprtest.lm)) # generate diagnostic plot
+plot(rstudent(sprtest.lm))  # generate diagnostic plot
+par(mfrow = c(1, 1))        # restore normal plot window
+```
+
+\caption{Diagnostic plots for the regression analysis that test the effect of language learning methods.}
+
+The graphics do not indicate outliers or other issues, so we can continue with more diagnostic graphics.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+par(mfrow = c(2, 2)) # generate a plot window with 2x2 panels
+plot(sprtest.lm)     # generate diagnostic plots
+par(mfrow = c(1, 1)) # restore normal plot window
+```
+
+\caption{Additional diagnostic plots for the regression analysis that test the effect of language learning methods.}
+
+
+These graphics also show no problems. In this case, the data can be summarized in the next step.
+
+```{r echo=T, message=FALSE, warning=FALSE}
+# ergebnisse tabellieren
+slrtb2 <- slr.summary(sprtest.lm)
+library(knitr)
+kable(slrtb2, caption = "Results of a simple linear regression analysis.")
+```
+
+The results of this second simple linear regressions can be summarized as follows: 
+
+A simple linear regression was fitted to the data. A visual assessment of the model diagnostic graphics did not indicate any problematic data points (outliers) or disproportionately influential data points and pointed to a good model fit. The final linear regression model is based on 60 data points and correlates highly significantly with the data (R^2^: 0.2322, F statistic (1, 58): 2.93, p-value <. 001\*\*\*) and confirms that group A scored significantly better on the language learning test than group B (coefficient: -3.17, standardized $\beta$: -0.4819, SE: 0.48, t-value: -4.19, p-value <. 001 \*\*\*).
+
+>
+> Exercise Time!
+>
+> Load the data set called mblrdata by executing the following command in R:
+
+```{r echo=T, message=FALSE, warning=FALSE}
+slrdata2 <- read.delim("data/mlrdata.txt", header = TRUE) # load data
+attach(slrdata2)                                 # attach data
+slrdata2$attraction <- NULL                      # remove superfluous columns
+str(slrdata2)                                    # inspect structure of the data
+```
+>
+> Perform a regression analysis that analyses if the money spend on a present for someone (money) depends on the receiver's relationship status (status).
+>
+
+# References
+
+

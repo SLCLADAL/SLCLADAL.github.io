@@ -384,8 +384,16 @@ div.tocify {
     <li>
       <a href="descriptivestatz.html">Descriptive Statistics</a>
     </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Basic Interential Statistics</li>
     <li>
-      <a href="basicstatz.html">Basic Interential Statistics</a>
+      <a href="basicstatz.html">Basic Inferential Tests</a>
+    </li>
+    <li>
+      <a href="basicstatzchi.html">The Chi-Square Family</a>
+    </li>
+    <li>
+      <a href="basicstatzregression.html">Simple Linear Regression</a>
     </li>
     <li class="divider"></li>
     <li class="dropdown-header">Advanced Interential Statistics</li>
@@ -588,11 +596,15 @@ gini_low &lt;- 1-(60/(60+85))^2 - (85/(60+85))^2    # Gini: low
 gini_status &lt;- 73/(33+73)* gini_high +  60/(60+85) * gini_low
 gini_status</code></pre>
 <pre><code>## [1] 0.4960521</code></pre>
-<ul>
-<li><p>G_{Gender} = 0.4611915</p></li>
-<li><p>G_{Age} = 0.4323148</p></li>
-<li><p>G_{Status} = 0.4960521</p></li>
-</ul>
+<span class="math display">\[\begin{equation} 
+
+G_{Gender} = 0.4611915
+
+G_{Age} = 0.4323148
+
+G_{Status} = 0.4960521
+
+\end{equation}\]</span>
 <p>Age has the lowest Gini impurity value and therefore separates LikeUsers from NonLikeUsers better than Gender or Social Status. Therefore, age will be the root of our tree.</p>
 <p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
 <p>In a next step, we need to find out which of the remaining variables best separates the speakers who use discourse <em>like</em> from those that do not under the first node. In order to do so, we calculate the Gini values for Gender and SocialStatus for the “15-40” node.</p>
@@ -1045,23 +1057,264 @@ G_{split18.5} = \frac{1} {6} \times 0.0 +  \frac{5} {6} \times 0.48 = 0.4
 <p>As you can see, the bootstrapped data contains the second row twice while the fifth row is missing.</p>
 <p><strong>Random Variable Selection</strong></p>
 <p>Random Forests also differ from simple CITs in that at each step, not all possible variables are considered for a node, but only a subset. For example, we have a data set with five predicting independent variables and one dependent variable. When generating a CIT, all possible variables (variables that do not represent a node further up in the tree) are consiederd as splitting candidates. In Random Forests, only a fixed number (typically the square-root of the number of independent variables) are considered as candidates for a node. So at each potential split, a fixed number of randomly selected variables is considered potential node candidates.</p>
-<div id="example-1" class="section level2">
-<h2><span class="header-section-number">2.1</span> Example 1</h2>
-<pre class="r"><code>library(knitr)               # activate knitr library
-library(dplyr)               # activate dplyr library
+<div id="random-forests-in-r-heart-disease" class="section level2">
+<h2><span class="header-section-number">2.1</span> Random Forests in R: Heart Disease</h2>
+<p>This section is adapted from <a href="https://statquest.org/2018/02/26/statquest-random-forests-in-r/" class="uri">https://statquest.org/2018/02/26/statquest-random-forests-in-r/</a>. We start the procedure by activating the packages that we will need for the analysis.</p>
+<pre class="r"><code>library(ggplot2)       # activate ggplot2 library for plotting
+library(cowplot)       # activate cowplot library for modifying ggplot2
+library(randomForest)  # activate randomForest library for random forests</code></pre>
+<p>The data used in this demo comes from the UCI machine learning repository ( <a href="http://archive.ics.uci.edu/ml/index.php" class="uri">http://archive.ics.uci.edu/ml/index.php</a>). Specifically, this is the heart disease data set ( <a href="http://archive.ics.uci.edu/ml/datasets/Heart+Disease" class="uri">http://archive.ics.uci.edu/ml/datasets/Heart+Disease</a>).</p>
+<pre class="r"><code># define path to data
+url &lt;- &quot;http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data&quot;
+# load data 
+data &lt;- read.csv(url, header=FALSE)
+# inspect data
+head(data) </code></pre>
+<pre><code>##   V1 V2 V3  V4  V5 V6 V7  V8 V9 V10 V11 V12 V13 V14
+## 1 63  1  1 145 233  1  2 150  0 2.3   3 0.0 6.0   0
+## 2 67  1  4 160 286  0  2 108  1 1.5   2 3.0 3.0   2
+## 3 67  1  4 120 229  0  2 129  1 2.6   2 2.0 7.0   1
+## 4 37  1  3 130 250  0  0 187  0 3.5   3 0.0 3.0   0
+## 5 41  0  2 130 204  0  2 172  0 1.4   1 0.0 3.0   0
+## 6 56  1  2 120 236  0  0 178  0 0.8   1 0.0 3.0   0</code></pre>
+<p>Because the data does not have variable names, we have to add variable names manually. In additon, we need to rReformat the data so that it is easy to use and interpreted correctly by randomForest.</p>
+<pre class="r"><code>colnames(data) &lt;- c(
+  &quot;age&quot;,
+  &quot;sex&quot;,# 0 = female, 1 = male
+  &quot;cp&quot;, # chest pain
+          # 1 = typical angina,
+          # 2 = atypical angina,
+          # 3 = non-anginal pain,
+          # 4 = asymptomatic
+  &quot;trestbps&quot;, # resting blood pressure (in mm Hg)
+  &quot;chol&quot;, # serum cholestoral in mg/dl
+  &quot;fbs&quot;,  # fasting blood sugar greater than 120 mg/dl, 1 = TRUE, 0 = FALSE
+  &quot;restecg&quot;, # resting electrocardiographic results
+          # 1 = normal
+          # 2 = having ST-T wave abnormality
+          # 3 = showing probable or definite left ventricular hypertrophy
+  &quot;thalach&quot;, # maximum heart rate achieved
+  &quot;exang&quot;,   # exercise induced angina, 1 = yes, 0 = no
+  &quot;oldpeak&quot;, # ST depression induced by exercise relative to rest
+  &quot;slope&quot;, # the slope of the peak exercise ST segment
+          # 1 = upsloping
+          # 2 = flat
+          # 3 = downsloping
+  &quot;ca&quot;, # number of major vessels (0-3) colored by fluoroscopy
+  &quot;thal&quot;, # this is short of thalium heart scan
+          # 3 = normal (no cold spots)
+          # 6 = fixed defect (cold spots during rest and exercise)
+          # 7 = reversible defect (when cold spots only appear during exercise)
+  &quot;hd&quot; # (the predicted attribute) - diagnosis of heart disease
+          # 0 if less than or equal to 50% diameter narrowing
+          # 1 if greater than 50% diameter narrowing
+  )
+head(data) # now we have data and column names</code></pre>
+<pre><code>##   age sex cp trestbps chol fbs restecg thalach exang oldpeak slope  ca
+## 1  63   1  1      145  233   1       2     150     0     2.3     3 0.0
+## 2  67   1  4      160  286   0       2     108     1     1.5     2 3.0
+## 3  67   1  4      120  229   0       2     129     1     2.6     2 2.0
+## 4  37   1  3      130  250   0       0     187     0     3.5     3 0.0
+## 5  41   0  2      130  204   0       2     172     0     1.4     1 0.0
+## 6  56   1  2      120  236   0       0     178     0     0.8     1 0.0
+##   thal hd
+## 1  6.0  0
+## 2  3.0  2
+## 3  7.0  1
+## 4  3.0  0
+## 5  3.0  0
+## 6  3.0  0</code></pre>
+<pre class="r"><code>str(data) </code></pre>
+<pre><code>## &#39;data.frame&#39;:    303 obs. of  14 variables:
+##  $ age     : num  63 67 67 37 41 56 62 57 63 53 ...
+##  $ sex     : num  1 1 1 1 0 1 0 0 1 1 ...
+##  $ cp      : num  1 4 4 3 2 2 4 4 4 4 ...
+##  $ trestbps: num  145 160 120 130 130 120 140 120 130 140 ...
+##  $ chol    : num  233 286 229 250 204 236 268 354 254 203 ...
+##  $ fbs     : num  1 0 0 0 0 0 0 0 0 1 ...
+##  $ restecg : num  2 2 2 0 2 0 2 0 2 2 ...
+##  $ thalach : num  150 108 129 187 172 178 160 163 147 155 ...
+##  $ exang   : num  0 1 1 0 0 0 0 1 0 1 ...
+##  $ oldpeak : num  2.3 1.5 2.6 3.5 1.4 0.8 3.6 0.6 1.4 3.1 ...
+##  $ slope   : num  3 2 2 3 1 1 3 1 2 3 ...
+##  $ ca      : Factor w/ 5 levels &quot;?&quot;,&quot;0.0&quot;,&quot;1.0&quot;,..: 2 5 4 2 2 2 4 2 3 2 ...
+##  $ thal    : Factor w/ 4 levels &quot;?&quot;,&quot;3.0&quot;,&quot;6.0&quot;,..: 3 2 4 2 2 2 2 2 4 4 ...
+##  $ hd      : int  0 2 1 0 0 0 3 0 2 1 ...</code></pre>
+<p>This shows that we need to tell R which columns contain factors and it also shows us that there are some missing values For example, there are “?”s in the dataset. First, replace “?”s with NAs. And then, we add factors for variables that are factors and clean up the factors that had missing data…</p>
+<pre class="r"><code>data[data == &quot;?&quot;] &lt;- NA
+data[data$sex == 0,]$sex &lt;- &quot;F&quot;
+data[data$sex == 1,]$sex &lt;- &quot;M&quot;
+data$sex &lt;- as.factor(data$sex)
+data$cp &lt;- as.factor(data$cp)
+data$fbs &lt;- as.factor(data$fbs)
+data$restecg &lt;- as.factor(data$restecg)
+data$exang &lt;- as.factor(data$exang)
+data$slope &lt;- as.factor(data$slope)
+data$ca &lt;- as.integer(data$ca) </code></pre>
+<p>Since “ca” had “?”s in it (which we have since converted to NAs) R thinks that the levels for the factor are strings, but we know they are integers, so we’ll first convert the strings to integiers…</p>
+<pre class="r"><code>data$ca &lt;- as.factor(data$ca)  # ...then convert the integers to factor levels
+data$thal &lt;- as.integer(data$thal) # &quot;thal&quot; also had &quot;?&quot;s in it.
+data$thal &lt;- as.factor(data$thal)
+data$hd &lt;- ifelse(test=data$hd == 0, yes=&quot;Healthy&quot;, no=&quot;Unhealthy&quot;)
+data$hd &lt;- as.factor(data$hd) # Now convert to a factor
+str(data) </code></pre>
+<pre><code>## &#39;data.frame&#39;:    303 obs. of  14 variables:
+##  $ age     : num  63 67 67 37 41 56 62 57 63 53 ...
+##  $ sex     : Factor w/ 2 levels &quot;F&quot;,&quot;M&quot;: 2 2 2 2 1 2 1 1 2 2 ...
+##  $ cp      : Factor w/ 4 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;: 1 4 4 3 2 2 4 4 4 4 ...
+##  $ trestbps: num  145 160 120 130 130 120 140 120 130 140 ...
+##  $ chol    : num  233 286 229 250 204 236 268 354 254 203 ...
+##  $ fbs     : Factor w/ 2 levels &quot;0&quot;,&quot;1&quot;: 2 1 1 1 1 1 1 1 1 2 ...
+##  $ restecg : Factor w/ 3 levels &quot;0&quot;,&quot;1&quot;,&quot;2&quot;: 3 3 3 1 3 1 3 1 3 3 ...
+##  $ thalach : num  150 108 129 187 172 178 160 163 147 155 ...
+##  $ exang   : Factor w/ 2 levels &quot;0&quot;,&quot;1&quot;: 1 2 2 1 1 1 1 2 1 2 ...
+##  $ oldpeak : num  2.3 1.5 2.6 3.5 1.4 0.8 3.6 0.6 1.4 3.1 ...
+##  $ slope   : Factor w/ 3 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;: 3 2 2 3 1 1 3 1 2 3 ...
+##  $ ca      : Factor w/ 4 levels &quot;2&quot;,&quot;3&quot;,&quot;4&quot;,&quot;5&quot;: 1 4 3 1 1 1 3 1 2 1 ...
+##  $ thal    : Factor w/ 3 levels &quot;2&quot;,&quot;3&quot;,&quot;4&quot;: 2 1 3 1 1 1 1 1 3 3 ...
+##  $ hd      : Factor w/ 2 levels &quot;Healthy&quot;,&quot;Unhealthy&quot;: 1 2 2 1 1 1 2 1 2 2 ...</code></pre>
+<p>This shows that the correct columns are factors and we’ve replaced “?”s with NAs because “?” no longer appears in the list of factors for “ca” and “thal”.</p>
+<p>Note that for most machine learning methods, you need to divide the data manually into a “training” set and a “test” set. This allows you to train the method using the training data, and then test it on data it was not originally trained on.</p>
+<p>In contrast, Random Forests split the data into “training” and “test” sets for you. This is because Random Forests use bootstrapped data, and thus, not every sample is used to build every tree. The “training” dataset is the bootstrapped data and the “test” dataset is the remaining samples. The remaining samples are called the “Out-Of-Bag” (OOB) data.</p>
+<pre class="r"><code>set.seed(42)
+## impute any missing values in the training set using proximities
+data.imputed &lt;- rfImpute(hd ~ ., data = data, iter=6)</code></pre>
+<pre><code>## ntree      OOB      1      2
+##   300:  17.49% 12.80% 23.02%
+## ntree      OOB      1      2
+##   300:  16.83% 14.02% 20.14%
+## ntree      OOB      1      2
+##   300:  17.82% 13.41% 23.02%
+## ntree      OOB      1      2
+##   300:  17.49% 14.02% 21.58%
+## ntree      OOB      1      2
+##   300:  17.16% 12.80% 22.30%
+## ntree      OOB      1      2
+##   300:  18.15% 14.63% 22.30%</code></pre>
+<p>The argument “iter” refers to the number of iterations to run. Breiman says 4 to 6 iterations is usually good enough. With this dataset, when we set iter=6, OOB-error bounces around between 17% and 18%. When we set iter=20, we get values a little better and a little worse, so doing more iterations doesn’t improve the situation.</p>
+<p>Also, if you really want to micromanage how rfImpute(), you can change the number of trees it makes (the default is 300) and the number of variables that it will consider at each step.</p>
+<p>Now we are ready to build a random forest. If the thing we’re trying to predict (in this case it is whether or not someone has heart disease) is a continuous number (i.e. “weight” or “height”), then by default, randomForest() will set “mtry”, the number of variables to consider at each step, to the total number of variables divided by 3 (rounded down), or to 1 (if the division results in a value less than 1). If the thing we’re trying to predict is a “factor” (i.e. either “yes/no” or “ranked”), then randomForest() will set mtry to the square root of the number of variables (rounded down to the next integer value).</p>
+<p>In this example, “hd”, the thing we are trying to predict, is a factor and there are 13 variables. So by default, randomForest() will set mtry = sqrt(13) = 3.6 rounded down = 3. Also, by default random forest generates 500 trees (NOTE: rfImpute() only generates 300 tress by default)</p>
+<pre class="r"><code>model &lt;- randomForest(hd ~ ., data=data.imputed, proximity=TRUE)
+model </code></pre>
+<pre><code>## 
+## Call:
+##  randomForest(formula = hd ~ ., data = data.imputed, proximity = TRUE) 
+##                Type of random forest: classification
+##                      Number of trees: 500
+## No. of variables tried at each split: 3
+## 
+##         OOB estimate of  error rate: 16.83%
+## Confusion matrix:
+##           Healthy Unhealthy class.error
+## Healthy       142        22   0.1341463
+## Unhealthy      29       110   0.2086331</code></pre>
+<p>The model gives us an overview of the call, along with the OOB error rate for the forest with ntree trees (in this case ntree=500 by default). In additon, the output provides a confusion matrix for the forest with ntree trees. The confusion matrix is laid out like this:</p>
+<table>
+<caption>Confusion matrix for the random forest for Heart Disease data.</caption>
+<tbody>
+<tr class="odd">
+<td></td>
+<td align="left">Healthy</td>
+<td align="left">Unhealthy</td>
+</tr>
+<tr class="even">
+<td>Healthy</td>
+<td align="left">Number of healthy people correctly called healthy by the forest.</td>
+<td align="left">Number of healthy people incorectly called unhealthy by the forest</td>
+</tr>
+<tr class="odd">
+<td>Unhealthy</td>
+<td align="left">Number of unhealthy people incorrectly called healthy by the forest</td>
+<td align="left">Number of unhealthy people correctly called unhealthy by the forest</td>
+</tr>
+</tbody>
+</table>
+<p>Now, we check to see if the random forest is actually big enough… Up to a point, the more trees in the forest, the better. You can tell when you’ve made enough when the OOB no longer improves.</p>
+<pre class="r"><code>oob.error.data &lt;- data.frame(
+  Trees=rep(1:nrow(model$err.rate), times=3),
+  Type=rep(c(&quot;OOB&quot;, &quot;Healthy&quot;, &quot;Unhealthy&quot;), each=nrow(model$err.rate)),
+  Error=c(model$err.rate[,&quot;OOB&quot;],
+    model$err.rate[,&quot;Healthy&quot;],
+    model$err.rate[,&quot;Unhealthy&quot;]))
+ 
+ggplot(data=oob.error.data, aes(x=Trees, y=Error)) +
+  geom_line(aes(color=Type))</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-33-1.png" width="672" /></p>
+<pre class="r"><code># ggsave(&quot;oob_error_rate_500_trees.pdf&quot;)</code></pre>
+<p>The blue line shows the error rate specifically for calling “Unheathly” patients that are OOB. The green line shows the overall OOB error rate. The red line shows the error rate specifically for calling “Healthy” patients that are OOB.</p>
+<p>After building a random forest with 500 tress, the graph does not make it clear that the OOB-error has settled on a value or, if we added more trees, it would continue to decrease. So we do the whole thing again, but this time add more trees.</p>
+<pre class="r"><code>model &lt;- randomForest(hd ~ ., data=data.imputed, ntree=1000, proximity=TRUE)
+model</code></pre>
+<pre><code>## 
+## Call:
+##  randomForest(formula = hd ~ ., data = data.imputed, ntree = 1000,      proximity = TRUE) 
+##                Type of random forest: classification
+##                      Number of trees: 1000
+## No. of variables tried at each split: 3
+## 
+##         OOB estimate of  error rate: 17.16%
+## Confusion matrix:
+##           Healthy Unhealthy class.error
+## Healthy       141        23   0.1402439
+## Unhealthy      29       110   0.2086331</code></pre>
+<pre class="r"><code>oob.error.data &lt;- data.frame(
+  Trees=rep(1:nrow(model$err.rate), times=3),
+  Type=rep(c(&quot;OOB&quot;, &quot;Healthy&quot;, &quot;Unhealthy&quot;), each=nrow(model$err.rate)),
+  Error=c(model$err.rate[,&quot;OOB&quot;],
+    model$err.rate[,&quot;Healthy&quot;],
+    model$err.rate[,&quot;Unhealthy&quot;]))
+ 
+ggplot(data=oob.error.data, aes(x=Trees, y=Error)) +
+  geom_line(aes(color=Type))</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-35-1.png" width="672" /></p>
+<pre class="r"><code># ggsave(&quot;oob_error_rate_1000_trees.pdf&quot;)</code></pre>
+<p>After building a random forest with 1,000 trees, we get the same OOB-error 16.5% and we can see convergence in the graph. So we could have gotten away with only 500 trees, but we wouldn’t have been sure that number was enough.</p>
+<p>If we want to compare this random forest to others with different values for mtry (to control how many variables are considered at each step)…</p>
+<pre class="r"><code>oob.values &lt;- vector(length=10)
+for(i in 1:10) {
+  temp.model &lt;- randomForest(hd ~ ., data=data.imputed, mtry=i, ntree=1000)
+  oob.values[i] &lt;- temp.model$err.rate[nrow(temp.model$err.rate),1]
+}
+oob.values</code></pre>
+<pre><code>##  [1] 0.1749175 0.1782178 0.1716172 0.1782178 0.1683168 0.1881188 0.1815182
+##  [8] 0.1980198 0.1782178 0.1848185</code></pre>
+<p>The lowest value is when mtry=3, so the default setting was the best. Now let’s create an MDS-plot to show how the samples are related to each other.</p>
+<p>Start by converting the proximity matrix into a distance matrix.</p>
+<pre class="r"><code>distance.matrix &lt;- dist(1-model$proximity)
+mds.stuff &lt;- cmdscale(distance.matrix, eig=TRUE, x.ret=TRUE)
+## calculate the percentage of variation that each MDS axis accounts for...
+mds.var.per &lt;- round(mds.stuff$eig/sum(mds.stuff$eig)*100, 1)
+## now make a fancy looking plot that shows the MDS axes and the variation:
+mds.values &lt;- mds.stuff$points
+mds.data &lt;- data.frame(Sample=rownames(mds.values),
+  X=mds.values[,1],
+  Y=mds.values[,2],
+  Status=data.imputed$hd)
+ 
+ggplot(data=mds.data, aes(x=X, y=Y, label=Sample)) +
+  geom_text(aes(color=Status)) +
+  theme_bw() +
+  xlab(paste(&quot;MDS1 - &quot;, mds.var.per[1], &quot;%&quot;, sep=&quot;&quot;)) +
+  ylab(paste(&quot;MDS2 - &quot;, mds.var.per[2], &quot;%&quot;, sep=&quot;&quot;)) +
+  ggtitle(&quot;MDS plot using (1 - Random Forest Proximities)&quot;)</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-37-1.png" width="672" /></p>
+</div>
+<div id="random-forests-in-r-really" class="section level2">
+<h2><span class="header-section-number">2.2</span> Random Forests in R: Really</h2>
+<p>We now use a similar but slightly more elaborate method of going through a random forest analysis. Again, we start the procedure by activating libraries that we will need and by loading the data and setting a seed. A seed allows us to replicate this analysis.</p>
+<pre class="r"><code>library(knitr)         # activate knitr library
+library(dplyr)         # activate dplyr library
+library(randomForest)  # activate randomForest library
 rfd &lt;- read.delim(&quot;data/treedata.txt&quot;, header = T, sep = &quot;\t&quot;)
 set.seed(222)                       # set seed</code></pre>
-<p>After the data preparation, we can now start with the random forest analysis.</p>
-<pre class="r"><code># partition data for evaluating rf 
-id &lt;- sample(2, nrow(rfd), replace = T, prob = c(.7, .3))
+<p>After the data preparation, we can now start with the random forest analysis and, in a first step, we partition the data in order to be able to evaluate the precision of the random forest model later on. We partition the data into a training and a test set.</p>
+<pre class="r"><code>id &lt;- sample(2, nrow(rfd), replace = T, prob = c(.7, .3))
 train &lt;- rfd[id == 1, ]
 test &lt;- rfd[id == 2,]</code></pre>
-<pre class="r"><code># load library
-library(randomForest)
-# create initial model
-like_rf1 &lt;- randomForest(LikeUser~., data = train)
-# inspect model
-print(like_rf1)</code></pre>
+<p>We now create an initial random forest model and inspect its parameters.</p>
+<pre class="r"><code>like_rf1 &lt;- randomForest(LikeUser~., data = train)
+print(like_rf1) # inspect model</code></pre>
 <pre><code>## 
 ## Call:
 ##  randomForest(formula = LikeUser ~ ., data = train) 
@@ -1074,8 +1327,8 @@ print(like_rf1)</code></pre>
 ##     no yes class.error
 ## no  40  37   0.4805195
 ## yes 11  86   0.1134021</code></pre>
-<pre class="r"><code># inspect attibutes
-attributes(like_rf1)</code></pre>
+<p>We can also inspect attibutes of the random forest model.</p>
+<pre class="r"><code>attributes(like_rf1)</code></pre>
 <pre><code>## $names
 ##  [1] &quot;call&quot;            &quot;type&quot;            &quot;predicted&quot;      
 ##  [4] &quot;err.rate&quot;        &quot;confusion&quot;       &quot;votes&quot;          
@@ -1087,8 +1340,8 @@ attributes(like_rf1)</code></pre>
 ## 
 ## $class
 ## [1] &quot;randomForest.formula&quot; &quot;randomForest&quot;</code></pre>
-<pre class="r"><code># start model evaluation
-# install package
+<p>After running an initial random forest model, we will now start with the model evaluation. To evaluate the model, we will have to load additional libraries.</p>
+<pre class="r"><code># install package
 #source(&quot;https://bioconductor.org/biocLite.R&quot;); biocLite(); library(Biobase)
 #install.packages(&quot;Biobase&quot;, repos=c(&quot;http://rstudio.org/_packages&quot;, &quot;http://cran.rstudio.com&quot;, 
 #                                      &quot;http://cran.rstudio.com/&quot;, dependencies=TRUE))
@@ -1103,8 +1356,8 @@ head(ptrain1); head(train$LikeUser)         # inspect predictions</code></pre>
 ## Levels: no yes</code></pre>
 <pre><code>## [1] no  no  yes yes no  no 
 ## Levels: no yes</code></pre>
-<pre class="r"><code># generate confusion matrix
-confusionMatrix(ptrain1, train$LikeUser)  </code></pre>
+<p>Now, we generate a confusion matrix for the training data, extract the prediction for test data, and create confusion matrix for the test data.</p>
+<pre class="r"><code>confusionMatrix(ptrain1, train$LikeUser)  </code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
@@ -1131,9 +1384,7 @@ confusionMatrix(ptrain1, train$LikeUser)  </code></pre>
 ##                                           
 ##        &#39;Positive&#39; Class : no              
 ## </code></pre>
-<pre class="r"><code># extract prediction for test data
-ptest1 &lt;- predict(like_rf1, test)
-# create confusionMatrix
+<pre class="r"><code>ptest1 &lt;- predict(like_rf1, test)
 confusionMatrix(ptest1, test$LikeUser)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
@@ -1161,11 +1412,11 @@ confusionMatrix(ptest1, test$LikeUser)</code></pre>
 ##                                           
 ##        &#39;Positive&#39; Class : no              
 ## </code></pre>
-<pre class="r"><code># determine errorrate of random forest model
-plot(like_rf1, main = &quot;&quot;)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-30-1.png" width="672" /></p>
-<pre class="r"><code># tune model
-like_rf2 &lt;- tuneRF(train[, !colnames(train)== &quot;LikeUser&quot;], 
+<p>Now, we determine error rate of random forest model.</p>
+<pre class="r"><code>plot(like_rf1, main = &quot;&quot;)</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-44-1.png" width="672" /></p>
+<p>After going through the model evaluation, we can now tune the ransom forest model.</p>
+<pre class="r"><code>like_rf2 &lt;- tuneRF(train[, !colnames(train)== &quot;LikeUser&quot;], 
                         train[, colnames(train)== &quot;LikeUser&quot;], 
                         stepFactor = 3, # for most values 3 appears to be optimal
                         plot = T,
@@ -1178,15 +1429,14 @@ like_rf2 &lt;- tuneRF(train[, !colnames(train)== &quot;LikeUser&quot;],
 ## Searching right ...
 ## mtry = 3     OOB error = 23.56% 
 ## 0.08888889 0.05</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-31-1.png" width="672" /></p>
-<pre class="r"><code># create improved model
-like_rf2 &lt;- randomForest(LikeUser~., data = train, 
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-45-1.png" width="672" /></p>
+<p>Again, we create an improved model and inspect its properties.</p>
+<pre class="r"><code>like_rf2 &lt;- randomForest(LikeUser~., data = train, 
                               ntree = 200,
                               ntry = 6,
                               importance= T,
                               proximity = T)
-# inspect model
-print(like_rf2)</code></pre>
+print(like_rf2)   # inspect model</code></pre>
 <pre><code>## 
 ## Call:
 ##  randomForest(formula = LikeUser ~ ., data = train, ntree = 200,      ntry = 6, importance = T, proximity = T) 
@@ -1199,9 +1449,8 @@ print(like_rf2)</code></pre>
 ##     no yes class.error
 ## no  40  37  0.48051948
 ## yes  5  92  0.05154639</code></pre>
-<pre class="r"><code># predict based on improved model
-ptrain2 &lt;- predict(like_rf2, train)
-# create confusionMatrix
+<p>As before, we extract the predictions based on the improved model and create a confusion matrix.</p>
+<pre class="r"><code>ptrain2 &lt;- predict(like_rf2, train)
 confusionMatrix(ptrain2, train$LikeUser)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
@@ -1229,9 +1478,8 @@ confusionMatrix(ptrain2, train$LikeUser)</code></pre>
 ##                                           
 ##        &#39;Positive&#39; Class : no              
 ## </code></pre>
-<pre class="r"><code># extract prediction for test data
-ptest2 &lt;- predict(like_rf2, test)
-# create confusionMatrix
+<p>We will now extract predictions for test data and create a confusion matrix.</p>
+<pre class="r"><code>ptest2 &lt;- predict(like_rf2, test)
 confusionMatrix(ptest2, test$LikeUser)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
@@ -1259,40 +1507,38 @@ confusionMatrix(ptest2, test$LikeUser)</code></pre>
 ##                                           
 ##        &#39;Positive&#39; Class : no              
 ## </code></pre>
-<pre class="r"><code># inspect number of nodes for trees
-hist(treesize(like_rf2), main = &quot;&quot;, col = &quot;lightgray&quot;)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-35-1.png" width="672" /></p>
-<pre class="r"><code># check variable importance
-varImpPlot(like_rf2, main = &quot;&quot;, pch = 20) </code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-36-1.png" width="672" /></p>
-<pre class="r"><code># left plot (Accuracy): how much accuracy decreases if factor is left out
-# left plot (Gini/Pureness): how much more unpure (ambiguous) the distributions become if factor is left out
-# extract variable importance values
-importance(like_rf2)</code></pre>
+<p>Now, we inspect number of nodes per tree in the forest.</p>
+<pre class="r"><code>hist(treesize(like_rf2), main = &quot;&quot;, col = &quot;lightgray&quot;)</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-49-1.png" width="672" /></p>
+<p>We now move on and determine the effect size by checking variable importance.</p>
+<pre class="r"><code>varImpPlot(like_rf2, main = &quot;&quot;, pch = 20) </code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-50-1.png" width="672" /></p>
+<p>The left plot shows the accuracy. More precisely, it shows how much accuracy decreases if factor is left out. The right plot shows the impurity of the nodes of the model based on the predictors. In other words, it shows how much more unpure (ambiguous) the distributions become if factor is left out extract variable importance values.</p>
+<pre class="r"><code>importance(like_rf2)</code></pre>
 <pre><code>##               no       yes MeanDecreaseAccuracy MeanDecreaseGini
 ## Age    14.099255 12.421169            14.586045         8.184826
 ## Gender 14.606837 14.386844            15.423353         8.799358
 ## Status  4.539962  3.110163             4.601034         3.468382</code></pre>
-<pre class="r"><code>#which variables have been used in the trees
-varUsed(like_rf2)</code></pre>
+<p>Which variables have been used in the trees?</p>
+<pre class="r"><code>varUsed(like_rf2)</code></pre>
 <pre><code>## [1] 215 217 215</code></pre>
-<pre class="r"><code># partial dependence plot
-partialPlot(like_rf2, train, Age)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-39-1.png" width="672" /></p>
-<pre class="r"><code># extract tree
-getTree(like_rf2, 1, labelVar = T)</code></pre>
+<p>We can also show the effect size in partial dependence plots.</p>
+<pre class="r"><code>partialPlot(like_rf2, train, Age)</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-53-1.png" width="672" /></p>
+<p>To extract a specific tree. we can use the following command.</p>
+<pre class="r"><code>getTree(like_rf2, 1, labelVar = T)</code></pre>
 <pre><code>##   left daughter right daughter split var split point status prediction
 ## 1             2              3    Status           1      1       &lt;NA&gt;
 ## 2             4              5       Age           1      1       &lt;NA&gt;
 ## 3             0              0      &lt;NA&gt;           0     -1         no
 ## 4             0              0      &lt;NA&gt;           0     -1        yes
 ## 5             0              0      &lt;NA&gt;           0     -1         no</code></pre>
-<pre class="r"><code># mds plot
-MDSplot(like_rf2, test$LikeUser)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-41-1.png" width="672" /></p>
+<p>Finally, a multidimensional scaling plot shows patternings in the data.</p>
+<pre class="r"><code>MDSplot(like_rf2, test$LikeUser)</code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-55-1.png" width="672" /></p>
 </div>
-<div id="example-2" class="section level2">
-<h2><span class="header-section-number">2.2</span> Example 2</h2>
+<div id="random-forests-in-r-really-again" class="section level2">
+<h2><span class="header-section-number">2.3</span> Random Forests in R: Really again</h2>
 <pre class="r"><code># detach partykit
 #detach(&quot;package:partykit&quot;, unload=TRUE)
 # load package party
@@ -1309,7 +1555,7 @@ round(like.varimp, 3)</code></pre>
 ##  0.090  0.068 -0.001</code></pre>
 <pre class="r"><code># plot result
 dotchart(sort(like.varimp), pch = 20, main = &quot;Conditional importance of variables&quot;)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-43-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-57-1.png" width="672" /></p>
 <pre class="r"><code># load library
 library(Hmisc)
 # evaluate random forst
@@ -1318,8 +1564,8 @@ somers2(like.rf.pred, as.numeric(rfd$LikeUser) - 1)</code></pre>
 <pre><code>##           C         Dxy           n     Missing 
 ##   0.8059768   0.6119536 251.0000000   0.0000000</code></pre>
 </div>
-<div id="example-3" class="section level2">
-<h2><span class="header-section-number">2.3</span> Example 3</h2>
+<div id="random-forests-in-r-really-1" class="section level2">
+<h2><span class="header-section-number">2.4</span> Random Forests in R: Really?</h2>
 <pre class="r"><code># load library
 library(party)
 cf1 &lt;- cforest(LikeUser ~ . , data= rfd, control=cforest_unbiased(mtry=2,ntree=100)) # fit the random forest
@@ -1340,7 +1586,7 @@ axis(1, at = seq(-0.01, 0.2, 0.05), seq(-0.01, 0.2, 0.05))
 axis(2, at = 1:length(varimpAUC(cf1)), names(varimpAUC(cf1))[order(varimpAUC(cf1))], las = 2)
 grid()
 box()</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-48-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-62-1.png" width="672" /></p>
 <pre class="r"><code>par(mar = c(5, 4, 4, 2) + 0.1)</code></pre>
 </div>
 </div>
@@ -1379,22 +1625,22 @@ head(borutadata)</code></pre>
 <pre class="r"><code># initial run
 boruta1 &lt;- Boruta(LikeUser~.,data=borutadata)
 print(boruta1)</code></pre>
-<pre><code>## Boruta performed 9 iterations in 0.3912568 secs.
+<pre><code>## Boruta performed 9 iterations in 0.3785379 secs.
 ##  3 attributes confirmed important: Age, Gender, Status;
 ##  No attributes deemed unimportant.</code></pre>
 <pre class="r"><code>getConfirmedFormula(boruta1)</code></pre>
 <pre><code>## LikeUser ~ Age + Gender + Status
-## &lt;environment: 0x000000002f991340&gt;</code></pre>
+## &lt;environment: 0x0000000031520bc8&gt;</code></pre>
 <pre class="r"><code>plot(boruta1, cex = .5)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-51-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-65-1.png" width="672" /></p>
 <p>We now have a look at the importance history to see if any variables can be removed from the analysis.</p>
 <pre class="r"><code>plotImpHistory(boruta1)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-52-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-66-1.png" width="672" /></p>
 <p>After inspecting the importance history, we see that our predictors performed consistently better than chance and the Boruta parameters tehrefore do not need to be modified and we also do not need to remove insignificant variables which do not consistently perform better than the shadow variable. If perdictors do perform worse than the best shadow variable, then these variables should be excludde and the Boruta analysis should be re-run on the dataset that does no longer contain the superfluous variable.</p>
 <p>Now, we print the confirmed formular to check which predictors should be included in the model.</p>
 <pre class="r"><code>getConfirmedFormula(boruta1)</code></pre>
 <pre><code>## LikeUser ~ Age + Gender + Status
-## &lt;environment: 0x0000000030309a68&gt;</code></pre>
+## &lt;environment: 0x0000000030e708e0&gt;</code></pre>
 <p>As a last step, we customize the results plot of the Boruta analysis.</p>
 <pre class="r"><code>par(mar = c(8, 8, 4, 2) + 0.1)
 plot(boruta1, cex.axis=.75, las=2, xlab=&quot;&quot;, ylab = &quot;&quot;, cex = .75, 
@@ -1403,7 +1649,7 @@ abline(v = 3.5, lty = &quot;dashed&quot;)
 mtext(&quot;Predictors&quot;, 1, line = 6, at = 5, cex = 1)
 mtext(&quot;Control&quot;, 1, line = 6, at = 2, cex = 1)
 mtext(&quot;Importance&quot;, 2, line = 2.5, at = 20, cex = 1, las = 0)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-54-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-68-1.png" width="672" /></p>
 <pre class="r"><code>par(mar = c(5, 4, 4, 2) + 0.1)</code></pre>
 </div>
 <div id="references" class="section level1">
