@@ -477,6 +477,17 @@ div.tocify {
 <p>This section deals with tree-structure models, the most basic type is a conditional inference tree. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. In addition, tree-structure models are very useful because they can deal with different types of variables. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.</p>
 <p>Before we implement a conditional inference tree in R, we will have a look at how it works. We will do this in more detail here as random forests and Boruta anlyses are extensions of conditional inference trees and are therefore based on the same concepts.</p>
 <p>Below is a conditional inference tree of the iris-data set. All conditional inference trees answer a simple question, namely “How do we classify elements based on the given predictors?”. The answer that conditional inference trees provide is the classification of the elements based on the levels of the predictors. If predictors are not significant or all elements can be classified correctly without them (i.e. if these predictors are unneccessary), then they are not included in the decision tree. The conditional inference tree shows that the best predictor for discourse <em>like</em> use is age as it is the highest node. Among young speakers, those with high status use like more compared with speakers of lower social status. Among old speakers, women use discourse <em>like</em> more than men.</p>
+<pre class="r"><code>library(partykit)              # activate partykit library
+library(dplyr)                 # activate dplyr library
+options(stringsAsFactors = T)  # set options: do not convert strings
+citdata &lt;- read.delim(&quot;https://slcladal.github.io/data/treedata.txt&quot;, header = T, sep = &quot;\t&quot;)
+set.seed(111)        # set.seed
+# apply bonferroni correction (1 minus alpha multiplied by n of predictors)
+control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
+# create initial conditional inference tree model
+citd.ctree &lt;- ctree(LikeUser ~ Age + Gender + Status,
+                    data = citdata)
+plot(citd.ctree, gp = gpar(fontsize = 8)) # plot final ctree</code></pre>
 <p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-1-1.png" width="672" /></p>
 <p>Before going through how this conditional decision tree is generated, let us first go over some basic concepts. The top of the decision tree is called “root” or “root node”, the categories at the end of branches are called “leaves” or “leaf nodes”. Nodes that are in-between the root and leaves are called “internal nodes” or just “nodes”. The root node has only arrows or lines pointing away from it, internal nodes have lines going to and from them, while leaf nodes only have lines pointing towards them.</p>
 <p>Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse <em>like</em> given their age, gender, and social status. The first six lines of this ficticious data set are displayed in the table below:</p>
@@ -556,13 +567,13 @@ G_{x} = 1 - ( p_{1} )^{2} - ( p_{0} )^{2}
 <p>For the node for men, this would mean the following:</p>
 <span class="math display">\[\begin{equation}
 
-G_{men} = 1-(\frac{42} {42+75})^{2} - (\frac{91} {91+43})^{2} = 0.4602235
+G_{men} = 1-(\frac{42} {42+75})^{2} - (\frac{75} {42+75})^{2} = 0.4602235
 
 \end{equation}\]</span>
 <p>For women, we caculate G or Gini as follows:</p>
 <span class="math display">\[\begin{equation}
 
-G_{women} = 1-(\frac{105} {105+39})^{2} - (\frac{39} {39+105})^{2} = 0.4358432
+G_{women} = 1-(\frac{91} {91+43})^{2} - (\frac{43} {91+43})^{2} = 0.4358432
 
 \end{equation}\]</span>
 <p>To calculate the Gini value of Gender, we need to calculate the weighted average leaf node impurity (weighted because the number of speakers is different in each group). We calculate the weighted avergage leaf node impurity using the forluar below.</p>
@@ -1324,6 +1335,9 @@ ggplot(data=mds.data, aes(x=X, y=Y, label=Sample)) +
   ylab(paste(&quot;MDS2 - &quot;, mds.var.per[2], &quot;%&quot;, sep=&quot;&quot;)) +
   ggtitle(&quot;MDS plot using (1 - Random Forest Proximities)&quot;)</code></pre>
 <p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-38-1.png" width="672" /></p>
+<p>As a final step, we plot the effect sizes of the variables as the mean of decrease in Gini values.</p>
+<pre class="r"><code>varImpPlot(model, main = &quot;&quot;, pch = 20) </code></pre>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-39-1.png" width="672" /></p>
 </div>
 <div id="random-forests-in-r-really" class="section level2">
 <h2><span class="header-section-number">2.2</span> Random Forests in R: Really</h2>
@@ -1439,7 +1453,7 @@ confusionMatrix(ptest1, test$LikeUser)</code></pre>
 ## </code></pre>
 <p>Now, we determine error rate of random forest model.</p>
 <pre class="r"><code>plot(like_rf1, main = &quot;&quot;)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-45-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-46-1.png" width="672" /></p>
 <p>After going through the model evaluation, we can now tune the ransom forest model.</p>
 <pre class="r"><code>like_rf2 &lt;- tuneRF(train[, !colnames(train)== &quot;LikeUser&quot;], 
                         train[, colnames(train)== &quot;LikeUser&quot;], 
@@ -1454,7 +1468,7 @@ confusionMatrix(ptest1, test$LikeUser)</code></pre>
 ## Searching right ...
 ## mtry = 3     OOB error = 23.56% 
 ## 0.08888889 0.05</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-46-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-47-1.png" width="672" /></p>
 <p>Again, we create an improved model and inspect its properties.</p>
 <pre class="r"><code>like_rf2 &lt;- randomForest(LikeUser~., data = train, 
                               ntree = 200,
@@ -1534,10 +1548,10 @@ confusionMatrix(ptest2, test$LikeUser)</code></pre>
 ## </code></pre>
 <p>Now, we inspect number of nodes per tree in the forest.</p>
 <pre class="r"><code>hist(treesize(like_rf2), main = &quot;&quot;, col = &quot;lightgray&quot;)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-50-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-51-1.png" width="672" /></p>
 <p>We now move on and determine the effect size by checking variable importance.</p>
 <pre class="r"><code>varImpPlot(like_rf2, main = &quot;&quot;, pch = 20) </code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-51-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-52-1.png" width="672" /></p>
 <p>The left plot shows the accuracy. More precisely, it shows how much accuracy decreases if factor is left out. The right plot shows the impurity of the nodes of the model based on the predictors. In other words, it shows how much more unpure (ambiguous) the distributions become if factor is left out extract variable importance values.</p>
 <pre class="r"><code>importance(like_rf2)</code></pre>
 <pre><code>##               no       yes MeanDecreaseAccuracy MeanDecreaseGini
@@ -1549,7 +1563,7 @@ confusionMatrix(ptest2, test$LikeUser)</code></pre>
 <pre><code>## [1] 215 217 215</code></pre>
 <p>We can also show the effect size in partial dependence plots.</p>
 <pre class="r"><code>partialPlot(like_rf2, train, Age)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-54-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-55-1.png" width="672" /></p>
 <p>To extract a specific tree. we can use the following command.</p>
 <pre class="r"><code>getTree(like_rf2, 1, labelVar = T)</code></pre>
 <pre><code>##   left daughter right daughter split var split point status prediction
@@ -1560,7 +1574,7 @@ confusionMatrix(ptest2, test$LikeUser)</code></pre>
 ## 5             0              0      &lt;NA&gt;           0     -1         no</code></pre>
 <p>Finally, a multidimensional scaling plot shows patternings in the data.</p>
 <pre class="r"><code>MDSplot(like_rf2, test$LikeUser)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-56-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-57-1.png" width="672" /></p>
 </div>
 <div id="random-forests-in-r-really-again" class="section level2">
 <h2><span class="header-section-number">2.3</span> Random Forests in R: Really again</h2>
@@ -1580,7 +1594,7 @@ round(like.varimp, 3)</code></pre>
 ##  0.090  0.068 -0.001</code></pre>
 <pre class="r"><code># plot result
 dotchart(sort(like.varimp), pch = 20, main = &quot;Conditional importance of variables&quot;)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-58-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-59-1.png" width="672" /></p>
 <pre class="r"><code># load library
 library(Hmisc)
 # evaluate random forst
@@ -1611,7 +1625,7 @@ axis(1, at = seq(-0.01, 0.2, 0.05), seq(-0.01, 0.2, 0.05))
 axis(2, at = 1:length(varimpAUC(cf1)), names(varimpAUC(cf1))[order(varimpAUC(cf1))], las = 2)
 grid()
 box()</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-63-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-64-1.png" width="672" /></p>
 <pre class="r"><code>par(mar = c(5, 4, 4, 2) + 0.1)</code></pre>
 </div>
 </div>
@@ -1650,22 +1664,22 @@ head(borutadata)</code></pre>
 <pre class="r"><code># initial run
 boruta1 &lt;- Boruta(LikeUser~.,data=borutadata)
 print(boruta1)</code></pre>
-<pre><code>## Boruta performed 9 iterations in 0.4805081 secs.
+<pre><code>## Boruta performed 9 iterations in 0.3817508 secs.
 ##  3 attributes confirmed important: Age, Gender, Status;
 ##  No attributes deemed unimportant.</code></pre>
 <pre class="r"><code>getConfirmedFormula(boruta1)</code></pre>
 <pre><code>## LikeUser ~ Age + Gender + Status
-## &lt;environment: 0x00000000359f7400&gt;</code></pre>
+## &lt;environment: 0x0000000034e9e4b0&gt;</code></pre>
 <pre class="r"><code>plot(boruta1, cex = .5)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-66-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-67-1.png" width="672" /></p>
 <p>We now have a look at the importance history to see if any variables can be removed from the analysis.</p>
 <pre class="r"><code>plotImpHistory(boruta1)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-67-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-68-1.png" width="672" /></p>
 <p>After inspecting the importance history, we see that our predictors performed consistently better than chance and the Boruta parameters tehrefore do not need to be modified and we also do not need to remove insignificant variables which do not consistently perform better than the shadow variable. If perdictors do perform worse than the best shadow variable, then these variables should be excludde and the Boruta analysis should be re-run on the dataset that does no longer contain the superfluous variable.</p>
 <p>Now, we print the confirmed formular to check which predictors should be included in the model.</p>
 <pre class="r"><code>getConfirmedFormula(boruta1)</code></pre>
 <pre><code>## LikeUser ~ Age + Gender + Status
-## &lt;environment: 0x00000000365a6248&gt;</code></pre>
+## &lt;environment: 0x000000003daf3300&gt;</code></pre>
 <p>As a last step, we customize the results plot of the Boruta analysis.</p>
 <pre class="r"><code>par(mar = c(8, 8, 4, 2) + 0.1)
 plot(boruta1, cex.axis=.75, las=2, xlab=&quot;&quot;, ylab = &quot;&quot;, cex = .75, 
@@ -1674,7 +1688,7 @@ abline(v = 3.5, lty = &quot;dashed&quot;)
 mtext(&quot;Predictors&quot;, 1, line = 6, at = 5, cex = 1)
 mtext(&quot;Control&quot;, 1, line = 6, at = 2, cex = 1)
 mtext(&quot;Importance&quot;, 2, line = 2.5, at = 20, cex = 1, las = 0)</code></pre>
-<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-69-1.png" width="672" /></p>
+<p><img src="advancedstatztrees_files/figure-html/unnamed-chunk-70-1.png" width="672" /></p>
 <pre class="r"><code>par(mar = c(5, 4, 4, 2) + 0.1)</code></pre>
 </div>
 <div id="references" class="section level1">
