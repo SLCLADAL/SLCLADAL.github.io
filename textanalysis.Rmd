@@ -45,39 +45,196 @@ rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
 
 Concordancing is helpful for inspecting how often a given word occurs in a text or a collection of texts, for seeing how the term is used in the data, for extracting examples, and it also represents a basic procedure and often the first step in more sophisticated analyses of language data. 
 
+## Practical example
+In this example, we will use "R" to create a KWIC display. More precisely, we will load Charles Darwin's "On the origin of species" and investigate his use of the term "natural selection" in across chapters. 
+
+```{r conc1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# read in text
+darwin <- readLines("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/origindarwin.txt")
+# inspect data
+str(darwin)
+```
+
+The output shows that we are dealing with 20001 individual elements. Therefore, we combine these elements into one element and remove everything element that occurs after the header "CHAPTER II".
+
+```{r conc2, echo=T, eval = T, message=FALSE, warning=FALSE}
+# create a single element 
+darwin1 <- paste(darwin, sep = " ", collapse = " ")
+# split monograph into chapters
+darwin2 <- as.vector(unlist(sapply(darwin1, function(x) {
+  x <- strsplit(gsub("(CHAPTER [xviXVI]{1,7})", "qwertz\\1", x), "qwertz" )
+}))) 
+# convert everything into lower case
+darwin3 <- tolower(darwin2)
+# inspect data
+nchar(darwin1); nchar(darwin2)
+```
+
+We now have the subsection of the data that we aim to investigate and can now perform the concordaning.
+
+```{r conc3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load function for concordancing
+source("D:\\R/ConcR_2.3_loadedfiles.R")
+# set parameters for concordancing
+pattern <- "organism[s]{0,1}"
+context <- 50
+# extract all adjectives (concordance)
+darwinnatsel <- ConcR(darwin3, pattern, context)
+# inspect data
+darwinnatsel[1:5, 2:ncol(darwinnatsel)]
+```
+
+```{r conc4, echo=T, eval = T, message=FALSE, warning=FALSE}
+# clean data
+darwinnatsel1 <- darwinnatsel[complete.cases(darwinnatsel),]
+# determine chapter
+darwinnatsel1$Chapter <- ifelse(grepl("chapter [xvi]{1,7}\\.{0,1} .*", darwinnatsel1$OriginalString) == T, gsub("(chapter [xvi]{1,7})\\.{0,1} .*", "\\1", darwinnatsel1$OriginalString), darwinnatsel1$OriginalString)
+# remove OriginalString column 
+darwinnatsel1$OriginalString <- NULL
+# inspect data
+head(darwinnatsel1)
+```
+
+
+```{r conc5, echo=T, eval = T, message=FALSE, warning=FALSE}
+# extract number of words per chapter
+wordfreq <- as.vector(sapply(darwin3, function(x){
+  x <- as.vector(unlist(strsplit(x, " ")))
+  x <- length(x)
+}))
+# extract number of search terms per chapter
+termfreq <- as.vector(unlist(sapply(darwin3, function(x){
+  x <- str_extract_all(x, pattern)
+  x <- length(as.vector(unlist(x)))
+})))
+# extract chapters
+chapters <- as.vector(unlist(sapply(darwin3, function(x){
+  x <- gsub("(chapter [xvi]{1,7})\\.{0,1} .*", "\\1", x)
+  x <- ifelse(nchar(x) >50, "chapter 0", x)
+})))
+# calculate rel. freq of serach term per chapter 
+relfreq <- termfreq/wordfreq*1000
+# create table of results
+tb <- data.frame(chapters, relfreq)
+tb$chapters <- factor(tb$chapters, 
+                         levels = c("chapter 0", "chapter i", "chapter ii",
+                            "chapter iii", "chapter iv", "chapter v",
+                            "chapter vi", "chapter vii", "chapter viii",
+                            "chapter ix", "chapter x", "chapter xi",
+                            "chapter xii", "chapter xiii", "chapter xiv",
+                            "chapter xv"))
+# inspect results
+tb
+```
+
+We can now vizualize the relative frequencies of our search word per chapter.
+
+```{r conc6, echo=T, eval = T, message=FALSE, warning=FALSE}
+library(ggplot2)
+ggplot(tb, aes(x=chapters, y=relfreq, group =1)) + 
+  geom_smooth(aes(y = relfreq, x = chapters), color = "goldenrod2")+
+  geom_line(aes(y = relfreq, x = chapters), color = "indianred4") +         
+  guides(color=guide_legend(override.aes=list(fill=NA))) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_x_discrete(name ="",
+                   breaks=c("chapter 0", "chapter i", "chapter ii",
+                            "chapter iii", "chapter iv", "chapter v",
+                            "chapter vi", "chapter vii", "chapter viii",
+                            "chapter ix", "chapter x", "chapter xi",
+                            "chapter xii", "chapter xiii", "chapter xiv",
+                            "chapter xv"),
+                    labels=c("Chapter 0", "Chapter i", "Chapter ii",
+                             "Chapter iii", "Chapter iv", "Chapter v",
+                             "Chapter vi", "Chapter vii", "Chapter viii",
+                             "Chapter ix", "Chapter x", "Chapter xi",
+                             "Chapter xii", "Chapter xiii", "Chapter xiv",
+                             "Chapter xv")) +
+  scale_y_continuous(name ="Relative Frequency (per 1,000 words)",
+                   breaks=seq(0, 1, 0.2),
+                   labels=seq(0, 1, 0.2),
+                   limits=c(-0.05, 1))
+
+```
+
+
 # Word Frequency
 
-One basic aspect of Text Analysis consists in extracting word frequency lists, i.e. determining how often word forms occur in a given text or collection of texts. Such word lists can be used to determine differences between texts. 
+One basic aspect of Text Analysis consists in extracting word frequency lists, i.e. determining how often word forms occur in a given text or collection of texts. 
 
-```{r echo=F, eval = T, message=FALSE, warning=FALSE}
+```{r wf1, echo=F, eval = T, message=FALSE, warning=FALSE}
 # define path to corpus
 corpuspath <- "D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data\\testcorpus"
-# define files to load
+# create list of files
 corpus.files = list.files(path = corpuspath, pattern = NULL, all.files = T,
   full.names = T, recursive = T, ignore.case = T, include.dirs = T)
-# load corpus and start processing
+# load file content and start processing
 corpus <- lapply(corpus.files, function(x) {
   x <- scan(x, what = "char", sep = "", quote = "", quiet = T, skipNul = T)
   x <- paste(x, sep = " ", collapse = " ")
   } )
-# define path to data
-testdatawords <- paste(as.vector(unlist(corpus)), sep = " ", collapse = " ")
-testdatawords <- gsub("[^[:alpha:][:space:]]*", "", testdatawords)
-testdatawords <- as.vector(unlist(strsplit(testdatawords, " ")))
-testdatawords <- table(testdatawords)[order(table(testdatawords), decreasing = T)]
-library(knitr)
-testdatawords <- data.frame(names(testdatawords), as.vector(testdatawords))
-colnames(testdatawords) <- c("Word", "Frequency")
+# collapse data into one element
+corpuswords <- paste(as.vector(unlist(corpus)), sep = " ", collapse = " ")
+# remove non-words
+corpuswords <- gsub("[^[:alpha:][:space:]]*", "", corpuswords)
+# split data into individula words
+corpuswords <- as.vector(unlist(strsplit(corpuswords, " ")))
+# tabulate words in decending order of frequency
+wordfreqs <- table(corpuswords)[order(table(corpuswords), decreasing = T)]
+# convert table into a data frame
+wordfreqs <- data.frame(names(wordfreqs), as.vector(wordfreqs))
+# add column names
+colnames(wordfreqs) <- c("Word", "Frequency")
+# inspect data
+head(wordfreqs)
+```
+
+Such word frequency lists can be visualized as word clouds. 
+
+```{r wf2, echo=F, eval = T, message=FALSE, warning=FALSE}
+# load library
+library("wordcloud")
+# create wordcloud
+wordcloud(words = wordfreqs$Word, freq = wordfreqs$Frequency, 
+          max.words=100, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "BrBG"))
+```
+
+Such word lists can be used to determine differences between texts. For instance, we can load two different texts and check whether they differ with respect to word frequencies.
+
+```{r wf3, echo=F, eval = T, message=FALSE, warning=FALSE}
+# load data
+twain <- readLines("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/twainhuckfinn.txt")
+melville <- readLines("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/melvillemobydick.txt")
+# combine each text into one element
+twain <- paste(as.vector(unlist(twain)), sep = " ", collapse = " ")
+melville <- paste(as.vector(unlist(melville)), sep = " ", collapse = " ")
+# load libraries
+library(tm)
+library(dplyr)
+library(xtable)
+# clean texts
+docs <- Corpus(VectorSource(c(twain, melville))) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(tolower)  %>%
+  tm_map(removeWords, stopwords("english")) %>%
+  tm_map(stripWhitespace) %>%
+  tm_map(PlainTextDocument)
+# create term document matrix
+tdm <- TermDocumentMatrix(docs) %>%
+  as.matrix()
+colnames(tdm) <- c("Twain","Melville")
+
+# create comparison cloud
+comparison.cloud(tdm, random.order=FALSE, 
+                 colors = c("orange","lightblue"),
+                 title.size=2.5, max.words=400, 
+                 title.bg.colors = "white")
+
 ```
 
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
-kable(testdatawords[1:6,], caption = "Word frequency list of an example corpus.")
-```
-
-
-
-For instance, private dialogue data will contain second person pronouns substantially more frequently than, for instance, scripted monologues such as speeches. Thus, word lists cane be used in text classification and to determine the formality of texts.
+Also, private dialogue data will contain second person pronouns substantially more frequently than, for instance, scripted monologues such as speeches. Thus, word lists can be used in text classification and to determine the formality of texts.
 
 As an example, below you find the number of the second person pronouns you and your and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the International corpus of English (ICE).
 
@@ -143,6 +300,7 @@ rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
 
 
 # Text Classification
+
 Text classification refers to methods that allow to classify a given text to a predefined set of languages, genres, authors, or the like. Such classifications are typically based on the relative frequency of word classes, key words, phonemes, or other linguistic features such as average sentence length, words per line, etc.
 
 As with most other methods that are used in text analysis, text classification typically builds upon a training set that is already annotated with the required tags. Training sets and the features that are derived from these training sets can be created by oneself or one can use build in training sets that are provided in the respective software packages or tools. 

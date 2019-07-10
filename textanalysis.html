@@ -11,7 +11,7 @@
 
 <meta name="author" content="UQ SLC Digital Team" />
 
-<meta name="date" content="2019-07-09" />
+<meta name="date" content="2019-07-10" />
 
 <title>Text Analysis</title>
 
@@ -469,7 +469,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Text Analysis</h1>
 <h4 class="author"><em>UQ SLC Digital Team</em></h4>
-<h4 class="date"><em>2019-07-09</em></h4>
+<h4 class="date"><em>2019-07-10</em></h4>
 
 </div>
 
@@ -501,47 +501,159 @@ div.tocify {
 </p>
 </div>
 <p>Concordancing is helpful for inspecting how often a given word occurs in a text or a collection of texts, for seeing how the term is used in the data, for extracting examples, and it also represents a basic procedure and often the first step in more sophisticated analyses of language data.</p>
+<div id="practical-example" class="section level2">
+<h2><span class="header-section-number">3.1</span> Practical example</h2>
+<p>In this example, we will use “R” to create a KWIC display. More precisely, we will load Charles Darwin’s “On the origin of species” and investigate his use of the term “natural selection” in across chapters.</p>
+<pre class="r"><code># read in text
+darwin &lt;- readLines(&quot;D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/origindarwin.txt&quot;)
+# inspect data
+str(darwin)</code></pre>
+<pre><code>##  chr [1:20001] &quot;THE ORIGIN OF SPECIES &quot; &quot;BY &quot; &quot;CHARLES DARWIN &quot; ...</code></pre>
+<p>The output shows that we are dealing with 20001 individual elements. Therefore, we combine these elements into one element and remove everything element that occurs after the header “CHAPTER II”.</p>
+<pre class="r"><code># create a single element 
+darwin1 &lt;- paste(darwin, sep = &quot; &quot;, collapse = &quot; &quot;)
+# split monograph into chapters
+darwin2 &lt;- as.vector(unlist(sapply(darwin1, function(x) {
+  x &lt;- strsplit(gsub(&quot;(CHAPTER [xviXVI]{1,7})&quot;, &quot;qwertz\\1&quot;, x), &quot;qwertz&quot; )
+}))) 
+# convert everything into lower case
+darwin3 &lt;- tolower(darwin2)
+# inspect data
+nchar(darwin1); nchar(darwin2)</code></pre>
+<pre><code>## [1] 1181142</code></pre>
+<pre><code>##  [1]  10133  76156  40736  37419 121498  75188  95602 102880  83598  81775
+## [11]  72428  70939  74511  53293 114322  70664</code></pre>
+<p>We now have the subsection of the data that we aim to investigate and can now perform the concordaning.</p>
+<pre class="r"><code># load function for concordancing
+source(&quot;D:\\R/ConcR_2.3_loadedfiles.R&quot;)
+# set parameters for concordancing
+pattern &lt;- &quot;organism[s]{0,1}&quot;
+context &lt;- 50
+# extract all adjectives (concordance)
+darwinnatsel &lt;- ConcR(darwin3, pattern, context)
+# inspect data
+darwinnatsel[1:5, 2:ncol(darwinnatsel)]</code></pre>
+<pre><code>##                                           PreContext     Token
+## 1                                               &lt;NA&gt;      &lt;NA&gt;
+## 2 y generations. no case is on record of a variable   organism
+## 3  there are two factors; namely, the nature of the   organism
+## 4 ects of the conditions of life on each individual   organism
+## 5 hat unlike their parents. i may add, that as some  organisms
+##                                          PostContext
+## 1                                               &lt;NA&gt;
+## 2  ceasing to vary wnder cultivation. our oldest cul
+## 3 , and the nature of the conditions. the former see
+## 4 , in nearly the same manner as the chill affects d
+## 5  breed freely under the most unnat- ural condition</code></pre>
+<pre class="r"><code># clean data
+darwinnatsel1 &lt;- darwinnatsel[complete.cases(darwinnatsel),]
+# determine chapter
+darwinnatsel1$Chapter &lt;- ifelse(grepl(&quot;chapter [xvi]{1,7}\\.{0,1} .*&quot;, darwinnatsel1$OriginalString) == T, gsub(&quot;(chapter [xvi]{1,7})\\.{0,1} .*&quot;, &quot;\\1&quot;, darwinnatsel1$OriginalString), darwinnatsel1$OriginalString)
+# remove OriginalString column 
+darwinnatsel1$OriginalString &lt;- NULL
+# inspect data
+head(darwinnatsel1)</code></pre>
+<pre><code>##                                           PreContext     Token
+## 2 y generations. no case is on record of a variable   organism
+## 3  there are two factors; namely, the nature of the   organism
+## 4 ects of the conditions of life on each individual   organism
+## 5 hat unlike their parents. i may add, that as some  organisms
+## 6 e importance in comparison with the nature of the   organism
+## 7 likewise neces- sarily occurs with closely allied  organisms
+##                                          PostContext    Chapter
+## 2  ceasing to vary wnder cultivation. our oldest cul  chapter i
+## 3 , and the nature of the conditions. the former see  chapter i
+## 4 , in nearly the same manner as the chill affects d  chapter i
+## 5  breed freely under the most unnat- ural condition  chapter i
+## 6  in determining each particular form of variation   chapter i
+## 7 , which inhabit distinct continents or islands. wh chapter ii</code></pre>
+<pre class="r"><code># extract number of words per chapter
+wordfreq &lt;- as.vector(sapply(darwin3, function(x){
+  x &lt;- as.vector(unlist(strsplit(x, &quot; &quot;)))
+  x &lt;- length(x)
+}))
+# extract number of search terms per chapter
+termfreq &lt;- as.vector(unlist(sapply(darwin3, function(x){
+  x &lt;- str_extract_all(x, pattern)
+  x &lt;- length(as.vector(unlist(x)))
+})))
+# extract chapters
+chapters &lt;- as.vector(unlist(sapply(darwin3, function(x){
+  x &lt;- gsub(&quot;(chapter [xvi]{1,7})\\.{0,1} .*&quot;, &quot;\\1&quot;, x)
+  x &lt;- ifelse(nchar(x) &gt;50, &quot;chapter 0&quot;, x)
+})))
+# calculate rel. freq of serach term per chapter 
+relfreq &lt;- termfreq/wordfreq*1000
+# create table of results
+tb &lt;- data.frame(chapters, relfreq)
+tb$chapters &lt;- factor(tb$chapters, 
+                         levels = c(&quot;chapter 0&quot;, &quot;chapter i&quot;, &quot;chapter ii&quot;,
+                            &quot;chapter iii&quot;, &quot;chapter iv&quot;, &quot;chapter v&quot;,
+                            &quot;chapter vi&quot;, &quot;chapter vii&quot;, &quot;chapter viii&quot;,
+                            &quot;chapter ix&quot;, &quot;chapter x&quot;, &quot;chapter xi&quot;,
+                            &quot;chapter xii&quot;, &quot;chapter xiii&quot;, &quot;chapter xiv&quot;,
+                            &quot;chapter xv&quot;))
+# inspect results
+tb</code></pre>
+<pre><code>##        chapters   relfreq
+## 1     chapter 0 0.0000000
+## 2     chapter i 0.3554924
+## 3    chapter ii 0.4023605
+## 4   chapter iii 0.4204036
+## 5    chapter iv 0.4032800
+## 6     chapter v 0.2155792
+## 7    chapter vi 0.1687194
+## 8   chapter vii 0.1574390
+## 9  chapter viii 0.0000000
+## 10   chapter ix 0.0678380
+## 11    chapter x 0.4506873
+## 12   chapter xi 0.4616805
+## 13  chapter xii 0.7271141
+## 14 chapter xiii 0.5093206
+## 15  chapter xiv 0.3815520
+## 16   chapter xv 0.5390005</code></pre>
+<p>We can now vizualize the relative frequencies of our search word per chapter.</p>
+<pre class="r"><code>library(ggplot2)
+ggplot(tb, aes(x=chapters, y=relfreq, group =1)) + 
+  geom_smooth(aes(y = relfreq, x = chapters), color = &quot;goldenrod2&quot;)+
+  geom_line(aes(y = relfreq, x = chapters), color = &quot;indianred4&quot;) +         
+  guides(color=guide_legend(override.aes=list(fill=NA))) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_x_discrete(name =&quot;&quot;,
+                   breaks=c(&quot;chapter 0&quot;, &quot;chapter i&quot;, &quot;chapter ii&quot;,
+                            &quot;chapter iii&quot;, &quot;chapter iv&quot;, &quot;chapter v&quot;,
+                            &quot;chapter vi&quot;, &quot;chapter vii&quot;, &quot;chapter viii&quot;,
+                            &quot;chapter ix&quot;, &quot;chapter x&quot;, &quot;chapter xi&quot;,
+                            &quot;chapter xii&quot;, &quot;chapter xiii&quot;, &quot;chapter xiv&quot;,
+                            &quot;chapter xv&quot;),
+                    labels=c(&quot;Chapter 0&quot;, &quot;Chapter i&quot;, &quot;Chapter ii&quot;,
+                             &quot;Chapter iii&quot;, &quot;Chapter iv&quot;, &quot;Chapter v&quot;,
+                             &quot;Chapter vi&quot;, &quot;Chapter vii&quot;, &quot;Chapter viii&quot;,
+                             &quot;Chapter ix&quot;, &quot;Chapter x&quot;, &quot;Chapter xi&quot;,
+                             &quot;Chapter xii&quot;, &quot;Chapter xiii&quot;, &quot;Chapter xiv&quot;,
+                             &quot;Chapter xv&quot;)) +
+  scale_y_continuous(name =&quot;Relative Frequency (per 1,000 words)&quot;,
+                   breaks=seq(0, 1, 0.2),
+                   labels=seq(0, 1, 0.2),
+                   limits=c(-0.05, 1))</code></pre>
+<p><img src="textanalysis_files/figure-html/conc6-1.png" width="672" /></p>
+</div>
 </div>
 <div id="word-frequency" class="section level1">
 <h1><span class="header-section-number">4</span> Word Frequency</h1>
-<p>One basic aspect of Text Analysis consists in extracting word frequency lists, i.e. determining how often word forms occur in a given text or collection of texts. Such word lists can be used to determine differences between texts.</p>
-<pre class="r"><code>kable(testdatawords[1:6,], caption = &quot;Word frequency list of an example corpus.&quot;)</code></pre>
-<table>
-<caption>Word frequency list of an example corpus.</caption>
-<thead>
-<tr class="header">
-<th align="left">Word</th>
-<th align="right">Frequency</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">of</td>
-<td align="right">54</td>
-</tr>
-<tr class="even">
-<td align="left">the</td>
-<td align="right">50</td>
-</tr>
-<tr class="odd">
-<td align="left">and</td>
-<td align="right">46</td>
-</tr>
-<tr class="even">
-<td align="left">language</td>
-<td align="right">29</td>
-</tr>
-<tr class="odd">
-<td align="left">in</td>
-<td align="right">19</td>
-</tr>
-<tr class="even">
-<td align="left">a</td>
-<td align="right">16</td>
-</tr>
-</tbody>
-</table>
-<p>For instance, private dialogue data will contain second person pronouns substantially more frequently than, for instance, scripted monologues such as speeches. Thus, word lists cane be used in text classification and to determine the formality of texts.</p>
+<p>One basic aspect of Text Analysis consists in extracting word frequency lists, i.e. determining how often word forms occur in a given text or collection of texts.</p>
+<pre><code>##       Word Frequency
+## 1       of        54
+## 2      the        50
+## 3      and        46
+## 4 language        29
+## 5       in        19
+## 6        a        16</code></pre>
+<p>Such word frequency lists can be visualized as word clouds.</p>
+<p><img src="textanalysis_files/figure-html/wf2-1.png" width="672" /></p>
+<p>Such word lists can be used to determine differences between texts. For instance, we can load two different texts and check whether they differ with respect to word frequencies.</p>
+<p><img src="textanalysis_files/figure-html/wf3-1.png" width="672" /></p>
+<p>Also, private dialogue data will contain second person pronouns substantially more frequently than, for instance, scripted monologues such as speeches. Thus, word lists can be used in text classification and to determine the formality of texts.</p>
 <p>As an example, below you find the number of the second person pronouns you and your and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the International corpus of English (ICE).</p>
 <pre><code>Private dialogues   Scripted monologues</code></pre>
 <p>Second person pronouns (you, your) 6761 659 Other words 259625 105295 Total 266386 105954</p>
@@ -564,21 +676,21 @@ div.tocify {
 <div id="part-of-speech-tagging-pos-tagging" class="section level2">
 <h2><span class="header-section-number">7.1</span> Part-of-speech tagging (pos tagging)</h2>
 <p>For many analyses that use language data it is useful or even important to differentiate between different parts of speech. In order to determine the word class of a certain word, we use a procedure which is called part-of-speech tagging or pos-tagging for short.</p>
-<p><img src="textanalysis_files/figure-html/unnamed-chunk-3-1.png" width="384" /> Figure 3: Example of the first lines of the pos-tagged ICE Ireland.</p>
+<p><img src="textanalysis_files/figure-html/unnamed-chunk-1-1.png" width="384" /> Figure 3: Example of the first lines of the pos-tagged ICE Ireland.</p>
 </div>
 <div id="syntactic-parsing" class="section level2">
 <h2><span class="header-section-number">7.2</span> Syntactic Parsing</h2>
 <p>Parsing refers to another type of annotation in which typically syntactic relations or functions are added to text. Parsing builds on PoS-tagging and allows drawing syntactic trees or dependencies.</p>
-<p><img src="textanalysis_files/figure-html/unnamed-chunk-4-1.png" width="384" /></p>
+<p><img src="textanalysis_files/figure-html/unnamed-chunk-2-1.png" width="384" /></p>
 <p>The parsed information can then be used to create e.g. syntax trees.</p>
-<p><img src="textanalysis_files/figure-html/unnamed-chunk-5-1.png" width="384" /></p>
+<p><img src="textanalysis_files/figure-html/unnamed-chunk-3-1.png" width="384" /></p>
 </div>
 </div>
 <div id="text-classification" class="section level1">
 <h1><span class="header-section-number">8</span> Text Classification</h1>
 <p>Text classification refers to methods that allow to classify a given text to a predefined set of languages, genres, authors, or the like. Such classifications are typically based on the relative frequency of word classes, key words, phonemes, or other linguistic features such as average sentence length, words per line, etc.</p>
 <p>As with most other methods that are used in text analysis, text classification typically builds upon a training set that is already annotated with the required tags. Training sets and the features that are derived from these training sets can be created by oneself or one can use build in training sets that are provided in the respective software packages or tools.</p>
-<div id="practical-example" class="section level2">
+<div id="practical-example-1" class="section level2">
 <h2><span class="header-section-number">8.1</span> Practical example</h2>
 <p>In the following, we will use the frequency of phonemes to classify a text. In a first step, we read in a German text, and split it into phonemes.</p>
 <pre class="r"><code># read in German text
@@ -690,7 +802,7 @@ library(&quot;class&quot;)
 prediction &lt;- knn(train[2:ncol(train)], test[2:ncol(train)], cl = train[, 1], k = 3)
 # inspect the result
 prediction</code></pre>
-<pre><code>## [1] German
+<pre><code>## [1] Spanish
 ## Levels: English German Spanish</code></pre>
 <p>Based on the frequenies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley’s “Brave New World”. The training texts were German, English, and Spanish translations of a subsection of Wikipedia’s article for Hermann Hesse’s “Steppenwolf”.</p>
 </div>
@@ -701,7 +813,7 @@ prediction</code></pre>
 <p>Typically, Sentiment Analysis represents a type of classifier only provide information about positive or negative polarity, e.g. whether a tweet is “positive” or “negative”. Therefore, Sentiment Analysis is often regarded as rather coarse-grained and, thus, rather irrelevant for the types of research questions in linguistics.</p>
 <p>In the language sciences, Sentiment Analysis can also be a very helpful tool if the type of Sentiment Analysis provides more fine-grained information. In the following, we will perform such a information-rich Sentiment Analysis. The Sentiment Analysis used here does not only provide information about polarity but it will also provide association values for eight core emotions.</p>
 <p>The more fine-grained output is made possible by relying an the Word-Emotion Association Lexicon (Mohammad &amp; Turney 2013), which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (cf. Mohammad &amp; Turney 2013). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word “cry” or “tragedy” are more readily associated with SADNESS while words such as “happy” or “beautiful” are indicative of JOY and words like “fit” or “burst” may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction.</p>
-<div id="practical-example-1" class="section level2">
+<div id="practical-example-2" class="section level2">
 <h2><span class="header-section-number">9.1</span> Practical example</h2>
 <p>In the following, we will perform two sentiment analses. In the first example, we will investigate the emotionality of three different novels while we will analyse how the sentiment changes throughout the course of a anovel in the second example.</p>
 <p>We will start with the first example and load five pieces of literature.</p>
@@ -739,14 +851,14 @@ head(darwinemo)</code></pre>
 ## 1     0            0       0    0   0       0        0     0        0
 ## 2     0            0       0    0   0       0        0     0        0
 ## 3     0            0       0    0   0       0        0     0        0
-## 4     0            0       0    0   0       0        0     0        0
+## 4     0            0       0    0   0       0        0     1        0
 ## 5     0            0       0    0   0       0        0     0        0
 ## 6     0            0       0    0   0       0        0     0        0
 ##   positive
 ## 1        0
 ## 2        0
 ## 3        0
-## 4        0
+## 4        1
 ## 5        0
 ## 6        0</code></pre>
 <p>After performing the Sentiment Analysis, we prepare the data for visualizations</p>
@@ -765,17 +877,17 @@ rownames(emo) &lt;- gsub(&quot;emos&quot;, &quot;&quot;, rownames(emo))
 # inspect data
 head(emo)</code></pre>
 <pre><code>##           anger anticipation disgust fear  joy sadness surprise trust
-## darwin     0.62         1.68    0.42 1.00 1.18    0.88     0.74  2.62
-## twain      1.06         2.12    0.74 1.64 1.52    1.52     1.10  2.00
-## orwell     1.54         1.94    1.30 2.26 1.72    2.04     0.86  2.80
-## lovecraft  1.80         1.80    1.68 2.48 1.06    2.40     0.96  1.36
-## husband    2.10         2.38    1.18 2.34 2.22    2.32     1.22  2.32
+## darwin     0.88         2.06    0.46 1.62 1.36    1.44     1.08  2.90
+## twain      1.24         2.20    0.76 1.50 1.88    1.20     1.36  2.28
+## orwell     1.38         2.22    1.28 2.16 1.56    1.90     0.96  2.48
+## lovecraft  1.84         1.82    1.62 2.70 1.10    2.34     1.00  1.52
+## husband    2.08         2.38    1.16 2.34 2.16    2.30     1.22  2.32
 ##           negative positive
-## darwin        2.18     4.12
-## twain         2.98     3.14
-## orwell        4.08     4.62
-## lovecraft     4.68     2.78
-## husband       4.46     4.44</code></pre>
+## darwin        2.80     4.44
+## twain         2.44     3.70
+## orwell        3.72     3.76
+## lovecraft     4.78     2.68
+## husband       4.46     4.38</code></pre>
 <pre class="r"><code>#convert into data frame
 emo &lt;- as.data.frame(emo)
 # add author column
@@ -787,12 +899,12 @@ emol &lt;- gather(emo, Emotion, Score, anger:positive, factor_key=TRUE)
 # inspect data
 head(emol)</code></pre>
 <pre><code>##      Author      Emotion Score
-## 1    Darwin        anger  0.62
-## 2     Twain        anger  1.06
-## 3    Orwell        anger  1.54
-## 4 Lovecraft        anger  1.80
-## 5   Husband        anger  2.10
-## 6    Darwin anticipation  1.68</code></pre>
+## 1    Darwin        anger  0.88
+## 2     Twain        anger  1.24
+## 3    Orwell        anger  1.38
+## 4 Lovecraft        anger  1.84
+## 5   Husband        anger  2.08
+## 6    Darwin anticipation  2.06</code></pre>
 <pre class="r"><code># load library
 library(ggplot2)
 # extract subset
@@ -807,7 +919,7 @@ ggplot(emol2,                   # plot barplotdatagg1
            position=position_dodge()) +  # determine grouping
   scale_fill_manual(values=c(&quot;goldenrod2&quot;, &quot;gray70&quot;, &quot;indianred4&quot;, &quot;grey30&quot;, &quot;lightblue&quot;)) +                 # define colours
   theme_bw()                    # define theme (black and white)</code></pre>
-<p><img src="textanalysis_files/figure-html/unnamed-chunk-19-1.png" width="672" /></p>
+<p><img src="textanalysis_files/figure-html/unnamed-chunk-17-1.png" width="672" /></p>
 </div>
 </div>
 <div id="entity-extraction" class="section level1">
