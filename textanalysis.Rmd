@@ -7,7 +7,7 @@ output:
 bibliography: bibliography.bib
 link-citations: yes
 ---
-```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+```{r uq1, echo=F, eval = T, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("images/uq1.jpg")
 ```
 
@@ -56,26 +56,26 @@ library(stringr)
 # read in text
 darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
   paste(sep = " ", collapse = " ") %>%
-  tolower() %>%
-  str_replace_all("(chapter [xvi]{1,4} {0,1})\\.{0,1}", "qwertz\\1") %>%
+  tolower() %>% 
+  str_replace_all("(chapter [xvi]{1,7}\\.{0,1}) ", "qwertz\\1") %>%
   strsplit("qwertz") %>%
   unlist()
 # inspect data
-nchar(darwin3)
+nchar(darwin)
 ```
 
-Now that we have the subsections of the data that we aim to investigate, we can perform the concordancing. To create a KWIC display, we load the function "ConcR" from a script called "ConcR_2.3_loadedfiles.R". Then we define a pattern that we want to look for (the pattern can be a simple word or it contain regular expressions). Then, we define the amount of context that we want to have displayed (in our case 50 characters). Finally, we run the concordance function "ConcR" with the arguments "darwin3" the text elements that we want to inspect, the search pattern, and the context.
+Now that we have the subsections of the data that we aim to investigate, we can perform the concordancing. To create a KWIC display, we load the function "ConcR" from a script called "ConcR_2.3_loadedfiles.R". Then we define a pattern that we want to look for (the pattern can be a simple word or it contain regular expressions). Then, we define the amount of context that we want to have displayed (in our case 50 characters). Finally, we run the concordance function "ConcR" with the arguments "darwin" the text elements that we want to inspect, the search pattern, and the context.
 
 ```{r conc3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load function for concordancing
 source("https://slcladal.github.io/rscripts/ConcR_2.3_loadedfiles.r")
 # start concordancing
-darwinnatsel <- ConcR(darwin3, "organism[s]{0,1}", 50)
+darwinnatsel <- ConcR(darwin, "organism[s]{0,1}", 50)
 # inspect data
 darwinnatsel[1:5, 2:ncol(darwinnatsel)]
 ```
 
-We now have the KWIC display but would like to clean the display a little bit. For instance, we would like to get rid of lines that do not contain any information (which happens if the search pattern does not occur in a subfile that we searched).
+We now have the KWIC display but would like to clean the display and get rid of the rows that do not contain information (which happens if the search pattern does not occur in a subfile that we searched).
 
 In addition, we want to extract the chapter in which the instance has occurred.
 
@@ -106,7 +106,7 @@ In a first step, we extract the number of words in each chapter.
 ```{r wf1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # extract number of words per chapter
 library(dplyr)
-darwinchapters <- darwin3 %>%
+darwinchapters <- darwin %>%
   strsplit(" ")
 words <- sapply(darwinchapters, function(x) length(x))
 # inspect data
@@ -118,8 +118,8 @@ Next, we extract the number of matches in each chapter.
 ```{r wf2, echo=T, eval = T, message=FALSE, warning=FALSE}
 # extract number of matches per chapter
 library(stringr)
-matcheschapters <- darwin3 %>%
-  str_extract_all(., pattern) 
+matcheschapters <- darwin %>%
+  str_extract_all(., "organism[s]{0,1}") 
 matches <- sapply(matcheschapters, function(x) length(x))
 # inspect data
 matches
@@ -129,7 +129,7 @@ Now, we extract the names of the chapters and create a table with the chapter na
 
 ```{r wf3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # extract chapters
-Chapters <- as.vector(unlist(sapply(darwin3, function(x){
+Chapters <- as.vector(unlist(sapply(darwin, function(x){
   x <- gsub("(chapter [xvi]{1,7})\\.{0,1} .*", "\\1", x)
   x <- ifelse(nchar(x) > 50, "chapter 0", x)
 })))
@@ -147,9 +147,9 @@ We can now visualize the relative frequencies of our search word per chapter.
 # load library
 library(ggplot2)
 # create plot
-ggplot(tb, aes(x=chapters, y=relfreq, group =1)) + 
-  geom_smooth(aes(y = relfreq, x = chapters), color = "goldenrod2")+
-  geom_line(aes(y = relfreq, x = chapters), color = "indianred4") +         
+ggplot(tb, aes(x=Chapters, y=Frequency, group =1)) + 
+  geom_smooth(aes(y = Frequency, x = Chapters), color = "goldenrod2")+
+  geom_line(aes(y = Frequency, x = Chapters), color = "indianred4") +         
   guides(color=guide_legend(override.aes=list(fill=NA))) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   scale_y_continuous(name ="Relative Frequency (per 1,000 words)")
@@ -181,9 +181,22 @@ colnames(wordfreqs) <- c("Word", "Frequency")
 head(wordfreqs)
 ```
 
-Such word frequency lists can be visualized as word clouds. 
+Such word frequency lists can be visualized, for example,  as bargraphs.
 
 ```{r wf6, echo=T, eval = T, message=FALSE, warning=FALSE}
+# prepare data
+wfd <- table(corpuswords)
+wfd <- wfd[order(wfd, decreasing = T)]
+wfd <- wfd[1:10]
+# start plot
+barplot(wfd, las = 1, ylim = c(0,2000), las=2)
+text(seq(0.7, 11.5, 1.2), wfd+150, wfd)
+
+```
+
+Alternatively, word frequency lists can be visualized, although less informative, as word clouds. 
+
+```{r wf7, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load library
 library("wordcloud")
 # create wordcloud
@@ -194,7 +207,7 @@ wordcloud(words = wordfreqs$Word, freq = wordfreqs$Frequency,
 
 Word lists can be used to determine differences between texts. For instance, we can load two different texts and check whether they differ with respect to word frequencies.
 
-```{r wf7, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r wf8, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load data
 orwell <- readLines("https://slcladal.github.io/data/orwell.txt")
 melville <- readLines("https://slcladal.github.io/data/melvillemobydick.txt")
@@ -231,7 +244,7 @@ Frequency information can also tell us something about the nature of a text. For
 
 As an example, below you find the number of the second person pronouns “you” and “your” and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the International corpus of English (ICE).
 
-```{r wf8, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r wf9, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
 library(knitr)
 numbers <- matrix(c("you, your", "6761", "659", 
 "Other words",	"259625",	"105295"), byrow = T, nrow = 2)
@@ -241,7 +254,7 @@ kable(numbers, caption = "", align=c(rep('c',times=2)))
 
 If we calculate the percentage of second person pronouns in both text types and see whether private dialogues contain more of these second person pronouns than scripted monologues (i.e. speeches).
 
-```{r wf9, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r wf10, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
 library(knitr)
 numbers <- matrix(c("you, your", "6761", "659", 
 "Other words",	"259625",	"105295", "Percent",	"2.60",	"0.63"), byrow = T, nrow = 3)
@@ -252,8 +265,8 @@ kable(numbers, caption = "", align=c(rep('c',times=2)))
 
 This simple example shows that second person pronouns make up 2.6 percent of all words that are used in private dialogues while they only amount to 0.63 percent in scripted speeches. A handy way to present such differences visually are association and mosaic plots.
 
-```{r wf10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-d <- matrix(c( 6761, 659, 259625, 105295), nrow = 2, byrow = T)
+```{r wf11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+d <- matrix(c(6761, 659, 259625, 105295), nrow = 2, byrow = T)
 colnames(d) <- c("D", "M")
 rownames(d) <- c("you, your", "Other words")
 assocplot(d)
@@ -289,7 +302,8 @@ head(darwin)
 
 ```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # create data frame
-darwindf <- data.frame(darwin[1:length(darwin)-1], darwin[2:length(darwin)])
+darwindf <- data.frame(darwin[1:length(darwin)-1], 
+                       darwin[2:length(darwin)])
 # add column names
 colnames(darwindf) <- c("Word1", "Word2")
 # inspect data
@@ -419,7 +433,7 @@ As with most other methods that are used in text analysis, text classification t
 
 In the following, we will use the frequency of phonemes to classify a text. In a first step, we read in a German text, and split it into phonemes.
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r tc1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # read in German text
 German <- readLines("https://slcladal.github.io/data/phonemictext1.txt")
 # clean text
@@ -434,7 +448,7 @@ head(German)
 
 We now do the same for three other texts - an English and a Spanish text as well as one text in a language that we will determine using classification.
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r tc2, echo=T, eval = T, message=FALSE, warning=FALSE}
 # read in texts
 English <- readLines("https://slcladal.github.io/data/phonemictext2.txt")
 Spanish <- readLines("https://slcladal.github.io/data/phonemictext3.txt")
@@ -449,7 +463,7 @@ head(English)
 
 We will now create a table that represents the phonemes and their frequencies in each of the 4 texts. In addition, we will add the language and simply the column names.
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r tc3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # create data tables
 German <- data.frame(names(table(German)), as.vector(table(German)))
 English <- data.frame(names(table(English)), as.vector(table(English)))
@@ -473,7 +487,7 @@ head(classdata)
 
 Now, we group the data so that we see, how often each phoneme is used in each language.
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r tc4, echo=T, eval = T, message=FALSE, warning=FALSE}
 # set options
 options(stringsAsFactors = F)
 # create wide format
@@ -490,7 +504,7 @@ classdw[, 1:6]
 
 Now, we need to transform the data again, so that we have the frequency of each phoneme by language as the classifier will use "Language" as the dependent variable and the phoneme frequencies as predictors.
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r tc5, echo=T, eval = T, message=FALSE, warning=FALSE}
 numvar <- colnames(classdw)[2:length(colnames(classdw))]
 classdw[numvar] <- lapply(classdw[numvar], as.numeric)
 # function for normalizing numeric variables
@@ -501,6 +515,27 @@ normalize <- function(x) { (x -min(x))/(max(x)-min(x))   }
 classdw[, 1:5]
 ```
 
+Before turning to the actual classification, we will use a cluster analysis to see which texts the unknown text is most similar with.
+
+```{r tc6, echo=T, eval = T, message=FALSE, warning=FALSE}
+# remove language column
+textm <- classdw[,2:ncol(classdw)]
+# add languages as row names
+rownames(textm) <- classdw[,1]
+# create distance matrix
+distmtx <- dist(textm)
+# activate library
+library("cluster")         # activate library
+clustertexts <- hclust(    # hierarchical cluster object
+  distmtx,                 # use data diststudents
+  method="ward.D")         # ward.D as linkage method
+plot(clustertexts,         # plot result as dendrogram
+     hang = .25,           # labels at split
+     main = "")            # no title
+```
+
+According to the cluster analysis, the unknown text clusters together with the English texts which suggests that the unknown text is likely to be English.
+
 Before we begin with the actual classification, we will split the data so that we have one data set without "Unknown" (this is our training set) and one data set with only "Unknown" (this is our test set).
 
 ```{r echo=T, eval = T, message=FALSE, warning=FALSE}
@@ -509,6 +544,8 @@ library(dplyr)
 # create training set
 train <- classdw %>%
   filter(Language != "Unknown")
+# increase training set size
+train <- rbind(train, train, train, train, train, train, train, train)
 # create test set
 test <- classdw %>%
   filter(Language == "Unknown")
@@ -516,7 +553,7 @@ test <- classdw %>%
 train$Language <- as.factor(train$Language)
 train$Language <- as.factor(train$Language)
 # inspect data
-train[, 1:3]; test[, 1:3]
+train[1:10, 1:3]; test[, 1:3]
 ```
 
 Finally, we can apply our classifier to our data. The classifier we use is a  k-nearest neighbour classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
@@ -525,10 +562,9 @@ Finally, we can apply our classifier to our data. The classifier we use is a  k-
 # activate library
 library("class")
 # apply k-nearest-neighbor (knn) classifier
-prediction <- knn(train[2:ncol(train)], test[2:ncol(test)], cl = train[, 1], k = 3)
+prediction <- class::knn(train[,2:ncol(train)], test[,2:ncol(test)], cl = train[, 1], k = 3)
 # inspect the result
 prediction
-
 ```
 
 Based on the frequencies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley's "Brave New World". The training texts were German, English, and Spanish translations of a subsection of Wikipedia's article for Hermann Hesse's "Steppenwolf". 
@@ -549,7 +585,7 @@ In the following, we will perform a sentiment analysis to investigate the emotio
 
 We will start with the first example and load five pieces of literature. 
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # read in texts
 darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt")
 twain <- readLines("https://slcladal.github.io/data/twainhuckfinn.txt")
@@ -560,7 +596,7 @@ husband <- readLines("https://slcladal.github.io/data/husbandsregret.txt")
 
 In a next step, we clean the data, convert it to lower case, and split it into individual words. 
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa2, echo=T, eval = T, message=FALSE, warning=FALSE}
 # clean and split files into words 
 darwin <- tolower(as.vector(unlist(strsplit(paste(gsub(" {2,}", " ", darwin), sep = " "), " "))))
 twain <- tolower(as.vector(unlist(strsplit(paste(gsub(" {2,}", " ", twain), sep = " "), " "))))
@@ -571,7 +607,7 @@ husband <- tolower(as.vector(unlist(strsplit(paste(gsub(" {2,}", " ", husband), 
 
 Now, we extract samples from each data set. 
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa3, echo=T, eval = T, message=FALSE, warning=FALSE}
 darwin <- sample(darwin, 5000, replace = F)
 twain <- sample(twain, 5000, replace = F)
 orwell <- sample(orwell, 5000, replace = F)
@@ -581,7 +617,7 @@ husband <- sample(husband, 5000, replace = F)
 
 We now load the "syuzhet" package and apply the "get_nrc_sentiment" function to the data which performs the Sentiment Analysis.
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa4, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load library
 library(syuzhet)
 # perform sentiment analysis
@@ -596,7 +632,7 @@ head(darwinemo)
 
 After performing the Sentiment Analysis, we prepare the data for visualizations
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa5, echo=T, eval = T, message=FALSE, warning=FALSE}
 # extract percentages of emotional words
 darwinemos <- colSums(darwinemo)/50
 twainemos <- colSums(twainemo)/50
@@ -613,7 +649,7 @@ rownames(emo) <- gsub("emos", "", rownames(emo))
 head(emo)
 ```
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa6, echo=T, eval = T, message=FALSE, warning=FALSE}
 #convert into data frame
 emo <- as.data.frame(emo)
 # add author column
@@ -628,7 +664,7 @@ head(emol)
 
 
 
-```{r echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r sa7, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load library
 library(ggplot2)
 # extract subset
