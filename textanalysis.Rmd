@@ -234,7 +234,7 @@ colnames(tdm) <- c("Twain","Melville")
 # create comparison cloud
 comparison.cloud(tdm, random.order=FALSE, 
                  colors = c("orange","lightblue"),
-                 title.size=2.5, max.words=400, 
+                 title.size=2.5, max.words=200, 
                  title.bg.colors = "white")
 
 ```
@@ -290,13 +290,13 @@ For many analyses that use language data it is useful or even important to diffe
 
 ```{r pos1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load corpus data
-text <- readLines("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/text4.txt", skipNul = T)
+text <- readLines("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/text2.txt", skipNul = T)
 # clean data
 text <- text[5] %>%
   removeNumbers() %>%
   stripWhitespace() %>%
   str_replace_all("\"", "")  %>%
-  str_replace_all("Considered hideous.*", "")  %>%
+  str_replace_all("When Harry.*", "")  %>%
   strsplit("qwertz") %>%
   unlist() %>%
   stripWhitespace() 
@@ -316,36 +316,51 @@ textpos <- POStag(object = text)
 textpos
 ```
 
-```{r fig.width=4, fig.height=4, echo=FALSE, warning=FALSE}
-library(png)
-ima <- readPNG("images/PosTaggedIceIreland.png")
-plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
-lim <- par()
-rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
-```
-Figure 3: Example of the first lines of the pos-tagged ICE Ireland.
 
 ## Syntactic Parsing
-Parsing refers to another type of annotation in which typically syntactic relations or functions are added to text. Parsing builds on PoS-tagging and allows drawing syntactic trees or dependencies.
 
-```{r fig.width=4, fig.height=4, echo=FALSE, warning=FALSE}
-library(png)
-ima <- readPNG("images/SyntacticParsing.png")
-plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
-lim <- par()
-rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
-``` 
+Parsing refers to another type of annotation in which either structural information (as in the case of XML documents) or syntactic relations are added to text. As syntactic parsing is commonly more relevenat in the language sciences, the follwoing will focus only on syntactic parsing. syntactic parsing builds on PoS-tagging and allows drawing syntactic trees or dependencies. Unfortunately, syntactic parsing is still has relatively high error rates when dealing with language that is not very formal. However, syntactic parsing is very reliable when dealing with written language.
+
+```{r pars1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# convert character to string
+s <- as.String(text)
+# define sentence and word token annotator
+sent_token_annotator <- Maxent_Sent_Token_Annotator()
+word_token_annotator <- Maxent_Word_Token_Annotator()
+# apply sentence and word annotatior
+a2 <- annotate(s, list(sent_token_annotator, word_token_annotator))
+# define syntactic parsing annotator
+parse_annotator <- Parse_Annotator()
+# apply parser
+p <- parse_annotator(s, a2)
+# extract parsed information
+ptexts <- sapply(p$features, '[[', "parse")
+ptexts
+```
+
+```{r pars2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# read into NLP Tree objects.
+ptrees <- lapply(ptexts, Tree_parse)
+# show frist tree
+ptrees[[2]]
+```
+
+These trees can, of course, also be shown visually.
+
+```{r pars3, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load library
+library(igraph)
+source("D:\\R/parse2graph.R")
+parse2graph(ptexts[2], title = "", margin=-0.2, vertex.color=NA,
+            vertex.frame.color=NA, vertex.label.font=2,
+            vertex.label.cex=.75, vertex.label.color="black", asp=.5,
+            edge.width=1, edge.color='red', edge.arrow.size=0)
+
+
+```
+
 
 The parsed information can then be used to create e.g. syntax trees.
-
-```{r fig.width=4, fig.height=4, echo=FALSE, warning=FALSE}
-library(png)
-ima <- readPNG("images/SyntacticTree.png")
-plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
-lim <- par()
-rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
-``` 
-
 
 
 # Text Classification
@@ -585,7 +600,29 @@ ggplot(emol2,                   # plot barplotdatagg1
 ```
 
 # Entity Extraction
+
 Entity Extraction is a process during which textual elements which have characteristics that are common to proper nouns (locations, people, organizations, etc.) rather than other parts of speech, e.g. non-sentence initial capitalization, are extracted from texts. Retrieving entities is common in automated summarization and in Topic Modelling. Entity extraction can be achieved by simple feature extraction (e.g. extract all non-sentence initial capitalized words) or with the help of training sets. Using training sets, i.e. texts that are annotated for entities and non-entities, achieves better results when dealing with unknown data and data with inconsistent capitalization.
+
+```{r ee1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load libraries
+library(NLP)
+library(openNLP)
+library(openNLPmodels.en)
+# load text
+orwell <- readLines("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/orwell.txt")
+
+
+loc_annot = Maxent_Entity_Annotator(kind = "location") #annotate location
+people_annot = Maxent_Entity_Annotator(kind = "person") #annotate person
+
+annot.l1 = NLP::annotate(text, list(loc_annot,people_annot))
+
+k <- sapply(annot.l1$features, `[[`, "kind")
+berk_locations = text[annot.l1[k == "location"]]
+berk_people = text[annot.l1[k == "person"]]
+
+
+```
 
 # Topic Modelling
 Topic Modelling is a procedure that allows to extract clusters of key words. These key word clusters can represent topics that texts deal with. This procedure builds on word frequencies and correlations between word frequencies. 
