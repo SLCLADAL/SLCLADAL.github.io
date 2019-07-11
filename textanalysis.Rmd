@@ -46,45 +46,36 @@ rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
 Concordancing is helpful for inspecting how often a given word occurs in a text or a collection of texts, for seeing how the term is used in the data, for extracting examples, and it also represents a basic procedure and often the first step in more sophisticated analyses of language data. 
 
 ## Practical example
+
 In this example, we will use "R" to create a KWIC display. More precisely, we will load Charles Darwin's "On the origin of species" and investigate his use of the term "natural selection" in across chapters. 
 
 ```{r conc1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load libraries
+library(dplyr)
+library(stringr)
 # read in text
-darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt")
-# inspect data
-str(darwin)
-```
-
-The output shows that we are dealing with 20001 individual elements. Therefore, we combine these elements into one element and remove everything element that occurs after the header "CHAPTER II".
-
-```{r conc2, echo=T, eval = T, message=FALSE, warning=FALSE}
-# create a single element 
-darwin1 <- paste(darwin, sep = " ", collapse = " ")
-# split monograph into chapters
-darwin2 <- as.vector(unlist(sapply(darwin1, function(x) {
-  x <- strsplit(gsub("(CHAPTER [xviXVI]{1,7})", "qwertz\\1", x), "qwertz" )
-}))) 
-# convert everything into lower case
-darwin3 <- tolower(darwin2)
+darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
+  paste(sep = " ", collapse = " ") %>%
+  tolower() %>%
+  str_replace_all("(chapter [xvi]{1,4} {0,1})\\.{0,1}", "qwertz\\1") %>%
+  strsplit("qwertz") %>%
+  unlist()
 # inspect data
 nchar(darwin3)
 ```
 
-We now have the subsections of the data that we aim to investigate and can now perform the concordancing. To cerate a KWIC display, we load the function "ConcR" from a script called "ConcR_2.3_loadedfiles.R". Then we define a pattern that we want to look for (the pattern can be a simple word or it contain regular expressions). Then, we define the amount of context that we want to have displayed (in our case 50 characters). Finally, we run the concordance function "ConcR" with the arguments "darwin3" the text elements taht we want to inspect, the search pattern, and the context.
+Now that we have the subsections of the data that we aim to investigate, we can perform the concordancing. To create a KWIC display, we load the function "ConcR" from a script called "ConcR_2.3_loadedfiles.R". Then we define a pattern that we want to look for (the pattern can be a simple word or it contain regular expressions). Then, we define the amount of context that we want to have displayed (in our case 50 characters). Finally, we run the concordance function "ConcR" with the arguments "darwin3" the text elements that we want to inspect, the search pattern, and the context.
 
 ```{r conc3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load function for concordancing
-source("https://slcladal.github.io/rscripts/ConcR_2.3_loadedfiles.R")
-# set parameters for concordancing
-pattern <- "organism[s]{0,1}"
-context <- 50
-# extract all adjectives (concordance)
-darwinnatsel <- ConcR(darwin3, pattern, context)
+source("https://slcladal.github.io/rscripts/ConcR_2.3_loadedfiles.r")
+# start concordancing
+darwinnatsel <- ConcR(darwin3, "organism[s]{0,1}", 50)
 # inspect data
 darwinnatsel[1:5, 2:ncol(darwinnatsel)]
 ```
 
-We now have the KWIC display but would liek to clean the display a little bit. For instance, we would liek to get rid of lines that do not contain anay information (which happens if the serach pattern does not occur in a subfile that we searched).
+We now have the KWIC display but would like to clean the display a little bit. For instance, we would like to get rid of lines that do not contain any information (which happens if the search pattern does not occur in a subfile that we searched).
 
 In addition, we want to extract the chapter in which the instance has occurred.
 
@@ -106,7 +97,7 @@ Now, the KWIC display is finished and we could go about investigating how Darwin
 
 One basic aspect of Text Analysis consists in extracting word frequency lists, i.e. determining how often word forms occur in a given text or collection of texts. In fact, frequency information lies at the very core of Text Analysis. 
 
-To exemplify how frequency information can help us in an analysis, we will continue working with the KWIC display that we have cretaed above.
+To exemplify how frequency information can help us in an analysis, we will continue working with the KWIC display that we have created above.
 
 In the following, we want to find out about changes in the frequency with which the term "organism" has been used across chapters in Darwin's "Origin". 
 
@@ -134,18 +125,19 @@ matches <- sapply(matcheschapters, function(x) length(x))
 matches
 ```
 
-Now, we exctract the names of the chapters adn cretae a table with the chapter names and the relative frequency of matches per 1,000 words.
+Now, we extract the names of the chapters and create a table with the chapter names and the relative frequency of matches per 1,000 words.
 
 ```{r wf3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # extract chapters
 chapters <- as.vector(unlist(sapply(darwin3, function(x){
   x <- gsub("(chapter [xvi]{1,7})\\.{0,1} .*", "\\1", x)
-  x <- ifelse(nchar(x) >50, "chapter 0", x)
+  x <- ifelse(nchar(x) > 50, "chapter 0", x)
 })))
 # calculate rel. freq of serach term per chapter 
 relfreq <- matches/words*1000
 # create table of results
 tb <- data.frame(chapters, relfreq)
+# factorize chapters column
 tb$chapters <- factor(tb$chapters, 
                          levels = c("chapter 0", "chapter i", "chapter ii",
                             "chapter iii", "chapter iv", "chapter v",
@@ -157,10 +149,12 @@ tb$chapters <- factor(tb$chapters,
 head(tb)
 ```
 
-We can now vizualize the relative frequencies of our search word per chapter.
+We can now visualize the relative frequencies of our search word per chapter.
 
 ```{r wf4, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
 library(ggplot2)
+# create plot
 ggplot(tb, aes(x=chapters, y=relfreq, group =1)) + 
   geom_smooth(aes(y = relfreq, x = chapters), color = "goldenrod2")+
   geom_line(aes(y = relfreq, x = chapters), color = "indianred4") +         
@@ -177,7 +171,7 @@ We will now briefly check an example where we simply extract a frequency list fr
 # load library
 library(tm)
 # load and process corpus
-corpuswords <- Corpus(DirSource("https://slcladal.github.io/data/testcorpus", encoding = "UTF-8"))  %>%
+corpuswords <- Corpus(DirSource("https://slcladal.github.io/rscripts/data/testcorpus", encoding = "UTF-8"))  %>%
   paste(sep = " ", collapse = " ") %>%
   str_replace_all(" {2,}", " ") %>%
   tolower() %>% 
@@ -240,9 +234,9 @@ comparison.cloud(tdm, random.order=FALSE,
 ```
 
 
-Frequency infromation can also tell us something about the nature of a text. For instance, private dialogues will typically contain higher rates of  second person pronouns compared with more format text types, such as, for instance, scripted monologues like speeches. For this reason, word frequency lists can be used in text classification and to determine the formality of texts.
+Frequency information can also tell us something about the nature of a text. For instance, private dialogues will typically contain higher rates of second person pronouns compared with more format text types, such as, for instance, scripted monologues like speeches. For this reason, word frequency lists can be used in text classification and to determine the formality of texts.
 
-As an example, below you find the number of the second person pronouns you and your and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the International corpus of English (ICE).
+As an example, below you find the number of the second person pronouns “you” and “your” and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the International corpus of English (ICE).
 
 ```{r wf8, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
 library(knitr)
@@ -263,7 +257,7 @@ kable(numbers, caption = "", align=c(rep('c',times=2)))
 ```
 
 
-This simple example shows that second person pronouns make up 2.6 percent of all words that are used in private dialogues while they only amount to 0.63 percent in scripted speeches. A handy way to present such differences vizually are association and mosaic plots.
+This simple example shows that second person pronouns make up 2.6 percent of all words that are used in private dialogues while they only amount to 0.63 percent in scripted speeches. A handy way to present such differences visually are association and mosaic plots.
 
 ```{r wf10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 d <- matrix(c( 6761, 659, 259625, 105295), nrow = 2, byrow = T)
@@ -272,12 +266,65 @@ rownames(d) <- c("you, your", "Other words")
 assocplot(d)
 ```
 
-Bars above the dashed line indicate relative overse while bars below the line suggest relative underuse. Therefore, the associationplot indicates underuse of "you/your" and overuseuse of "other words" in monologoues while the opposite trends holds true for dialogues, i.e. overuse of "you/your" and undersuse of "Other words". 
+Bars above the dashed line indicate relative overuse while bars below the line suggest relative underuse. Therefore, the association plot indicates underuse of "you/your" and overuse of "other words" in monologues while the opposite trends holds true for dialogues, i.e. overuse of "you/your" and underuse of "Other words". 
 
-# Collocation
+# Collocations and N-grams
 
-Collocation refers to the co-occurrence of words. A typical example of a collocation is “Merry Christmas” because the words merry and Christmas occur together more frequently together than would be expected by chance, if words were just randomly stringed together.  Collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. 
-In addition, words that collocate do not have to be immediately adjacent but can also encompass several slots. 
+Collocation refers to the co-occurrence of words. A typical example of a collocation is “Merry Christmas” because the words merry and Christmas occur together more frequently together than would be expected by chance, if words were just randomly stringed together.  
+
+N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the "Origin" to create a bi-gram list. As a first step, we load the data and split it into individual words.
+
+```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load libraries
+library(dplyr)
+library(stringr)
+library(tm)
+# read in text
+darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
+  paste(sep = " ", collapse = " ") %>%
+  unlist() %>%
+  as.vector() %>%
+  tolower() %>%
+  removePunctuation() %>%
+  str_replace_all(" {2,}", " ") %>%
+  strsplit(" ") %>%
+  as.vector() %>%
+  unlist() 
+# inspect data
+head(darwin)
+```
+
+```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create data frame
+darwindf <- data.frame(darwin[1:length(darwin)-1], darwin[2:length(darwin)])
+# add column names
+colnames(darwindf) <- c("Word1", "Word2")
+# inspect data
+head(darwindf)
+```
+
+```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create data frame
+darwin2grams <- paste(darwindf$Word1, darwindf$Word2, sep = " ")
+# tabulate results
+darwin2gramstb <- table(darwin2grams)
+# create data frame
+darwin2gramsdf <- data.frame(darwin2gramstb)
+# order data frame
+darwin2gramsdf <- darwin2gramsdf[order(darwin2gramsdf$Freq, decreasing = T),]
+# simplify column names
+colnames(darwin2gramsdf) <- c("Bigram", "Frequency")
+# inspect data
+head(darwin2gramsdf)
+```
+
+Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
+
+```{r coll3, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+
+
+```
 
 # Tagging and Annotation
 
@@ -286,7 +333,7 @@ Tagging or annotation refers to a process in which information is added to exist
 
 ## Part-of-speech tagging (pos tagging)
 
-For many analyses that use language data it is useful or even important to differentiate between different parts of speech. In order to determine the word class of a certain word, we use a procedure which is called part-of-speech tagging or pos-tagging for short. Part-of-speech tagging is offered by many online services (e.g. )
+For many analyses that use language data it is useful or even important to differentiate between different parts of speech. In order to determine the word class of a certain word, we use a procedure which is called part-of-speech tagging or pos-tagging for short. Part-of-speech tagging is offered by many online services (e.g. XXX).
 
 ```{r pos1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load corpus data
@@ -301,16 +348,19 @@ text <- text[5] %>%
   unlist() %>%
   stripWhitespace() 
 # inspect data
-text
+str(text)
 
 ```
 
 ```{r pos2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load libraries
-source("https://slcladal.github.io/rscripts/POStagObject.R") # for pos-tagging objects in R
+source("https://slcladal.github.io/rscripts/POStagObject.r") # for pos-tagging objects in R
 library(NLP)
 library(openNLP)
 library(openNLPmodels.en)
+# detach ggplot2 library becuase function "annotate" 
+# would be taken from ggplot2 rather than NLP
+detach("package:ggplot2", unload=TRUE)
 # pos tagging data
 textpos <- POStag(object = text)
 textpos
@@ -319,7 +369,7 @@ textpos
 
 ## Syntactic Parsing
 
-Parsing refers to another type of annotation in which either structural information (as in the case of XML documents) or syntactic relations are added to text. As syntactic parsing is commonly more relevenat in the language sciences, the follwoing will focus only on syntactic parsing. syntactic parsing builds on PoS-tagging and allows drawing syntactic trees or dependencies. Unfortunately, syntactic parsing is still has relatively high error rates when dealing with language that is not very formal. However, syntactic parsing is very reliable when dealing with written language.
+Parsing refers to another type of annotation in which either structural information (as in the case of XML documents) or syntactic relations are added to text. As syntactic parsing is commonly more relevant in the language sciences, the following will focus only on syntactic parsing. syntactic parsing builds on PoS-tagging and allows drawing syntactic trees or dependencies. Unfortunately, syntactic parsing still has relatively high error rates when dealing with language that is not very formal. However, syntactic parsing is very reliable when dealing with written language.
 
 ```{r pars1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # extract text
@@ -403,7 +453,7 @@ Unknown <- as.vector(unlist(strsplit(gsub(" ", "", Unknown), "")))
 head(English)
 ```
 
-We will now create a table that represents the phonemes and their frequencies in each of the 4 texts. In addition, we will add the language and simpily the column names.
+We will now create a table that represents the phonemes and their frequencies in each of the 4 texts. In addition, we will add the language and simply the column names.
 
 ```{r echo=T, eval = T, message=FALSE, warning=FALSE}
 # create data tables
@@ -444,7 +494,7 @@ classdw <- as.data.frame(classdw)
 classdw[, 1:6]
 ```
 
-Now, we need to transform the data again, so that we have the frequency of each phoneme by language as the classifier will use "Language" as the dependent varianble and the phoneme frequencies as predictors.
+Now, we need to transform the data again, so that we have the frequency of each phoneme by language as the classifier will use "Language" as the dependent variable and the phoneme frequencies as predictors.
 
 ```{r echo=T, eval = T, message=FALSE, warning=FALSE}
 numvar <- colnames(classdw)[2:length(colnames(classdw))]
@@ -475,19 +525,19 @@ train$Language <- as.factor(train$Language)
 train[, 1:3]; test[, 1:3]
 ```
 
-Finally, we can apply our classifier to our data. The classifier we use is a  k-nearest neighbor classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
+Finally, we can apply our classifier to our data. The classifier we use is a  k-nearest neighbour classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
 
 ```{r echo=T, eval = T, message=FALSE, warning=FALSE}
 # activate library
 library("class")
 # apply k-nearest-neighbor (knn) classifier
-prediction <- knn(train[2:ncol(train)], test[2:ncol(train)], cl = train[, 1], k = 3)
+prediction <- knn(train[2:ncol(train)], test[2:ncol(test)], cl = train[, 1], k = 3)
 # inspect the result
 prediction
 
 ```
 
-Based on the frequenies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley's "Brave New World". The training texts were German, English, and Spanish translations of a subsection of Wikipedia's article for Hermann Hesse's "Steppenwolf". 
+Based on the frequencies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley's "Brave New World". The training texts were German, English, and Spanish translations of a subsection of Wikipedia's article for Hermann Hesse's "Steppenwolf". 
 
 # Sentiment Analysis
 
@@ -497,11 +547,11 @@ Typically, Sentiment Analysis represents a type of classifier only provide infor
 
 In the language sciences, Sentiment Analysis can also be a very helpful tool if the type of Sentiment Analysis provides more fine-grained information. In the following, we will perform such a information-rich Sentiment Analysis. The Sentiment Analysis used here does not only provide information about polarity but it will also provide association values for eight core emotions. 
 
-The more fine-grained output is made possible by relying an the Word-Emotion Association Lexicon (Mohammad & Turney 2013), which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (cf. Mohammad & Turney 2013). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word "cry" or "tragedy" are more readily associated with SADNESS while words such as "happy" or "beautiful" are indicative of JOY and words like "fit" or "burst" may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction. 
+The more fine-grained output is made possible by relying on the Word-Emotion Association Lexicon (Mohammad & Turney 2013), which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (cf. Mohammad & Turney 2013). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word "cry" or "tragedy" are more readily associated with SADNESS while words such as "happy" or "beautiful" are indicative of JOY and words like "fit" or "burst" may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction. 
 
 ## Practical example
 
-In the following, we will perform two sentiment analses. In the first example, we will investigate the emotionality of three different novels while we will analyse how the sentiment changes throughout the course of a anovel in the second example. 
+In the following, we will perform a sentiment analysis to investigate the emotionality of five different novels. 
 
 We will start with the first example and load five pieces of literature. 
 
@@ -638,7 +688,7 @@ orwellpeople
 
 # Topic Modelling
 
-Topic Modelling is a procedure that allows to extract clusters of key words. These key word clusters can represent topicsand the extraction and detection of such key word clusters builds on word frequencies and correlations between word frequencies. 
+Topic Modelling is a procedure that allows to extract clusters of key words. These key word clusters can represent topics and the extraction and detection of such key word clusters builds on word frequencies and correlations between word frequencies. 
 
 ```{r tm, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load libraries
