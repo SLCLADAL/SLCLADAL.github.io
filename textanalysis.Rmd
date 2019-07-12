@@ -408,9 +408,40 @@ plot(res.ca, shadow = T, cex = 1, selectRow = "cos2 0.1", selectCol = "cos2 0.9"
 
 ```
 
-The bi-plot shows that "natural" and "selection" collocate, as do "life" and "conditions", "distinct" and "species" as well as "two" and "varieties". Other words with lower collocation strength are masked from the bi-plot. We will now use an example of one individual word to show, how collocation strength for individual terms is calculated and displayed as a network.
+The bi-plot shows that "natural" and "selection" collocate, as do "life" and "conditions", "distinct" and "species" as well as "two" and "varieties". Other words with lower collocation strength are masked from the bi-plot. 
 
 ```{r coll9, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create cooccurence table
+word <- rep(rownames(collocates), each = ncol(collocates))
+collocate <- rep(rownames(collocates), ncol(collocates))
+collfreq <- as.vector(unlist(collocates))
+# combine into data frame
+dc <- data.frame(word, collocate, collfreq)
+# load library 
+library(igraph)
+# remove infrequent cooccurences and create graph object
+bigram_graph <- dc %>%
+  filter(collfreq > 200) %>%
+  graph_from_data_frame()
+# load library
+library(ggraph)
+library(grid)
+# define arrow type
+a <- grid::arrow(type = "closed", length = unit(.15, "cm"))
+# create plot
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = collfreq), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 1) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
+
+Now, this graph is not very appealing but it shows that there are relatively few words that collocate significantly in Darwin's "Origin". 
+
+We will now use an example of one individual word to show, how collocation strength for individual terms is calculated and displayed as a network.
+
+```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load function for co-occurrence calculation
 source("rscripts/calculateCoocStatistics.R")
 # define minimum number of cooccurences
@@ -425,7 +456,7 @@ print(coocs[1:numberOfCoocs])
 
 Now, we will vizualize the collocation network for our example term. Unfortunately, creating a graph object is rather complex.
 
-```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r coll11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # create graph object
 resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
 # create data frame
@@ -442,7 +473,7 @@ tmpGraph[, 3] <- coocs[1:numberOfCoocs]
 resultGraph <- rbind(resultGraph, tmpGraph)
 ```
 
-```{r coll11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r coll12, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # iterate over most significant numberOfCoocs co-occurrences
 for (i in 1:numberOfCoocs){
   # calculate co-occurrence strength for term i
@@ -461,7 +492,7 @@ for (i in 1:numberOfCoocs){
 
 Now, we can create a network graph object. 
 
-```{r coll12, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r coll13, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load packages
 library(igraph)
 # define graph and type ("F" means "Force Directed")
@@ -487,7 +518,7 @@ E(graphNetwork)$width <- 1.5
 
 And finally, we can vizualize the network.
 
-```{r coll13, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r coll14, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # Define the frame and spacing for the plot
 par(mai=c(0,0,1,0)) 
 # Finaler Plot
@@ -543,6 +574,7 @@ library(openNLPmodels.en)
 # detach ggplot2 library becuase function "annotate" 
 # would be taken from ggplot2 rather than NLP
 detach("package:factoextra", unload=TRUE)
+detach("package:ggraph", unload=TRUE)
 detach("package:ggplot2", unload=TRUE)
 # pos tagging data
 textpos <- POStag(object = text)
@@ -580,9 +612,12 @@ ptrees <- lapply(ptexts, Tree_parse)
 ptrees[[1]]
 ```
 
-These trees can, of course, also be shown visually.
+These trees can, of course, also be shown visually, for instance, in the form of a syntax trees (or tree dendrogram). 
 
 ```{r pars3, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# remove punctuation
+ptexts[1] <- gsub("\\(\\. \\.\\)", "", ptexts[1])
+ptexts[1] <- gsub("\\(\\, \\,\\)", "", ptexts[1])
 # load library
 library(igraph)
 source("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\rscripts/parse2graph.R")
@@ -591,12 +626,7 @@ parse2graph(ptexts[1], title = "", margin=-0.2, vertex.color=NA,
             vertex.frame.color=NA, vertex.label.font=2,
             vertex.label.cex=.75, vertex.label.color="black", asp=.5,
             edge.width=1, edge.color='red', edge.arrow.size=0)
-
-
 ```
-
-
-The parsed information can then be used to create e.g. syntax trees.
 
 
 # Text Classification
