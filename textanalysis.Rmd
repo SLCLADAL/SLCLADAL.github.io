@@ -326,11 +326,174 @@ head(darwin2gramsdf)
 
 Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
 
+In the follwoing, we will extract collocations from Darwin's "Origin". In a first step, we will split the Origin into smaller chunks.
+
 ```{r coll4, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-
-
-
+# read in text
+darwinsentences <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
+  paste(sep = " ", collapse = " ") %>%
+  str_replace_all(" {2,}", " ") %>%
+  str_replace_all("([A-Z]{2,} [A-Z]{2,}) ([A-Z][a-z]{1,} )", "\\1 qwertz\\2") %>%
+  str_replace_all("([a-z]{2,}\\.) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
+    str_replace_all("([a-z]{2,}\\?) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
+  strsplit("qwertz")%>%
+  unlist()
+# inspect data
+head(darwinsentences)
 ```
+
+In a next setp, we will create a matrix that shows cooccurrence of words.
+
+```{r coll5, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# convert into corpus
+darwincorpus <- Corpus(VectorSource(darwinsentences))
+# clean corpus
+darwincorpusclean <- darwincorpus %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeWords, stopwords(kind = "en")) %>%
+  tm_map(tolower)
+# create document term matrix
+darwindtm <- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
+# load library
+require(Matrix)
+# convert dtm into sparse matrix
+darwinsdtm <- sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
+                           x = darwindtm$v, 
+                           dims = c(darwindtm$nrow, darwindtm$ncol),
+                           dimnames = dimnames(darwindtm))
+# calculate cooccurrence counts
+coocurrences <- t(darwinsdtm) %*% darwinsdtm
+# convert into matrix
+collocates <- as.matrix(coocurrences)
+# inspect results
+collocates[1:8, 1:5]
+```
+
+```{r coll6, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# inspect size of matrix
+ncol(collocates)
+summary(rowSums(collocates))
+```
+
+
+```{r coll7, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# remove terms that do not collocate with other terms
+noncoll <- colnames(collocates)[which(rowSums(collocates) < 5000)]
+# remove non-collocating terms
+collocates <- collocates[!rownames(collocates) %in% noncoll, ]
+collocates <- collocates[, !colnames(collocates) %in% noncoll]
+# create distance matrix
+distmtx <- dist(collocates)
+# activate library
+library("cluster")         # activate library
+clustertexts <- hclust(    # hierarchical cluster object
+  distmtx,                 # use data diststudents
+  method="ward.D2")         # ward.D as linkage method
+plot(clustertexts,         # plot result as dendrogram
+     hang = .25,           # labels at split
+     main = "")            # no title
+```
+
+
+
+We will now use an example of one individual word to show, how collocation strength for individual terms is calculated and displayed as a network.
+
+```{r coll8, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load function for co-occurrence calculation
+source("rscripts/calculateCoocStatistics.R")
+# define minimum number of cooccurences
+numberOfCoocs <- 10
+# define term
+coocTerm <- "selection"
+# calculate cooccurence statistics
+coocs <- calculateCoocStatistics(coocTerm, darwinsdtm, measure="LOGLIK")
+# show strenght of cooccurence
+print(coocs[1:numberOfCoocs])
+```
+
+Now, we will vizualize the collocation network for our example term. Unfortunately, creating a graph object is rather complex.
+
+```{r coll9, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create graph object
+resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+# create data frame
+tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+# fill data frame to produce the correct number of lines
+tmpGraph[1:numberOfCoocs, 3] <- coocs[1:numberOfCoocs]
+# enter search word into the first column in all lines
+tmpGraph[, 1] <- coocTerm
+# enter co-occurrences into second column
+tmpGraph[, 2] <- names(coocs)[1:numberOfCoocs]
+# enter collocation strength
+tmpGraph[, 3] <- coocs[1:numberOfCoocs]
+# attach data frame to resultGraph
+resultGraph <- rbind(resultGraph, tmpGraph)
+```
+
+```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# iterate over most significant numberOfCoocs co-occurrences
+for (i in 1:numberOfCoocs){
+  # calculate co-occurrence strength for term i
+  newCoocTerm <- names(coocs)[i]
+  coocs2 <- calculateCoocStatistics(newCoocTerm, darwinsdtm, measure="LOGLIK")
+  # fill temporary graph object
+  tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+  tmpGraph[1:numberOfCoocs, 3] <- coocs2[1:numberOfCoocs]
+  tmpGraph[, 1] <- newCoocTerm
+  tmpGraph[, 2] <- names(coocs2)[1:numberOfCoocs]
+  tmpGraph[, 3] <- coocs2[1:numberOfCoocs]
+  # append results to the result graph data frame
+  resultGraph <- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
+}
+```
+
+Now, we can create a network graph object. 
+
+```{r coll11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load packages
+library(igraph)
+# define graph and type ("F" means "Force Directed")
+graphNetwork <- graph.data.frame(resultGraph, directed = F)
+# identify nodes with fewer than 2 edges
+graphVs <- V(graphNetwork)[degree(graphNetwork) < 2]
+# removed these edges from graph
+graphNetwork <- delete.vertices(graphNetwork, graphVs) 
+# sssign colors to edges and nodes (searchterm blue, rest orange)
+V(graphNetwork)$color <- ifelse(V(graphNetwork)$name == coocTerm, 'cornflowerblue', 'orange') 
+# Edges with a significance of at least 50% of the maximum significance in the graph are drawn in orange
+halfMaxSig <- max(E(graphNetwork)$sig) * 0.5
+E(graphNetwork)$color <- ifelse(E(graphNetwork)$sig > halfMaxSig, "coral", "azure3")
+# disable edges with radius
+E(graphNetwork)$curved <- 0 
+# size the nodes by their degree of networking
+V(graphNetwork)$size <- log(degree(graphNetwork)) * 5
+# all nodes must be assigned a standard minimum-size
+V(graphNetwork)$size[V(graphNetwork)$size < 5] <- 3 
+# edge thickness
+E(graphNetwork)$width <- 1.5
+```
+
+And finally, we can vizualize the network.
+
+```{r coll12, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Define the frame and spacing for the plot
+par(mai=c(0,0,1,0)) 
+# Finaler Plot
+plot(graphNetwork,              
+     layout = layout.fruchterman.reingold,  # Force Directed Layout 
+     main = paste("Cooccurrence network for", " \"", coocTerm, "\""),
+     vertex.label.family = "sans",
+     vertex.label.cex = .75,
+     vertex.shape = "circle",
+     vertex.label.dist = 2,           # Labels of the nodes moved slightly
+     vertex.frame.color = 'darkolivegreen',
+     vertex.label.color = 'black',      # Color of node names
+     vertex.label.font = 2,         # Font of node names
+     vertex.label = V(graphNetwork)$name,       # node names
+     vertex.label.cex = .75 # font size of node names 
+)
+```
+
 
 # Tagging and Annotation
 
@@ -359,8 +522,9 @@ str(text)
 ```
 
 ```{r pos2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# load libraries
+# load function
 source("https://slcladal.github.io/rscripts/POStagObject.r") # for pos-tagging objects in R
+# load libraries
 library(NLP)
 library(openNLP)
 library(openNLPmodels.en)

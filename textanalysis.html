@@ -807,6 +807,162 @@ head(darwin2gramsdf)</code></pre>
 ## 48173    on the       744
 ## 30694 have been       624</code></pre>
 <p>Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.</p>
+<p>In the follwoing, we will extract collocations from Darwin’s “Origin”. In a first step, we will split the Origin into smaller chunks.</p>
+<pre class="r"><code># read in text
+darwinsentences &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;) %&gt;%
+  paste(sep = &quot; &quot;, collapse = &quot; &quot;) %&gt;%
+  str_replace_all(&quot; {2,}&quot;, &quot; &quot;) %&gt;%
+  str_replace_all(&quot;([A-Z]{2,} [A-Z]{2,}) ([A-Z][a-z]{1,} )&quot;, &quot;\\1 qwertz\\2&quot;) %&gt;%
+  str_replace_all(&quot;([a-z]{2,}\\.) ([A-Z] {0,1}[a-z]{0,30})&quot;, &quot;\\1qwertz\\2&quot;) %&gt;%
+    str_replace_all(&quot;([a-z]{2,}\\?) ([A-Z] {0,1}[a-z]{0,30})&quot;, &quot;\\1qwertz\\2&quot;) %&gt;%
+  strsplit(&quot;qwertz&quot;)%&gt;%
+  unlist()
+# inspect data
+head(darwinsentences)</code></pre>
+<pre><code>## [1] &quot;THE ORIGIN OF SPECIES BY CHARLES DARWIN AN HISTORICAL SKETCH OF THE PROGRESS OF OPINION ON THE ORIGIN OF SPECIES INTRODUCTION &quot;                                                                                                                                                
+## [2] &quot;When on board H.M.S. &#39;Beagle,&#39; as naturalist, I was much struck with certain facts in the distribution of the organic beings in- habiting South America, and in the geological relations of the present to the past inhabitants of that continent.&quot;                            
+## [3] &quot;These facts, as will be seen in the latter chapters of this volume, seemed to throw some light on the origin of species — that mystery of mysteries, as it has been called by one of our greatest philosophers.&quot;                                                               
+## [4] &quot;On my return home, it occurred to me, in 1837, that something might perhaps be made out on this question by patiently accumulating and reflecting on all sorts of facts which could possibly have any bearing on it.&quot;                                                          
+## [5] &quot;After five years&#39; work I allowed myself to specu- late on the subject, and drew up some short notes; these I enlarged in 1844 into a sketch of the conclusions, which then seemed to me probable; from that period to the present day I have steadily pursued the same object.&quot;
+## [6] &quot;I hope that I may be excused for entering on these personal details, as I give them to show that I have not been hasty in coming to a decision.&quot;</code></pre>
+<p>In a next setp, we will create a matrix that shows cooccurrence of words.</p>
+<pre class="r"><code># convert into corpus
+darwincorpus &lt;- Corpus(VectorSource(darwinsentences))
+# clean corpus
+darwincorpusclean &lt;- darwincorpus %&gt;%
+  tm_map(removePunctuation) %&gt;%
+  tm_map(removeWords, stopwords(kind = &quot;en&quot;)) %&gt;%
+  tm_map(tolower)
+# create document term matrix
+darwindtm &lt;- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
+# load library
+require(Matrix)
+# convert dtm into sparse matrix
+darwinsdtm &lt;- sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
+                           x = darwindtm$v, 
+                           dims = c(darwindtm$nrow, darwindtm$ncol),
+                           dimnames = dimnames(darwindtm))
+# calculate cooccurrence counts
+coocurrences &lt;- t(darwinsdtm) %*% darwinsdtm
+# convert into matrix
+collocates &lt;- as.matrix(coocurrences)
+# inspect results
+collocates[1:8, 1:5]</code></pre>
+<pre><code>##              charles darwin historical introduction opinion
+## charles            9      1          1            1       1
+## darwin             1      1          1            1       1
+## historical         1      1          4            1       1
+## introduction       1      1          1            7       1
+## opinion            1      1          1            1      10
+## origin             1      1          2            2       1
+## progress           1      1          1            1       1
+## sketch             1      1          1            1       1</code></pre>
+<pre class="r"><code># inspect size of matrix
+ncol(collocates)</code></pre>
+<pre><code>## [1] 10634</code></pre>
+<pre class="r"><code>summary(rowSums(collocates))</code></pre>
+<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##     1.0    25.0    49.0   221.9   135.0 28133.0</code></pre>
+<pre class="r"><code># remove terms that do not collocate with other terms
+noncoll &lt;- colnames(collocates)[which(rowSums(collocates) &lt; 5000)]
+# remove non-collocating terms
+collocates &lt;- collocates[!rownames(collocates) %in% noncoll, ]
+collocates &lt;- collocates[, !colnames(collocates) %in% noncoll]
+# create distance matrix
+distmtx &lt;- dist(collocates)
+# activate library
+library(&quot;cluster&quot;)         # activate library
+clustertexts &lt;- hclust(    # hierarchical cluster object
+  distmtx,                 # use data diststudents
+  method=&quot;ward.D2&quot;)         # ward.D as linkage method
+plot(clustertexts,         # plot result as dendrogram
+     hang = .25,           # labels at split
+     main = &quot;&quot;)            # no title</code></pre>
+<p><img src="textanalysis_files/figure-html/coll7-1.png" width="672" /></p>
+<p>We will now use an example of one individual word to show, how collocation strength for individual terms is calculated and displayed as a network.</p>
+<pre class="r"><code># load function for co-occurrence calculation
+source(&quot;rscripts/calculateCoocStatistics.R&quot;)
+# define minimum number of cooccurences
+numberOfCoocs &lt;- 10
+# define term
+coocTerm &lt;- &quot;selection&quot;
+# calculate cooccurence statistics
+coocs &lt;- calculateCoocStatistics(coocTerm, darwinsdtm, measure=&quot;LOGLIK&quot;)
+# show strenght of cooccurence
+print(coocs[1:numberOfCoocs])</code></pre>
+<pre><code>##       natural        theory    variations       effects          acts 
+##    1476.38620     121.48373     112.17318      66.45145      51.64986 
+## modifications        sexual         power        slight        disuse 
+##      45.69396      44.95857      43.80820      42.97196      41.69089</code></pre>
+<p>Now, we will vizualize the collocation network for our example term. Unfortunately, creating a graph object is rather complex.</p>
+<pre class="r"><code># create graph object
+resultGraph &lt;- data.frame(from = character(), to = character(), sig = numeric(0))
+# create data frame
+tmpGraph &lt;- data.frame(from = character(), to = character(), sig = numeric(0))
+# fill data frame to produce the correct number of lines
+tmpGraph[1:numberOfCoocs, 3] &lt;- coocs[1:numberOfCoocs]
+# enter search word into the first column in all lines
+tmpGraph[, 1] &lt;- coocTerm
+# enter co-occurrences into second column
+tmpGraph[, 2] &lt;- names(coocs)[1:numberOfCoocs]
+# enter collocation strength
+tmpGraph[, 3] &lt;- coocs[1:numberOfCoocs]
+# attach data frame to resultGraph
+resultGraph &lt;- rbind(resultGraph, tmpGraph)</code></pre>
+<pre class="r"><code># iterate over most significant numberOfCoocs co-occurrences
+for (i in 1:numberOfCoocs){
+  # calculate co-occurrence strength for term i
+  newCoocTerm &lt;- names(coocs)[i]
+  coocs2 &lt;- calculateCoocStatistics(newCoocTerm, darwinsdtm, measure=&quot;LOGLIK&quot;)
+  # fill temporary graph object
+  tmpGraph &lt;- data.frame(from = character(), to = character(), sig = numeric(0))
+  tmpGraph[1:numberOfCoocs, 3] &lt;- coocs2[1:numberOfCoocs]
+  tmpGraph[, 1] &lt;- newCoocTerm
+  tmpGraph[, 2] &lt;- names(coocs2)[1:numberOfCoocs]
+  tmpGraph[, 3] &lt;- coocs2[1:numberOfCoocs]
+  # append results to the result graph data frame
+  resultGraph &lt;- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
+}</code></pre>
+<p>Now, we can create a network graph object.</p>
+<pre class="r"><code># load packages
+library(igraph)
+# define graph and type (&quot;F&quot; means &quot;Force Directed&quot;)
+graphNetwork &lt;- graph.data.frame(resultGraph, directed = F)
+# identify nodes with fewer than 2 edges
+graphVs &lt;- V(graphNetwork)[degree(graphNetwork) &lt; 2]
+# removed these edges from graph
+graphNetwork &lt;- delete.vertices(graphNetwork, graphVs) 
+# sssign colors to edges and nodes (searchterm blue, rest orange)
+V(graphNetwork)$color &lt;- ifelse(V(graphNetwork)$name == coocTerm, &#39;cornflowerblue&#39;, &#39;orange&#39;) 
+# Edges with a significance of at least 50% of the maximum significance in the graph are drawn in orange
+halfMaxSig &lt;- max(E(graphNetwork)$sig) * 0.5
+E(graphNetwork)$color &lt;- ifelse(E(graphNetwork)$sig &gt; halfMaxSig, &quot;coral&quot;, &quot;azure3&quot;)
+# disable edges with radius
+E(graphNetwork)$curved &lt;- 0 
+# size the nodes by their degree of networking
+V(graphNetwork)$size &lt;- log(degree(graphNetwork)) * 5
+# all nodes must be assigned a standard minimum-size
+V(graphNetwork)$size[V(graphNetwork)$size &lt; 5] &lt;- 3 
+# edge thickness
+E(graphNetwork)$width &lt;- 1.5</code></pre>
+<p>And finally, we can vizualize the network.</p>
+<pre class="r"><code># Define the frame and spacing for the plot
+par(mai=c(0,0,1,0)) 
+# Finaler Plot
+plot(graphNetwork,              
+     layout = layout.fruchterman.reingold,  # Force Directed Layout 
+     main = paste(&quot;Cooccurrence network for&quot;, &quot; \&quot;&quot;, coocTerm, &quot;\&quot;&quot;),
+     vertex.label.family = &quot;sans&quot;,
+     vertex.label.cex = .75,
+     vertex.shape = &quot;circle&quot;,
+     vertex.label.dist = 2,           # Labels of the nodes moved slightly
+     vertex.frame.color = &#39;darkolivegreen&#39;,
+     vertex.label.color = &#39;black&#39;,      # Color of node names
+     vertex.label.font = 2,         # Font of node names
+     vertex.label = V(graphNetwork)$name,       # node names
+     vertex.label.cex = .75 # font size of node names 
+)</code></pre>
+<p><img src="textanalysis_files/figure-html/coll12-1.png" width="672" /></p>
 </div>
 <div id="tagging-and-annotation" class="section level1">
 <h1><span class="header-section-number">6</span> Tagging and Annotation</h1>
@@ -828,8 +984,9 @@ text &lt;- text[5] %&gt;%
 # inspect data
 str(text)</code></pre>
 <pre><code>##  chr &quot;By chance, Harry encounters the man who gave him the book, just as the man has attended a funeral. He inquires &quot;| __truncated__</code></pre>
-<pre class="r"><code># load libraries
+<pre class="r"><code># load function
 source(&quot;https://slcladal.github.io/rscripts/POStagObject.r&quot;) # for pos-tagging objects in R
+# load libraries
 library(NLP)
 library(openNLP)
 library(openNLPmodels.en)
@@ -1093,14 +1250,14 @@ husbandemo &lt;- get_nrc_sentiment(husband)
 # inspect data
 head(darwinemo)</code></pre>
 <pre><code>##   anger anticipation disgust fear joy sadness surprise trust negative
-## 1     0            0       0    0   0       0        0     0        0
+## 1     0            1       0    0   0       0        0     0        0
 ## 2     0            0       0    0   0       0        0     0        0
 ## 3     0            0       0    0   0       0        0     0        0
 ## 4     0            0       0    0   0       0        0     0        0
 ## 5     0            0       0    0   0       0        0     0        0
 ## 6     0            0       0    0   0       0        0     0        0
 ##   positive
-## 1        0
+## 1        1
 ## 2        0
 ## 3        0
 ## 4        0
@@ -1122,17 +1279,17 @@ rownames(emo) &lt;- gsub(&quot;emos&quot;, &quot;&quot;, rownames(emo))
 # inspect data
 head(emo)</code></pre>
 <pre><code>##           anger anticipation disgust fear  joy sadness surprise trust
-## darwin     0.78         1.64    0.50 1.44 0.98    1.36     0.88  2.44
-## twain      0.84         2.12    0.64 1.48 1.62    1.28     1.06  2.00
-## orwell     1.14         1.80    1.06 2.04 1.80    1.56     0.94  2.86
-## lovecraft  1.44         1.84    1.16 2.16 1.06    2.10     0.94  1.64
-## husband    2.04         2.38    1.16 2.28 2.22    2.30     1.24  2.34
+## darwin     0.70         1.64    0.56 1.56 1.22    1.60     0.92  2.54
+## twain      1.26         1.96    0.96 1.40 1.54    1.28     1.10  2.22
+## orwell     1.64         2.30    1.48 2.28 1.56    1.78     1.00  2.24
+## lovecraft  1.56         1.72    1.64 2.18 1.04    2.02     0.90  1.76
+## husband    2.10         2.36    1.16 2.32 2.20    2.28     1.24  2.36
 ##           negative positive
-## darwin        2.78     4.12
-## twain         2.46     3.16
-## orwell        3.54     4.28
-## lovecraft     4.26     2.90
-## husband       4.36     4.48</code></pre>
+## darwin        2.82     4.24
+## twain         2.40     3.42
+## orwell        3.82     3.92
+## lovecraft     4.24     3.00
+## husband       4.38     4.46</code></pre>
 <pre class="r"><code>#convert into data frame
 emo &lt;- as.data.frame(emo)
 # add author column
@@ -1144,11 +1301,11 @@ emol &lt;- gather(emo, Emotion, Score, anger:positive, factor_key=TRUE)
 # inspect data
 head(emol)</code></pre>
 <pre><code>##      Author      Emotion Score
-## 1    Darwin        anger  0.78
-## 2     Twain        anger  0.84
-## 3    Orwell        anger  1.14
-## 4 Lovecraft        anger  1.44
-## 5   Husband        anger  2.04
+## 1    Darwin        anger  0.70
+## 2     Twain        anger  1.26
+## 3    Orwell        anger  1.64
+## 4 Lovecraft        anger  1.56
+## 5   Husband        anger  2.10
 ## 6    Darwin anticipation  1.64</code></pre>
 <pre class="r"><code># load library
 library(ggplot2)
