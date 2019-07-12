@@ -41,7 +41,7 @@ You will see in the `R`-code below that there is already a function that test wh
 
 The example we will go through here is taken from @field2012discovering. In this example, the research question is if the money that men spend on presents for women depends on the women's attractiveness and their relationship status. To answer this research question, we will implement a multiple linear regression and start by preparing the `R`-session (cleaning the workspace, setting options necessary, installing and activating necessary packages, and loading functions).
 
-```{r SessionSetUp, message=FALSE, warning=FALSE}
+```{r mlr1, eval = T, echo = T, message=FALSE, warning=FALSE}
 rm(list=ls(all=T))                     # clean workspace
 options("scipen" = 100, "digits" = 4)  # set options (supress math annotation)
 #install.packages("ggplot2")           # install ggplot2 package (remove # to activate)
@@ -60,7 +60,7 @@ source("rscripts/ExpR.r")              # load function ExpR
 
 After preparing the session, we can now load the data and inspect its structure and properties.
 
-```{r load data}
+```{r mlr2, eval = T, echo = T, message=FALSE, warning=FALSE}
 mlrdata <- read.delim("data/mlrdata.txt", header = TRUE) # load data
 head(mlrdata)    # inspect first 6 lines
 str(mlrdata)     # inspect structure
@@ -69,7 +69,7 @@ summary(mlrdata) # summarize data
 
 The data set consist of three variables stored in three columns. The first column contains the relationship status of the women, the second whether the man is interested in the woman, and the third column represents the money spend on the present. The data set represents 100 cases and the mean amount of money spend on a present is 88.38 dollars. In a next step, we visualize the data to get a more detailed impression of the relationships between variables. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr3, eval = T, echo = T, message=FALSE, warning=FALSE}
 # plot 1
 p1 <- ggplot(mlrdata,                   # create plot based on mlrdata
              aes(status, money)) +      # define x- and y-axes
@@ -122,7 +122,7 @@ The boxplot in the lower right panel confirms the existence of an interaction (a
 
 We will now start to implement the regression model. In a first step, we initialize four base-line models: two minimal base-line models that only use the intercept as their sole predictor and two saturated base-line models that contain all possible predictors. The model pairs are generated with the `lm` and the `glm` function as these functions offer different model parameters in their output. 
 
-```{r echo = T, message=FALSE, warning=FALSE}
+```{r mlr4, eval = T, echo = T, message=FALSE, warning=FALSE}
 m0.mlr = lm(                       # generate regression object using the lm function
   money ~ 1,                       # define rgression formula (1 = intercept) 
   data = mlrdata)                  # define data set
@@ -156,13 +156,13 @@ The AIC is calculated using the equation below. The lower the AIC value, the bet
 
 Interactions are evaluated first and only if all interactions have been removed would the procedure start removing main effects. Other model fitting procedures (forced entry, step-wise step up, hierarchical) are discussed during the implementation of other regression models. We cannot discuss all procedures here as model fitting is rather complex and a discussion of even the most common procedures would to lengthy and time consuming at this point. It is important to note though that there is not perfect model fitting procedure and automated approaches should be handled with care as they are likely to ignore violations of model parameters that can be detected during manual - but time consuming - model fitting procedures. As a general rule of thumb, it is advisable to fit models as carefully and deliberately as possible. We will now begin to fit the model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr5, eval = T, echo = T, message=FALSE, warning=FALSE}
 step(m1.mlr, direction = "both") # automated AIC based model fitting
 ```
 
 The automated model fitting procedure informs us that removing predictors ahs not caused a decrease in the AIC. The saturated model is thus also the final minimal adequate model. We will now inspect the final minimal model and go over the model report.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr6, eval = T, echo = T, message=FALSE, warning=FALSE}
 m2.mlr = lm(                       # generate regression object using the lm function
   money ~ (status + attraction)^2, # define regression formula
   data = mlrdata)                  # define data set
@@ -181,7 +181,7 @@ All main effects (status and attraction) as well as the interaction between stat
 
 The top most term is called intercept and has a value of 99.15 which represents the base estimate to which all other estimates refer. To exemplify what this means, let us consider what the model would predict a man would spend on a present for a women who is single but the man is not attracted to her: The amount he would spend (based on the model would be 99.15 dollars (the intercept) plus 57.69 dollars (because she is single)  minus 47.66 dollars (because he is not interested in her) minus 63.18 dollars because of the interaction between status and attraction.  
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr7, eval = T, echo = T, message=FALSE, warning=FALSE}
 #intercept  Single  NotInterested  Single:NotInterested
 99.15     + 57.69  + 0           + 0     # 156.8 single + interested 
 99.15     + 57.69  - 47.66       - 63.18 # 46.00 single + not interested
@@ -191,7 +191,7 @@ The top most term is called intercept and has a value of 99.15 which represents 
 
 Interestingly, the model predicts that a man would invest even less money in a woman that he is not interested in if she were single compared to being in a relationship! We can derive the same results easier using the `predict` function.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr8, eval = T, echo = T, message=FALSE, warning=FALSE}
 prediction <- predict(m2.mlr,            # make prediction based on the model
                       newdata = mlrdata) # for original data
 table(round(prediction,2))               # inspect predictions
@@ -205,14 +205,14 @@ The adjusted R^2^-value considers the amount of explained variance in light of t
 
 Before continuing, we will calculate the confidence intervals of the coefficients.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr9, eval = T, echo = T, message=FALSE, warning=FALSE}
 confint(m2.mlr)       # extract confidence intervals of the coefficients
 anova(m0.mlr, m2.mlr) # compare baseline- and minimal adequate model
 ```
 
 Now, we compare the final minimal adequate model to the base-line model to test whether then final model significantly outperforms the baseline model. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr10, eval = T, echo = T, message=FALSE, warning=FALSE}
 Anova(m0.mlr, m2.mlr, type = "III") # compare baseline- and minimal adequate model
 ```
 
@@ -222,14 +222,14 @@ The comparison between the two model confirms that the minimal adequate model pe
 
 After implementing the multiple regression, we now need to look for outliers and perform the model diagnostics by testing whether removing data points disproportionately decreases model fit. To begin with, we generate diagnostic plots.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr11, eval = T, echo = T, message=FALSE, warning=FALSE}
 # start plotting
 par(mfrow = c(1, 4))           # display plots in 3 rows and 2 columns
 plot(m2.mlr)                   # plot fitted values
 par(mfrow = c(1, 1))           # restore original 1 plot per row and column settings
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr12, eval = T, echo = T, message=FALSE, warning=FALSE}
 # determine a cutoff for data points that have D-values higher than 4/(n-k-1) 
 cutoff <- 4/((nrow(mlrdata)-length(m2.mlr$coefficients)-2))
 # start plotting
@@ -241,7 +241,7 @@ par(mfrow = c(1, 1))           # restore original 1 plot per row and column sett
 
 The graphs indicate that data points 52, 64, and 83 may be problematic. We will therefore statistically evaluate whether these data points need to be removed. In order to find out which data points require removal, we extract the influence measure statistics and add them to out data set. 
 
-```{r removeinfluentials, echo=T, message=FALSE, warning=FALSE}
+```{r mlr13, eval = T, echo = T, message=FALSE, warning=FALSE}
 infl <- influence.measures(m2.mlr)       # extract influence statistics
 mlrdata <- data.frame(mlrdata, infl[[1]], infl[[2]]) # add infl. statistics to data
 # annotate too influential data points
@@ -259,7 +259,7 @@ The difference in row in the data set before and after removing data points indi
 
 As we have a different data set now, we need to rerun the regression analysis. As the steps are identical to the regression analysis performed above, the steps will not be described in greater detail.
 
-```{r echo = T, message=FALSE, warning=FALSE}
+```{r mlr14, eval = T, echo = T, message=FALSE, warning=FALSE}
 m0.mlr = lm(                       # generate regression object using the lm function
   money ~ 1,                       # define regression formula (1 = intercept) 
   data = mlrdata)                  # define data set
@@ -278,7 +278,7 @@ step(m1.mlr, direction = "both")   # automated AIC based model fitting
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr15, eval = T, echo = T, message=FALSE, warning=FALSE}
 m2.mlr = lm(                       # generate regression object using the lm function
   money ~ (status + attraction)^2, # define regression formula
   data = mlrdata)                  # define data set
@@ -289,15 +289,15 @@ m2.glm = glm(                      # generate regression object using the glm fu
 summary(m2.mlr)                    # inspect final minimal model
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr16, eval = T, echo = T, message=FALSE, warning=FALSE}
 confint(m2.mlr)       # extract confidence intervals of the coefficients
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr17, eval = T, echo = T, message=FALSE, warning=FALSE}
 anova(m0.mlr, m2.mlr)               # compare baseline with final model
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr18, eval = T, echo=T, message=FALSE, warning=FALSE}
 Anova(m0.mlr, m2.mlr, type = "III") # compare baseline with final model
 ```
 
@@ -305,7 +305,7 @@ Anova(m0.mlr, m2.mlr, type = "III") # compare baseline with final model
 
 After rerunning the regression analysis on the updated data set, we again cerate diagnostic plots in order to check whether there are potentially problematic data points.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr19, eval = T, echo=T, message=FALSE, warning=FALSE}
 # start plotting
 par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
 plot(m2.mlr)                   # plot fitted values
@@ -314,7 +314,7 @@ par(mfrow = c(1, 1))           # restore original 1 plot per row and column sett
 
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr20, eval = T, echo=T, message=FALSE, warning=FALSE}
 # determine a cutoff for data points that have D-values higher than 4/(n-k-1) 
 cutoff <- 4/((nrow(mlrdata)-length(m2.mlr$coefficients)-2))
 # start plotting
@@ -326,7 +326,7 @@ par(mfrow = c(1, 1))           # restore original 1 plot per row and column sett
 
 Although the diagnostic plots indicate that additional points may be problematic, but these data points deviate substantially less from the trend than was the case with the data points that have already been removed. To make sure that retaining the data points that are deemed potentially problematic by the diagnostic plots, is acceptable, we extract diagnostic statistics and add them to the data.  
 
-```{r mlrresiduals, echo=T, message=FALSE, warning=FALSE}
+```{r mlr21, eval = T, echo=T, message=FALSE, warning=FALSE}
 # addieren von modelldiagnostiken zum datasatz
 mlrdata$residuals <- resid(m2.mlr)
 mlrdata$standardized.residuals <- rstandard(m2.mlr)
@@ -340,7 +340,7 @@ mlrdata$fitted <- m2.mlr$fitted.values
 
 We can now use these diagnostic statistics to create more precise diagnostic plots. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr22, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot 5
 p5 <- ggplot(mlrdata, 
              aes(studentized.residuals)) +
@@ -390,7 +390,7 @@ The new diagnostic plots do not indicate outliers that require removal. With res
 
 * The mean value of VIFs should be $<$ 1 [@bowerman1990linear].
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr23, eval = T, echo=T, message=FALSE, warning=FALSE}
 # 1: optimal = 0
 # (aufgelistete datenpunkte sollten entfernt werden)
 which(mlrdata$standardized.residuals > 3.29)
@@ -435,14 +435,14 @@ Except for the mean VIF value (2.307) which should not exceed 1, all diagnostics
 
 After performing the diagnostics, we will now test whether the sample size is adequate and what the values of `R` would be based on a random distribution in order to be able to estimate how likely a $\beta$-error is given the present sample size [cf. @field2012discovering 274]. Beta errors (or $\beta$-errors) refer to the erroneous assumption that a predictor is not significant (based on the analysis and given the sample) although it does have an effect in the population. In other words, $\beta$-error means to overlook a significant effect because of weaknesses of the analysis. The test statistics ranges between 0 and 1 where lower values are better. If the values approximate 1, then there is serious concern as the model is not reliable given the sample size. In such cases, unfortunately, the best option is to increase the sample size. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr24, eval = T, echo=T, message=FALSE, warning=FALSE}
 smplesz(m2.mlr) # check if sample size is sufficient
 expR(m2.mlr)    # check for beta-error likelihood 
 ```
 
 The function `smplesz` reports that the sample size is insufficient by 9 data points according to [@green1991many]. The likelihood of $\beta$-errors, however, is very small (0.0309). As a last step, we summarize the results of the regression analysis.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r mlr25, eval = T, echo=T, message=FALSE, warning=FALSE}
 mlrsummary <- mlr.summary(m2.mlr, m2.glm, ia = T)  # tabulate regression results
 mlrsummary[,-c(4:5)]
 ```
@@ -476,7 +476,7 @@ Major disadvantages of mixed-effects regression modelling are that they are pron
 
 So far, the regression models that we have used only had fixed-effects. having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common, that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modelling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and or slope for each speaker. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm1, echo=F, eval = T, message=FALSE, warning=FALSE}
 # random intercepts and random slops
 x <- 0:10
 y = 0:10
@@ -528,7 +528,7 @@ par(mfrow = c(1, 1))
 
 *Random Effects* have two parameters: the intercept (the point where the regression line cross the y-axis) and the slope (the acclivity of the regression line). In contrast to fixed-effects models have only 1 intercept and one slope (left panel of the Figure above) while mixed-effects models can have various *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm2, eval=T, echo=F, message=FALSE, warning=FALSE}
 Height <- c(169, 176, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
 Weight <- c(68, 72, 65, 62, 60, 80, 75, 70, 85, 92, 88, 92, 85, 82, 80) # plot scatterplot and the regression line
 z <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
@@ -575,7 +575,7 @@ In terms of general procedure, random effects are added first, and only after we
 
 To explore how to implement a mixed-effects model in `R` we revisit the preposition data that contains relative frequencies of prepositions in English texts written between 1150 and 1913. As a first step, and to prepare our analysis, we load necessary `R` packages, specify options, and load as well as provide an overview of the data.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm3, eval = T, echo=T, message=FALSE, warning=FALSE}
 # activate packages
 library(RLRsim)
 #library(car)
@@ -595,7 +595,7 @@ head(mydata); nrow(mydata)                 # inspect updated data set
 
 The data set contains the date when the text was written (`date`), the genre of the text (`genre`), the name of the text (`text`), the relative frequency of prepositions in the text (`pptw`), and the region in which the text was written (`region`). We now plot the data to get a first impression of its structure.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm4, eval = T, echo=T, message=FALSE, warning=FALSE}
 # visualize variables (2 plots per row)
 # 3 plots in 1 window
 def.par <- par(no.readonly = TRUE)
@@ -633,7 +633,7 @@ par(def.par)
 
 The scatter plot in the upper panel indicates that the use of prepositions has moderately increased over time while the boxplots in the lower left panel show  that the genres differ quite substantially with respect to their median frequencies of prepositions per text. Finally, the histogram in the lower right panel show that preposition use is distributed normally with a mean of 132.2 prepositions per text. 
 
-```{r plotprep2, echo=T, message=FALSE, warning=FALSE}
+```{r lmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot 8
 p8 <- ggplot(mydata, aes(date, pptw)) +
   geom_point() +
@@ -651,7 +651,7 @@ p9 <- ggplot(mydata, aes(region, pptw)) +
 multiplot(p8, p9, cols = 2)
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
 ggplot(mydata, aes(date, pptw)) +
   geom_point() +
   facet_wrap(~ genre, nrow = 4) +
@@ -664,7 +664,7 @@ ggplot(mydata, aes(date, pptw)) +
 
 Centering or scaling numeric variables is useful for later interpretation of regression models: if the date variable was not centered, the regression would show the effects of variables at year 0(!). If numeric variables are scaled, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centering simply means that the mean of the numeric variable is subtracted from each value.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 mydata$date <- scale(mydata$date, scale = F)
 head(mydata)
@@ -673,7 +673,7 @@ str(mydata)
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
 # generate a glm baseline model
 m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
 # generate a lm base-line model
@@ -689,7 +689,7 @@ m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
 As a first step in the modelling process, we now need to determine whether or not including a random effect structure is justified. We do so by comparing the base-line model without random intercepts to the model with random intercepts using a Likelihood Ratio Test. A short word of warning is in order here regarding the specific of the model: we need to set `REML = T` because Relative Estimate Maximum Likelihood (REML) provides better estimates for the random effects part of the model compared with the simpler Maximum Likelihood (ML) specification (cf. Field, Miles & Field 2012:879). 
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm9, eval = T, echo=T, message=FALSE, warning=FALSE}
 x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
 x2 <- x2 <- x2[[1]]
 list(x2, pchisq(x2, df=2, lower.tail=F))
@@ -702,7 +702,7 @@ random effect structure has the highest explanatory power.
 
 We generate a m0.lmer model but using the `lmer` function from the `lme4` package. When we compare models, the REML specification must be FALSE or set to `method = "ML"` (Maximum Likelihood) (depending on the function) when we use ANOVAs to compare models (cf. Field, Miles & Field 2012:). This is because "`ML` produces more accurate estimates of fixed regression parameters, whereas `REML` produces more accurate estimates of random variances (Twisk 2006). [...] Also, if you want to compare models you must use ML" (Field, Miles & Field 2012:879).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm10, eval = T, echo=T, message=FALSE, warning=FALSE}
 m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
 m0.lmer2 <- lmer(pptw ~ (1|region) + 1, data = mydata, REML = T)
 m0.lmer3 <- lmer(pptw ~ (1|genre/region) + 1, data = mydata, REML = T)
@@ -751,19 +751,19 @@ intervals(m1.lme)
 
 We can now evaluate the goodness of fit of the model and check if mathematical requirements and assumptions have been violated. In a first step, we generate diagnostic plots that focus on the random effect structure.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm11, eval = T, echo=T, message=FALSE, warning=FALSE}
 plot(m1.lme, genre ~ resid(.), abline = 0 ) # generate diagnostic plots
 ```
 
 The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values (Pinheiro & Bates 2000:175).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm12, eval = T, echo=T, message=FALSE, warning=FALSE}
 plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
 ```
 
 The plot showing the standardized residuals versus fitted values confirms that there are outliers in the letters because there are obviously differences in the variance, we create a new model which uses weights to compensate heterogeneity of variance (cf. Pinheiro & Bates 2000:177).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm13, eval = T, echo=T, message=FALSE, warning=FALSE}
 m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
 # test if m2.lme is more appropriate for the data than m1.lme
 anova(m1.lme, m2.lme)
@@ -771,20 +771,20 @@ anova(m1.lme, m2.lme)
 
 The heteroscedastic model (i.e. m2.lme which uses weights to account for unequal variance) is performing significantly better than the homoscedasticity model m1.lme. We therefore inspect the results of the new heteroscedastic model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm14, eval = T, echo=T, message=FALSE, warning=FALSE}
 summary(m2.lme)        # inspect results
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm15, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m2.lme)          # ANOVA display of the results
 ```
 
-```{r anovalme, echo=T, message=FALSE, warning=FALSE}
+```{r lmm16, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m0.lme, m2.lme)  # test if date is significant
 ```
 
-```{r intervalslme, echo=T, message=FALSE, warning=FALSE}
+```{r lmm17, eval = T, echo=T, message=FALSE, warning=FALSE}
 intervals(m2.lme)      # extract estimates and sd for fixed and random effects
 ```
 
@@ -796,7 +796,7 @@ r = `sqrt(t^2^/(t^2^+df))`.
 
 A brief word of warning is in order here: only apply this function to main effects not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear (cf. Field, Miles & Field 2012:641).
 
-```{r effectmler, echo=T, message=FALSE, warning=FALSE}
+```{r lmm18, eval = T, echo=T, message=FALSE, warning=FALSE}
 ef.lme <- function(x) {
   df <- summary(x)[[20]][6]
   t <-  summary(x)[[20]][8]
@@ -810,7 +810,7 @@ ef.lme(m2.lme)
 
 We now generate another m1 model but we use the `lmer` function from the `lme4` package rather than the `glmer` function.
 
-```{r lmersummary2, echo=T, message=FALSE, warning=FALSE}
+```{r lmm19, eval = T, echo=T, message=FALSE, warning=FALSE}
 m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
 summary(m2.lmer)
 ```
@@ -824,7 +824,7 @@ An alternative for testing if including the random intercepts is permitted.
 WARNING: this method is not as good as applying a restricted likelihood ratio test(!) because the p-value is only an approximation IMPORTANT: the second model is a glm object
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm20, eval = T, echo=T, message=FALSE, warning=FALSE}
 m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
 2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)
 ```
@@ -833,7 +833,7 @@ m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
 
 Diagnostic plot (Pinheiro & Bates 2000:11, 182) what we wish to see: a cloud of dots in the middle of the window without structure what we do not want to see: a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) in short: observed values against fitted values (cf. Pinheiro & Bates 2000:182)
 
-```{r diagnostics2, echo=T, message=FALSE, warning=FALSE}
+```{r lmm21, eval = T, echo=T, message=FALSE, warning=FALSE}
 # start plotting
 par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
 plot(m2.lme)
@@ -842,31 +842,31 @@ par(mfrow = c(1, 1))
 
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm22, eval = T, echo=T, message=FALSE, warning=FALSE}
 # diagnostic plot (Pinheiro & Bates 2000:21)
 plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | genre, abline = 0, cex = .5)
 
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm23, eval = T, echo=T, message=FALSE, warning=FALSE}
 # diagnostic plot: residuals of fitted values against observed values (cf. Pinheiro & Bates 2000:182)
 qqnorm(m2.lme)
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm24, eval = T, echo=T, message=FALSE, warning=FALSE}
 # normal plot of the estimated date %in% genre random effects
 qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))
 ```
 
 
-```{r diagnosticsgenre, echo=T, message=FALSE, warning=FALSE}
+```{r lmm25, eval = T, echo=T, message=FALSE, warning=FALSE}
 # diagnostic plot: normal plots of the residuals by genre (cf. Pinheiro & Bates 2000:22, 179)
 qqnorm(m2.lme, ~resid(.) | genre )
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r lmm26, eval = T, echo=T, message=FALSE, warning=FALSE}
 # inspect the observed responses versus the within-group fitted values
 # (cf. Pinheiro & Bates 2000:178)
 plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
@@ -874,7 +874,7 @@ plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .
 
 ## Reporting Results 
 
-```{r summarylmer, echo=T, message=FALSE, warning=FALSE}
+```{r lmm27, eval = T, echo=T, message=FALSE, warning=FALSE}
 summary(m2.lmer)
 ```
 
@@ -884,7 +884,7 @@ Logistic regression is a multivariate analysis technique that builds on and is v
 
 To understand what this mean, we will use a very simple example. In this example, we want to see whether the height of men affect their likelihood of being in a relationship. The data we use represents a data set consisting of two variables: height and relationship. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm1, eval = T, echo=T, message=FALSE, warning=FALSE}
 bodyheight=rnorm(20,180,10) # generates 20 values, with mean of 30 & s.d.=2
 bodyheight=sort(bodyheight) # sorts these values in ascending order.
 relationship=c(0,0,0,0,0,1,0,1,0,0,1,1,0,1,1,1,0,1,1,1) # assign 'survival' to these 20 individuals non-randomly... most mortality occurs at smaller body size
@@ -893,7 +893,7 @@ library(knitr)
 kable(blrex, caption = "Example data set representing the height and relationship status of a sample of men.")
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm2, eval = T, echo=F, message=FALSE, warning=FALSE}
 library(ggplot2)                              # activate library
 # plot 1
 p1 <- ggplot(blrex,                           # create plot based on blrex
@@ -925,7 +925,7 @@ The left panel of the Figure above shows that a linear model would predict value
 
 To exemplify hot to implement a logistic regression in `R`, we will analyse the use of the discourse particle *eh* in New Zealand English and test which factors correlate with its occurrence. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender, ethnicity, and age of that speaker and whether or not the speech unit contained an *eh*. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm3, eval = T, echo=T, message=FALSE, warning=FALSE}
 rm(list=ls(all=T))                     # clean workspace
 options("scipen" = 100, "digits" = 4)  # set options (supress math annotation)
 #install.packages(effects)   # install effects package (remove # to activate)
@@ -954,14 +954,14 @@ str(blrdata)
 
  The summary of the data show that the data set contains 25,821 observations of five variables. The variable `ID` contains strings that represent a combination file and speaker of a speech unit. The second variable represents the gender, the third the age, and the fourth the ethnicity of speakers. The fifth variable represents whether or not a speech unit contained the discourse particle *eh*. The first six lines of the data set are shown in the Table below.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm4, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(knitr)
 kable(head(blrdata), caption = "First six line of the blrdata data set.")
 ```
 
 Next, we factorize the variables in our data set. In other words, we specify that the strings represent variable levels and define new reference levels because as a default `R` will use the variable level which first occurs in alphabet ordering as the reference level for each variable, we redefine the variable levels for Age and Ethnicity.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm5, eval = T, echo=T, message=FALSE, warning=FALSE}
 vrs <- c("Age", "Gender", "Ethnicity", "ID")  # define variables to be factorized
 fctr <- which(colnames(blrdata) %in% vrs)     # define vector with variables
 blrdata[,fctr] <- lapply(blrdata[,fctr], factor) # factorize variables
@@ -972,7 +972,7 @@ blrdata$Ethnicity <- relevel(                # relevel Ethnicity
 
 After preparing the data, we will now plot the data to get an overview of potential relationships between variables.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm6, eval = T, echo=T, message=FALSE, warning=FALSE}
 p1 <- ggplot(blrdata,                            # cerate plot based on blrdata
              aes(Gender, EH, color = Gender)) +  # define axes and colouring factor
   stat_summary(fun.y = mean, geom = "point") +   # define statistics for points
@@ -1052,7 +1052,7 @@ The plots in the lower panels do not indicate significant interactions between u
 
 As a first step, we need to define contrasts and add a distance matrix to the options. Contrasts define what should be tested and therefore has influence on how the results of the regression analysis are presented. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm7, eval = T, echo=T, message=FALSE, warning=FALSE}
 options(contrasts  =c("contr.treatment", "contr.poly")) # set contrasts
 blrdata.dist <- datadist(blrdata)  # cerate distance matrix
 options(datadist = "blrdata.dist") # include distance matrix in options
@@ -1060,7 +1060,7 @@ options(datadist = "blrdata.dist") # include distance matrix in options
 
 Next, we generate four base-line models: two minimal models that predict the use of *eh* sole based on the intercept and two initial saturated regression models that include all variables and their interactions.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm8, eval = T, echo=T, message=FALSE, warning=FALSE}
 m0.glm = glm(EH ~ 1, family = binomial, data = blrdata) # baseline model glm
 m0.lrm = lrm(EH ~ 1, data = blrdata, x = T, y = T) # baseline model lrm
 m1.glm = glm(EH ~ Age*Gender*Ethnicity, family = binomial, data = blrdata)
@@ -1073,49 +1073,49 @@ A few words on `glm` vs `lrm`:   Baayen (2008:196-197) states that lrm should be
 
 We will now start with the model building procedure. In the present case, we will use a manual step-wise step-down protocol during which predictors are removed from the model if they do not significantly to the model fit.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm9, eval = T, echo=T, message=FALSE, warning=FALSE}
 m2.glm <- update(m1.glm, . ~ . -Age:Gender:Ethnicity) # remove Age:Gender:Ethnicity
 anova(m1.glm, m2.glm, test = "Chi")  # did removal significantly decrease model fit
 ```
 
 The ANOVA shows that the fit of the saturated model (m1.glm) and the model without the interaction between Age, Gender, and Ethnicity (m2.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.63) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m3.glm) as this is the correct procedure based on the principle of parsimony.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm10, eval = T, echo=T, message=FALSE, warning=FALSE}
 m3.glm <- update(m2.glm, . ~ . -Gender:Ethnicity)
 anova(m2.glm, m3.glm, test = "Chi")
 ```
 
 The ANOVA shows that the fit of the saturated model (m2.glm) and the model without the interaction between Gender and Ethnicity (m3.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.94) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m3.glm) as this is the correct procedure based on the principle of parsimony.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm11, eval = T, echo=T, message=FALSE, warning=FALSE}
 m4.glm <- update(m3.glm, . ~ . -Age:Gender)
 anova(m3.glm, m4.glm, test = "Chi")
 ```
 
 The ANOVA shows that the fit of the saturated model (m3.glm) and the model without the interaction between Age and Gender (m4.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.63) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m4.glm) as this is the correct procedure based on the principle of parsimony.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm12, eval = T, echo=T, message=FALSE, warning=FALSE}
 m5.glm <- update(m4.glm, . ~ . -Age:Ethnicity)
 anova(m4.glm, m5.glm, test = "Chi")
 ```
 
 The ANOVA shows that the fit of the saturated model (m4.glm) and the model without the interaction between Age and Ethnicity (m5.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.09) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m5.glm) as this is the correct procedure based on the principle of parsimony.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm13, eval = T, echo=T, message=FALSE, warning=FALSE}
 m6.glm <- update(m5.glm, . ~ . -Ethnicity)
 anova(m5.glm, m6.glm, test = "Chi")
 ```
 
 The ANOVA shows that the fit of the saturated model (m5.glm) and the model without the main effect for Ethnicity (m6.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.61) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m6.glm) as this is the correct procedure based on the principle of parsimony.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm14, eval = T, echo=T, message=FALSE, warning=FALSE}
 m7.glm <- update(m6.glm, . ~ . -Gender)
 anova(m7.glm, m6.glm, test = "Chi")
 ```
 
 The ANOVA shows that the fit of the more saturated model (m6.glm) and the model without the main effect for Gender (m7.glm) differ significantly. The significant difference is provided in  the value of Pr(>Chi) (<0.0000000000000002 ***) which is smaller than .05. Because the models differ significantly, we continue with the more saturated model (m6.glm) as this is the correct procedure based on the principle of parsimony.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm15, eval = T, echo=T, message=FALSE, warning=FALSE}
 m8.glm <- update(m6.glm, . ~ . -Age)
 anova(m8.glm, m6.glm, test = "Chi")
 ```
@@ -1124,13 +1124,13 @@ The ANOVA shows that the fit of the more saturated model (m6.glm) and the model 
 
 As we have now arrived at the final minimal adequate model (m6.glm), we generate a final minimal model using the `lrm` model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm16, eval = T, echo=T, message=FALSE, warning=FALSE}
 m6.lrm <- lrm(EH ~ Age+Gender, data = blrdata, x = T, y = T, linear.predictors = T)
 m6.lrm
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm17, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m6.lrm)
 ```
 
@@ -1140,26 +1140,26 @@ After fitting the model, we validate the model to avoid arriving at a final mini
 
 To validate the final minimal model, we apply the `validate` function and apply it to the initial saturated model. The output of the `validate` function shows how often predictors are retained if the sample is re-selected with the same size but with placing back the drawn data point. The execution of the function requires some patience as it is rather computationally expensive.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm18, eval = T, echo=T, message=FALSE, warning=FALSE}
 validate(m1.lrm, bw = T, B = 200) # model validation
 ```
 
 The `validate` function shows that retaining two predictors (Age and Gender) is the best option and thereby confirms our final minimal adequate model as the best minimal model. In addition, we check whether we need to include a penalty for data points because they have too strong of an impact of the model fit. To see whether a penalty is warranted, we apply the `pentrace` function to the final minimal adequate model. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm19, eval = T, echo=T, message=FALSE, warning=FALSE}
 pentrace(m6.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
 ```
 
 The `pentrace` function proposes a penalty of .8 but the values are so similar  that a penalty is unnecessary. In a next step, we rename the final models.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm20, eval = T, echo=T, message=FALSE, warning=FALSE}
 lr.glm <- m6.glm  # rename final minimal adeqaute glm model
 lr.lrm <- m6.lrm  # rename final minimal adeqaute lrm model
 ```
 
 Now, we calculate a Model Likelihood Ratio Test to check if the final model performs significantly better than the initial minimal base-line model. The result of this test is provided as a default if we call a summary of the lrm object.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm21, eval = T, echo=T, message=FALSE, warning=FALSE}
 modelChi <- lr.glm$null.deviance - lr.glm$deviance
 chidf <- lr.glm$df.null - lr.glm$df.residual
 chisq.prob <- 1 - pchisq(modelChi, chidf)
@@ -1170,14 +1170,14 @@ The code above provides three values: a $\chi$^2^, the degrees of freedom, and a
 
 The Model Likelihood Ratio Test 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm22, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m0.glm, lr.glm, test = "Chi") # Model Likelihood Ratio Test
 ```
 
 In a next step, we calculate pseudo-R^2^ values which represent the amount of residual variance that is explained by the final minimal adequate model. We cannot use the ordinary R^2^ because the model works on the logged likelihoods rather than the values of the dependent variable. 
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm23, eval = T, echo=T, message=FALSE, warning=FALSE}
 # calculate pseudo R^2
 # number of cases
 ncases <- length(fitted(lr.glm))
@@ -1202,7 +1202,7 @@ logisticPseudoR2s(lr.glm)
 
 The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the variance in the data. Next, we extract the confidence intervals for the coefficients of the model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm24, eval = T, echo=T, message=FALSE, warning=FALSE}
 # extract the confidence intervals for the coefficients
 confint(lr.glm)
 ```
@@ -1213,7 +1213,7 @@ Despite having low explanatory and predictive power, the age of speakers and the
 
 In a next step, we compute odds ratios and their confidence intervals. Odds Ratios represent a common measure of effect size and can be used to compare effect sizes across models. Odds ratios rang between 0 and infinity. Values of 1 indicate that there is not effect. The further away the values from 1, the stronger the effect. If the values are lower than 1, then the variable level correlates negatively with the occurrence of the outcome (the likelihood decreases) while values above 1 indicate a positive correlation and show that the variable level causes an increase in the likelihood of the outcome (the occurrence of EH).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm25, eval = T, echo=T, message=FALSE, warning=FALSE}
 exp(lr.glm$coefficients) # odds ratios
 exp(confint(lr.glm))     # confidence intervals of the coefficients
 ```
@@ -1224,7 +1224,7 @@ The odds ratios confirm that older speakers use *eh* significantly less often co
 
 In order to calculate the prediction accuracy of the model, we rearrange the data so that it does not reflect one speech unit per row but the number of speech units with *eh* and the number of speech units without *eh* per speaker! Thus, we transform the data into a per speaker rather than a per speech-unit format.  
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm26, eval = T, echo=T, message=FALSE, warning=FALSE}
 blrdata_byspeaker <- table(blrdata$ID, blrdata$EH)
 blrdata_byspeaker <- data.frame(rownames(blrdata_byspeaker), blrdata_byspeaker[, 1], blrdata_byspeaker[, 2])
 names(blrdata_byspeaker) <- c("ID", "NOEH", "EH")
@@ -1239,13 +1239,13 @@ blrdata_byspeaker$EH <- NULL                  # remove EH column
 
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm27, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(knitr)    # load library
 kable(head(blrdata_byspeaker), caption = "First six rows of the by-speaker data.")
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm28, eval = T, echo=T, message=FALSE, warning=FALSE}
 # use by.spk data to fit another model which we will use to test the accuracy of the model
 lr.glm.spk <- glm(cbind(EH, NOEH) ~ Age*Gender + Ethnicity + Age:Ethnicity, data = blrdata_byspeaker, family = binomial)
 correct <- sum(blrdata_byspeaker$EH * (predict(lr.glm.spk, type = "response") >= 0.5)) + sum(blrdata_byspeaker$NOEH * (predict(lr.glm.spk, type="response") < 0.5))
@@ -1256,7 +1256,7 @@ predict.acc
 
 The models predicts 66.28 of cases accurately which appears to be a satisfactory result but in order to evaluate the prediction accuracy, we need to compare it to the accuracy of the minimal base-line model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm29, eval = T, echo=T, message=FALSE, warning=FALSE}
 lr.glm.spk.base <- glm(cbind(EH, NOEH) ~ 1, data = blrdata_byspeaker, family = binomial)
 correct.b <- sum(blrdata_byspeaker$EH * (predict(lr.glm.spk.base, type = "response") >= 0.5)) + sum(blrdata_byspeaker$NOEH * (predict(lr.glm.spk.base, type="response") < 0.5))
 tot.b <- sum(blrdata_byspeaker$EH) + sum(blrdata_byspeaker$NOEH)
@@ -1268,7 +1268,7 @@ predict.acc.base   # inspect predictions
 Both, the final-minimal and the minimal base-line model have the same prediction accuracy. This is interesting and we need to determine why this is the case. WE will extract the predictions based on both models to find out why the predictions are identical.
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm30, eval = T, echo=T, message=FALSE, warning=FALSE}
 which(lr.glm.spk$fitted > .5)
 
 which(lr.glm.spk.base$fitted > .5)
@@ -1277,7 +1277,7 @@ which(lr.glm.spk.base$fitted > .5)
 
 The reason why both models arrive at the same predictions is that because both models always predict an absence of EH.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm31, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot effects using the visreg package (cf. Breheny & Burchett 2013)
 par(mfrow = c(1, 2))
 visreg(lr.glm, "Age", xlab = "Age", ylab = "Logged Odds (EH)", ylim = c(-3, 0))
@@ -1294,13 +1294,13 @@ We are now in a position to perform model diagnostics and test if the model viol
 
 To check whether the final minimal model contains predictors that correlate with each other, we extract variance inflation factors (VIF). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is completely unreliable and cannot claim the multicollinearity is absent [@myers1990classical]. Predictors causing such VIFs should be removed. Indeed, predictors with VIF values greater than 4 are usually already problematic but, for large data sets, even VIFs greater than 2 can lead inflated standard errors (Jaeger 2013:http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&do=view&target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf). Also, VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215] and [@zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm32, eval = T, echo=T, message=FALSE, warning=FALSE}
 vif(lr.glm)
 ```
 
 In addition, predictors with 1/VIF values $<$ .1 must be removed (data points with values above .2 are considered problematic) [@menard1995applied] and the mean value of VIFs should be $<$ 1 [@bowerman1990linear].
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm33, eval = T, echo=T, message=FALSE, warning=FALSE}
 mean(vif(lr.glm))
 ```
 
@@ -1308,12 +1308,12 @@ mean(vif(lr.glm))
 
 In order to detect potential outliers, we will calculate diagnostic parameters and add these to our data set.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm34, eval = T, echo=T, message=FALSE, warning=FALSE}
 infl <- influence.measures(lr.glm) # calculate influence statistics
 blrdata <- data.frame(blrdata, infl[[1]], infl[[2]]) # add influence statistics
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm35, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(knitr)    # load library
 kable(head(blrdata), caption = "First six rows of the data set with added influence statistics.")
 ```
@@ -1326,7 +1326,7 @@ We now check whether the sample size is sufficient for our analysis [@green1991m
 * if you are interested in individual predictors: 104 + k
 * if you are interested in both: take the higher value!
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm36, eval = T, echo=T, message=FALSE, warning=FALSE}
 # function to evaluate sample size
 smplesz <- function(x) {
   ifelse((length(x$fitted) < (104 + ncol(summary(x)$coefficients)-1)) == TRUE,
@@ -1343,7 +1343,7 @@ According to rule of thumb provided in [@green1991many], the sample size is suff
 
 ## Summarizing Results
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blm37, eval = T, echo=T, message=FALSE, warning=FALSE}
 blrmsummary <- blrm.summary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
 blrmsummary[, -c(4:5)] # remove columns with confidence intervals
 ```
@@ -1401,7 +1401,7 @@ As is the case with linear mixed-effects models, binomial logistic mixed-effect 
 
 *Random Effects* in linear models two parameters: the intercept (the point where the regression line crosses the y-axis) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm1, eval = T, echo=F, message=FALSE, warning=FALSE}
 x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
 x2 <- x1-2
 x3 <- x2-2
@@ -1498,7 +1498,7 @@ In terms of general procedure, random effects are added first, and only after we
 
 In this example we will investigate which factors correlate with the use of *final discourse like* (e.g. "*The weather is shite, like!*") in Irish English. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender (Gender: Men versus Women) and age of that speaker (Age: Old versus Young), whether the interlocutors were of the same or a different gender (ConversationType: SameGender  versus MixedGender), and whether another *final discourse like* had been used up to three speech units before (Priming: NoPrime versus Prime), whether or not the speech unit contained an *final discourse like* (SUFLike: 1 = yes, 0 = no. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm2, eval = T, echo=T, message=FALSE, warning=FALSE}
 rm(list=ls(all=T))  # clean current workspace
 options("scipen" = 100, "digits" = 4)     # set options
 library(Hmisc)      # activate library
@@ -1520,7 +1520,7 @@ source("rscripts/meblr.summary.R")        # load summary function
 Next, we load the data and inspect the structure of the data set,
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm3, eval = T, echo=T, message=FALSE, warning=FALSE}
 # read in existing s´data set mblrdata.txt
 mblrdata <- read.table("data/mblrdata.txt", # load data
                        comment.char = "",   # data does not contain comments
@@ -1533,7 +1533,7 @@ str(mblrdata)                               # inspect data structure
 As all variables except for the dependent variable (SUFlike) are character strings, we
 factorize the independent variables.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm4, eval = T, echo=T, message=FALSE, warning=FALSE}
 vrs <- c("ID", "Age", "Gender", "ConversationType", "Priming")  # define variables to be factorized
 fctr <- which(colnames(mblrdata) %in% vrs)     # define vector with variables
 mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor) # factorize variables
@@ -1542,7 +1542,7 @@ mblrdata$Age <- relevel(mblrdata$Age, "Young") # relevel Age (Young = Reference)
 
 Before continuing, we check if speakers need to be collapsed because they nest too few data points. As a general rule of thumb, random effects should have a minimum of 20 data points per level.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
 plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
      ylim = c(0,150),
       cex = .5)
@@ -1550,21 +1550,21 @@ plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
 
 The plot indicates that the vast majority of speakers represent more than 20 cases. However, we will collapse speakers that represent fewer data points.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
 collapsespeaker <- table(mblrdata$ID)[which(table(mblrdata$ID) < 21)]
 mblrdata$ID <- ifelse(mblrdata$ID %in% collapsespeaker, "Other", mblrdata$ID)
 ```
 
 After preparing the data, we have a look at the first six lines of the data set.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(knitr)    # load library
 kable(head(mblrdata), caption = "First six rows of the data set.")
 ```
 
 We now plot the data to inspect the relationships within the data set. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
 p1 <- ggplot(mblrdata, aes(Gender, SUFlike, color = Gender)) +
   scale_fill_brewer() +
   stat_summary(fun.y = mean, geom = "point") +
@@ -1628,7 +1628,7 @@ The upper left panel in the Figure above indicates that men sue discourse like m
 
 In a first step, we set the options and generate a distance matrix of the data.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm9, eval = T, echo=T, message=FALSE, warning=FALSE}
 # set options
 options(contrasts  =c("contr.treatment", "contr.poly"))
 mblrdata.dist <- datadist(mblrdata)
@@ -1637,7 +1637,7 @@ options(datadist = "mblrdata.dist")
 
 In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the `glmer` function with a random intercept for ID (a lmer object of the final minimal adequate model will be created later).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm10, eval = T, echo=T, message=FALSE, warning=FALSE}
 m0.glm = glm(SUFlike ~ 1, family = binomial, data = mblrdata) # baseline model glm
 m0.lrm = lrm(SUFlike ~ 1, data = mblrdata, x = T, y = T) # baseline model lrm
 m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) # base-line mixed-model
@@ -1648,7 +1648,7 @@ m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) # base-li
 Now, we check if including the random effect is permitted by comparing the AICs from the glm to AIC from the glmer model. If the AIC of the glmer object is smaller than the AIC of the glm object, then this indicates that including random intercepts is justified.
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm11, eval = T, echo=T, message=FALSE, warning=FALSE}
 aic.glmer <- AIC(logLik(m0.glmer))
 aic.glm <- AIC(logLik(m0.glm))
 aic.glmer; aic.glm
@@ -1656,7 +1656,7 @@ aic.glmer; aic.glm
 
 The AIC of the glmer object is smaller which shows that including the random intercepts is justified. To confirm whether the AIC reduction is sufficient for justifying the inclusion of a random-effect structure, we also test whether the mixed-effects minimal base-line model explains significantly more variance by applying a Model Likelihood Ratio Test to the fixed- and the mixed effects minimal base-line models.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm12, eval = T, echo=T, message=FALSE, warning=FALSE}
 # test random effects
 null.id = -2 * logLik(m0.glm) + 2 * logLik(m0.glmer)
 pchisq(as.numeric(null.id), df=1, lower.tail=F) # sig m0.glmer better than m0.glm
@@ -1669,13 +1669,13 @@ The p-value of the Model Likelihood Ratio Test is lower than .05 which shows tha
 The next step is to fit the model which means that we aim to find the "best" model, i.e. the minimal adequate model. In this case, we will use a manual step-wise step-up, forward elimination procedure.
 Before we begin with the model fitting process we need to add ´control = glmerControl(optimizer = "bobyqa")´ to avoid unneccesary failures to converge.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm13, eval = T, echo=T, message=FALSE, warning=FALSE}
 m0.glmer <- glmer(SUFlike ~ 1+ (1|ID), family = binomial, data = mblrdata, control=glmerControl(optimizer="bobyqa"))
 ```
 
 During each step of the fitting procedure, we test whether certain assumptions on which the model relies are violated. To avoid *incomplete information* (a combination of variables does not occur in the data), we tabulate the variables we intend to include and make sure that all possible combinations are present in the data. Including variables although not all combinations are present in the data would lead to unreliable models that report (vastly) inaccurate results. A special case of incomplete information is *complete separation* which occurs if one predictor perfectly explains an outcome (in that case the incomplete information would be caused by a level of the dependent variable). In addition, we make sure that the VIFs do not exceed a maximum of 3 as higher values would indicate multicollinearity and thus that the model is unstable. Only once we have confirmed that the incomplete information, complete separation, and *multicollinearity* are not a major concern, we generate the more saturated model and test whether the inclusion of a predictor leads to a significant reduction in residual deviance. If the predictor explains a significant amount of variance, it is retained in the model while being disregarded in case it does not explain a sufficient quantity of variance.  
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm14, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming
 ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m1.glm <- update(m0.glm, .~.+Priming)
@@ -1686,7 +1686,7 @@ anova(m1.glmer, m0.glmer, test = "Chi") # SIG (p<.001***)
 
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm15, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Age
 ifelse(min(ftable(mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m2.glm <- update(m1.glm, .~.+Age)
@@ -1695,7 +1695,7 @@ m2.glmer <- update(m1.glmer, .~.+Age)
 anova(m2.glmer, m1.glmer, test = "Chi") #mar sig (p=.0.61) BUT BIC inflation  
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm16, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Gender
 ifelse(min(ftable(mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m3.glm <- update(m1.glm, .~.+Gender)
@@ -1704,7 +1704,7 @@ m3.glmer <- update(m1.glmer, .~.+Gender)
 anova(m3.glmer, m1.glmer, test = "Chi") # SIG (p<.001***)  
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm17, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add ConversationType
 ifelse(min(ftable(mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m4.glm <- update(m3.glm, .~.+ConversationType)
@@ -1713,7 +1713,7 @@ m4.glmer <- update(m3.glmer, .~.+ConversationType)
 anova(m4.glmer, m3.glmer, test = "Chi") # SIG (p<.001***)  
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm18, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*Age
 ifelse(min(ftable(mblrdata$Priming, mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m5.glm <- update(m4.glm, .~.+Priming*Age)
@@ -1722,7 +1722,7 @@ m5.glmer <- update(m4.glmer, .~.+Priming*Age)
 anova(m5.glmer, m4.glmer, test = "Chi") # not sig (p=0.6)  
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm19, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*Gender
 ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m6.glm <- update(m4.glm, .~.+Priming*Gender)
@@ -1731,7 +1731,7 @@ ifelse(max(vif(m6.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccept
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm20, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*ConversationType
 ifelse(min(ftable(mblrdata$Priming, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m7.glm <- update(m4.glm, .~.+Priming*ConversationType)
@@ -1740,7 +1740,7 @@ ifelse(max(vif(m7.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccept
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm21, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Age*Gender
 ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m8.glm <- update(m4.glm, .~.+Age*Gender)
@@ -1749,7 +1749,7 @@ ifelse(max(vif(m8.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccept
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm22, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Age*ConversationType
 ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m9.glm <- update(m4.glm, .~.+Age*ConversationType)
@@ -1760,7 +1760,7 @@ anova(m9.glmer, m4.glmer, test = "Chi") # not sig (p=0.3)
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm23, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Gender*ConversationType
 ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m10.glm <- update(m4.glm, .~.+Gender*ConversationType)
@@ -1769,7 +1769,7 @@ ifelse(max(vif(m10.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccep
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm24, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*Age*Gender
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m11.glm <- update(m4.glm, .~.+Priming*Age*Gender)
@@ -1778,7 +1778,7 @@ ifelse(max(vif(m11.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccep
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm25, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*Age*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m12.glm <- update(m4.glm, .~.+Priming*Age*ConversationType)
@@ -1787,7 +1787,7 @@ ifelse(max(vif(m12.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccep
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm26, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m13.glm <- update(m4.glm, .~.+Priming*Gender*ConversationType)
@@ -1796,7 +1796,7 @@ ifelse(max(vif(m13.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccep
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm27, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m14.glm <- update(m4.glm, .~.+Age*Gender*ConversationType)
@@ -1805,7 +1805,7 @@ ifelse(max(vif(m14.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccep
 
 Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm28, eval = T, echo=T, message=FALSE, warning=FALSE}
 # add Priming*Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m15.glm <- update(m4.glm, .~.+Priming*Age*Gender*ConversationType)
@@ -1814,7 +1814,7 @@ ifelse(max(vif(m15.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unaccep
 
 In a next step, we test which models are the most adequate by comparing all models to get an overview of model parameters. This way it is possible to check which model has the lowest AIC, BIC, and the highest $\chi$^2^ value
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm29, eval = T, echo=T, message=FALSE, warning=FALSE}
 # comparisons of glmer objects
 m1.m0 <- anova(m1.glmer, m0.glmer, test = "Chi") 
 m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi") 
@@ -1834,7 +1834,7 @@ kable(mdlft, caption = "Model fitting process summary.")
 
 We now rename our final minimal adequate model, test whether it performs significantly better than the minimal base-line model, and print the regression summary.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm30, eval = T, echo=T, message=FALSE, warning=FALSE}
 mlr.glmer <- m4.glmer # rename final minimal adequate model
 mlr.glm <- m4.glm # rename final minimal adequate fixed-effects model
 anova(mlr.glmer, m0.glmer, test = "Chi") # final model better than base-line model
@@ -1842,21 +1842,21 @@ print(mlr.glmer, corr = F) # inspect final minimal adequate model
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm31, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(mlr.glmer)  # ANOVA summary
 ```
 
 To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that  effect so that we can ascertain how much variance that effect explains.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm32, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m1.glmer, m0.glmer, test = "Chi") #  Priming effect
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm33, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m3.glmer, m1.glmer, test = "Chi") # Gender effect
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm34, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m4.glmer, m3.glmer, test = "Chi") #  ConversationType effect
 ```
 
@@ -1865,7 +1865,7 @@ anova(m4.glmer, m3.glmer, test = "Chi") #  ConversationType effect
 
 We now create an `lrm` and `lmer` object that are equivalent to the final minimal adequate model (but the former without the random effect).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm35, eval = T, echo=T, message=FALSE, warning=FALSE}
 mlr.lrm <- lrm(SUFlike ~ Priming + Gender + ConversationType, data = mblrdata, x = T, y = T)
 m1.glm = glm(SUFlike ~ Priming + Gender + ConversationType, family = binomial, data = mblrdata) # baseline model glm
 # we now create a lmer object equivalent to the final minimal adequate model
@@ -1875,13 +1875,13 @@ mlr.lmer <- lmer(SUFlike ~ Age + Gender + ConversationType + (1|ID), data = mblr
 
 We now check on the lmer object if the fixed effects of the `lrm` and of the `lmer` model correlate (cf Baayen 2008:281).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm36, eval = T, echo=T, message=FALSE, warning=FALSE}
 cor.test(coef(mlr.lrm), fixef(mlr.lmer))
 ```
 
 The fixed effects correlate strongly (.8827) which is a good indicator as it suggests that the coefficient estimates are sufficiently stable. We now activate the `Hmisc` package (if not already active) to extract model fit parameters (cf. Baayen 2008:281).
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm37, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(Hmisc)   # activate Hmisc library
 probs = 1/(1+exp(-fitted(mlr.lmer)))
 probs = binomial()$linkinv(fitted(mlr.lmer))
@@ -1896,23 +1896,23 @@ Somers’ D~xy~ is a value that represents a rank correlation between predicted 
 
 We begin the model diagnostics by generating a diagnostic that plots the fitted or predicted values against the residuals.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm38, eval = T, echo=T, message=FALSE, warning=FALSE}
 plot(mlr.glmer)
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm39, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot residuals against fitted
 stripParams <- list(cex=.3, lines=1.5)
 plot(mlr.glmer, form = resid(., type = "response") ~ fitted(.) | ID, abline = 0, par.strip.text = stripParams,cex = .3,id = 0.05, adj = -0.3)
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm40, eval = T, echo=T, message=FALSE, warning=FALSE}
 # diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
 plot(mlr.glmer, ID ~ resid(.), abline = 0 , cex = .5)
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r blmm41, eval = T, echo=T, message=FALSE, warning=FALSE}
 # summarize final model
 mblrmtb <- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
 mblrmtb <- mblrmtb[, -c(4:5)]

@@ -762,14 +762,11 @@ library(tm)
 # read in text
 darwin &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;) %&gt;%
   paste(sep = &quot; &quot;, collapse = &quot; &quot;) %&gt;%
-  unlist() %&gt;%
-  as.vector() %&gt;%
-  tolower() %&gt;%
   removePunctuation() %&gt;%
-  str_replace_all(&quot; {2,}&quot;, &quot; &quot;) %&gt;%
+  str_replace_all(&quot; {2,}&quot;, &quot; &quot;) %&gt;% 
+  tolower() %&gt;%
   strsplit(&quot; &quot;) %&gt;%
-  as.vector() %&gt;%
-  unlist() 
+  unlist()
 # inspect data
 head(darwin)</code></pre>
 <pre><code>## [1] &quot;the&quot;     &quot;origin&quot;  &quot;of&quot;      &quot;species&quot; &quot;by&quot;      &quot;charles&quot;</code></pre>
@@ -828,11 +825,18 @@ head(darwinsentences)</code></pre>
 <p>In a next setp, we will create a matrix that shows cooccurrence of words.</p>
 <pre class="r"><code># convert into corpus
 darwincorpus &lt;- Corpus(VectorSource(darwinsentences))
+# create vector with words to remove
+extrawords &lt;- c(&quot;the&quot;, &quot;can&quot;, &quot;get&quot;, &quot;got&quot;, &quot;can&quot;, &quot;one&quot;, 
+                &quot;dont&quot;, &quot;even&quot;, &quot;may&quot;, &quot;but&quot;, &quot;will&quot;, 
+                &quot;much&quot;, &quot;first&quot;, &quot;but&quot;, &quot;see&quot;, &quot;new&quot;, 
+                &quot;many&quot;, &quot;less&quot;, &quot;now&quot;, &quot;well&quot;, &quot;like&quot;, 
+                &quot;often&quot;, &quot;every&quot;, &quot;said&quot;, &quot;two&quot;)
 # clean corpus
 darwincorpusclean &lt;- darwincorpus %&gt;%
   tm_map(removePunctuation) %&gt;%
+  tm_map(tolower) %&gt;%
   tm_map(removeWords, stopwords(kind = &quot;en&quot;)) %&gt;%
-  tm_map(tolower)
+  tm_map(removeWords, extrawords)
 # create document term matrix
 darwindtm &lt;- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
 # load library
@@ -859,10 +863,10 @@ collocates[1:8, 1:5]</code></pre>
 ## sketch             1      1          1            1       1</code></pre>
 <pre class="r"><code># inspect size of matrix
 ncol(collocates)</code></pre>
-<pre><code>## [1] 10634</code></pre>
+<pre><code>## [1] 10548</code></pre>
 <pre class="r"><code>summary(rowSums(collocates))</code></pre>
 <pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##     1.0    25.0    49.0   221.9   135.0 28133.0</code></pre>
+##       1      23      45     191     124   25722</code></pre>
 <pre class="r"><code># remove terms that do not collocate with other terms
 noncoll &lt;- colnames(collocates)[which(rowSums(collocates) &lt; 5000)]
 # remove non-collocating terms
@@ -889,7 +893,7 @@ res.ca &lt;- CA(collocates, graph = FALSE)
 #fviz_ca_biplot(res.ca, repel = F, select.ind = list(cos2 = .02))
 plot(res.ca, shadow = T, cex = 1, selectRow = &quot;cos2 0.1&quot;, selectCol = &quot;cos2 0.9&quot;, col.row = &quot;gray50&quot;, title = &quot;&quot;)</code></pre>
 <p><img src="textanalysis_files/figure-html/coll8-1.png" width="672" /></p>
-<p>The bi-plot shows that “natural” and “selection” collocate, as do “life” and “conditions”, “distinct” and “species” as well as “two” and “varieties”. Other words with lower collocation strength are masked from the bi-plot.</p>
+<p>The bi-plot shows that “natural” and “selection” collocate, as do “animals” and “plants”, “period”, “long”, and “time” as well as “conditions” and “life”. Other words with lower collocation strength are masked from the bi-plot.</p>
 <pre class="r"><code># create cooccurence table
 word &lt;- rep(rownames(collocates), each = ncol(collocates))
 collocate &lt;- rep(rownames(collocates), ncol(collocates))
@@ -1131,8 +1135,8 @@ English &lt;- as.vector(unlist(strsplit(gsub(&quot; &quot;, &quot;&quot;, Englis
 Spanish &lt;- as.vector(unlist(strsplit(gsub(&quot; &quot;, &quot;&quot;, Spanish), &quot;&quot;)))
 Unknown &lt;- as.vector(unlist(strsplit(gsub(&quot; &quot;, &quot;&quot;, Unknown), &quot;&quot;)))
 # inspect data
-head(English)</code></pre>
-<pre><code>## [1] &quot;D&quot; &quot;@&quot; &quot;b&quot; &quot;U&quot; &quot;k&quot; &quot;I&quot;</code></pre>
+head(English, 10)</code></pre>
+<pre><code>##  [1] &quot;D&quot;  &quot;@&quot;  &quot;b&quot;  &quot;U&quot;  &quot;k&quot;  &quot;I&quot;  &quot;z&quot;  &quot;p&quot;  &quot;r&quot;  &quot;\\&quot;</code></pre>
 <p>We will now create a table that represents the phonemes and their frequencies in each of the 4 texts. In addition, we will add the language and simply the column names.</p>
 <pre class="r"><code># create data tables
 German &lt;- data.frame(names(table(German)), as.vector(table(German)))
@@ -1320,17 +1324,17 @@ rownames(emo) &lt;- gsub(&quot;emos&quot;, &quot;&quot;, rownames(emo))
 # inspect data
 head(emo)</code></pre>
 <pre><code>##           anger anticipation disgust fear  joy sadness surprise trust
-## darwin     0.68         1.64    0.36 1.12 1.22    1.22     0.84  2.48
-## twain      1.08         1.96    0.98 1.34 1.72    1.26     1.02  2.12
-## orwell     1.62         2.36    1.32 2.12 1.68    1.86     1.10  2.98
-## lovecraft  1.74         1.54    1.46 2.34 1.04    2.06     0.84  1.54
-## husband    2.06         2.40    1.16 2.28 2.20    2.26     1.24  2.34
+## darwin     0.88         1.46    0.56 1.54 0.96    1.24     0.74  2.50
+## twain      0.86         1.92    0.84 1.40 1.52    1.34     1.12  1.86
+## orwell     1.52         1.98    1.08 2.24 1.60    1.66     0.90  2.30
+## lovecraft  1.78         1.98    1.50 2.48 1.02    2.48     1.00  1.60
+## husband    2.10         2.40    1.18 2.34 2.22    2.32     1.24  2.32
 ##           negative positive
-## darwin        2.22     3.88
-## twain         2.32     3.34
-## orwell        3.58     4.14
-## lovecraft     4.26     2.74
-## husband       4.40     4.46</code></pre>
+## darwin        2.76     4.36
+## twain         2.30     2.94
+## orwell        3.86     3.98
+## lovecraft     4.70     2.98
+## husband       4.48     4.48</code></pre>
 <pre class="r"><code>#convert into data frame
 emo &lt;- as.data.frame(emo)
 # add author column
@@ -1342,12 +1346,13 @@ emol &lt;- gather(emo, Emotion, Score, anger:positive, factor_key=TRUE)
 # inspect data
 head(emol)</code></pre>
 <pre><code>##      Author      Emotion Score
-## 1    Darwin        anger  0.68
-## 2     Twain        anger  1.08
-## 3    Orwell        anger  1.62
-## 4 Lovecraft        anger  1.74
-## 5   Husband        anger  2.06
-## 6    Darwin anticipation  1.64</code></pre>
+## 1    Darwin        anger  0.88
+## 2     Twain        anger  0.86
+## 3    Orwell        anger  1.52
+## 4 Lovecraft        anger  1.78
+## 5   Husband        anger  2.10
+## 6    Darwin anticipation  1.46</code></pre>
+<p>Based on this table, we can now vizualise the relative emotion scores for each book.</p>
 <pre class="r"><code># load library
 library(ggplot2)
 # extract subset
@@ -1409,7 +1414,90 @@ orwellpeople</code></pre>
 <div id="topic-modelling" class="section level1">
 <h1><span class="header-section-number">10</span> Topic Modelling</h1>
 <p>Topic Modelling is a procedure that allows to extract clusters of key words. These key word clusters can represent topics and the extraction and detection of such key word clusters builds on word frequencies and correlations between word frequencies.</p>
-<pre class="r"><code># load libraries</code></pre>
+<pre class="r"><code># load data
+darwin &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;)
+twain &lt;- readLines(&quot;https://slcladal.github.io/data/twainhuckfinn.txt&quot;)
+orwell &lt;- readLines(&quot;https://slcladal.github.io/data/orwell.txt&quot;)
+# clean files 
+darwin &lt;- paste(gsub(&quot; {2,}&quot;, &quot; &quot;, darwin), sep = &quot; &quot;, collapse = &quot; &quot;)
+twain &lt;- paste(gsub(&quot; {2,}&quot;, &quot;  &quot;, twain), sep = &quot; &quot;, collapse = &quot; &quot;)
+orwell &lt;- paste(gsub(&quot; {2,}&quot;, &quot; &quot;, orwell), sep = &quot; &quot;, collapse = &quot; &quot;)
+# inspect data
+str(orwell)</code></pre>
+<pre><code>##  chr &quot;1984 George Orwell Part 1, Chapter 1 It was a bright cold day in April, and the clocks were striking thirteen. &quot;| __truncated__</code></pre>
+<p>Now, we create a corpus object and clean the corpus.</p>
+<pre class="r"><code># load library
+library(tm)
+# create corpus object
+texts &lt;- Corpus(VectorSource(c(darwin, twain, orwell)))
+# create vector with words to remove
+extrawords &lt;- c(&quot;the&quot;, &quot;can&quot;, &quot;get&quot;, &quot;got&quot;, &quot;can&quot;, &quot;one&quot;, 
+                &quot;dont&quot;, &quot;even&quot;, &quot;may&quot;, &quot;but&quot;, &quot;will&quot;, 
+                &quot;much&quot;, &quot;first&quot;, &quot;but&quot;, &quot;see&quot;, &quot;new&quot;, 
+                &quot;many&quot;, &quot;less&quot;, &quot;now&quot;, &quot;well&quot;, &quot;like&quot;, 
+                &quot;often&quot;, &quot;every&quot;, &quot;said&quot;, &quot;two&quot;)
+# load libraries
+library(dplyr)
+library(stringr)
+# clean corpus
+textsclean &lt;- texts %&gt;%
+  tm_map(removePunctuation) %&gt;%
+  tm_map(removeNumbers) %&gt;% 
+  tm_map(tolower) %&gt;%
+  tm_map(removeWords, stopwords(kind = &quot;en&quot;)) %&gt;%
+  tm_map(removeWords, extrawords)
+# inspect data
+summary(textsclean)</code></pre>
+<pre><code>##   Length Class             Mode
+## 1 2      PlainTextDocument list
+## 2 2      PlainTextDocument list
+## 3 2      PlainTextDocument list</code></pre>
+<p>We now create a document term matrix.</p>
+<pre class="r"><code># create DTM
+textsdtm &lt;- DocumentTermMatrix(textsclean)
+# load library
+library(topicmodels)
+# perform LDA
+textslda &lt;- LDA(textsdtm, k = 3, control = list(seed = 20190712))
+textslda</code></pre>
+<pre><code>## A LDA_VEM topic model with 3 topics.</code></pre>
+<p>We can now inspect which words are particularly associated with which topic.</p>
+<pre class="r"><code># load library
+library(tidytext)
+# convert data into tidy format
+textstopics &lt;- tidy(textslda, matrix = &quot;beta&quot;)
+textstopics</code></pre>
+<pre><code>## # A tibble: 61,596 x 3
+##    topic term            beta
+##    &lt;int&gt; &lt;chr&gt;          &lt;dbl&gt;
+##  1     1 abdomen    4.99e-108
+##  2     2 abdomen    2.19e-  5
+##  3     3 abdomen    5.34e-163
+##  4     1 aberrant   9.46e-108
+##  5     2 aberrant   7.66e-  5
+##  6     3 aberrant   7.53e-163
+##  7     1 aberration 2.96e-108
+##  8     2 aberration 2.19e-  5
+##  9     3 aberration 5.88e-163
+## 10     1 abhorrent  2.18e-108
+## # ... with 61,586 more rows</code></pre>
+<pre class="r"><code># load libraries
+library(ggplot2)
+library(dplyr)
+# extract top words
+textstopicstop &lt;- textstopics %&gt;%
+  group_by(topic) %&gt;%
+  top_n(15, beta) %&gt;%
+  ungroup() %&gt;%
+  arrange(term, -beta)
+# create plots
+textstopicstop %&gt;%
+  mutate(term = reorder(term, beta)) %&gt;%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = &quot;free&quot;) +
+  coord_flip()</code></pre>
+<p><img src="textanalysis_files/figure-html/tm5-1.png" width="672" /></p>
 </div>
 
 
