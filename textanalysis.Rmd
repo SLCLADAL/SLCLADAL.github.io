@@ -29,13 +29,21 @@ lim <- par()
 rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
 ```
 
+```{r Fig2, fig.width=8, fig.height=6, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:Fig1} Comparative network graph for personas in William Shakespeare's King Lear, Macbeth, and Orthello. (from http://www.martingrandjean.ch/network-visualization-shakespeare/."}
+library(png)
+ima <- readPNG("images/ShakespeareKingLearNwtwork.png")
+plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
+lim <- par()
+rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
+```
+
 Distant Reading is very attractive because it can be applied to so many different research questions as the only requirements are that the data is present in text format and is sufficiently large. If these conditions are met, then Distant Reading or Text Analysis methods can offer a myriad of insights that would not be derivable from close reading techniques. 
 
 # Concordancing
 
 In Text Analysis, concordancing refers to the extraction of words from a given text or texts. Commonly, concordances are displayed in the form of KWIC displays (Key Word in Context) where the search term is shown with some preceding and following context.
 
-```{r Fig2, fig.width=8, fig.height=6, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:Fig2} KWIC display of the search term language extracted from the BROWN corpus in the program AntConc."}
+```{r Fig3, fig.width=8, fig.height=6, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:Fig2} KWIC display of the search term language extracted from the BROWN corpus in the program AntConc."}
 library(png)
 ima <- readPNG("images/AntConcConcordance.png")
 plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
@@ -414,35 +422,6 @@ plot(res.ca, shadow = T, cex = 1, selectRow = "cos2 0.1", selectCol = "cos2 0.9"
 
 The bi-plot shows that "natural" and "selection" collocate, as do "animals" and "plants", "period", "long", and "time" as well as "conditions" and "life". Other words with lower collocation strength are masked from the bi-plot. 
 
-```{r coll9, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# create cooccurence table
-word <- rep(rownames(collocates), each = ncol(collocates))
-collocate <- rep(rownames(collocates), ncol(collocates))
-collfreq <- as.vector(unlist(collocates))
-# combine into data frame
-dc <- data.frame(word, collocate, collfreq)
-# load library 
-library(igraph)
-# remove infrequent cooccurences and create graph object
-bigram_graph <- dc %>%
-  filter(collfreq > 200) %>%
-  graph_from_data_frame()
-# load library
-library(ggraph)
-library(grid)
-# define arrow type
-a <- grid::arrow(type = "closed", length = unit(.15, "cm"))
-# create plot
-ggraph(bigram_graph, layout = "fr") +
-  geom_edge_link(aes(edge_alpha = collfreq), show.legend = FALSE,
-                 arrow = a, end_cap = circle(.07, 'inches')) +
-  geom_node_point(color = "lightblue", size = 1) +
-  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
-  theme_void()
-```
-
-Now, this graph is not very appealing but it shows that there are relatively few words that collocate significantly in Darwin's "Origin". 
-
 We will now use an example of one individual word to show, how collocation strength for individual terms is calculated and displayed as a network.
 
 ```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
@@ -578,7 +557,6 @@ library(openNLPmodels.en)
 # detach ggplot2 library becuase function "annotate" 
 # would be taken from ggplot2 rather than NLP
 detach("package:factoextra", unload=TRUE)
-detach("package:ggraph", unload=TRUE)
 detach("package:ggplot2", unload=TRUE)
 # pos tagging data
 textpos <- POStag(object = text)
@@ -632,6 +610,7 @@ parse2graph(ptexts[1], title = "", margin=-0.2, vertex.color=NA,
             edge.width=1, edge.color='red', edge.arrow.size=0)
 ```
 
+Syntax trees are very handy because the allow us to check how reliable the parser performed. In the example above, the sentence was, in fact, parsed erroneously: the caluse conatining the string <just as the man has attended a funeral> is dependent on the relative clause <who gave him the book> although the first clause would correctly be dependent on the the clause <By chance Harry encountered the man>. However, other constituents are parsed correctly.
 
 # Text Classification
 
@@ -966,8 +945,6 @@ textsclean <- texts %>%
   tm_map(tolower) %>%
   tm_map(removeWords, stopwords(kind = "en")) %>%
   tm_map(removeWords, extrawords)
-# inspect data
-summary(textsclean)
 ```
 
 We now create a document term matrix.
@@ -1011,3 +988,135 @@ textstopicstop %>%
   coord_flip()
 ```
 
+The topic modeling does, in fact, reflect the narrative topics of the three monographs with the first topic representing Orwell's "1984", the second topic representing Darwin's "On the origin of species", and the third topic representing Twain's "Adventures of Huckleberry Finn".
+
+Topic Models can be refined and made more meaningful in various ways. For instance, the topic model shown here could be improved by splitting the monographs into chapters and running the analysis on the individual chapters rather than the entire monograph. Also, a very intersting application of Topic Modles would be to investiagte changes in topics over time which is dealt with in the tutorial that delves deeper into topic modelling.
+
+# Network Analysis
+
+Network analysis is not really a type of analysis but rather a method for visualization that can be used to represent various types of data. However, because network analyses are widely used and a very useful procedure, we will introduce the basics of network analysis here. 
+
+The issue we want to investigate here relates to networks of personas in Shakespeare's "Romeo and Juliett".
+
+```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load libraries
+library(gutenbergr)
+library(dplyr)
+# load data
+romeo <- gutenberg_works(title == "Romeo and Juliet") %>%
+  gutenberg_download(meta_fields = "title")
+# inspect data
+romeo
+```
+
+Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a subscene.
+
+```{r na2, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(stringr)
+# load split
+romeoscenes <- romeo %>%
+  select(text) %>%
+  as.vector() %>%
+  str_replace_all(fixed("\""), "") %>%
+  str_replace_all(fixed("\n"), "") %>%
+  paste(collapse = " ") %>%
+  str_replace_all("(Scene )", "qwertz\\1") %>%
+  strsplit("qwertz") %>%
+  unlist()
+# inspect data
+str(romeoscenes[2])
+```
+
+Now we extract the persons that are present in each scene.
+
+```{r na3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(stringr)
+# extract persons
+romeopersonas <- romeoscenes %>%
+  str_match_all(" , [A-Z][a-z]{2,} {0,1}[A-Z]{0,1}[a-z]{0,}\\.")
+# inspect data
+str(romeopersonas[1:5])
+```
+
+```{r na4, echo=T, eval = T, message=FALSE, warning=FALSE}
+# extract personas per scene
+personas <- sapply(romeopersonas, function(x){
+  x <- unlist(x)
+  x <- gsub(",", "", x)
+  x <- gsub("\\.", "", x)
+  x <- gsub(" ", "", x)
+  x <- unique(x)
+  x <- as.vector(x)
+  x <- paste(x, collapse = " ")
+  x <- gsub(" ActV", "", x)
+  x <- gsub(" Page", "", x)
+})
+# inspect data
+personas
+```
+
+```{r na6, echo=T, eval = T, message=FALSE, warning=FALSE}
+# remove first elements
+personas <- personas[2:length(personas)]
+str(personas)
+```
+
+```{r na7, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(tm)
+# create corpus
+corpus <- Corpus(VectorSource(personas))
+# create document term matrix
+scenepersonas <- DocumentTermMatrix(corpus) 
+# load library
+require(Matrix)
+# convert dtm into sparse matrix
+rnjdtm <- sparseMatrix(i = scenepersonas$i, j = scenepersonas$j, 
+                           x = scenepersonas$v, 
+                           dims = c(scenepersonas$nrow,
+                                    scenepersonas$ncol),
+                           dimnames = dimnames(scenepersonas))
+# calculate cooccurrence counts
+coocurrence <- t(rnjdtm) %*% rnjdtm
+# convert into matrix
+romeom <- as.matrix(coocurrence)
+# inspect data
+head(romeom)
+```
+
+```{r na8, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create cooccurence table
+persona1 <- rep(colnames(romeom), each = nrow(romeom))
+persona2 <- rep(rownames(romeom), ncol(romeom))
+freq <- as.vector(unlist(romeom))
+# combine into data frame
+dc <- data.frame(persona1, persona2, freq)
+# remove cooccurence with oneself
+df <- dc %>%
+  filter(persona1 != persona2)
+# inspect data
+head(df)
+```
+
+
+```{r na9, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load library 
+library(igraph)
+# remove infrequent cooccurences and create graph object
+bigram_graph <- df %>%
+  graph_from_data_frame()
+# load library
+library(ggraph)
+library(grid)
+# define arrow type
+a <- grid::arrow(type = "open", length = unit(.15, "cm"))
+# create plot
+ggraph(bigram_graph, layout = "auto") +
+  geom_edge_link(aes(edge_alpha = freq), show.legend = FALSE,
+                 arrow = a, end_cap = circle(1, 'inches')) +
+  geom_node_point(color = "lightblue", size = 3) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
