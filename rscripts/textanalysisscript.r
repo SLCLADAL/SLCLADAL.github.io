@@ -3,10 +3,12 @@
 # Preparation
 # install libraries
 install.packages(c("class", "cluster", "dplyr", "factoextra", 
-"FactoMineR", "ggplot2", "ggraph", "grid", "gutenbergr", "igraph", 
-"Matrix", "NLP", "openNLP", "openNLPmodels.en", "Matrix", "stringr", 
-"syuzhet", "tidyr", "tidytext", "tm", "topicmodels", "wordcloud", "xtable"))
-# Concordancing
+                   "FactoMineR", "ggplot2", "ggraph", "grid", 
+                   "gutenbergr", "igraph", "Matrix", "NLP", 
+                   "openNLP", "openNLPmodels.en", "Matrix", 
+                   "stringr", "syuzhet", "tidyr", "tidytext", 
+                   "tm", "topicmodels", "wordcloud", "xtable"))
+                   # Concordancing
 # load libraries
 library(dplyr)
 library(stringr)
@@ -210,7 +212,7 @@ darwincorpusclean <- darwincorpus %>%
 # create document term matrix
 darwindtm <- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
 # load library
-require(Matrix)
+load(Matrix)
 # convert dtm into sparse matrix
 darwinsdtm <- sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
                            x = darwindtm$v, 
@@ -722,7 +724,7 @@ corpus <- Corpus(VectorSource(personas))
 # create document term matrix
 scenepersonas <- DocumentTermMatrix(corpus) 
 # load library
-require(Matrix)
+load(Matrix)
 # convert dtm into sparse matrix
 rnjdtm <- sparseMatrix(i = scenepersonas$i, j = scenepersonas$j, 
                            x = scenepersonas$v, 
