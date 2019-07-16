@@ -1183,17 +1183,18 @@ Word clouds visualize word frequencies of either single corpus or different corp
 
 ```{r wc1, activatepackageswordcloud, echo = T, message=FALSE, warning=FALSE}
 # activate packages
+library(dplyr)
 library(tm)
 library(wordcloud)
 library(stringr)
 library(SnowballC)
 ```
 
-In a next step, we load the data.
+In a next step, we load and process the data.
 
 ```{r wc2, echo = T, message=FALSE, warning=FALSE}
 # specify path to corpus
-corpus.path <- "https://slcladal.github.io/data/uspoliticalcorpus2016/"
+corpus.path <- "https://slcladal.github.io/data/uspoliticalcorpus"
 # load files
 corpus.files = list.files(path = corpus.path, 
                           pattern = NULL, 
@@ -1202,6 +1203,8 @@ corpus.files = list.files(path = corpus.path,
                           recursive = T, 
                           ignore.case = F, 
                           include.dirs = T)
+
+str(corpus.files)
 # load corpus and start processing
 corp <- lapply(corpus.files, function(x) {
   x <- scan(x, 
@@ -1215,6 +1218,8 @@ corp <- lapply(corpus.files, function(x) {
   x <- str_replace_all(x, fixed("\n"), " ")
   x <- unlist(x)
   } )
+# inspect corpus structure
+str(corp)
 ```
 
 After loading the data, we need to clean it.
@@ -1228,9 +1233,7 @@ corp <- tm_map(corp, removePunctuation)
 corp <- tm_map(corp, tolower)                             
 # remove numerals
 corp <- tm_map(corp, removeNumbers)                       
-corp <- tm_map(corp, function(x) {
-  # remove stopwords
-  x <- removeWords(x, stopwords("english"))})             
+corp <- tm_map(corp, removeWords, stopwords("english"))            
 # create term document matrix
 tdm <- TermDocumentMatrix(corp)                           
 # remove infrequent words
@@ -1250,7 +1253,14 @@ tdm[, 1] <- as.vector(unlist(sapply(tdm[, 1], function(x) round(x/colSums(tdm)[1
 tdm[, 2] <- as.vector(unlist(sapply(tdm[, 2], function(x) round(x/colSums(tdm)[2]*1000, 0) )))
 ```
 
-After processing the data, we can now create word clouds. However, there are different word clouds: Common word clouds, comparative word clouds, and commonality word clouds. Common or simple word clouds simply show the frequency of word types while comparative word clouds show which word types are particularly overrepresented in one subcorpus compared to another subcorpus. Commonality word clouds show words that are sharedand are thus particularly indistinctive for different subcorpora.
+After processing the data, we can now create word clouds. However, there are different word clouds: 
+
+* (Common) word clouds
+* Comparative clouds
+* Commonality clouds
+
+Common or simple word clouds simply show the frequency of word types while comparative word clouds show which word types are particularly overrepresented in one subcorpus compared to another subcorpus. Commonality word clouds show words that are sharedand are thus particularly indistinctive for different subcorpora.
+
 Let us first inspect a common word cloud of the corpus.
 
 ```{r wc5, echo = T, eval = T, message=FALSE, warning=FALSE}
@@ -1259,6 +1269,8 @@ wordcloud(corp, max.words = 100,
           colors = brewer.pal(6, "Dark2"), 
           random.order = FALSE)
 ```
+
+The common word cloud shows the frequevies of words regardless of who used them. In contrast, the comaprative cloud shown below highlights words that differ most with respect to their frequencies in the subcorpora under investigation.  
 
 ```{r wc6, echo = T, eval = T, message=FALSE, warning=FALSE}
 # create comparison cloud
@@ -1270,6 +1282,8 @@ comparison.cloud(tdm,
                  bg.color = "black")
 ```
 
+The opposite of comparative clouds are commonality clouds which highlight words that use with similar relative frequenciesin the subcorpora under investigation adn that are therefore particularly indistinctive.  
+
 ```{r wc7, echo = T, eval = T, message=FALSE, warning=FALSE}
 # create commonality cloud
 commonality.cloud(tdm, 
@@ -1278,5 +1292,45 @@ commonality.cloud(tdm,
 ```
 
 At first, I thought that word clouds are simply a fancy but not very helpful way to inspect language data but I have to admit that word clouds really surprised me as they do appear to possess potential to provide an idea of what groups of people are talking about. The comparative word cloud shows that the Trump uses a lot of contractions ("'re", "'ll", etc.) and stresses concepts linked to the future ("going") thereby stressing his vision of the US (great). In Contrast, Clinton did not use contractions but talked about "Americans", "work", the "economy", and "women".
+
+```{r wc2, activatepackageswordcloud, echo = T, message=FALSE, warning=FALSE}
+# load data
+Clinton <- readLines("https://slcladal.github.io/data/Clinton.txt")
+Trump <- readLines("https://slcladal.github.io/data/Trump.txt")
+# combine each text into one element
+Clinton <- paste(as.vector(unlist(Clinton)), sep = " ", collapse = " ")
+melville <- paste(as.vector(unlist(Trump)), sep = " ", collapse = " ")
+# load libraries
+library(tm)
+library(dplyr)
+library(xtable)
+# clean texts
+docs <- Corpus(VectorSource(c(Clinton, Trump))) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(tolower)  %>%
+  tm_map(removeWords, stopwords("english")) %>%
+  tm_map(stripWhitespace) %>%
+  tm_map(PlainTextDocument)
+# create term document matrix
+tdm <- TermDocumentMatrix(docs) %>%
+  as.matrix()
+colnames(tdm) <- c("Clinton","Trump")
+```
+
+Now, we can cretae a comparison cloud.
+
+```{r wc3, activatepackageswordcloud, echo = T, message=FALSE, warning=FALSE}
+# create comparison cloud
+comparison.cloud(tdm, random.order=FALSE, 
+                 colors = c("orange","lightblue"),
+                 title.size=2.5, max.words=200, 
+                 title.bg.colors = "white")
+```
+
+
+
+
+
 
 # References
