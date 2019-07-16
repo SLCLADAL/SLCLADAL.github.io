@@ -60,9 +60,9 @@ install.packages(c("lattice", "ggplot2", "dplyr", "likert",
 
 Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
 
-## Data
+## Data sets
 
-Before turning to the graphs, we will briefly look at the structures of the data sets to what we are working with. In this chapter, we will not use language data but inbuild data sets that are provided by R and already loaded when entering R. The data sets are called "iris"  and "mtcars". The "iris" data set contains information about "measurements in centimetres of the variables sepal length and width and petal length and width, respectively, for 50 flowers from each of 3 species of iris. The species are Iris Setosa, versicolor, and virginica" (cf. [@becker1988s]; [@anderson1935iris]; [@fisher1936iris]). In a first step, we attach the "iris"  data so that we only need to write the variable names without having to repeat the name of the data set. Then, we inspect the structure of the "iris" data using the "str()" command.
+Before turning to the graphs, we will briefly look at the structures of the data sets to what we are working with. In this chapter, we will mostly use inbuild data sets that are provided by R and already loaded when entering R. The data sets are called "iris"  and "mtcars". The "iris" data set contains information about "measurements in centimetres of the variables sepal length and width and petal length and width, respectively, for 50 flowers from each of 3 species of iris. The species are Iris Setosa, versicolor, and virginica" (cf. [@becker1988s]; [@anderson1935iris]; [@fisher1936iris]). In a first step, we attach the "iris"  data so that we only need to write the variable names without having to repeat the name of the data set. Then, we inspect the structure of the "iris" data using the "str()" command.
 
 ```{r data1, echo = T, eval=T, message=FALSE, warning=FALSE}
 # attach iris
@@ -71,7 +71,16 @@ attach(iris)
 str(iris)                  
 ```
 
-The "iris" data contains four numeric variables (Sepal.Length, Sepal.Width, Petal.Length, Petal.Width) which contain the values for sepal length and width as well as petal length and width. In addition, the data contains a factor or categorical variable (Species) which denotes the flower species. We will now turn to creating the graphs.
+The "iris" data contains four numeric variables (Sepal.Length, Sepal.Width, Petal.Length, Petal.Width) which contain the values for sepal length and width as well as petal length and width. In addition, the data contains a factor or categorical variable (Species) which denotes the flower species. 
+
+```{r data2, echo = T, eval=T, message=FALSE, warning=FALSE}
+# attach iris
+attach(mtcars) 
+# inspect  iris data
+str(mtcars)                  
+```
+
+The "mtcars" data contains eleven numeric variables that represent features of different cars (mpg = miles per gallon, cyl = number of cylinders, disp = dispersion, etc.). For a more detailed inspection of the data and explanation of the variables simply execute the command "?mtcars". We will now turn to creating the graphs.
 
 # Scatter Plots
 
@@ -279,7 +288,7 @@ ggplot(iris,
                # add error bars
                geom = "errorbar", width = 0.2) + 
   # def. y-axis range
-  coord_cartesian(ylim = c(0, 8)) +              
+  coord_cartesian(ylim = c(4, 8)) +              
   # def. font size
   theme_set(theme_bw(base_size = 20)) +         
   # def. size of x-axis
@@ -325,14 +334,11 @@ The implementation of line graphs in the "base" package is very simple and there
 ```{r line1, echo = T, results='hide', message=FALSE, warning=FALSE}
 # clean workspace
 rm(list=ls(all=T))
-# unload package
+# unload package Rmsic
 unloadNamespace("Rmisc")
-#unloadNamespace("plyr")
-#detach("package:Rmisc", unload = T, character.only=TRUE)
-#detach("package:plyr", unload = T, character.only=TRUE)
-#detach_package("Rmisc", TRUE)
-#detach_package("plyr", TRUE)
 ```
+
+Sometimes packages need to be unloaded because other libraries have different fucntions that are called the same. If one did not unload the package that also contain the function name but which performs adifferent task, then this would lead to erroneous outcomes. 
 
 ```{r line2, echo = T, message=FALSE, warning=FALSE}
 # activate dplyr package
@@ -1192,56 +1198,30 @@ library(SnowballC)
 
 In a next step, we load and process the data.
 
-```{r wc2, echo = T, message=FALSE, warning=FALSE}
-# specify path to corpus
-corpus.path <- "https://slcladal.github.io/data/uspoliticalcorpus"
-# load files
-corpus.files = list.files(path = corpus.path, 
-                          pattern = NULL, 
-                          all.files = T,
-                          full.names = T, 
-                          recursive = T, 
-                          ignore.case = F, 
-                          include.dirs = T)
-
-str(corpus.files)
-# load corpus and start processing
-corp <- lapply(corpus.files, function(x) {
-  x <- scan(x, 
-            what = "char", 
-            sep = "", 
-            quote = "", 
-            quiet = T, 
-            skipNul = T)
-  x <- gsub(" {2,}", " ", x)
-  x <- str_trim(x, side = "both")
-  x <- str_replace_all(x, fixed("\n"), " ")
-  x <- unlist(x)
-  } )
-# inspect corpus structure
-str(corp)
+```{r wc2, eval = T, echo = T, message=FALSE, warning=FALSE}
+# load and process speeches by clinton
+clinton <- readLines("https://slcladal.github.io/data/Clinton.txt") %>%
+  paste(sep = " ", collapse = " ")
+# load and process speeches by trump
+trump <- readLines("https://slcladal.github.io/data/Trump.txt") %>%
+  paste(sep = " ", collapse = " ")
 ```
 
 After loading the data, we need to clean it.
 
-```{r wc3, echo = T, message=FALSE, warning=FALSE}
-# create corpus object
-corp <- Corpus(VectorSource(corp))                   
-# remove punctuation
-corp <- tm_map(corp, removePunctuation)                   
-# convert to lower case
-corp <- tm_map(corp, tolower)                             
-# remove numerals
-corp <- tm_map(corp, removeNumbers)                       
-corp <- tm_map(corp, removeWords, stopwords("english"))            
+```{r wc3, eval = T, echo = T, message=FALSE, warning=FALSE}
+# clean texts
+docs <- Corpus(VectorSource(c(clinton, trump))) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(tolower)  %>%
+  tm_map(removeWords, stopwords("english")) %>%
+  tm_map(stripWhitespace) %>%
+  tm_map(PlainTextDocument)
 # create term document matrix
-tdm <- TermDocumentMatrix(corp)                           
-# remove infrequent words
-tdm <- removeSparseTerms(tdm, 0.5)                        
-# convert into matrix
-tdm <- as.matrix(tdm)                                     
-# add lables
-attr(tdm, "dimnames")$Docs <- c("Clinton", "Trump")       
+tdm <- TermDocumentMatrix(docs) %>%
+  as.matrix()
+colnames(tdm) <- c("Clinton","Trump")
 ```
 
 Next, we normalize the absolute frequencies of the terms in the document by converting them into relative frequencies.
@@ -1265,8 +1245,8 @@ Let us first inspect a common word cloud of the corpus.
 
 ```{r wc5, echo = T, eval = T, message=FALSE, warning=FALSE}
 # create word cloud
-wordcloud(corp, max.words = 100, 
-          colors = brewer.pal(6, "Dark2"), 
+wordcloud(docs, max.words = 100, 
+          colors = brewer.pal(6, "BrBG"), 
           random.order = FALSE)
 ```
 
@@ -1288,45 +1268,11 @@ The opposite of comparative clouds are commonality clouds which highlight words 
 # create commonality cloud
 commonality.cloud(tdm, 
                   max.words = 100, 
-                  random.order = FALSE)
+                  random.order = FALSE, 
+          colors = brewer.pal(6, "Spectral"))
 ```
 
 At first, I thought that word clouds are simply a fancy but not very helpful way to inspect language data but I have to admit that word clouds really surprised me as they do appear to possess potential to provide an idea of what groups of people are talking about. The comparative word cloud shows that the Trump uses a lot of contractions ("'re", "'ll", etc.) and stresses concepts linked to the future ("going") thereby stressing his vision of the US (great). In Contrast, Clinton did not use contractions but talked about "Americans", "work", the "economy", and "women".
-
-```{r wc2, activatepackageswordcloud, echo = T, message=FALSE, warning=FALSE}
-# load data
-Clinton <- readLines("https://slcladal.github.io/data/Clinton.txt")
-Trump <- readLines("https://slcladal.github.io/data/Trump.txt")
-# combine each text into one element
-Clinton <- paste(as.vector(unlist(Clinton)), sep = " ", collapse = " ")
-melville <- paste(as.vector(unlist(Trump)), sep = " ", collapse = " ")
-# load libraries
-library(tm)
-library(dplyr)
-library(xtable)
-# clean texts
-docs <- Corpus(VectorSource(c(Clinton, Trump))) %>%
-  tm_map(removePunctuation) %>%
-  tm_map(removeNumbers) %>%
-  tm_map(tolower)  %>%
-  tm_map(removeWords, stopwords("english")) %>%
-  tm_map(stripWhitespace) %>%
-  tm_map(PlainTextDocument)
-# create term document matrix
-tdm <- TermDocumentMatrix(docs) %>%
-  as.matrix()
-colnames(tdm) <- c("Clinton","Trump")
-```
-
-Now, we can cretae a comparison cloud.
-
-```{r wc3, activatepackageswordcloud, echo = T, message=FALSE, warning=FALSE}
-# create comparison cloud
-comparison.cloud(tdm, random.order=FALSE, 
-                 colors = c("orange","lightblue"),
-                 title.size=2.5, max.words=200, 
-                 title.bg.colors = "white")
-```
 
 
 
