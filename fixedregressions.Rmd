@@ -1195,7 +1195,7 @@ ggplot(p, aes(x = math, y = phat, colour = prog)) +
 library(foreign)
 library(MASS)
 # load data
-robustdata <- read.table("https://slcladal.github.io/data/robustdata.txt")
+robustdata <- read.delim("https://slcladal.github.io/data/robustdata.txt", sep = "\t", header = T)
 # inspect data
 summary(robustdata)
 ```
@@ -1203,40 +1203,44 @@ summary(robustdata)
 
 ```{r rr2, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create model
-ols <- lm(crime ~ poverty + single, data = cdata)
+slm <- lm(crime ~ poverty + single, data = robustdata)
 # inspect model
-summary(ols)
+summary(slm)
 ```
 
 ```{r rr3, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
-plot(ols, las = 1)
+plot(slm, las = 1)
 par(opar)
 ```
 
 ```{r rr4, eval = T, echo=T, message=FALSE, warning=FALSE}
-cdata[c(9, 25, 51), 1:2]
+robustdata[c(9, 25, 51), 1:2]
 
 
-d1 <- cooks.distance(ols)
-r <- stdres(ols)
-a <- cbind(cdata, d1, r)
+d1 <- cooks.distance(slm)
+r <- stdres(slm)
+a <- cbind(robustdata, d1, r)
 a[d1 > 4/51, ]
 
 rabs <- abs(r)
-a <- cbind(cdata, d1, r, rabs)
+a <- cbind(robustdata, d1, r, rabs)
 asorted <- a[order(-rabs), ]
 asorted[1:10, ]
 
+# create robust regression model
+rmodel <- rlm(crime ~ poverty + single, data = robustdata)
+# inspect model
+summary(rmodel)
 
-summary(rr.huber <- rlm(crime ~ poverty + single, data = cdata))
 
-hweights <- data.frame(state = cdata$state, resid = rr.huber$resid, weight = rr.huber$w)
-hweights2 <- hweights[order(rr.huber$w), ]
+
+hweights <- data.frame(state = robustdata$state, resid = rmodel$resid, weight = rmodel$w)
+hweights2 <- hweights[order(rmodel$w), ]
 hweights2[1:15, ]
 
-rr.bisquare <- rlm(crime ~ poverty + single, data=cdata, psi = psi.bisquare)
+rr.bisquare <- rlm(crime ~ poverty + single, data=robustdata, psi = psi.bisquare)
 summary(rr.bisquare)
 
 biweights <- data.frame(state = cdata$state, resid = rr.bisquare$resid, weight = rr.bisquare$w)
