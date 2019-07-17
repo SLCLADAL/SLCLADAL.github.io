@@ -48,8 +48,8 @@ options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
 install.packages(c("boot", "car", "effects", "ggplot2",
                    "Hmisc", "languageR", "lme4", "mlogit",
-                   "plyr", "QuantPsyc", "RLRsim", "rms",
-                   "sjPlot", "visreg"))
+                   "msm", "plyr", "QuantPsyc", "RLRsim", "rms",
+                   "sandwich", "sjPlot", "visreg"))
 ```
 
 Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
@@ -1037,9 +1037,214 @@ Akaike information criteria (AlC = -2LL + 2k) provide a value that reflects a ra
 
 # Ordinal Regression
 
+Ordinal regression is very similar to multiple linear regression but takes an ordinal dependent variable. For this reason, ordinal regression is one of the key methods in analyzing Likert data. 
+
+```{r orr1, eval = T, echo=T, message=FALSE, warning=FALSE}
+# load libraries
+library(foreign)
+library(ggplot2)
+library(MASS)
+library(Hmisc)
+library(reshape2)
+# load data
+dat <- read.dta("https://stats.idre.ucla.edu/stat/data/ologit.dta")
+# inspect data
+head(dat)
+
+## one at a time, table apply, pared, and public
+lapply(dat[, c("apply", "pared", "public")], table)
+
+## three way cross tabs (xtabs) and flatten the table
+ftable(xtabs(~ public + apply + pared, data = dat))
+
+summary(dat$gpa)
+
+sd(dat$gpa)
+
+# visualize data
+ggplot(dat, aes(x = apply, y = gpa)) +
+  geom_boxplot(size = .75) +
+  geom_jitter(alpha = .5) +
+  facet_grid(pared ~ public, margins = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+
+## fit ordered logit model and store results 'm'
+m <- polr(apply ~ pared + public + gpa, data = dat, Hess=TRUE)
+
+## view a summary of the model
+summary(m)
+
+## store table
+(ctable <- coef(summary(m)))
+
+## calculate and store p values
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+
+## combined table
+(ctable <- cbind(ctable, "p value" = p))
+
+# default method gives profiled CIs
+(ci <- confint(m)) 
+
+# CIs assuming normality
+confint.default(m) 
+
+## odds ratios
+exp(coef(m))
+
+## OR and CI
+exp(cbind(OR = coef(m), ci))
+
+```
+
+References
+
+    Agresti, A. (1996) An Introduction to Categorical Data Analysis. New York: John Wiley & Sons, Inc
+    Agresti, A. (2002) Categorical Data Analysis, Second Edition. Hoboken, New Jersey: John Wiley & Sons, Inc.
+    Harrell, F. E, (2001) Regression Modeling Strategies. New York: Springer-Verlag.
+    Liao, T. F. (1994) Interpreting Probability Models: Logit, Probit, and Other Generalized Linear Models. Thousand Oaks, CA: Sage Publications, Inc.
+    Powers, D. and Xie, Yu. Statistical Methods for Categorical Data Analysis.  Bingley, UK: Emerald Group Publishing Limited.
+
+
+
 # Poissant Regression
 
+Poissant regressions is the most common type of regression model that is used to analyze data where the dependent variable represents counts of some sort. 
+
+```{r pr1, eval = T, echo=T, message=FALSE, warning=FALSE}
+# load libraries
+library(ggplot2)
+library(sandwich)
+library(msm)
+# load data
+p <- read.csv("https://stats.idre.ucla.edu/stat/data/poisson_sim.csv")
+# inspect data
+summary(p)
+
+# factorize id and prog
+p$id <- factor(p$id)
+p$prog <- factor(prog, levels=1:3, labels=c("General", "Academic", 
+                                                     "Vocational"))
+# inspect data
+summary(p)
+
+# 
+with(p, tapply(num_awards, prog, function(x) {
+  sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
+}))
+
+ggplot(p, aes(num_awards, fill = prog)) +
+  geom_histogram(binwidth=.5, position="dodge")
+
+summary(m1 <- glm(num_awards ~ prog + math, family="poisson", data=p))
+
+cov.m1 <- vcovHC(m1, type="HC0")
+std.err <- sqrt(diag(cov.m1))
+r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
+"Pr(>|z|)" = 2 * pnorm(abs(coef(m1)/std.err), lower.tail=FALSE),
+LL = coef(m1) - 1.96 * std.err,
+UL = coef(m1) + 1.96 * std.err)
+
+r.est
+
+with(m1, cbind(res.deviance = deviance, df = df.residual,
+  p = pchisq(deviance, df.residual, lower.tail=FALSE)))
+
+## update m1 model dropping prog
+m2 <- update(m1, . ~ . - prog)
+## test model differences with chi square test
+anova(m2, m1, test="Chisq")
+
+s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
+                                                coef(m1), cov.m1)
+
+## exponentiate old estimates dropping the p values
+rexp.est <- exp(r.est[, -3])
+## replace SEs with estimates for exponentiated coefficients
+rexp.est[, "Robust SE"] <- s
+
+rexp.est
+
+(s1 <- data.frame(math = mean(p$math),
+  prog = factor(1:3, levels = 1:3, labels = levels(p$prog))))
+
+predict(m1, s1, type="response", se.fit=TRUE)
+
+## calculate and store predicted values
+p$phat <- predict(m1, type="response")
+
+## order by program and then by math
+p <- p[with(p, order(prog, math)), ]
+
+## create the plot
+ggplot(p, aes(x = math, y = phat, colour = prog)) +
+  geom_point(aes(y = num_awards), alpha=.5, position=position_jitter(h=.2)) +
+  geom_line(size = 1) +
+  labs(x = "Math Score", y = "Expected number of awards")
+
+
+```
+
+
+
 # Robust Regression
+
+```{r rr1, eval = T, echo=T, message=FALSE, warning=FALSE}
+# load libraries
+library(foreign)
+library(MASS)
+# load data
+robustdata <- read.table("https://slcladal.github.io/data/robustdata.txt")
+# inspect data
+summary(robustdata)
+```
+
+
+```{r rr2, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create model
+ols <- lm(crime ~ poverty + single, data = cdata)
+# inspect model
+summary(ols)
+```
+
+```{r rr3, eval = T, echo=T, message=FALSE, warning=FALSE}
+
+opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
+plot(ols, las = 1)
+par(opar)
+```
+
+```{r rr4, eval = T, echo=T, message=FALSE, warning=FALSE}
+cdata[c(9, 25, 51), 1:2]
+
+
+d1 <- cooks.distance(ols)
+r <- stdres(ols)
+a <- cbind(cdata, d1, r)
+a[d1 > 4/51, ]
+
+rabs <- abs(r)
+a <- cbind(cdata, d1, r, rabs)
+asorted <- a[order(-rabs), ]
+asorted[1:10, ]
+
+
+summary(rr.huber <- rlm(crime ~ poverty + single, data = cdata))
+
+hweights <- data.frame(state = cdata$state, resid = rr.huber$resid, weight = rr.huber$w)
+hweights2 <- hweights[order(rr.huber$w), ]
+hweights2[1:15, ]
+
+rr.bisquare <- rlm(crime ~ poverty + single, data=cdata, psi = psi.bisquare)
+summary(rr.bisquare)
+
+biweights <- data.frame(state = cdata$state, resid = rr.bisquare$resid, weight = rr.bisquare$w)
+biweights2 <- biweights[order(rr.bisquare$w), ]
+biweights2[1:15, ]
+
+
+```
 
 
 # References
