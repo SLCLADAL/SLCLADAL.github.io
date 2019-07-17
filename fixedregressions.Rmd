@@ -1047,43 +1047,66 @@ library(MASS)
 library(Hmisc)
 library(reshape2)
 # load data
-dat <- read.dta("https://stats.idre.ucla.edu/stat/data/ologit.dta")
+ordata <- read.delim("https://slcladal.github.io/data/ordinaldata.txt", sep = "\t", header = T)
+colnames(ordata) <- c("Recommend", "Internal", "Exchange", "FinalScore")
 # inspect data
-head(dat)
+head(ordata); nrow(ordata)
+```
 
-## one at a time, table apply, pared, and public
-lapply(dat[, c("apply", "pared", "public")], table)
+```{r orr2, eval = T, echo=T, message=FALSE, warning=FALSE}
+#
+ordata$Recommend <- factor(ordata$Recommend, levels=1:3, labels=c("General", "Academic", 
+                                                     "Vocational"))
+# one at a time, table apply, pared, and public
+lapply(ordata[, c("Recommend", "Internal", "Exchange")], table)
+```
 
+
+```{r orr3, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## three way cross tabs (xtabs) and flatten the table
-ftable(xtabs(~ public + apply + pared, data = dat))
+ftable(xtabs(~ Exchange + Recommend + Internal, data = ordata))
+```
 
-summary(dat$gpa)
+```{r orr4, eval = T, echo=T, message=FALSE, warning=FALSE}
 
-sd(dat$gpa)
+summary(ordata$gpa); sd(ordata$gpa)
+```
 
+
+```{r orr5, eval = T, echo=T, message=FALSE, warning=FALSE}
 # visualize data
-ggplot(dat, aes(x = apply, y = gpa)) +
+ggplot(ordata, aes(x = apply, y = gpa)) +
   geom_boxplot(size = .75) +
   geom_jitter(alpha = .5) +
   facet_grid(pared ~ public, margins = TRUE) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+```
 
 
+
+```{r orr6, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## fit ordered logit model and store results 'm'
-m <- polr(apply ~ pared + public + gpa, data = dat, Hess=TRUE)
-
+m <- polr(apply ~ pared + public + gpa, data = ordata, Hess=TRUE)
 ## view a summary of the model
 summary(m)
+```
 
+```{r orr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## store table
 (ctable <- coef(summary(m)))
+```
 
+
+```{r orr8, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## calculate and store p values
 p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
 
 ## combined table
 (ctable <- cbind(ctable, "p value" = p))
+```
 
+
+```{r orr9, eval = T, echo=T, message=FALSE, warning=FALSE}
 # default method gives profiled CIs
 (ci <- confint(m)) 
 
@@ -1121,40 +1144,64 @@ library(msm)
 p <- read.csv("https://stats.idre.ucla.edu/stat/data/poisson_sim.csv")
 # inspect data
 summary(p)
+```
 
+```{r pr2, eval = T, echo=T, message=FALSE, warning=FALSE}
 # factorize id and prog
 p$id <- factor(p$id)
-p$prog <- factor(prog, levels=1:3, labels=c("General", "Academic", 
+p$prog <- factor(p$prog, levels=1:3, labels=c("General", "Academic", 
                                                      "Vocational"))
 # inspect data
 summary(p)
+```
 
-# 
+```{r pr3, eval = T, echo=T, message=FALSE, warning=FALSE}
+# extract mean and standard devaiation
 with(p, tapply(num_awards, prog, function(x) {
   sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
 }))
+```
 
+```{r pr4, eval = T, echo=T, message=FALSE, warning=FALSE}
+# plot data
 ggplot(p, aes(num_awards, fill = prog)) +
   geom_histogram(binwidth=.5, position="dodge")
+```
 
-summary(m1 <- glm(num_awards ~ prog + math, family="poisson", data=p))
+```{r pr5, eval = T, echo=T, message=FALSE, warning=FALSE}
+# calculate poissant regression
+poissantr <- glm(num_awards ~ prog + math, family="poisson", data=p)
+# inspect model
+summary(poissantr)
+```
 
+```{r pr6, eval = T, echo=T, message=FALSE, warning=FALSE}
+# 
 cov.m1 <- vcovHC(m1, type="HC0")
 std.err <- sqrt(diag(cov.m1))
 r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
 "Pr(>|z|)" = 2 * pnorm(abs(coef(m1)/std.err), lower.tail=FALSE),
 LL = coef(m1) - 1.96 * std.err,
 UL = coef(m1) + 1.96 * std.err)
-
+# inspect data
 r.est
+```
+
+```{r pr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 with(m1, cbind(res.deviance = deviance, df = df.residual,
   p = pchisq(deviance, df.residual, lower.tail=FALSE)))
+```
 
+
+```{r pr8, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## update m1 model dropping prog
 m2 <- update(m1, . ~ . - prog)
 ## test model differences with chi square test
 anova(m2, m1, test="Chisq")
+```
+
+```{r pr9, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
                                                 coef(m1), cov.m1)
@@ -1165,25 +1212,33 @@ rexp.est <- exp(r.est[, -3])
 rexp.est[, "Robust SE"] <- s
 
 rexp.est
+```
+
+
+```{r pr10, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 (s1 <- data.frame(math = mean(p$math),
   prog = factor(1:3, levels = 1:3, labels = levels(p$prog))))
 
 predict(m1, s1, type="response", se.fit=TRUE)
+```
 
+
+```{r pr11, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## calculate and store predicted values
 p$phat <- predict(m1, type="response")
 
 ## order by program and then by math
 p <- p[with(p, order(prog, math)), ]
+```
 
+```{r pr12, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## create the plot
 ggplot(p, aes(x = math, y = phat, colour = prog)) +
-  geom_point(aes(y = num_awards), alpha=.5, position=position_jitter(h=.2)) +
+  geom_point(aes(y = num_awards), alpha=.5, 
+             position=position_jitter(h=.2)) +
   geom_line(size = 1) +
   labs(x = "Math Score", y = "Expected number of awards")
-
-
 ```
 
 
@@ -1194,6 +1249,7 @@ ggplot(p, aes(x = math, y = phat, colour = prog)) +
 # load libraries
 library(foreign)
 library(MASS)
+library(sfsmisc)
 # load data
 robustdata <- read.delim("https://slcladal.github.io/data/robustdata.txt", sep = "\t", header = T)
 # inspect data
@@ -1208,48 +1264,78 @@ slm <- lm(crime ~ poverty + single, data = robustdata)
 summary(slm)
 ```
 
-```{r rr3, eval = T, echo=T, message=FALSE, warning=FALSE}
+We now check whether the model is well fitted using diagnostic plots.
 
+```{r rr3, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create model diagnost plots
 opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
 plot(slm, las = 1)
 par(opar)
 ```
 
+The diagnostic plots indicate that there is an outlier in the data (data point 51). Therefore, we need to evaluate if the outlier severely affects the fit of the model.
+
 ```{r rr4, eval = T, echo=T, message=FALSE, warning=FALSE}
 robustdata[c(9, 25, 51), 1:2]
+```
 
 
+```{r rr5, eval = T, echo=T, message=FALSE, warning=FALSE}
 d1 <- cooks.distance(slm)
 r <- stdres(slm)
 a <- cbind(robustdata, d1, r)
 a[d1 > 4/51, ]
+```
 
+
+```{r rr6, eval = T, echo=T, message=FALSE, warning=FALSE}
 rabs <- abs(r)
 a <- cbind(robustdata, d1, r, rabs)
 asorted <- a[order(-rabs), ]
 asorted[1:10, ]
+```
 
+
+
+```{r rr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create robust regression model
 rmodel <- rlm(crime ~ poverty + single, data = robustdata)
 # inspect model
 summary(rmodel)
+```
 
 
-
+```{r rr8, eval = T, echo=T, message=FALSE, warning=FALSE}
 hweights <- data.frame(state = robustdata$state, resid = rmodel$resid, weight = rmodel$w)
 hweights2 <- hweights[order(rmodel$w), ]
 hweights2[1:15, ]
-
-rr.bisquare <- rlm(crime ~ poverty + single, data=robustdata, psi = psi.bisquare)
-summary(rr.bisquare)
-
-biweights <- data.frame(state = cdata$state, resid = rr.bisquare$resid, weight = rr.bisquare$w)
-biweights2 <- biweights[order(rr.bisquare$w), ]
-biweights2[1:15, ]
-
-
 ```
 
+
+```{r rr9, eval = T, echo=T, message=FALSE, warning=FALSE}
+rr.bisquare <- rlm(crime ~ poverty + single, data=robustdata, psi = psi.bisquare)
+summary(rr.bisquare)
+```
+
+
+```{r rr10, eval = T, echo=T, message=FALSE, warning=FALSE}
+biweights <- data.frame(state = robustdata$state, 
+                        resid = rr.bisquare$resid,
+                        weight = rr.bisquare$w)
+biweights2 <- biweights[order(rr.bisquare$w), ]
+biweights2[1:15, ]
+```
+
+After inspecting the weights, we also want to extract the p-values for the predictors. The p-values have to be calculated separately using the "f.robftest" fucntion from the "sfsmisc" library.
+
+```{r rr11, eval = T, echo=T, message=FALSE, warning=FALSE}
+p_poverty <- f.robftest(rmodel, var = "poverty")
+p_single <- f.robftest(rmodel, var = "single")
+# inspect results
+p_poverty; p_single
+```
+
+The output shows that poverty is not a significant predictor while single correlates highly significanty with crime.
 
 # References
 
