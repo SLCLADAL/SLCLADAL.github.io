@@ -1,0 +1,970 @@
+---
+title: "Mixed-Effects Regression Models"
+author: "UQ SLC Digital Team"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Linear Mixed-Effects Regression Models \label{mem}
+The following focuses on an extension of ordinary multiple linear regressions: mixed-effects regression linear regression. Mixed-effects models have the following advantages over simpler statistical tests: 
+
+* Mixed-effects models are multivariate, i.e. they test the effect of several predictors simultaneously while controlling for the effect of all other predictors. 
+
+* Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical data structures. 
+
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+
+Major disadvantages of mixed-effects regression modelling are that they are prone to producing β-errors (cf. Johnson 2009) and that they require rather large data sets. 
+
+## Introduction 
+
+So far, the regression models that we have used only had fixed-effects. having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common, that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modelling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and or slope for each speaker. 
+
+```{r lmm1, echo=F, eval = T, message=FALSE, warning=FALSE}
+# random intercepts and random slops
+x <- 0:10
+y = 0:10
+# start plot
+par(mfrow = c(1, 4))
+# intercepts
+plot(x, y, type = "n", xaxt='n', yaxt='n', ylab='Weight', xlab = "Height", xlim = c(0, 10), ylim = c(-5, 10))
+axis(2, seq(-5,10, 5), seq(50, 110, 20))
+abline(0, 1, lty = 1, col ="black")
+mtext("Fixed-Effects Model:\n1 Intercept + 1 Slope", 1, 2, cex = .6)
+box()
+# random intercepts
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(4, 1, col ="black")
+abline(2, 1, col ="black")
+abline(2, 1, col ="black")
+abline(0, 1, col ="black")
+abline(-1, 1, col ="black")
+abline(-2, 1, col ="black")
+abline(-4, 1, col ="black")
+mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope", 1, 3, cex = .6)
+box()
+# random slopes
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(0, 1.75, col ="black")
+abline(0, 1.5, col ="black")
+abline(0, 1.25, col ="black")
+abline(0, 0, col ="black")
+abline(0, -.25, col ="black")
+abline(0, -.5, col ="black")
+abline(0, -.75, col ="black")
+mtext("Mixed-Effects Model:\n1 Intercept\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
+box()
+# random slopesund random intercepts
+plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
+abline(2, 1.75, col ="black")
+abline(-1, 1.5, col ="black")
+abline(1, 1.25, col ="black")
+abline(4, 0, col ="black")
+abline(-4, -.25, col ="black")
+abline(0, -.5, col ="black")
+abline(-1, -.75, col ="black")
+mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
+box()
+# restore original graphic's parameters
+par(mfrow = c(1, 1))
+```
+
+
+*Random Effects* have two parameters: the intercept (the point where the regression line cross the y-axis) and the slope (the acclivity of the regression line). In contrast to fixed-effects models have only 1 intercept and one slope (left panel of the Figure above) while mixed-effects models can have various *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+
+```{r lmm2, eval=T, echo=F, message=FALSE, warning=FALSE}
+Height <- c(169, 176, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
+Weight <- c(68, 72, 65, 62, 60, 80, 75, 70, 85, 92, 88, 92, 85, 82, 80) # plot scatterplot and the regression line
+z <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
+tb <- data.frame(Height,Weight, z)
+a <- tb[z == "a", ]
+a <- a[, 1:2]
+b <- tb[z == "b", ]
+b <- b[, 1:2]
+c <- tb[z == "c", ]
+c <- c[, 1:2]
+d <- tb[, 1:2]
+# plot
+par(mfrow = c(1, 3))
+# plot 1
+plot(a, xlim = c(150, 200), ylim = c(50, 100))
+text(b[,1], b[,2], "+")
+text(c[,1], c[,2], "*")
+# plot 2
+plot(a, xlim = c(150, 200), ylim = c(50, 100))
+mod0 <- lm(d$Weight ~ d$Height, data = d)
+abline(mod0, lty=1, col = "black")
+text(b[,1], b[,2], "+")
+text(c[,1], c[,2], "*")
+# plot 3
+plot(a, xlim = c(150, 200), ylim = c(50, 100))
+grid()
+mod1 <- lm(a$Weight ~ a$Height, data = a)
+abline(mod0, lty=1, col = "black")
+abline(mod0[[1]][[1]]+10, mod0[[1]][[2]], lty = 2, col = "red")
+abline(mod0[[1]][[1]]-10, mod0[[1]][[2]], lty = 3, col = "blue")
+abline(mod0[[1]][[1]]-1, mod0[[1]][[2]], lty = 4, col = "green")
+text(b[,1], b[,2], "+")
+text(c[,1], c[,2], "*")
+par(mfrow = c(1, 1))
+```
+
+The left panel merely shows the data while the centre panel includes the regression line for a regression that estimates Weight based on Height. The right panel shows the regression line and, in addition, random intercepts each  of the three groups.
+
+After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
+
+In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted [vgl.@field2012discovering]. We test whether including random effects is warranted by comparing a model, that bases its estimates of the depended variable solely on the base intercept (the mean), with a model, that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the random-effect model explains significantly more variance than the simple model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified if they reduce residual deviance.
+
+## Example: Preposition Use across Time by Genre
+
+To explore how to implement a mixed-effects model in `R` we revisit the preposition data that contains relative frequencies of prepositions in English texts written between 1150 and 1913. As a first step, and to prepare our analysis, we load necessary `R` packages, specify options, and load as well as provide an overview of the data.
+
+```{r lmm3, eval = T, echo=T, message=FALSE, warning=FALSE}
+# activate packages
+library(RLRsim)
+#library(car)
+#library(QuantPsyc)
+#library(boot)
+library(nlme)
+library(lme4)
+#library(ez)
+library(ggplot2)
+# set options
+options("scipen" = 100, "digits" = 4)      # supress scientific notation
+options(stringsAsFactors = F)              # do not convert strings into factors
+mydata <- read.delim("data/lmemdata.txt", header = TRUE) # read in data
+mydata$date <- as.numeric(mydata$date)     # convert date into a numeric variable
+head(mydata); nrow(mydata)                 # inspect updated data set
+```
+
+The data set contains the date when the text was written (`date`), the genre of the text (`genre`), the name of the text (`text`), the relative frequency of prepositions in the text (`pptw`), and the region in which the text was written (`region`). We now plot the data to get a first impression of its structure.
+
+```{r lmm4, eval = T, echo=T, message=FALSE, warning=FALSE}
+# visualize variables (2 plots per row)
+# 3 plots in 1 window
+def.par <- par(no.readonly = TRUE)
+nf <- layout(matrix(c(1, 1, 2, 3), 2, 2, byrow = T))
+plot(mydata$pptw ~ mydata$date, ylab = "Frequency", xlab = "year of publication")
+abline(lm(mydata$pptw ~ mydata$date), lty = 3, lwd = 2, col = "red")
+# re-set margins to fit the labels
+par(mar = c(7.2, 4, 1, 2) + 0.1)
+# reorder genre by median
+genrebymedian <- with(mydata, reorder(genre, -pptw, median))
+#	generate plots
+plot(mydata$pptw ~ genrebymedian,
+  col = "lightgrey",
+  ylab = "Frequency",
+  xlab = "",
+  las = 2,
+  cex.axis = .7,
+  cex = .5)
+# re-set margins
+par(mar = c(5, 4, 1, 2) + 0.1)
+x = mydata$pptw
+h = hist(mydata$pptw,
+	ylim =c(0, 150),
+	xlim = c(50, 200),
+	xlab = "prepositions per text",
+	col = "lightgrey",
+	main = "")
+xfit <- seq(min(mydata$pptw), max(mydata$pptw), length = 40)
+yfit <- dnorm(xfit, mean = mean(mydata$pptw),sd = sd(mydata$pptw))
+yfit <- yfit*diff(h$mids[1:2])*length(x)
+lines(xfit, yfit, lty = 2, lwd=2)
+# restore original graphic's parameters
+par(def.par)
+```
+
+The scatter plot in the upper panel indicates that the use of prepositions has moderately increased over time while the boxplots in the lower left panel show  that the genres differ quite substantially with respect to their median frequencies of prepositions per text. Finally, the histogram in the lower right panel show that preposition use is distributed normally with a mean of 132.2 prepositions per text. 
+
+```{r lmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
+# plot 8
+p8 <- ggplot(mydata, aes(date, pptw)) +
+  geom_point() +
+  labs(x = "Year") +
+  labs(y = "Prepositions per 1,000 words") +
+  geom_smooth(method = "lm")  + 
+  theme_set(theme_bw(base_size = 10))
+# plot 9
+p9 <- ggplot(mydata, aes(region, pptw)) +
+  geom_boxplot() +
+  labs(x = "Region") +
+  labs(y = "Prepositions per 1,000 words") +
+  geom_smooth(method = "lm") # with linear model smoothing!
+# include genre (lowess)
+multiplot(p8, p9, cols = 2)
+```
+
+```{r lmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
+ggplot(mydata, aes(date, pptw)) +
+  geom_point() +
+  facet_wrap(~ genre, nrow = 4) +
+  geom_smooth(method = "lm") +
+  theme_bw() +
+  labs(x = "Year") +
+  labs(y = "Prepositions per 1,000 words") +
+  coord_cartesian(ylim = c(0, 220))
+```
+
+Centering or scaling numeric variables is useful for later interpretation of regression models: if the date variable was not centered, the regression would show the effects of variables at year 0(!). If numeric variables are scaled, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centering simply means that the mean of the numeric variable is subtracted from each value.
+
+```{r lmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
+
+mydata$date <- scale(mydata$date, scale = F)
+head(mydata)
+
+str(mydata)
+```
+
+
+```{r lmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
+# generate a glm baseline model
+m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
+# generate a lm base-line model
+m0.lm <- lm(pptw ~ 1, data = mydata)
+# set up first lme model including only the random effect specifying the random intercepts
+m0.lme = lme(pptw ~ 1, random = ~1|genre, data = mydata, method = "ML")
+# set up first lmer model including only the random effect specifying the random intercepts
+m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
+```
+
+## Testing Random Effects
+
+As a first step in the modelling process, we now need to determine whether or not including a random effect structure is justified. We do so by comparing the base-line model without random intercepts to the model with random intercepts using a Likelihood Ratio Test. A short word of warning is in order here regarding the specific of the model: we need to set `REML = T` because Relative Estimate Maximum Likelihood (REML) provides better estimates for the random effects part of the model compared with the simpler Maximum Likelihood (ML) specification (cf. Field, Miles & Field 2012:879). 
+
+
+```{r lmm9, eval = T, echo=T, message=FALSE, warning=FALSE}
+x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
+x2 <- x2 <- x2[[1]]
+list(x2, pchisq(x2, df=2, lower.tail=F))
+```
+
+The inclusion of a random effect structure with random intercepts is justified based on the Likelihood Ratio Test. 
+
+However, we also want to test which random effects structure is the best. We therefore create several models with different random effect structures and compare these models to see which
+random effect structure has the highest explanatory power.
+
+We generate a m0.lmer model but using the `lmer` function from the `lme4` package. When we compare models, the REML specification must be FALSE or set to `method = "ML"` (Maximum Likelihood) (depending on the function) when we use ANOVAs to compare models (cf. Field, Miles & Field 2012:). This is because "`ML` produces more accurate estimates of fixed regression parameters, whereas `REML` produces more accurate estimates of random variances (Twisk 2006). [...] Also, if you want to compare models you must use ML" (Field, Miles & Field 2012:879).
+
+```{r lmm10, eval = T, echo=T, message=FALSE, warning=FALSE}
+m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
+m0.lmer2 <- lmer(pptw ~ (1|region) + 1, data = mydata, REML = T)
+m0.lmer3 <- lmer(pptw ~ (1|genre/region) + 1, data = mydata, REML = T)
+anova(m0.lmer1, m0.lmer2, m0.lmer3)
+
+# the model with the random effect structure (1|genre/region) performs
+# significantly better (also it has a much lower AIC and deviance)
+# therefore, m0.lmer3 is our new m0 model
+m0.lmer <- m0.lmer3
+# test if including the random effect is permitted by applying a restricted likelihood ratio test
+# WARNING: this test can only take simple random effect (1|genre) but not
+# (1|genre/date)
+exactRLRT(m0.lmer1)
+
+# there is another way to compare model with and without random effects: see below!
+
+# create a second model with date as a fixed effect
+# m1.lme <- lme(m0.lme, .~. + date) # alternative way to update the model
+m1.lme = lme(pptw ~ date, random = ~1|genre/region, data = mydata, method = "ML")
+# set up m1 model but using the lmer function from the lme4 package
+m1.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+
+# compare the models to see if including date has improved the model
+# the difference between the models is the effect (size) of date!
+anova(m0.lme, m1.lme)
+
+# m1.lme is the better model (sig. p-value & lower AIC)
+# date correlates significantly with pptw (X2(1) = 8.81, p = .003);
+# X2 = L.Ratio;
+# df = subtract df smaller from df larger model
+# inspect results
+summary(m1.lme)
+
+# alternative display of the results
+anova(m1.lme)
+
+# test if date is significant
+anova(m0.lmer, m1.lmer)
+
+# extract estimates and sd for fixed and random effects
+intervals(m1.lme)
+
+```
+
+## Model Diagnostics
+
+We can now evaluate the goodness of fit of the model and check if mathematical requirements and assumptions have been violated. In a first step, we generate diagnostic plots that focus on the random effect structure.
+
+```{r lmm11, eval = T, echo=T, message=FALSE, warning=FALSE}
+plot(m1.lme, genre ~ resid(.), abline = 0 ) # generate diagnostic plots
+```
+
+The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values (Pinheiro & Bates 2000:175).
+
+```{r lmm12, eval = T, echo=T, message=FALSE, warning=FALSE}
+plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
+```
+
+The plot showing the standardized residuals versus fitted values confirms that there are outliers in the letters because there are obviously differences in the variance, we create a new model which uses weights to compensate heterogeneity of variance (cf. Pinheiro & Bates 2000:177).
+
+```{r lmm13, eval = T, echo=T, message=FALSE, warning=FALSE}
+m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
+# test if m2.lme is more appropriate for the data than m1.lme
+anova(m1.lme, m2.lme)
+```
+
+The heteroscedastic model (i.e. m2.lme which uses weights to account for unequal variance) is performing significantly better than the homoscedasticity model m1.lme. We therefore inspect the results of the new heteroscedastic model.
+
+```{r lmm14, eval = T, echo=T, message=FALSE, warning=FALSE}
+summary(m2.lme)        # inspect results
+```
+
+
+```{r lmm15, eval = T, echo=T, message=FALSE, warning=FALSE}
+anova(m2.lme)          # ANOVA display of the results
+```
+
+```{r lmm16, eval = T, echo=T, message=FALSE, warning=FALSE}
+anova(m0.lme, m2.lme)  # test if date is significant
+```
+
+```{r lmm17, eval = T, echo=T, message=FALSE, warning=FALSE}
+intervals(m2.lme)      # extract estimates and sd for fixed and random effects
+```
+
+## Effect Sizes
+
+We will now extract effect sizes (in the example: the effect size of date) and calculate normalized effect size measures (this effect size measure works for all fixed effects). To calculate the effect size, take the square root of the squared t-value divided by the t-value squared plus the degrees of freedom: 
+
+r = `sqrt(t^2^/(t^2^+df))`.
+
+A brief word of warning is in order here: only apply this function to main effects not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear (cf. Field, Miles & Field 2012:641).
+
+```{r lmm18, eval = T, echo=T, message=FALSE, warning=FALSE}
+ef.lme <- function(x) {
+  df <- summary(x)[[20]][6]
+  t <-  summary(x)[[20]][8]
+  #df <- summary(x)$tTable[, 3]
+  #t <- summary(x)$tTable[, 4]
+  r <- sqrt((t^2)/((t^2)+df))
+  return(paste("Pearson's r = ", round(r, 3)))
+  }
+ef.lme(m2.lme)
+```
+
+We now generate another m1 model but we use the `lmer` function from the `lme4` package rather than the `glmer` function.
+
+```{r lmm19, eval = T, echo=T, message=FALSE, warning=FALSE}
+m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+summary(m2.lmer)
+```
+
+We now calculate the variance explained when only a simple random effect is involved. This is done by dividing the variance of the random effect (145.2) by variance of random effect plus residual variance (145.2+224.1) times 100. The results represents the percentage of variance explained by the random effect: `(145.2/(145.2+2284.1))*100`.
+
+Create lmer with complex random effect structure
+
+An alternative for testing if including the random intercepts is permitted.
+
+WARNING: this method is not as good as applying a restricted likelihood ratio test(!) because the p-value is only an approximation IMPORTANT: the second model is a glm object
+
+
+```{r lmm20, eval = T, echo=T, message=FALSE, warning=FALSE}
+m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)
+```
+
+## Rerun Model Diagnostics 
+
+Diagnostic plot (Pinheiro & Bates 2000:11, 182) what we wish to see: a cloud of dots in the middle of the window without structure what we do not want to see: a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) in short: observed values against fitted values (cf. Pinheiro & Bates 2000:182)
+
+```{r lmm21, eval = T, echo=T, message=FALSE, warning=FALSE}
+# start plotting
+par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
+plot(m2.lme)
+par(mfrow = c(1, 1))
+```
+
+
+
+```{r lmm22, eval = T, echo=T, message=FALSE, warning=FALSE}
+# diagnostic plot (Pinheiro & Bates 2000:21)
+plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | genre, abline = 0, cex = .5)
+
+```
+
+
+```{r lmm23, eval = T, echo=T, message=FALSE, warning=FALSE}
+# diagnostic plot: residuals of fitted values against observed values (cf. Pinheiro & Bates 2000:182)
+qqnorm(m2.lme)
+```
+
+
+```{r lmm24, eval = T, echo=T, message=FALSE, warning=FALSE}
+# normal plot of the estimated date %in% genre random effects
+qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))
+```
+
+
+```{r lmm25, eval = T, echo=T, message=FALSE, warning=FALSE}
+# diagnostic plot: normal plots of the residuals by genre (cf. Pinheiro & Bates 2000:22, 179)
+qqnorm(m2.lme, ~resid(.) | genre )
+```
+
+```{r lmm26, eval = T, echo=T, message=FALSE, warning=FALSE}
+# inspect the observed responses versus the within-group fitted values
+# (cf. Pinheiro & Bates 2000:178)
+plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
+```
+
+## Reporting Results 
+
+```{r lmm27, eval = T, echo=T, message=FALSE, warning=FALSE}
+summary(m2.lmer)
+```
+
+# Mixed-Effects Binomial Logistic Regression Models
+
+We now turn to an extension of binomial logistic regression: mixed-effects binomial logistic regression. As is the case with linear mixed-effects models logistic mixed effects models have the following advantages over simpler statistical tests: 
+
+* Mixed-effects models are multivariate, i.e. they test the effect of several predictors simultaneously while controlling for the effect of all other predictors. 
+
+* Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical data structures. 
+
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+
+Major disadvantages of regression modelling are that they are prone to producing β-errors (cf. Johnson 2009) and that they require rather large data sets. 
+
+## Introduction 
+
+As is the case with linear mixed-effects models, binomial logistic mixed-effect models are multivariate analysis that treat data points as hierarchical or grouped in some way. In other words, they take into account that the data is nested in the sense that data points are produced by the same speaker or are grouped by some other characteristics. In mixed-models, hierarchical structures are modelled as *random effects*. If the random effect structure represents speakers then this means that a mixed-model would have a separate intercept and/or slope for each speaker. 
+
+*Random Effects* in linear models two parameters: the intercept (the point where the regression line crosses the y-axis) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+
+```{r blmm1, eval = T, echo=F, message=FALSE, warning=FALSE}
+x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
+x2 <- x1-2
+x3 <- x2-2
+x4 <- x3-2
+x5 <- x1+2
+x6 <- x5+2
+x7 <- x6+2
+x11 <- x1-(mean(x1)-x1)
+x12 <- x1-(mean(x1)-x1)*1.5
+x13 <- x1-(mean(x1)-x1)*3
+x14 <- x1-(mean(x1)-x1)^1.5
+x15 <- x1-(mean(x1)-x1)^1.75
+x16 <- x1-(mean(x1)-x1)^.9
+x17 <- x1-(mean(x1)-x1)^.5
+x21 <- x1-(mean(x1)-x1)
+x22 <- x1-(mean(x1)-x1)*1.5
+x23 <- x1-(mean(x1)-x1)*3
+x24 <- x1-(mean(x1)-x1)*1.5
+x25 <- x1-(mean(x1)-x1)*2
+x26 <- x1-(mean(x1)-x1)*.9
+x27 <- x1-(mean(x1)-x1)*.5
+y <- c("A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B")
+yn <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1) 
+logd <- data.frame(x1, x2, x3, x4, x5, x6, x7, y, yn)
+colnames(logd) <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "y", "yn")
+m1 = glm(yn ~ x1, data=logd, family = binomial(link="logit"))
+m2 = glm(yn ~ x2, data=logd, family = binomial(link="logit"))
+m3 = glm(yn ~ x3, data=logd, family = binomial(link="logit"))
+m4 = glm(yn ~ x4, data=logd, family = binomial(link="logit"))
+m5 = glm(yn ~ x5, data=logd, family = binomial(link="logit"))
+m6 = glm(yn ~ x6, data=logd, family = binomial(link="logit"))
+m7 = glm(yn ~ x7, data=logd, family = binomial(link="logit"))
+m11 = glm(yn ~ x11, data=logd, family = binomial(link="logit"))
+m12 = glm(yn ~ x12, data=logd, family = binomial(link="logit"))
+m13 = glm(yn ~ x13, data=logd, family = binomial(link="logit"))
+m14 = glm(yn ~ x14, data=logd, family = binomial(link="logit"))
+m15 = glm(yn ~ x15, data=logd, family = binomial(link="logit"))
+m16 = glm(yn ~ x16, data=logd, family = binomial(link="logit"))
+m17 = glm(yn ~ x17, data=logd, family = binomial(link="logit"))
+m21 = glm(yn ~ x21, data=logd, family = binomial(link="logit"))
+m22 = glm(yn ~ x22, data=logd, family = binomial(link="logit"))
+m23 = glm(yn ~ x23, data=logd, family = binomial(link="logit"))
+m24 = glm(yn ~ x24, data=logd, family = binomial(link="logit"))
+m25 = glm(yn ~ x25, data=logd, family = binomial(link="logit"))
+m26 = glm(yn ~ x26, data=logd, family = binomial(link="logit"))
+m27 = glm(yn ~ x27, data=logd, family = binomial(link="logit"))
+par(mfrow = c(2, 2))
+plot(yn  ~ x1, type = "n", xaxt='n', yaxt='n', ann=FALSE, data = logd, xlab="x1", ylab="yn", pch=19)       
+axis(2, seq(0,1,1), seq(0,1,1))
+curve(predict(m1,data.frame(x1=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+mtext("Fixed-Effects Model:\n1 Intercept + 1 Slope", 1, 2, cex = .6)
+mtext("Probability", 2, 2, cex = .6)
+
+plot(yn  ~ x1, type = "n", xaxt='n', yaxt='n', ann=FALSE, data = logd, xlab="x1", ylab="yn", pch=19)     
+mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope", 1, 3, cex = .6)
+curve(predict(m1,data.frame(x1=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m2,data.frame(x2=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m3,data.frame(x3=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m4,data.frame(x4=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m5,data.frame(x5=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m6,data.frame(x6=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m7,data.frame(x7=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+
+plot(yn  ~ x11, type = "n", xaxt='n', yaxt='n', ann=FALSE, data = logd, xlim=c(50,100), ylab="yn", pch=19) 
+mtext("Mixed-Effects Model:\n1 Intercept\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
+mtext("Probability", 2, 2, cex = .6)
+curve(predict(m21,data.frame(x21=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m22,data.frame(x22=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m23,data.frame(x23=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m24,data.frame(x24=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m25,data.frame(x25=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m26,data.frame(x26=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m27,data.frame(x27=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+
+plot(yn  ~ x11, type = "n", xaxt='n', yaxt='n', ann=FALSE, data = logd, xlim=c(50,100), ylab="yn", pch=19) 
+mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
+curve(predict(m11,data.frame(x11=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m12,data.frame(x12=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m13,data.frame(x13=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m14,data.frame(x14=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m15,data.frame(x15=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m16,data.frame(x16=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+curve(predict(m17,data.frame(x17=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
+par(mfrow = c(1, 1))
+```
+
+The upper left panel merely shows the logistic curve representing the predictions of a fixed-effects logistic regression with a single intercept and slope. The upper right panel shows the logistic curves representing the predictions of a of a mixed-effects logistic regression with random intercepts for each level of a grouping variable. The lower left panel shows the logistic curves representing the predictions of a mixed-effects logistic regression with one intercept but random slopes for each level of a grouping variable. The lower right panel shows the logistic curves representing the predictions of a mixed-effects logistic regression with random intercepts and random slopes for each level of a grouping variable.
+
+After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
+
+In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted [vgl.@field2012discovering]. We test whether including random effects is warranted by comparing a model, that bases its estimates of the dependent variable solely on the base intercept, with a model, that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the random-effect model explains significantly more variance than the simple model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified if they reduce residual deviance.
+
+## Example: Discourse LIKE in Irish English
+
+In this example we will investigate which factors correlate with the use of *final discourse like* (e.g. "*The weather is shite, like!*") in Irish English. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender (Gender: Men versus Women) and age of that speaker (Age: Old versus Young), whether the interlocutors were of the same or a different gender (ConversationType: SameGender  versus MixedGender), and whether another *final discourse like* had been used up to three speech units before (Priming: NoPrime versus Prime), whether or not the speech unit contained an *final discourse like* (SUFLike: 1 = yes, 0 = no. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.
+
+```{r blmm2, eval = T, echo=T, message=FALSE, warning=FALSE}
+rm(list=ls(all=T))  # clean current workspace
+options("scipen" = 100, "digits" = 4)     # set options
+library(Hmisc)      # activate library
+library(RLRsim)     # activate library
+library(sjPlot)     # activate library
+library(visreg)     # activate library
+library(mlogit)     # activate library
+library(plyr)       # activate library
+library(rms)        # activate library
+library(ggplot2)    # activate library
+library(effects)    # activate library
+library(lme4)       # activate library
+library(languageR)  # activate library
+source("rscripts/multiplot_ggplot2.R")    # load multiplot function
+source("rscripts/PseudoR2lmerBinomial.R") # load pseudor2 function
+source("rscripts/meblr.summary.R")        # load summary function
+```
+
+Next, we load the data and inspect the structure of the data set,
+
+
+```{r blmm3, eval = T, echo=T, message=FALSE, warning=FALSE}
+# read in existing s´data set mblrdata.txt
+mblrdata <- read.table("data/mblrdata.txt", # load data
+                       comment.char = "",   # data does not contain comments
+                       quote = "",          # data does not contain quotes
+                       sep = "\t",          # data is tab separated
+                       header = T)          # data has column names
+str(mblrdata)                               # inspect data structure
+```
+
+As all variables except for the dependent variable (SUFlike) are character strings, we
+factorize the independent variables.
+
+```{r blmm4, eval = T, echo=T, message=FALSE, warning=FALSE}
+vrs <- c("ID", "Age", "Gender", "ConversationType", "Priming")  # define variables to be factorized
+fctr <- which(colnames(mblrdata) %in% vrs)     # define vector with variables
+mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor) # factorize variables
+mblrdata$Age <- relevel(mblrdata$Age, "Young") # relevel Age (Young = Reference)
+```
+
+Before continuing, we check if speakers need to be collapsed because they nest too few data points. As a general rule of thumb, random effects should have a minimum of 20 data points per level.
+
+```{r blmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
+plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
+     ylim = c(0,150),
+      cex = .5)
+```
+
+The plot indicates that the vast majority of speakers represent more than 20 cases. However, we will collapse speakers that represent fewer data points.
+
+```{r blmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
+collapsespeaker <- table(mblrdata$ID)[which(table(mblrdata$ID) < 21)]
+mblrdata$ID <- ifelse(mblrdata$ID %in% collapsespeaker, "Other", mblrdata$ID)
+```
+
+After preparing the data, we have a look at the first six lines of the data set.
+
+```{r blmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
+library(knitr)    # load library
+kable(head(mblrdata), caption = "First six rows of the data set.")
+```
+
+We now plot the data to inspect the relationships within the data set. 
+
+```{r blmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
+p1 <- ggplot(mblrdata, aes(Gender, SUFlike, color = Gender)) +
+  scale_fill_brewer() +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  coord_cartesian(ylim = c(0, 1)) +
+  labs(x = "Sex", y = "Mean frequency of discourse like") +
+    guides(fill=FALSE, color=FALSE) +              # supress legend
+  scale_color_manual(values = c("blue", "red"))
+p2 <- ggplot(mblrdata, aes(Age, SUFlike, color = Age)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Age", y = "Mean frequency of discourse like") +
+    guides(fill=FALSE, color=FALSE) +              # supress legend
+  scale_color_manual(values = c("darkblue", "lightblue"))
+p3 <- ggplot(mblrdata, aes(ConversationType, SUFlike, colour = ConversationType)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "ConversationType", y = "Mean frequency of discourse like", colour = "ConversationType") +
+    guides(fill=FALSE, color=FALSE) +              # supress legend
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+p4 <- ggplot(mblrdata, aes(Priming, SUFlike, colour = Priming)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Priming", y = "Mean frequency of discourse like", colour = "Priming") +
+    guides(fill=FALSE, color=FALSE) +              # supress legend
+  scale_color_manual(values = c("grey30", "grey60"))
+p5 <- ggplot(mblrdata, aes(Age, SUFlike, colour = Gender)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= Gender)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_set(theme_bw(base_size = 10)) +
+    scale_color_manual(values = c("blue", "red")) +
+  labs(x = "Age", y = "Mean frequency of discourse like", colour = "Gender")
+p6 <- ggplot(mblrdata, aes(Gender, SUFlike, colour = ConversationType)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "point", aes(group= ConversationType)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_set(theme_bw(base_size = 10)) +
+  labs(x = "Sex", y = "Mean frequency of discourse like", colour = "Age") +
+  scale_color_manual(values = c("darkgreen", "lightgreen"))
+# display the plots
+multiplot(p1, p3, p5, p2, p4, p6, cols = 2)
+```
+
+The upper left panel in the Figure above indicates that men sue discourse like more frequently than women. The centre right panel suggests that priming significantly increases the likelihood of discourse like being used. The centre left panel suggests that speakers use discourse like more frequently in mixed-gender conversations.  However, the lower right panel indicates an interaction between gender and conversation type as women appear to use discourse like less frequently in same gender conversations while the conversation type does not seem to have an effect on men. After visualizing the data, we will now turn to the model building process.
+
+## Model Building
+
+In a first step, we set the options and generate a distance matrix of the data.
+
+```{r blmm9, eval = T, echo=T, message=FALSE, warning=FALSE}
+# set options
+options(contrasts  =c("contr.treatment", "contr.poly"))
+mblrdata.dist <- datadist(mblrdata)
+options(datadist = "mblrdata.dist")
+```
+
+In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the `glmer` function with a random intercept for ID (a lmer object of the final minimal adequate model will be created later).
+
+```{r blmm10, eval = T, echo=T, message=FALSE, warning=FALSE}
+m0.glm = glm(SUFlike ~ 1, family = binomial, data = mblrdata) # baseline model glm
+m0.lrm = lrm(SUFlike ~ 1, data = mblrdata, x = T, y = T) # baseline model lrm
+m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) # base-line mixed-model
+```
+
+## Testing the Random Effect
+
+Now, we check if including the random effect is permitted by comparing the AICs from the glm to AIC from the glmer model. If the AIC of the glmer object is smaller than the AIC of the glm object, then this indicates that including random intercepts is justified.
+
+
+```{r blmm11, eval = T, echo=T, message=FALSE, warning=FALSE}
+aic.glmer <- AIC(logLik(m0.glmer))
+aic.glm <- AIC(logLik(m0.glm))
+aic.glmer; aic.glm
+```
+
+The AIC of the glmer object is smaller which shows that including the random intercepts is justified. To confirm whether the AIC reduction is sufficient for justifying the inclusion of a random-effect structure, we also test whether the mixed-effects minimal base-line model explains significantly more variance by applying a Model Likelihood Ratio Test to the fixed- and the mixed effects minimal base-line models.
+
+```{r blmm12, eval = T, echo=T, message=FALSE, warning=FALSE}
+# test random effects
+null.id = -2 * logLik(m0.glm) + 2 * logLik(m0.glmer)
+pchisq(as.numeric(null.id), df=1, lower.tail=F) # sig m0.glmer better than m0.glm
+```
+
+The p-value of the Model Likelihood Ratio Test is lower than .05 which shows that the inclusion of the random-effects structure is warranted. We can now continue with the model fitting process.
+
+## Model Fitting
+
+The next step is to fit the model which means that we aim to find the "best" model, i.e. the minimal adequate model. In this case, we will use a manual step-wise step-up, forward elimination procedure.
+Before we begin with the model fitting process we need to add ´control = glmerControl(optimizer = "bobyqa")´ to avoid unneccesary failures to converge.
+
+```{r blmm13, eval = T, echo=T, message=FALSE, warning=FALSE}
+m0.glmer <- glmer(SUFlike ~ 1+ (1|ID), family = binomial, data = mblrdata, control=glmerControl(optimizer="bobyqa"))
+```
+
+During each step of the fitting procedure, we test whether certain assumptions on which the model relies are violated. To avoid *incomplete information* (a combination of variables does not occur in the data), we tabulate the variables we intend to include and make sure that all possible combinations are present in the data. Including variables although not all combinations are present in the data would lead to unreliable models that report (vastly) inaccurate results. A special case of incomplete information is *complete separation* which occurs if one predictor perfectly explains an outcome (in that case the incomplete information would be caused by a level of the dependent variable). In addition, we make sure that the VIFs do not exceed a maximum of 3 as higher values would indicate multicollinearity and thus that the model is unstable. Only once we have confirmed that the incomplete information, complete separation, and *multicollinearity* are not a major concern, we generate the more saturated model and test whether the inclusion of a predictor leads to a significant reduction in residual deviance. If the predictor explains a significant amount of variance, it is retained in the model while being disregarded in case it does not explain a sufficient quantity of variance.  
+
+```{r blmm14, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming
+ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m1.glm <- update(m0.glm, .~.+Priming)
+m1.glmer <- update(m0.glmer, .~.+Priming)
+anova(m1.glmer, m0.glmer, test = "Chi") # SIG (p<.001***) 
+```
+
+
+
+
+```{r blmm15, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Age
+ifelse(min(ftable(mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m2.glm <- update(m1.glm, .~.+Age)
+ifelse(max(vif(m2.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+m2.glmer <- update(m1.glmer, .~.+Age)
+anova(m2.glmer, m1.glmer, test = "Chi") #mar sig (p=.0.61) BUT BIC inflation  
+```
+
+```{r blmm16, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Gender
+ifelse(min(ftable(mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m3.glm <- update(m1.glm, .~.+Gender)
+ifelse(max(vif(m3.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+m3.glmer <- update(m1.glmer, .~.+Gender)
+anova(m3.glmer, m1.glmer, test = "Chi") # SIG (p<.001***)  
+```
+
+```{r blmm17, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add ConversationType
+ifelse(min(ftable(mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m4.glm <- update(m3.glm, .~.+ConversationType)
+ifelse(max(vif(m4.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+m4.glmer <- update(m3.glmer, .~.+ConversationType)
+anova(m4.glmer, m3.glmer, test = "Chi") # SIG (p<.001***)  
+```
+
+```{r blmm18, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*Age
+ifelse(min(ftable(mblrdata$Priming, mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m5.glm <- update(m4.glm, .~.+Priming*Age)
+ifelse(max(vif(m5.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+m5.glmer <- update(m4.glmer, .~.+Priming*Age)
+anova(m5.glmer, m4.glmer, test = "Chi") # not sig (p=0.6)  
+```
+
+```{r blmm19, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*Gender
+ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m6.glm <- update(m4.glm, .~.+Priming*Gender)
+ifelse(max(vif(m6.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm20, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*ConversationType
+ifelse(min(ftable(mblrdata$Priming, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m7.glm <- update(m4.glm, .~.+Priming*ConversationType)
+ifelse(max(vif(m7.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm21, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Age*Gender
+ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m8.glm <- update(m4.glm, .~.+Age*Gender)
+ifelse(max(vif(m8.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm22, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Age*ConversationType
+ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m9.glm <- update(m4.glm, .~.+Age*ConversationType)
+ifelse(max(vif(m9.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+m9.glmer <- update(m4.glmer, .~.+Age*ConversationType)
+anova(m9.glmer, m4.glmer, test = "Chi") # not sig (p=0.3)  
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm23, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Gender*ConversationType
+ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m10.glm <- update(m4.glm, .~.+Gender*ConversationType)
+ifelse(max(vif(m10.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm24, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*Age*Gender
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m11.glm <- update(m4.glm, .~.+Priming*Age*Gender)
+ifelse(max(vif(m11.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm25, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*Age*ConversationType
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m12.glm <- update(m4.glm, .~.+Priming*Age*ConversationType)
+ifelse(max(vif(m12.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm26, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*Gender*ConversationType
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m13.glm <- update(m4.glm, .~.+Priming*Gender*ConversationType)
+ifelse(max(vif(m13.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm27, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Age*Gender*ConversationType
+ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m14.glm <- update(m4.glm, .~.+Age*Gender*ConversationType)
+ifelse(max(vif(m14.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+Because the VIFs exceed values of 3 the degree of multicollinearity is unacceptable so that we abort and move on the next model.
+
+```{r blmm28, eval = T, echo=T, message=FALSE, warning=FALSE}
+# add Priming*Age*Gender*ConversationType
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m15.glm <- update(m4.glm, .~.+Priming*Age*Gender*ConversationType)
+ifelse(max(vif(m15.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+```
+
+In a next step, we test which models are the most adequate by comparing all models to get an overview of model parameters. This way it is possible to check which model has the lowest AIC, BIC, and the highest $\chi$^2^ value
+
+```{r blmm29, eval = T, echo=T, message=FALSE, warning=FALSE}
+# comparisons of glmer objects
+m1.m0 <- anova(m1.glmer, m0.glmer, test = "Chi") 
+m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi") 
+m3.m1 <- anova(m3.glmer, m1.glmer, test = "Chi") 
+m4.m3 <- anova(m4.glmer, m3.glmer, test = "Chi") 
+m5.m4 <- anova(m5.glmer, m4.glmer, test = "Chi") 
+m9.m4 <- anova(m9.glmer, m4.glmer, test = "Chi") 
+# create a list of the model comparisons
+mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m9.m4)
+# load function for summary
+source("rscripts/ModelFittingSummarySWSU.R") # for GLMEM (step-wise step-up)
+mdlft <- mdl.fttng.swsu(mdlcmp)
+mdlft <- mdlft[,-2]
+library(knitr)    # load library
+kable(mdlft, caption = "Model fitting process summary.")
+```
+
+We now rename our final minimal adequate model, test whether it performs significantly better than the minimal base-line model, and print the regression summary.
+
+```{r blmm30, eval = T, echo=T, message=FALSE, warning=FALSE}
+mlr.glmer <- m4.glmer # rename final minimal adequate model
+mlr.glm <- m4.glm # rename final minimal adequate fixed-effects model
+anova(mlr.glmer, m0.glmer, test = "Chi") # final model better than base-line model
+print(mlr.glmer, corr = F) # inspect final minimal adequate model
+```
+
+
+```{r blmm31, eval = T, echo=T, message=FALSE, warning=FALSE}
+anova(mlr.glmer)  # ANOVA summary
+```
+
+To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that  effect so that we can ascertain how much variance that effect explains.
+
+```{r blmm32, eval = T, echo=T, message=FALSE, warning=FALSE}
+anova(m1.glmer, m0.glmer, test = "Chi") #  Priming effect
+```
+
+```{r blmm33, eval = T, echo=T, message=FALSE, warning=FALSE}
+anova(m3.glmer, m1.glmer, test = "Chi") # Gender effect
+```
+
+```{r blmm34, eval = T, echo=T, message=FALSE, warning=FALSE}
+anova(m4.glmer, m3.glmer, test = "Chi") #  ConversationType effect
+```
+
+## Extracting Model Fit Parameters
+
+
+We now create an `lrm` and `lmer` object that are equivalent to the final minimal adequate model (but the former without the random effect).
+
+```{r blmm35, eval = T, echo=T, message=FALSE, warning=FALSE}
+mlr.lrm <- lrm(SUFlike ~ Priming + Gender + ConversationType, data = mblrdata, x = T, y = T)
+m1.glm = glm(SUFlike ~ Priming + Gender + ConversationType, family = binomial, data = mblrdata) # baseline model glm
+# we now create a lmer object equivalent to the final minimal adequate model
+mlr.lmer <- lmer(SUFlike ~ Age + Gender + ConversationType + (1|ID), data = mblrdata, family = binomial)
+```
+
+
+We now check on the lmer object if the fixed effects of the `lrm` and of the `lmer` model correlate (cf Baayen 2008:281).
+
+```{r blmm36, eval = T, echo=T, message=FALSE, warning=FALSE}
+cor.test(coef(mlr.lrm), fixef(mlr.lmer))
+```
+
+The fixed effects correlate strongly (.8827) which is a good indicator as it suggests that the coefficient estimates are sufficiently stable. We now activate the `Hmisc` package (if not already active) to extract model fit parameters (cf. Baayen 2008:281).
+
+```{r blmm37, eval = T, echo=T, message=FALSE, warning=FALSE}
+library(Hmisc)   # activate Hmisc library
+probs = 1/(1+exp(-fitted(mlr.lmer)))
+probs = binomial()$linkinv(fitted(mlr.lmer))
+somers2(probs, as.numeric(mblrdata$SUFlike))
+```
+
+The model fit parameters indicate a sufficient but not very good fit. The C-value indicates a goodness of fit between predicted and observed responses (occurrences of SUFlike).  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicates real predictive capacity (Baayen 2008:204).
+
+Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction (Baayen 2008:204). This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.
+
+## Model Diagnostics
+
+We begin the model diagnostics by generating a diagnostic that plots the fitted or predicted values against the residuals.
+
+```{r blmm38, eval = T, echo=T, message=FALSE, warning=FALSE}
+plot(mlr.glmer)
+```
+
+```{r blmm39, eval = T, echo=T, message=FALSE, warning=FALSE}
+# plot residuals against fitted
+stripParams <- list(cex=.3, lines=1.5)
+plot(mlr.glmer, form = resid(., type = "response") ~ fitted(.) | ID, abline = 0, par.strip.text = stripParams,cex = .3,id = 0.05, adj = -0.3)
+```
+
+
+```{r blmm40, eval = T, echo=T, message=FALSE, warning=FALSE}
+# diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
+plot(mlr.glmer, ID ~ resid(.), abline = 0 , cex = .5)
+```
+
+```{r blmm41, eval = T, echo=T, message=FALSE, warning=FALSE}
+# summarize final model
+mblrmtb <- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
+mblrmtb <- mblrmtb[, -c(4:5)]
+library(knitr)    # load library
+kable(mblrmtb, caption = "Results of a Mixed-Effects Binomial Logistic Regression Model.")
+
+```
+
+# References
+

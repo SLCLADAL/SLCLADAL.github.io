@@ -1,5 +1,5 @@
 ---
-title: "Statistics: Pattern-Detection"
+title: "Classification"
 author: "UQ SLC Digital Team"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -13,7 +13,28 @@ knitr::include_graphics("images/uq1.jpg")
 
 # Introduction
 
-This section deals with methods that are used to find groups or patterns in data. 
+This section focuses on classification using "R". The entire code for the sections below can be downloaded [here](https://slcladal.github.io/rscripts/classificationscript.r). Classification methods are used to find groups or patterns in data or to predict group membership. As such, they are widely used and applied in machine learning. For linguists classification is not only common when it comes to phylogenetics but also in annotation-based procedures such as part-of-speech tagging and syntactic parsing. 
+
+# Preparation and session set up
+
+Since all examples will be performed in "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not already installed on your machine, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
+
+In addition, certain "libraries" or "packages" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the libraries by running the code below this paragraph. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # supress math annotation
+# install libraries
+install.packages(c("cluster", "factoextra", "cluster", 
+                   "seriation", "pvclust", "ape", "vcd", 
+                   "exact2x2", "factoextra", "seriation", 
+                   "NbClust", "pvclust"))
+```
+
+Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
 
 # Cluster Analysis
 
@@ -27,7 +48,7 @@ The underlying idea of cluster analysis is very simple and rather intuitive as w
 
 Imagine you see six trees representing different types of trees: a pine tree, a fir tree, an oak tree, a beech tree, a phoenix palm tree, and a nikau palm tree. Now, you were asked to group these trees accroing to similarity. Have a look at the plot below and see whether you would have come up with a similar type of grouping.
 
-```{r echo = F, results = 'asis'}
+```{r cl1, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 x <- 1:10
 y <- 1:10
 plot(x, y, type = "n", ylim = c(-.5,10), xlim = c(0,5), axes = F, xlab = "", ylab = "")
@@ -62,7 +83,7 @@ lines(x = c(2.5, 2.5), y = c(4.5, 4), lwd = 2)
 
 An alternative way to group the trees would be the follwoing.
 
-```{r echo = F, results = 'asis'}
+```{r cl2, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 x <- 1:10
 y <- 1:10
 plot(x, y, type = "n", ylim = c(-.5,15), xlim = c(0,5), axes = F, xlab = "", ylab = "")
@@ -98,7 +119,7 @@ lines(x = c(2.5, 2.5), y = c(4.5, 4), lwd = 2)
 
 In this display, conifers and broad-leaf trees are grouped together because their are more similar to each other compared to palm trees. This poses the question of what is meant by similarity. Consider the display below. 
 
-```{r echo = F, results = 'asis'}
+```{r cl3, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 # generate data
 y <- c(1, 3.1, 1.2, 2.3, 3.4, 2.5, 1.6, 2.7, 3.8, 2.9)
 x <- c(1:10)
@@ -119,7 +140,7 @@ Are the red and the blue line more similar because they have the same shape or a
 
 Let's consider another example to better understand how cluster analyses determine which data points should be merged when. Imagine you have five students adn want to group them togehter based on their overall performance in school. The data that you rely on are their grades in math, music, and biology (with 1 being the best grade and 6 being the worst).
 
-```{r echo = F, results = 'asis'}
+```{r cl4, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 # similarity
 students <- matrix(c(2,  3,  2, 1,  3,  2, 1,  2,  1, 2,  4,  4, 3,  4,  3),
   nrow = 5, byrow = T)
@@ -128,20 +149,20 @@ colnames(students) <- c("Math", "Music", "Biology")
 rownames(students) <- c("StudentA", "StudentB", "StudentC", "StudentD", "StudentE")
 ```
 
-```{r echo = F, results = 'asis'}
+```{r cl5, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 library(knitr)
 kable(students, caption = "Sample of five students and their grades in math, music, and biology")
 ```
  
  The first step in determining the similarity among students is to create a distance matrix. 
  
-```{r echo = T, results = 'asis'}
+```{r cl6, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 diststudents <- dist(students, method = "manhattan") # create a distance matrix
 ```
 
 The distance matrix below shows that Student A and Student B only differ by one grade. Student B and Student C differ by 2 grades. Student A and Student C differ by 3 grades and so on.
 
-```{r echo = F, results = 'asis'}
+```{r cl7, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 library(knitr)
 diststudentstb <- matrix(c("1", "3", "3","3", "", "2", "4", "4","", "", "6", "6", "", "", "", "2"), nrow = 4, byrow = F)
 # add column and row names
@@ -156,7 +177,7 @@ Based on this distance matrix, we can now implement a cluster analysis in `R`.
 
 To create a simple cluster object in `R`, we use the `hclust` function from the `cluster` package. The resulting object is then plotted to create a dentrogram which shows how students have been amalgamated (combined) by the clustering algorithm (which, in the present case, is called "ward.D").
 
-```{r echo = T, results = 'asis'}
+```{r cl8, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 library("cluster")    # activate library
 clusterstudents <- hclust( # hierarchical cluster object
   diststudents,       # use data diststudents
@@ -167,7 +188,7 @@ plot(clusterstudents, # plot result as dendrogram
 
 Let us have a look at how the clustering algorythm has amalgamated the students. The amalgamation process takes the distance matrix from above as a starting point and, in a first step, has merged Student A and Student B (because they were the most similar students in the data based on the distance matrix). After colapsing Student A and Stdent B, the resulting distance matrix looks like the distance matrix below (notice that Student A and Student B now form a cluster that is represented by the means of the grades of the two students).
 
-```{r eval=F, echo=T, message=FALSE, warning=FALSE}
+```{r cl9, eval=F, echo=T, message=FALSE, warning=FALSE}
 students2 <- matrix(c(1.5, 3, 2, 1,  2,  1, 2,  4,  4, 3,  4,  3),
   nrow = 4, byrow = T)
 students2 <- as.data.frame(students2)
@@ -175,7 +196,7 @@ rownames(students2) <- c("Cluster1", "StudentC", "StudentD", "StudentE")
 diststudents2 <- dist(students2, method = "manhattan")
 ```
 
-```{r echo = F, results = 'asis'}
+```{r cl10, eval = T, echo = F, results = 'asis'}
 library(knitr)
 diststudentstb <- matrix(c("2.5","3.5","3.5","","6.0","6.0","","","2.0"), 
                          nrow = 3, byrow = F)
@@ -188,7 +209,7 @@ kable(diststudentstb,
 
 The next lowest distnce now is 2.0 between Student D and Student E which means that these two students are merged next. The resulting distance matrix is shown below.
 
-```{r eval=F, echo=T, message=FALSE, warning=FALSE}
+```{r cl11, eval=F, echo=T, message=FALSE, warning=FALSE}
 students3 <- matrix(c(1.5,3,2,1,2,1,2.5,4,3.5),
   nrow = 3, byrow = T)
 students3 <- as.data.frame(students3)
@@ -196,7 +217,7 @@ rownames(students3) <- c("Cluster1", "StudentC", "Cluster2")
 diststudents3 <- dist(students3, 
                       method = "manhattan")
 ```
-```{r echo=F, message=FALSE, warning=FALSE}
+```{r cl12, eval = T, echo=F, message=FALSE, warning=FALSE}
 library(knitr)
 diststudentstb <- matrix(c("2.5", "3.5", "", "6.0"), nrow = 2, byrow = F)
 # add column and row names
@@ -213,7 +234,7 @@ How and which elements are merged depends on the what is understood as distance.
 
 To understand how a cluster analysis determines to which cluster a given data point belongs, we need to understand what different distance measures represent. Have a look at the Figure below which visually represents three different ways to conceptualize distance.
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl13, eval = T, echo =  T, message=FALSE, warning=FALSE}
 par(mar=c(1,1,1,1))  # define margine width of the plot
 x <- c(1,5)          # define an x value
 y <- c(1,5)          # define a y value
@@ -235,14 +256,13 @@ lines(x = c(.9, 5), y = c(.9, .9), type = "l", lty = 4, lwd = 2, col = "green")
 legend("topleft", inset=.05, title="", bty = "n", lty = c(3, 2, 4), lwd = 2,
    c("euclidean distance", "maximum distance", "manhatten distance"), col=c("red", "blue", "green"), horiz=F, cex = 1)
 par(mar=c(5.1,4.1,4.1,2.1))
-
 ```
 
 The Figure above depicts three ways to measure distance: the "eucledian distance" represents the distance between points as the hypothenuse of the x- and y-axis distances while the "maximum distance" represents  distance as the longer distance of either the distance on the x- or the y-axis. The manhatten distance (or block distance) is the sum of the distances on the x- and the y-axis. 
 
 We will now turn to another example in order to delve a little deeper into how clustering algorithms work. In this example, we will find cluster of varieties of English based on the relative frequency of selected non-standard features (such as the relative freqeuncies of cleaft constructions and tag questions). As a frist setp, we generate some fictional data set for this analysis. 
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl14, eval = T, echo =  T, message=FALSE, warning=FALSE}
 # generate data
 IrishEnglish <- round(sqrt((rnorm(10, 9.5, .5))^2), 3)
 ScottishEnglish <- round(sqrt((rnorm(10, 9.3, .4))^2), 3)
@@ -264,7 +284,7 @@ summary(clus) # inspect results
 
 As a next step, we cerate a cluster object based on the data we have just generated.
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl15, eval = T, echo =  T, message=FALSE, warning=FALSE}
 # clean data
 clust <- t(clus)            # transpose data
 clust <- na.omit(clust)     # remove missing values
@@ -275,7 +295,7 @@ clust
 
 We now assess if data is clusterable by testing whether or not the data includes nonrandom structures. To means to determine whether the data contains nonrandomness, we calculate the Hopkins statistic which informs how similar the data is to a random distribution. If the values of the Hopkins statistic are higher than 0.5 then this indicates that the data is random and that there are no inherent clusters. However, if the Hopkins statistic is close to 0, then the data is clusterable. The `n` in the `get_clust_tendency` functions represents the maximum number of clusters to be tested whcih should be  number of predictors in the data. 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r cl16, eval = T, echo=T, message=FALSE, warning=FALSE}
 library("factoextra")         # load library to extract cluster tendency
 clusttendency <- get_clust_tendency(clusts,    # apply get_clust_tendency to cluster object
                    n = 9,     # define number of points from sampe speace 
@@ -286,7 +306,7 @@ clusttendency[1]
 
 As the Hopkins statistic above shows, there is sufficient structure in the data and we can assume that there are actual clusters in the data. Next, we create a distance matrix based on eucleadian distances.
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl17, eval = T, echo =  T, message=FALSE, warning=FALSE}
 clustd <- dist(clusts,                 # create distance matrix
                method = "euclidean")   # use eucledian (!) distance
 round(clustd, 2)                       # display distance matrix
@@ -294,7 +314,7 @@ round(clustd, 2)                       # display distance matrix
 
 Below are other methods to cerate distance matrices. 
 
-```{r echo = T, results = 'asis'}
+```{r cl18, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create distance matrix (eucledian method: not good when dealing with many dimensions)
 clustd <- dist(clusts, method = "euclidean")
 # create distance matrix (maximum method: here the difference between points dominates)
@@ -315,19 +335,19 @@ clustd_daisy <- round(daisy(clusts, metric = "euclidean"), 2)
 
 If you call the individual distance matrices, you will see that depending on which distance measure is used, the distance matrices differ dramatically! Have alook at the distance matrix created using the manhatten metric and compare it to the distance matrix created using the eucledian metric (see above).
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl19, eval = T, echo =  T, message=FALSE, warning=FALSE}
 clustd_maximum 
 ```
 
 Next, we create a distance plot using the `distplot` function. If the distance plot shows different regions (non random, non uniform grey areas) then clustering the data is permitable as the data contains actual structures.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r cl20, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(seriation)
 dissplot(clustd)  # create distance plot
 ```
 
 
-```{r echo = T, results = 'asis'}
+```{r cl21, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 cd <- hclust(clustd,             # create cluster object
              method="ward.D2")   # ward.D2 linkage (minimum variance)
 plot(cd, hang = -1)              # display dendogram
@@ -335,7 +355,7 @@ plot(cd, hang = -1)              # display dendogram
 
 Other linkage methods.
  
-```{r echo = T, results = 'asis'}
+```{r cl22, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # single linkage: cluster with nearest data point
 cd_single <- hclust(clustd, method="single") 
 # create cluster object (ward.D linkage)
@@ -357,7 +377,7 @@ cd_complete <- hclust(clustd, method="complete")
 
 Now, we determine the optimal number of clusters based on silhouette widths which shows the ratio of internal similarity of clusters against the similarity between clusters. If the silhuette widths have values lower than .2 then this indicates that clustering is not appropriate ([@levshina2015linguistics] 311). The function below displays the silhouette width values of 2 to 8 clusters.
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl23, eval = T, echo =  T, message=FALSE, warning=FALSE}
 optclus <- sapply(2:8, function(x) summary(silhouette(cutree(cd, k = x), clustd))$avg.width)
 optclus # inspect results
 
@@ -367,7 +387,7 @@ groups <- cutree(cd, k=optnclust) # cut tree into optimal number of clusters
 
 The optimal number of clusters is the cluster solution with the highest silhouette width. We cut the tree into the optimal number of clusters and plot the result.
 
-```{r echo =  T, results = 'asis'}
+```{r cl24, eval = T, echo =  T, results = 'asis', message=FALSE, warning=FALSE}
 groups <- cutree(cd, k=optnclust)          # cut tree into optimal clusters
 plot(cd, hang = -1, cex = .75)             # plot result as dendrogram
 rect.hclust(cd, k=optnclust, border="red") # draw red borders around clusters
@@ -375,7 +395,7 @@ rect.hclust(cd, k=optnclust, border="red") # draw red borders around clusters
 
 In a next step, we aim to determine which factors are particularly important for the clustering - this step is soemwhat comparable to measuring the effect size in inferential designs.
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl25, eval = T, echo =  T, message=FALSE, warning=FALSE}
 # which factors are particularly important
 celtic <- clusts[c(1,2),]
 others <- clusts[-c(1,2),]
@@ -387,7 +407,7 @@ diff <- celtic.cm - others.cm
 sort(diff, decreasing = F)
 ```
 
-```{r echo =  T, results = 'asis'}
+```{r cl26, eval = T, echo =  T, results = 'asis', message=FALSE, warning=FALSE}
 plot(                   # start plot
   sort(diff),           # y-values
   1:length(diff),       # x-values 
@@ -400,7 +420,7 @@ plot(                   # start plot
 text(sort(diff), 1:length(diff), names(sort(diff)), cex = .75) # plot text into plot
 ```
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl27, eval = T, echo =  T, message=FALSE, warning=FALSE}
 Outer <- clusts[c(6:8),]     # data of outer circle varieties
 Inner <- clusts[-c(6:8),]    # data of inner circle varieties
 Outer.cm <- colMeans(Outer)  # column means for outer circle
@@ -409,7 +429,7 @@ diff <- Outer.cm - Inner.cm  # difference between inner and outer circle
 sort(diff, decreasing = F)   # order difference between inner and outer circle
 ```
 
-```{r echo =  T, results = 'asis'}
+```{r cl28, eval = T, echo =  T, results = 'asis', message=FALSE, warning=FALSE}
 plot(                   # start plot
   sort(diff),           # y-values
   1:length(diff),       # x-values 
@@ -426,7 +446,7 @@ We see that discourse like and  and the frequency of like is typical for other v
 
 We will now test whether the cluster is justified by validating the cluster solution using bootstrapping.
 
-```{r echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r cl29, eval = T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 library(pvclust) # activate library
 res.pv <- pvclust(clus,                     # apply pvclust method to clus data
                   method.dist="euclidean",  # use eucledian distance
@@ -436,8 +456,7 @@ res.pv <- pvclust(clus,                     # apply pvclust method to clus data
 
 The clustering provides approximately unbiased p-values and bootstrap probability value [cf. @levlevshina2015linguistics 316].
 
-```{r echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-
+```{r cl30, eval = T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 plot(res.pv, 
      cex = .75)
 pvrect(res.pv)
@@ -445,7 +464,7 @@ pvrect(res.pv)
 
 We can alsouse other libraries to customize the dendrograms. 
 
-```{r echo =  T, results = 'asis'}
+```{r cl31, eval = T, echo =  T, results = 'asis', message=FALSE, warning=FALSE}
 library(ape)            # load package ape
 plot(as.phylo(cd),      # plot cluster object
      cex = 0.75,        # .75 font size
@@ -454,7 +473,7 @@ plot(as.phylo(cd),      # plot cluster object
 
 One useful customization is to display an unrooted rather than a rooted tree diagram.
 
-```{r echo =  T, results = 'asis'}
+```{r cl32, eval = T, echo =  T, results = 'asis', message=FALSE, warning=FALSE}
 # plot as unrooted tree
 plot(as.phylo(cd),      # plot cluster object
      type = "unrooted", # plot as unrooted tree
@@ -464,7 +483,7 @@ plot(as.phylo(cd),      # plot cluster object
 
 ## Cluster Analysis: Nominal Data
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl33, eval = T, echo =  T, message=FALSE, warning=FALSE}
 # generate data
 IrishEnglish <- c(1,1,1,1,1,1,1,1,1,1)
 ScottishEnglish <- c(1,1,1,1,1,1,1,1,1,1)
@@ -490,7 +509,7 @@ clus
 ```
 
 
-```{r echo =  T, message=FALSE, warning=FALSE}
+```{r cl34, eval = T, echo =  T, message=FALSE, warning=FALSE}
 
 # clean data
 clusts <- as.matrix(clus)
@@ -501,8 +520,7 @@ round(clustd, 2)
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
-
+```{r cl35, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create cluster object (ward.D2 linkage)   : cluster in a way to achieve minimum variance
 cd <- hclust(clustd, method="ward.D2")
 # plot result as dendrogram
@@ -510,8 +528,7 @@ plot(cd, hang = -1)              # display dendogram
 
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
-
+```{r cl36, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create factor with celtic varieties on one hand and other varieties on other
 cluster <- as.factor(ifelse(as.character(rownames(clusts)) == "IrishEnglish", "1",
   ifelse(as.character(rownames(clusts)) == "ScottishEnglish", "1", "0")))
@@ -531,7 +548,7 @@ assocstats(table(cluster, clsts.df$like))
 ```
 
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r cl37, eval = T, echo=T, message=FALSE, warning=FALSE}
 library("factoextra")
 library("seriation")
 library("NbClust")
@@ -540,7 +557,9 @@ library("pvclust")
 
 # Correspondence Analysis
 
+# Principal Component Analysis
 
+# Multidimensional Scaling 
 
 # Vector Space Models
 
