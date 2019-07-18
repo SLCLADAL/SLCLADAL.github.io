@@ -1,6 +1,10 @@
 # Text Analysis
 # Introduction
 # Preparation
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)
 # install libraries
 install.packages(c("class", "cluster", "dplyr", "factoextra", 
                    "FactoMineR", "ggplot2", "ggraph", "grid", 
@@ -8,7 +12,7 @@ install.packages(c("class", "cluster", "dplyr", "factoextra",
                    "openNLP", "openNLPmodels.en", "Matrix", 
                    "stringr", "syuzhet", "tidyr", "tidytext", 
                    "tm", "topicmodels", "wordcloud", "xtable"))
-                   # Concordancing
+# Concordancing
 # load libraries
 library(dplyr)
 library(stringr)
