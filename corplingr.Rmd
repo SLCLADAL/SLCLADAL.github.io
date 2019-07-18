@@ -19,21 +19,26 @@ The case studies merely exemplify ways in which "R" can be used in language-base
 
 Since all examples will be performed in "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not already installed on your machine, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
 
-In addition, certain "libraries" or "packages" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the librariesby running the code below this paragraph. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+In a first step, we clean the existing work space and set the options. The option "stringsAsFactors = F" informs "R" that we do not want "R" to convert chacaters into factors (otherwise, character strings would be represented as numbers).
 
-```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r prep1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # clean current workspace
 rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
+```
+
+In addition, certain "libraries" or "packages" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the librariesby running the code below this paragraph. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep2, echo=T, eval = F, message=FALSE, warning=FALSE}
 # install libraries
 install.packages(c("tm", "dplyr","stringr", "visreg"))
 ```
 
 One installation may be a little more complex (depending on the type of machine you are using and the version of "R" that the machine is running). To install the development version of the "data.table" package, we need to install it directly from github (rather than a CRAN mirror server).
 
-```{r prep2, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r prep3, echo=T, eval = F, message=FALSE, warning=FALSE}
 # manual installation
 install.packages("devtools")
 # load devtools and install development version of data.table
@@ -43,16 +48,47 @@ install_github("Rdatatable/data.table", build_vignettes = FALSE)
 
 Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
 
-# Gender Differences in Swearing
+# Case Study: Gender Differences in Swearing
 
-This case study aims to answer if the frequency with which speakers use swear words is correlated with the gender of speakers. In a first step, we load the libraries and functions that we need and set the options for the"R" session. 
+This case study aims to answer if the frequency with which speakers use swear words is correlated with the gender of speakers. In a first step, we load the load the data into "R". The way that the corpus data is loaded in this example is somewhat ackward because the data is in a server directory rather than on a harddrive on a simple PC. If the corpus data is not stored in a directory of a server, then you should not use the code shown imediately below but code in the window following the code imediately below.  
 
-```{r sw3, eval = T, echo=F, message=FALSE, warning=FALSE}
-# load bio data
-bio <- read.table("https://slcladal.github.io/data/data01.txt", 
-                  header = T, sep = "\t")
+```{r sw1, eval = T, echo=T, message=FALSE, warning=FALSE}
+# define path to corpus
+corpuspath <- "https://slcladal.github.io/data/ICEIrelandSample/"
+# define corpusfiles
+files <- paste(corpuspath, "S1A-00", 1:20, ".txt", sep = "")
+files <- gsub("[0-9]([0-9][0-9][0-9])", "\\1", files)
+# load corpus files
+corpus <- sapply(files, function(x){
+  x <- readLines(x)
+  x <- paste(x, collapse = " ")
+})
+# inspect corpus
+str(corpus)
+```
+
+If the corpus data is stored on your own computer (on not on a serves as is the case in the present example), you shoudl use the follw 
+
+```{r sw2, eval = F, echo=T, message=FALSE, warning=FALSE}
+# define path to corpus
+# WARNING: you need to include your own path!
+corpuspath <- "D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data\\ICEIrelandSample"
+# define corpusfiles
+files <- list.paste(corpuspath, all.names = T)
+# load corpus files
+corpus <- sapply(files, function(x){
+  x <- scan(x, what = "char", sep = "", quote = "", skipNul = T)
+  x <- paste(x, sep = " ", collapse = " ")
+})
+# inspect corpus
+str(corpus)
+```
+
+Now that the corpus data is loaded, we can prepare the searches by defining the search patterns.
+
+```{r sw3, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load concordancing function
-source("https://slcladal.github.io/rscripts/ConcR_2.5_LoadedFiles.r")
+source("https://slcladal.github.io/rscripts/ConcR_2.5_LoadedFiles.R")
 # define surrounding context for KWIC display
 context <- 20
 # define that we want everything that preceeds a match for the serach pattern 
@@ -63,7 +99,7 @@ search.pattern2 <-  c("[F|f]uck[a-z]{0,}")
 search.pattern3 <-  c("[S|s]hit[a-z]{0,}")
 search.pattern4 <-  c("[C|c]ock[a-z]{0,}")
 search.pattern5 <-  c("[W|w]hore[a-z]{0,}")
-search.pattern6 <-  c("[A|a]ss")
+search.pattern6 <-  c("[A|a]ss[holes]{0,5}")
 search.pattern7 <-  c("[D|d]ick[a-z]{0,}")
 search.pattern8 <-  c("[W|w]anker[a-z]{0,}")
 search.pattern9 <-  c("[C|c]rap[a-z]{0,}")
@@ -71,178 +107,250 @@ search.pattern10 <-  c("[B|b]itch[a-z]{0,}")
 search.pattern11 <-  c("[D|d]amn[a-z]{0,}")
 ```
 
-It would, of course, also be possible to search for all search patterns in a single search but it may be advantageous to split search patterns so that the code is easier to parse and understand. After preparing the search, we perform the concordancing. 
+It would, of course, also be possible to search for all search patterns in a single search but it may be advantageous to split search patterns so that the code is easier to parse and understand. After preparing the search, we perform the concordancing and create a table with the results. 
 
-```{r sw3, eval = T, echo=F, message=FALSE, warning=FALSE}
+```{r sw4, eval = T, echo=T, message=FALSE, warning=FALSE}
 # start search
-sw1 <- ConcR(corpus, search.pattern1, context, all.pre = F)
-sw2 <- ConcR(corpus, search.pattern2, context, all.pre = F)
-sw3 <- ConcR(corpus, search.pattern3, context, all.pre = F)
-sw4 <- ConcR(corpus, search.pattern4, context, all.pre = F)
-sw5 <- ConcR(corpus, search.pattern5, context, all.pre = F)
-sw6 <- ConcR(corpus, search.pattern6, context, all.pre = F)
-sw7 <- ConcR(corpus, search.pattern7, context, all.pre = F)
-sw8 <- ConcR(corpus, search.pattern8, context, all.pre = F)
-sw9 <- ConcR(corpus, search.pattern9, context, all.pre = F)
-sw10 <- ConcR(corpus, search.pattern10, context, all.pre = F)
-sw11 <- ConcR(corpus, search.pattern11, context, all.pre = F)
+sw1 <- ConcR(corpus, search.pattern1, context, all.pre = T)
+sw2 <- ConcR(corpus, search.pattern2, context, all.pre = T)
+sw3 <- ConcR(corpus, search.pattern3, context, all.pre = T)
+sw4 <- ConcR(corpus, search.pattern4, context, all.pre = T)
+#sw5 <- ConcR(corpus, search.pattern5, context, all.pre = T)
+sw6 <- ConcR(corpus, search.pattern6, context, all.pre = T)
+#sw7 <- ConcR(corpus, search.pattern7, context, all.pre = T)
+sw8 <- ConcR(corpus, search.pattern8, context, all.pre = T)
+sw9 <- ConcR(corpus, search.pattern9, context, all.pre = T)
+sw10 <- ConcR(corpus, search.pattern10, context, all.pre = T)
+#sw11 <- ConcR(corpus, search.pattern11, context, all.pre = T)
 # combine search results
-swire <- rbind(sw1, sw2, sw3, sw4, sw5, sw6, sw7, sw8, sw9, sw10, sw11)
+swire <- rbind(sw1, sw2, sw3, sw4, sw6, sw8, sw9, sw10)
 # convert matrix into a data frame
 swire <- as.data.frame(swire)
+# inspect structure of the data
+str(swire)
+```
+
+The variable "OriginalString" contains the file name. However, we do not want the entire path to the file but only the file name itself. Therefore, we will clean the variable "OriginalString" so that it only contains the file names. 
+
+```{r sw5, eval = T, echo=T, message=FALSE, warning=FALSE}
+# clean file names
+swire$OriginalString <- gsub(".*/", "", swire$OriginalString)
+swire$OriginalString <- gsub("\\..*", "", swire$OriginalString)
+# store file names
+files <- names(table(swire$OriginalString))
+# inspect result
+names(table(swire$OriginalString))
+```
+
+Now, we nromalize the tokens that we have extracted by converting them into lower case. Once we have done so, we will inspect the extracted tokens to check if our search strings have indeed captured swear words. 
+
+```{r sw6, eval = T, echo=T, message=FALSE, warning=FALSE}
 # convert tokens to lower case
 swire$Token <- tolower(swire$Token)
 # inspect tokens
-table(swire$token)
+names(table(swire$Token))
 ```
 
-```{r sw4, eval = T, echo=F, message=FALSE, warning=FALSE}
-# clean data frame
-swire$remove <- gsub(".+ass.+", "remove", swire$token, perl = T)
-# remove items that are not swear words
-swire <- swire[swire$remove != "remove", ]
-# clean data frame
-swire$remove <- gsub("ass.+", "remove", swire$token, perl = T)
-# remove items that are not swear words
-swire <- swire[swire$remove != "remove", ]
-# clean data frame
-swire$remove <- gsub(".+ass", "remove", swire$token, perl = T)
-# remove items that are not swear words
-swire <- swire[swire$remove != "remove", ]
-# remove items that are not swear words
-swire <- swire[swire$token != "arsed",]
-swire <- swire[swire$token != "arsenal",]
-swire <- swire[swire$token != "arsenals",]
-swire <- swire[swire$token != "coarser",]
-swire <- swire[swire$token != "cocked",]
-swire <- swire[swire$token != "cockpit",]
-swire <- swire[swire$token != "cocktail",]
-swire <- swire[swire$token != "Cocktail",]
-swire <- swire[swire$token != "cocktails",]
-swire <- swire[swire$token != "cocktailyish",]
-swire <- swire[swire$token != "hearse",]
-swire <- swire[swire$token != "marseille",]
-swire <- swire[swire$token != "peacock",]
-swire <- swire[swire$token != "peacocks",]
-swire <- swire[swire$token != "pearse",]
-swire <- swire[swire$token != "rehearsed",]
-swire <- swire[swire$token != "sparse",]
-swire <- swire[swire$token != "alcock",]
-swire <- swire[swire$token != "dickens",]
-swire <- swire[swire$token != "dickensian",]
-swire <- swire[swire$token != "dickson",]
-swire <- swire[swire$token != "scrap",]
-swire <- swire[swire$token != "scrape",]
-swire <- swire[swire$token != "scraping",]
-swire <- swire[swire$token != "scrapped",]
-# inspect tokens
-#table(swire$token)
+Most of the extracted patters do indeed represent swear words but some tokens do not (e.g. "cocktails"). In other cases, we need to check if the swear word is indeed an instance of swearing or some other use of the word. To remove instances of words that clearly do not represent swear words, we create a vector with those words and remove rows from the table that contain those elements.
 
+```{r sw7, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create vector with non-swear words
+nonswearwords <- c("cocktails", "crape")
+# check number of rows in current data
+nrow(swire)
+# remove rows containing nonswearwords
+swire <- swire[!swire$Token %in% nonswearwords,]
+# check number of rows of data after removal
+nrow(swire)
+```
+
+The results show that we have removed three lines from the table. Next, we inspect the data to check which other instances do not represent swear words. o make this more convenient, we create a new variable that provides a display that is easier to read inspect the KWIC for false hits. 
+
+```{r sw8, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create new variable
+swire$KWIC <- paste(swire$PreContext, " << ", swire$Token, " >> ", swire$PostContext, sep = "")
+# inspect first lines
+head(swire$KWIC)
+```
+
+While you can, of course, also check the results in "R", you can also save the results on your PC to inspect them in Excel or another spreadsheet software using the "write.table" function.
+
+```{r sw9, eval = F, echo=T, message=FALSE, warning=FALSE}
+# save results on disc 
+# WARNING: you need to include your own path!
+write.table(swire$KWIC, "D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/swearwordkwic.txt", sep = "\t", quote = F)
+```
+
+The KWIC display shows that almost none of the tokens for "ass" are real swear word uses but instances of "Mass", "glass" and "pass" and the like (see below). 
+
+```{r Fig2, fig.width=6, fig.height=4, echo=FALSE, warning=FALSE, fig.cap="\\label{fig:Fig1} Coding of swear words in Excel."}
+library(png)
+ima <- readPNG("images/excelkwic.png")
+plot(c(100, 250), c(300, 450), type = "n", xlab = "", ylab = "", xaxt = "n",yaxt = "n")
+lim <- par()
+rasterImage(ima, lim$usr[1], lim$usr[3], lim$usr[2], lim$usr[4])
+```
+
+However, some of the instances of "ass" do represent swear word use, e.g. " like a pain in the  << ass >>  too you can like <S". Thus, in a next step, we will exclude those elements which represent swear word use. If the sequence "ass" is part of a word (e.g. "glass", then there is no space before the "ass" while there is in cases of the prase "pain in the ass"). Therefore, we create a new variable called "remove" and exclude all instances of "ass" that are not preceeded by a space.
+
+```{r sw10, eval = T, echo=T, message=FALSE, warning=FALSE}
+# clean data frame
+swire$remove <- ifelse(swire$Token == "ass" & nchar(gsub(".* ", " ", swire$PreContext) > 1), "remove", "keep")
+# remove items that are not swear words
+swire <- swire[swire$remove != "remove", ]
+```
+
+In addition,w e will exclude instances of "bitchy", "asses", "assle", and "asso" as they also represent non-swear word uses.
+
+```{r sw11, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create vector with non-swear word uses
+nonswearworduses <- c("bitchy", "asses", "assle", "asso")
+# remove non-swear word uses
+swire <- swire[!swire$Token %in% nonswearworduses, ]
+# inspect results
+names(table(swire$Token))
+```
+
+Now, we will extract the speaker to find out who has uttered the swaer word. In addition, we will remove the "remove" column.
+
+```{r sw12, eval = T, echo=T, message=FALSE, warning=FALSE}
+# remove columns
+swire$remove <- NULL
+swire$KWIC <- NULL
 # extract speaker
-swire$spk <- gsub(".*<S", "<S", swire[,3])
-swire$spk <- gsub(" .*", "", swire$spk)
+swire$EntirePreContext <- gsub(".*<S", "<S", swire$EntirePreContext)
+swire$EntirePreContext <- gsub(" .*", "", swire$EntirePreContext)
+# rename columns
+colnames(swire) <- ifelse(colnames(swire) == "EntirePreContext", "Speaker",
+                          ifelse(colnames(swire) == "OriginalString", "File",colnames(swire)))
 # inspect data
 head(swire)
+```
 
-##########################################################
-# determine how many swearwords a speaker has used
-swirespk <- table(swire$spk)
+```{r sw13, eval = T, echo=T, message=FALSE, warning=FALSE}
+# tabulate speaker and swear word frequency
+swirespk <- table(swire$Speaker)
 swirespk <- data.frame(swirespk)
-colnames(swirespk) <- c("file.speaker.id", "freq")
+colnames(swirespk) <- c("Speaker", "Swearwords")
 # inspect data
 head(swirespk)
-
-##########################################################
-# clean bio data: extract only relevant columns
-bio$file.speaker.id <- as.vector(unlist(apply(bio, 1, function(x){
-  x <- paste("<", x[2], "$", x[4], ">", sep = "")
-  x <- gsub(" ", "", x) } )))
-bio <- data.frame(bio$file.speaker.id, bio$sex, bio$age, bio$word.count)
-colnames(bio) <- c("file.speaker.id", "sex", "age", "wc")
-# inspect data
-head(bio)
-
-##########################################################
-# combine frequencies and biodata
-swire <- join(bio, swirespk, by = c("file.speaker.id"), type = "left")
-# clean data
-swire <- swire[is.na(swire$sex) == F, ]
-swire <- swire[is.na(swire$age) == F, ]
-swire$freq <- sapply(swire$freq, function(x){
-  ifelse(is.na(x) == T, 0, x) } )
-swire <- swire[swire$wc != 0, ]
-# calculate per-1,000-words frequency
-swire$ptw <- round(swire$freq/swire$wc*1000)
-# select only files with headers S1A
-swire$txttype <- gsub("<", "", swire$file.speaker.id)
-swire$txttype <- gsub("-.*", "", swire$txttype)
-swire <- swire[swire$txttype == "S1A", ]
-swire <- swire[swire$wc > 99, ]
-# inspect data
-head(swire)
-
-#############################################
-#            GRAPHIKEN
-# plot data (sex)
-boxplot(swire$ptw ~ swire$sex, ylim = c(-5, 20),
-  main = "Use of swear words by gender in Irish English",
-  col = c("lightgreen", "lightblue"), notch = T)
-grid()
-text(1:2, tapply(swire$ptw, swire$sex, mean), "+")
-text(1:2, c(-3.5, -3.5), paste("mean=\n", round(tapply(swire$ptw, swire$sex, mean), 3), sep = ""))
-# include statz in graph
-text(.75, 20, "Wilcox Test")
-text(.75, 19, paste("W=", wilcox.test(swire$ptw ~ swire$sex)[1], sep = ""))
-text(.75, 18, paste("p=", round(wilcox.test(swire$ptw ~ swire$sex)[[3]], 4), sep = ""))
-
-# plot data (sex)
-combined <- round(tapply(swire$ptw, swire$age, mean), 3)
-m <- swire[swire$sex == "male", ]
-male <- round(tapply(m$ptw, m$age, mean), 3)
-f <- swire[swire$sex == "female", ]
-female <- round(tapply(f$ptw, f$age, mean), 3)
-# remove first item
-combined <- combined[2:length(combined)]
-male <- male[2:length(male)]
-female <- female[2:length(female)]
-# start plotting
-plot(female, # plot the vector called "female"
-  type = "o", # use plot type "o" (overplotted points and lines)
-  lwd = 2, # use double line width (4 for 4 times the normal line width)
-  lty = 1, # use line type 1 (striaght line)
-  pch = 19, #  use point character 19 (filled circle)
-  ylim = c(0, 5), # the y-axis should be drawn from 0 to 3
-  ylab = "Relative Frequency", # the y-axis label should read "Relative Frequency"
-  xlab = "Age",  # the x-axis label should read "Stages"
-  axes = F, # don't draw axes yet!
-  cex = 1) # all writing should be of normal size (.5 for half size)
-# add aline for the data points in vector male (pch = 0: use empty squares as point characters)
-lines(male, type = "o", lwd = 2,  lty = 1, pch = 0,  cex = 1)
-# add aline for the data points in vector combined
-# (lty = 3: use a dotted line instead of a straight line and
-# pch = 4: use x marks as point characters)
-lines(combined, type = "o", lwd = 2,  lty = 3, pch = 4,  cex = 1)
-# add x-axes with specified labels at specified intervals
-axis(1, at = 0:5, lab = c("", "19-25", "26-33", "34-41", "42-49", "50+"))
-# add y-axes with specified labels at specified intervals
-axis(2, at = seq(0, 5, .5), las = 1, lab = seq(0, 5, .5))
-# create a legend
-# define vector with linetypes
-linetype <- c(1, 1, 3)
-# define vector with point charaters
-plotchar <- c(19, 0, 4)
-# set up legend
-legend("topright", inset = .05, c("female", "male", "both genders combined"),
-  horiz = F,  pch = plotchar, lty = linetype)
-# create a box around the plot
-box()
-# create a grid in the plot
-grid()
-
 ```
 
-## Example 2: Amplification
+Now that we extracted how many swear words the speakers in the corpus have used, we can load the biodata of the speakers.
 
-```{r echo = F, results = 'asis'}
+```{r sw14, eval = T, echo=T, message=FALSE, warning=FALSE}
+# load bio data
+bio <- read.table("https://slcladal.github.io/data/data01.txt", 
+                  header = T, sep = "\t")
+# create new speaker id
+bio$file.speaker.id <- paste("<", bio$text.id, "$", bio$spk.ref, ">", sep = "")
+# determine file
+bio$File <- bio$text.id
+# create shorter table
+bio <- data.frame(bio$File, bio$file.speaker.id, bio$sex, bio$age, bio$word.count)
+# add column names
+colnames(bio) <- c("File", "Speaker", "Gender", "Age", "Words")
+# inspect data
+head(bio)
+```
+
+ In a next step, we combine the table with the speaker information with the table showing the swaer word use.
+
+```{r sw15, eval = T, echo=T, message=FALSE, warning=FALSE}
+# remove speakers of files that are not in the sample corpus
+bio <- bio[bio$File %in% files,]
+# combine frequencies and biodata
+swire <- join(bio, swirespk, by = c("Speaker"), type = "left")
+# replave NA with 0
+swire$Swearwords <- ifelse(is.na(swire$Swearwords), 0, swire$Swearwords)
+# inspect data
+head(swire); table(swire$File)
+```
+
+
+```{r sw16, eval = T, echo=T, message=FALSE, warning=FALSE}
+# clean data
+swire <- swire[is.na(swire$Gender) == F, ]
+swire <- swire[is.na(swire$Age) == F, ]
+swire <- swire[swire$Words != 0, ]
+# calculate per-1,000-words frequency
+swire$RelativeFrequency <- round(swire$Swearwords/swire$Words*1000)
+# inspect data
+head(swire)
+```
+
+Now that we have prepared our data, we can plot swear word use by gender. 
+
+```{r sw18, eval = T, echo=T, message=FALSE, warning=FALSE}
+# plot swear word use by gender
+boxplot(swire$RelativeFrequency ~ swire$Gender, 
+        ylim = c(-5, 20),
+  main = "Use of swear words by gender in Irish English",
+  col = c("orange", "darkgrey"), 
+  notch = F)
+grid()
+# add text
+# add + where mean values are
+text(1:2, tapply(swire$RelativeFrequency, swire$Gender, mean), "+")
+# add mean value below box
+text(1:2, c(-3.5, -3.5), paste("mean=\n", round(tapply(swire$RelativeFrequency, swire$Gender, mean), 3), sep = ""))
+# include statz in graph
+# add results of Wilcox Test
+text(.75, 20, "Wilcox Test")
+text(.75, 18, paste("W=", as.vector(unlist(wilcox.test(swire$RelativeFrequency ~ swire$Gender)[1])), sep = ""))
+text(.75, 16, paste("p=", round(wilcox.test(swire$RelativeFrequency ~ swire$Gender)[[3]], 4), sep = ""))
+```
+
+Next, we plot the use of swearwords by both age and gender. To do this, we need to calculate the mean frequency of swearwords by age and  gender.
+
+```{r sw19, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create interaction table
+interactiontb <- as.data.frame(tapply(swire$RelativeFrequency , 
+                        list(swire$Age, swire$Gender), 
+                        mean))
+# inspect table
+interactiontb
+```
+
+We will now plot the distribution to see whether there are age related differences in swear word use between men and women.
+
+```{r sw20, eval = T, echo=T, message=FALSE, warning=FALSE}
+plot(interactiontb$female, 
+     type = "b", lwd = 2,  
+     lty = 1, 
+     pch = 0,  
+     cex = 1, 
+     ylim = c(0,10),
+     col = "orange",
+     axes = F, 
+     xlab = "Age",
+     ylab = "Relative frequency (per 1,000 words)")
+lines(interactiontb$male, 
+      type = "o", 
+      lwd = 2,  
+      lty = 2, 
+      pch = 1,
+      col = "darkgrey",
+      cex = 1)
+axis(1, at = 0:5, lab = c("", "19-25", "26-33", "34-41", "42-49", "50+"))
+# add y-axes with specified labels at specified intervals
+axis(2, at = seq(0, 10, 2), las = 1, lab = seq(0, 10, 2))
+# add legend
+legend("topright", inset = .05, c("female", "male"),
+  horiz = F,  pch = c(0,1), lty = c(1,2), col = c("orange", "darkgrey"))
+# create a box around the plot
+box()
+# add grid
+grid()
+```
+
+The graph suggests that the genders do not differ in their use of swear words execpt for the age bracket from 26 to 33 years of age where men swear substantially. In fact, the difference between the genders shown in the plot before is entirely due to the difference in this middle-aged age bracket.
+
+It has to be borne in mind, thoguh, that this is merely a case study and that a more fine-grained analysis on a substantially larger data set were necessary to get a more reliable impression.
+
+
+## Case Study: Adjective Amplification
+
+```{r amp1, eval = T, echo=F, message=FALSE, warning=FALSE}
 
 ```
