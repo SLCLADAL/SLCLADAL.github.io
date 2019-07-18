@@ -259,7 +259,7 @@ res.ca <- CA(collocates, graph = FALSE)
 plot(res.ca, shadow = T, cex = 1, selectRow = "cos2 0.1", selectCol = "cos2 0.9", col.row = "gray50", title = "")
 
 # load function for co-occurrence calculation
-source("rscripts/calculateCoocStatistics.R")
+source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # define minimum number of cooccurences
 numberOfCoocs <- 10
 # define term
