@@ -11,7 +11,7 @@
 
 <meta name="author" content="UQ SLC Digital Team" />
 
-<meta name="date" content="2019-07-15" />
+<meta name="date" content="2019-07-22" />
 
 <title>Basic Inferential Statistics</title>
 
@@ -402,13 +402,16 @@ div.tocify {
     <li class="divider"></li>
     <li class="dropdown-header">Advanced Interential Statistics</li>
     <li>
-      <a href="advancedstatzregressions.html">Regression Analysis</a>
+      <a href="fixedregressions.html">Fixed-Effects Regression Models</a>
+    </li>
+    <li>
+      <a href="mixedregressions.html">Mixed-Effects Regression Models</a>
     </li>
     <li>
       <a href="advancedstatztrees.html">Tree-Based Models</a>
     </li>
     <li>
-      <a href="groupingstatz.html">Agglomerative Procedures</a>
+      <a href="groupingstatz.html">Classification</a>
     </li>
   </ul>
 </li>
@@ -473,7 +476,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Basic Inferential Statistics</h1>
 <h4 class="author"><em>UQ SLC Digital Team</em></h4>
-<h4 class="date"><em>2019-07-15</em></h4>
+<h4 class="date"><em>2019-07-22</em></h4>
 
 </div>
 
@@ -481,127 +484,246 @@ div.tocify {
 <p><img src="images/uq1.jpg" width="100%" /></p>
 <div id="introduction" class="section level1">
 <h1><span class="header-section-number">1</span> Introduction</h1>
-<p>This tutorial introduces basic statistical techniques from inferential statistics for hypothesis testing. The first part of this section focuses on basic non-parametric tests such as Fisher’s Exact test while the second part introduces parametric tests such as the t-test.</p>
-<p>Non-Parametric Tests do not require the data to be distributed normally. Tests that do not rewuire normal data are referred to as <em>non-parametric tests</em> (test that require the data to be distributed normally are analogously called <em>parametric tests</em>). We focus on non-parametric tests first as this family of test in frequently used in linguistics. In the later part of this section, we will focus on regression modelling where assumptions of about the data become more important.</p>
-<div id="fishers-exact-test" class="section level2">
-<h2><span class="header-section-number">1.1</span> Fisher’s Exact Test</h2>
+<p>This tutorial introduces basic statistical techniques for inferential statistics for hypothesis testing. The first part of this section focuses on basic non-parametric tests such as Fisher’s Exact test while the second part introduces parametric tests such as the t-test.</p>
+<p>Non-Parametric Tests do not require the data (or the errors of the dependent variable, to be more precise) to be distributed normally. Tests that do not rewuire normal data are referred to as <em>non-parametric tests</em> (test that require the data to be distributed normally are analogously called <em>parametric tests</em>). We focus on non-parametric tests first as this family of test in frequently used in linguistics. In the later part of this section, we will focus on regression modelling where assumptions of about the data become more important.</p>
+</div>
+<div id="preparation" class="section level1">
+<h1><span class="header-section-number">2</span> Preparation</h1>
+<p>As the following sections introduce basic inferential statistics for hypothesis testing in “R”, it is necessary to install “R”, “RStudio”, and “Tinn-R”. If these programms (or, in the case of “R”, environments) are not installed yet, please search for them in your favorite search engine and add the term “download”. Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).</p>
+<p>In addition, certain “libraries” need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the libraries needed for running the code below. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).</p>
+<pre class="r"><code># clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)
+# install libraries
+install.packages(c(&quot;stringr&quot;, &quot;VGAM&quot;, &quot;fGarch&quot;))</code></pre>
+<p>Once you have installed “R”, “R-Studio”, “Tinn-R”, and have also initiated the session by executing the code shown above, you are good to go.</p>
+</div>
+<div id="fishers-exact-test" class="section level1">
+<h1><span class="header-section-number">3</span> Fisher’s Exact Test</h1>
 <p>Fisher’s Exact test is very useful because it does not rely on distributional assumptions relying on normality. Instead, Fisher’s Exact Test calculates the probabilities of all possible outcomes and uses these to determine significance. To understand how a Fisher’s Exact test, we will use a very simple example.</p>
-<p>Imagine, you observe that an exchange student from Germany has written an essay and uses the phrase “very cool” seven times and the phrase “truely cool” once. This strikes you as odd (not because of the register but) because you would rather say “really uncool”. In other words, the co-occurrence of very plus cool seems non-native-like to you. So you have a look at a corpus to check which adverbs are used to modify “cool”. You find that “cool” is modifed by an adverb in 40 cases and the distribution is shown below.</p>
+<p>Imagine you are interested in adjective modification and you want to find out if “very” and “truly” differ in their collocational preferences. So you extract all instances of “cool”, all instances of “very”, and all instances of “truly” from a corpus. Now that you have gathered this data, you want to test if “truly” and “very” differ with respect to their preference to co-occur with “cool”. Accodingly, you tabulate the results and get the follwoing table.</p>
 <pre class="r"><code>library(knitr)                 # activate library for tabulating
 # generate data
-coolmatrix &lt;- matrix(c(&quot;truely&quot;, &quot;extremely&quot;, &quot;so&quot;,&quot;really&quot;, &quot;massively&quot;, &quot;very&quot;, &quot;Total&quot;, 5, 6, 8, 8, 5, 8, 40), ncol = 2, byrow = F)
-colnames(coolmatrix) &lt;- c(&quot;Combination&quot;, &quot;Frequency&quot;)
+coolmatrix &lt;- matrix(c(&quot;truly&quot;, &quot;very&quot;, 5, 17, 40, 41), ncol = 3, byrow = F)
+colnames(coolmatrix) &lt;- c(&quot;Adverb&quot;, &quot;with cool&quot;, &quot;with other adjectives&quot;)
 kable(coolmatrix, caption = &quot;Co-occurrence of cool with adverbs.&quot;)</code></pre>
 <table>
 <caption>Co-occurrence of cool with adverbs.</caption>
 <thead>
 <tr class="header">
-<th align="left">Combination</th>
-<th align="left">Frequency</th>
+<th align="left">Adverb</th>
+<th align="left">with cool</th>
+<th align="left">with other adjectives</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td align="left">truely</td>
+<td align="left">truly</td>
 <td align="left">5</td>
-</tr>
-<tr class="even">
-<td align="left">extremely</td>
-<td align="left">6</td>
-</tr>
-<tr class="odd">
-<td align="left">so</td>
-<td align="left">8</td>
-</tr>
-<tr class="even">
-<td align="left">really</td>
-<td align="left">8</td>
-</tr>
-<tr class="odd">
-<td align="left">massively</td>
-<td align="left">5</td>
+<td align="left">40</td>
 </tr>
 <tr class="even">
 <td align="left">very</td>
-<td align="left">8</td>
-</tr>
-<tr class="odd">
-<td align="left">Total</td>
-<td align="left">40</td>
+<td align="left">17</td>
+<td align="left">41</td>
 </tr>
 </tbody>
 </table>
-<p>You now want to find out whether the student diverges in their modification of “cool” from how native speakers would modify “cool”.</p>
-<p>The way to do this is to calculate the probability of getting “cool” seven times together with “very” plus “very” being modified by “truely” once given the frequencies of combinations in the corpus. The probability of getting “very” plus “cool” is 8 in 40 for the first instance, 7 in 39 for the second instance, 6 in 38 for the third instance, 5 in 37 for the fourth instance, 4 in 36 in the fifth instance, 3 in 35 in the sixth instance, and 2 in 34 in the seveneth instance. In addition, we need to add the probability of getting “truely cool” one which is 5 in 33.</p>
-<span class="math display">\[\begin{equation}
-
-p_{7very1truely} = \frac{8}{40} \times \frac{7}{39} \times \frac{6}{38} \times \frac{5}{37} \times \frac{4}{36} \times \frac{3}{35} \times \frac{2}{34} \times \frac{5}{33} 
-
-= .2 \times 0.1794872 \times 0.1578947 \times 0.1351351 \times 0.1111111 \times 0.08571429 \times 0.05882353 \times 0.1515152 = 
-
-= 0.0000006501554
-
-\end{equation}\]</span>
-<p>This probability is very low, but we also need to consider the probabilities of getting “truely cool” not at the very end (where we only have 33 combinations left) but at the very beginning and in all other positions. For getting “truely cool” first, we would calculate the probability as shown below:</p>
-<span class="math display">\[\begin{equation}
-
-p_{1+7} = \frac{5}{40}   \times  \frac{8}{39} \times \frac{7}{38} \times \frac{6}{37} \times \frac{5}{36} \times \frac{4}{35} \times \frac{3}{34} \times \frac{2}{33}
-
-= 0.125 \times 0.2051282 \times 0.1842105 \times 0.1621622 \times 0.1388889 \times 0.1142857 \times 0.08823529 \times 0.06060606
-
-= 0.0000006501554
-
-\end{equation}\]</span>
-<p>This measn that the combined probabilities of getting7 instances of “very cool” and one instance of “truely cool” given the distribution in the corpus is 0.000005201243 (8 0.0000006501554). This measn that the probability is really low. But is it so low that we can say that the language learner differs significantly fro expert users?</p>
-<pre class="r"><code># generate data
-Rank &lt;- c(1,3,5,6,8,9,10,11,17,19, 2,4,7,12,13,14,15,16,18,20)
-Groups &lt;- c(rep(&quot;LanguageFamily1&quot;, 10), rep(&quot;LanguageFamily2&quot;, 10))
-fisher.test(Rank, Groups) </code></pre>
+<p>To perform a Fisher’s Exact test, we first need to create a table with these results in “R”.</p>
+<pre class="r"><code># create table
+coolmx &lt;- matrix(c(5, 17, 40, 41),
+                 # number of rows of the table
+                 nrow = 2,
+                 # def. dimension names
+                 dimnames = list(Adverbs = c(&quot;truly&quot;, &quot;very&quot;),
+                                 Adjectives = c(&quot;cool&quot;, &quot;other adjective&quot;)))
+# inspect resulting table
+coolmx</code></pre>
+<pre><code>##        Adjectives
+## Adverbs cool other adjective
+##   truly    5              40
+##   very    17              41</code></pre>
+<p>Once we have the created a matrix with these numbers, we can perform the Fisher’s Exact test to see if “very” and “truly” differ in their preference to co-occur with “cool.”</p>
+<pre class="r"><code># perform test
+fisher.test(coolmx)</code></pre>
 <pre><code>## 
 ##  Fisher&#39;s Exact Test for Count Data
 ## 
-## data:  Rank and Groups
-## p-value = 1
-## alternative hypothesis: two.sided</code></pre>
+## data:  coolmx
+## p-value = 0.03024
+## alternative hypothesis: true odds ratio is not equal to 1
+## 95 percent confidence interval:
+##  0.08015294 0.96759831
+## sample estimates:
+## odds ratio 
+##  0.3048159</code></pre>
+<p>The results of the Fisher’s Exact test show that the p-value is lower than .05 and that we are therefor justified in assuming that “very” and “truly” differ in their collocational prefernces to co-occur with “cool.”</p>
 </div>
-<div id="ranking-and-sign-based-non-parametric-tests" class="section level2">
-<h2><span class="header-section-number">1.2</span> Ranking and Sign-Based Non-Parametric Tests</h2>
+<div id="ranking-and-sign-based-non-parametric-tests" class="section level1">
+<h1><span class="header-section-number">4</span> Ranking and Sign-Based Non-Parametric Tests</h1>
 <p>If the depended variable is neither nominal nor categorical, but ordinal (that is if the dependent variable represents an order factor such as ranks), using a chi-square test is not warranted. In such cases it is advisable to apply tests that are designed to handle ordinal data. In the following, we will therefore briefly touch on bivariate tests that can handle ordinal dependent variables.</p>
 </div>
-<div id="mann-whitney-u-test" class="section level2">
-<h2><span class="header-section-number">1.3</span> Mann-Whitney U Test</h2>
-<p>It is a rather frequent case that numeric depend variables are transformed or converted into ordinal variables because the distribution of residuals does not allow the application of a linear regression. Because we are dealing with ordinal data, the application of a chi-square test is unwarranted and we need to use another test. In such cases, the Mann-Whitney U Test, which may be used even if the groups under investigation represent identical participants that are tested under two conditions, represents a viable alternative. If we are dealing with independent groups, i.e. groups that do not consist of the same subjects, and the dependent variable is ordinal, then the Wilcox Test or the Mann-Whitney U Test can be implemented.</p>
-<pre class="r"><code># generate data
+<div id="mann-whitney-u-test-wilcoxon-rank-sum-test" class="section level1">
+<h1><span class="header-section-number">5</span> Mann-Whitney U-Test / Wilcoxon Rank Sum-Test</h1>
+<p>It is a rather frequent case that numeric depend variables are transformed or converted into ordinal variables because the distribution of residuals does not allow the application of a linear regression. Because we are dealing with ordinal data, the application of a chi-square test is unwarranted and we need to use another test. In such cases, the Mann-Whitney U-test (also called Wilcoxon rank sum-test) can be used.</p>
+<p>The Mann-Whitney U-test can also be used if the groups under investigation represent identical participants that are tested under two conditions.</p>
+<p>Imaging we wanted to determine if two language families differed with resepct to the size of their phoneme inventories. You have already ranked the inventory sizes and would now like to now if language family correlates with inventory size. To answer this question, you cerate the table shown below.</p>
+<pre class="r"><code># create table
 Rank &lt;- c(1,3,5,6,8,9,10,11,17,19, 2,4,7,12,13,14,15,16,18,20)
-Groups &lt;- c(rep(&quot;LanguageFamily1&quot;, 10), rep(&quot;LanguageFamily2&quot;, 10))
-wilcox.test(Rank ~ Groups) # Rank is ordinal and Groups is a binary factor</code></pre>
+Groups &lt;- c(rep(&quot;Lang.Fam.1&quot;, 10), rep(&quot;Lang.Fam.2&quot;, 10))
+Languagefamilytb &lt;- data.frame(Groups, Rank)
+# inspect table
+Languagefamilytb</code></pre>
+<pre><code>##        Groups Rank
+## 1  Lang.Fam.1    1
+## 2  Lang.Fam.1    3
+## 3  Lang.Fam.1    5
+## 4  Lang.Fam.1    6
+## 5  Lang.Fam.1    8
+## 6  Lang.Fam.1    9
+## 7  Lang.Fam.1   10
+## 8  Lang.Fam.1   11
+## 9  Lang.Fam.1   17
+## 10 Lang.Fam.1   19
+## 11 Lang.Fam.2    2
+## 12 Lang.Fam.2    4
+## 13 Lang.Fam.2    7
+## 14 Lang.Fam.2   12
+## 15 Lang.Fam.2   13
+## 16 Lang.Fam.2   14
+## 17 Lang.Fam.2   15
+## 18 Lang.Fam.2   16
+## 19 Lang.Fam.2   18
+## 20 Lang.Fam.2   20</code></pre>
+<p>We will also briefly inspect the data visually using a box plot.</p>
+<pre class="r"><code># inspect data
+par(mfrow=c(1,2))
+boxplot(Languagefamilytb$Rank ~ Languagefamilytb$Groups, col = c(&quot;orange&quot;, &quot;darkgrey&quot;), main = &quot;&quot;)
+par(mfrow=c(1,1))</code></pre>
+<p><img src="basicstatz_files/figure-html/mwu2-1.png" width="672" /></p>
+<p>To use Mann-Whitney U test, the dependent variable (Rank) must be ordinal and independent variable (Group) must be a binary factor. We briefly check this by inspecting teh structure of the data.</p>
+<pre class="r"><code># perform test
+str(Languagefamilytb) </code></pre>
+<pre><code>## &#39;data.frame&#39;:    20 obs. of  2 variables:
+##  $ Groups: Factor w/ 2 levels &quot;Lang.Fam.1&quot;,&quot;Lang.Fam.2&quot;: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ Rank  : num  1 3 5 6 8 9 10 11 17 19 ...</code></pre>
+<p>As the variables are what we need them to be, we can now perform the Mann-Whitney U test on the table.</p>
+<pre class="r"><code># perform test
+wilcox.test(Languagefamilytb$Rank ~ Languagefamilytb$Groups) </code></pre>
 <pre><code>## 
 ##  Wilcoxon rank sum test
 ## 
-## data:  Rank by Groups
+## data:  Languagefamilytb$Rank by Languagefamilytb$Groups
 ## W = 34, p-value = 0.2475
 ## alternative hypothesis: true location shift is not equal to 0</code></pre>
-<p>If you are dealing with dependent groups, you have to set the argument “paired” to “TRUE” as in the dependent 2-group Wilcoxon Signed Rank Test below. In this example, y1 and y2 are both numeric.</p>
-<pre class="r"><code>#wilcox.test(y1,y2,paired=TRUE) # where y1 and y2 are numeric</code></pre>
+<p>The results of the Wilcoxon rank sum test tell use that the two language families to not differ significantly with respect to their phoeneme inventory size as the p-value is greater than .05.</p>
+<p>The Wilcoxon rank sum test can also be used with continuity correction. A continuety correction is neccessary when both variables represent numeric values that are non-normal. In the following example, we want to test if the reaction time for identifying a word as real is correlated with its token frequency.</p>
+<p>For this example, we generate data is deliberately non-normal.</p>
+<pre class="r"><code># load librarieslibrary(VGAM)
+library(fGarch)
+# generate non-normal skewed numeric data
+r=.1 
+Frequency=rsnorm(100,0,2,4)
+NormalReaction=rsnorm(100,0,2,4)
+ReactionTimes=Frequency*r+NormalReaction*sqrt(1-r^2)
+# inspect data
+par(mfrow=c(1,2))
+boxplot(Frequency, col = &quot;orange&quot;, main = &quot;Frequency&quot;)
+boxplot(ReactionTimes, col = &quot;darkgrey&quot;, main = &quot;Reaction Times&quot;)</code></pre>
+<p><img src="basicstatz_files/figure-html/mwu5-1.png" width="672" /></p>
+<pre class="r"><code>par(mfrow=c(1,1))</code></pre>
+<p>Both variables are skewed but we can use the Wilcoxon rank sum test with continuity correction which takes the skewness into account.</p>
+<pre class="r"><code># perform test
+wilcox.test(ReactionTimes, Frequency) </code></pre>
+<pre><code>## 
+##  Wilcoxon rank sum test with continuity correction
+## 
+## data:  ReactionTimes and Frequency
+## W = 5490, p-value = 0.2317
+## alternative hypothesis: true location shift is not equal to 0</code></pre>
+<p>When performing the Wilcoxon rank sum test with data that represent the same individulas that were tested under two condition, i.e. if the samples are dependent, then the argument “paired” has to be “TRUE”.</p>
+<p>In this example, the same individuals had to read tongue twisters when they were sober and when they were intoxicated. A Wilcoxon signed rank test with continuity correction is used to test if the number of errors that occur when reading tongue twisters correlates with being sober/intoxicated. Again, we create ficticious data.</p>
+<pre class="r"><code># create data
+Sober &lt;- sample(0:9, 15, replace = T)
+Intoxicated &lt;-  sample(3:12, 15, replace = T) 
+# tabulate data
+intoxtb &lt;- data.frame(Sober, Intoxicated) 
+# inspect data
+str(intoxtb)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    15 obs. of  2 variables:
+##  $ Sober      : int  2 0 0 0 9 9 3 4 9 9 ...
+##  $ Intoxicated: int  6 8 11 6 12 5 4 7 5 7 ...</code></pre>
+<p>Now, we briefly plot the data.</p>
+<pre class="r"><code># inspect data
+boxplot(intoxtb$Sober, intoxtb$Intoxicated, col = c(&quot;orange&quot;, &quot;darkgrey&quot;), main = &quot;&quot;, ylab = &quot;Number of errors&quot;, xlab = &quot;State&quot;, data = intoxtb)</code></pre>
+<p><img src="basicstatz_files/figure-html/mwu8-1.png" width="672" /></p>
+<p>The boxes indicate a significant difference. Finally, we perform the Wilcoxon signed rank test with continuity correction,</p>
+<pre class="r"><code># perform test
+wilcox.test(intoxtb$Sober, intoxtb$Intoxicated, paired=T) </code></pre>
+<pre><code>## 
+##  Wilcoxon signed rank test with continuity correction
+## 
+## data:  intoxtb$Sober and intoxtb$Intoxicated
+## V = 21.5, p-value = 0.03054
+## alternative hypothesis: true location shift is not equal to 0</code></pre>
+<p>The p-value is lower than .05 which means that the number of errors when reading tongue twisters is affected by one’s state (sober/intoxicated) - at least in this ficticious example.</p>
 </div>
-<div id="kruskal-wallis-test" class="section level2">
-<h2><span class="header-section-number">1.4</span> Kruskal Wallis Test</h2>
-<p>The Kruskal Wallis Test is a type of “Analysis of Variance” or ANOVA. For this reason, the Kruskal Wallis Test is also referd to as a “one-way Anova by ranks” which can not only handle numeric but also ordinal data. In the example below, y is numeric and x is a factor.</p>
-<pre class="r"><code>y &lt;- c(15, 13, 10, 8, 37, 23, 31, 52, 11, 17)
-x &lt;- c(&quot;A&quot;, &quot;A&quot;, &quot;A&quot;, &quot;A&quot;, &quot;A&quot;, &quot;B&quot;, &quot;B&quot;, &quot;B&quot;, &quot;B&quot;, &quot;B&quot;)
-#kruskal.test(y~x) </code></pre>
+<div id="kruskal-wallis-rank-sum-test" class="section level1">
+<h1><span class="header-section-number">6</span> Kruskal-Wallis Rank Sum Test</h1>
+<p>The Kruskal-Wallis rank sum test is a type of “Analysis of Variance” or ANOVA. For this reason, the Kruskal Wallis Test is also referd to as a “one-way Anova by ranks” which can handle numeric and ordinal data.</p>
+<p>In the example below, uhm represents the number of filled pauses in a short 5 minute interview while speaker represents whether the speaker was a native speaker or a learner of English. As before, the data is generated and thus artificial.</p>
+<pre class="r"><code># create data
+Uhms &lt;- c(15, 13, 10, 8, 37, 23, 31, 52, 11, 17)
+Speaker &lt;- c(rep(&quot;Learner&quot;, 5), rep(&quot;NativeSpeaker&quot;, 5))
+# create table
+uhmtb &lt;- data.frame(Speaker, Uhms)
+# inspect table
+str(uhmtb)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    10 obs. of  2 variables:
+##  $ Speaker: Factor w/ 2 levels &quot;Learner&quot;,&quot;NativeSpeaker&quot;: 1 1 1 1 1 2 2 2 2 2
+##  $ Uhms   : num  15 13 10 8 37 23 31 52 11 17</code></pre>
+<p>Now, we briefly plot the data.</p>
+<pre class="r"><code># inspect data
+boxplot(uhmtb$Uhms ~ uhmtb$Speaker, col = c(&quot;orange&quot;, &quot;darkgrey&quot;), main = &quot;&quot;, ylab = &quot;Number of errors&quot;, xlab = &quot;State&quot;)</code></pre>
+<p><img src="basicstatz_files/figure-html/kwt2-1.png" width="672" /></p>
+<p>Now, we test for statistical significance.</p>
+<pre class="r"><code>kruskal.test(uhmtb$Speaker~uhmtb$Uhms) </code></pre>
+<pre><code>## 
+##  Kruskal-Wallis rank sum test
+## 
+## data:  uhmtb$Speaker by uhmtb$Uhms
+## Kruskal-Wallis chi-squared = 9, df = 9, p-value = 0.4373</code></pre>
+<p>The Kruskal-Wallis test does not report a significant difference for the number of “uhms” produced by native speakers and learners of English in the ficticious data.</p>
 </div>
-<div id="the-friedman-test" class="section level2">
-<h2><span class="header-section-number">1.5</span> The Friedman Test</h2>
-<p>The Friedman Test is also called a randomized block design and it is used where y are the data values, x is a grouping factor and and z is a blocking factor.</p>
-<pre class="r"><code># friedman.test(y~x|z)</code></pre>
+<div id="the-friedman-rank-sum-test" class="section level1">
+<h1><span class="header-section-number">7</span> The Friedman Rank Sum Test</h1>
+<p>The Friedman rank sum test is also called a randomized block design and it is used when the correlation between a numeric dependent variable, a grouping factor and a blocking factor is tested. The Friedman rank sum test assumes that each combination of the grouping factor (Gender) and the blocking factor (Age) occur only once. Thus, imagine that the values of “Uhms” represent the means of the respective groups.</p>
+<pre class="r"><code># create data
+Uhms &lt;- c(7.2, 9.1, 14.6, 13.8)
+Gender &lt;- c(&quot;Female&quot;, &quot;Male&quot;, &quot;Female&quot;, &quot;Male&quot;)
+Age &lt;- c(&quot;Young&quot;, &quot;Young&quot;, &quot;Old&quot;, &quot;Old&quot;)
+# create table
+uhmtb2 &lt;- data.frame(Gender, Age, Uhms)
+# inspect table
+uhmtb2</code></pre>
+<pre><code>##   Gender   Age Uhms
+## 1 Female Young  7.2
+## 2   Male Young  9.1
+## 3 Female   Old 14.6
+## 4   Male   Old 13.8</code></pre>
+<pre class="r"><code># perform Friedman test
+friedman.test(Uhms ~ Age | Gender, data = uhmtb2)</code></pre>
+<pre><code>## 
+##  Friedman rank sum test
+## 
+## data:  Uhms and Age and Gender
+## Friedman chi-squared = 2, df = 1, p-value = 0.1573</code></pre>
+<p>In our example, age does not affect the use of filled pauses even if we control for gender as the p-value is higher than .05.</p>
 <blockquote>
 <p>Exercises</p>
 </blockquote>
-</div>
-</div>
-<div id="references" class="section level1">
-<h1><span class="header-section-number">2</span> References</h1>
+<p><img src="images/uq2.jpg" width="100%" /></p>
 </div>
 
 
