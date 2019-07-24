@@ -1055,8 +1055,13 @@ head(ordata); nrow(ordata)
 
 ```{r orr2, eval = T, echo=T, message=FALSE, warning=FALSE}
 #
-ordata$Recommend <- factor(ordata$Recommend, levels=1:3, labels=c("General", "Academic", 
-                                                     "Vocational"))
+ordata$Recommend <- factor(ordata$Recommend, 
+                           levels=c("unlikely", 
+                                    "somewhat likely", 
+                                    "very likely"),
+                           labels=c("unlikely", 
+                                    "somewhat likely", 
+                                    "very likely"))
 # one at a time, table apply, pared, and public
 lapply(ordata[, c("Recommend", "Internal", "Exchange")], table)
 ```
@@ -1069,16 +1074,16 @@ ftable(xtabs(~ Exchange + Recommend + Internal, data = ordata))
 
 ```{r orr4, eval = T, echo=T, message=FALSE, warning=FALSE}
 
-summary(ordata$gpa); sd(ordata$gpa)
+summary(ordata$FinalScore); sd(ordata$FinalScore)
 ```
 
 
 ```{r orr5, eval = T, echo=T, message=FALSE, warning=FALSE}
 # visualize data
-ggplot(ordata, aes(x = apply, y = gpa)) +
+ggplot(ordata, aes(x = Recommend, y = FinalScore)) +
   geom_boxplot(size = .75) +
   geom_jitter(alpha = .5) +
-  facet_grid(pared ~ public, margins = TRUE) +
+  facet_grid(Exchange ~ Internal, margins = TRUE) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
 ```
 
@@ -1086,7 +1091,7 @@ ggplot(ordata, aes(x = apply, y = gpa)) +
 
 ```{r orr6, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## fit ordered logit model and store results 'm'
-m <- polr(apply ~ pared + public + gpa, data = ordata, Hess=TRUE)
+m <- polr(Recommend ~ Internal + Exchange + FinalScore, data = ordata, Hess=TRUE)
 ## view a summary of the model
 summary(m)
 ```
@@ -1177,34 +1182,34 @@ summary(poissantr)
 
 ```{r pr6, eval = T, echo=T, message=FALSE, warning=FALSE}
 # 
-cov.m1 <- vcovHC(m1, type="HC0")
+cov.m1 <- vcovHC(poissantr, type="HC0")
 std.err <- sqrt(diag(cov.m1))
-r.est <- cbind(Estimate= coef(m1), "Robust SE" = std.err,
-"Pr(>|z|)" = 2 * pnorm(abs(coef(m1)/std.err), lower.tail=FALSE),
-LL = coef(m1) - 1.96 * std.err,
-UL = coef(m1) + 1.96 * std.err)
+r.est <- cbind(Estimate= coef(poissantr), "Robust SE" = std.err,
+"Pr(>|z|)" = 2 * pnorm(abs(coef(poissantr)/std.err), lower.tail=FALSE),
+LL = coef(poissantr) - 1.96 * std.err,
+UL = coef(poissantr) + 1.96 * std.err)
 # inspect data
 r.est
 ```
 
 ```{r pr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 
-with(m1, cbind(res.deviance = deviance, df = df.residual,
+with(poissantr, cbind(res.deviance = deviance, df = df.residual,
   p = pchisq(deviance, df.residual, lower.tail=FALSE)))
 ```
 
 
 ```{r pr8, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## update m1 model dropping prog
-m2 <- update(m1, . ~ . - prog)
+poissantr2 <- update(poissantr, . ~ . - prog)
 ## test model differences with chi square test
-anova(m2, m1, test="Chisq")
+anova(poissantr2, poissantr, test="Chisq")
 ```
 
 ```{r pr9, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
-                                                coef(m1), cov.m1)
+                                                coef(poissantr), cov.m1)
 
 ## exponentiate old estimates dropping the p values
 rexp.est <- exp(r.est[, -3])
@@ -1220,13 +1225,13 @@ rexp.est
 (s1 <- data.frame(math = mean(p$math),
   prog = factor(1:3, levels = 1:3, labels = levels(p$prog))))
 
-predict(m1, s1, type="response", se.fit=TRUE)
+predict(poissantr, s1, type="response", se.fit=TRUE)
 ```
 
 
 ```{r pr11, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## calculate and store predicted values
-p$phat <- predict(m1, type="response")
+p$phat <- predict(poissantr, type="response")
 
 ## order by program and then by math
 p <- p[with(p, order(prog, math)), ]

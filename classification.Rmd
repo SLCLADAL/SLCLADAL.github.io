@@ -11,7 +11,30 @@ link-citations: yes
 knitr::include_graphics("images/uq1.jpg")
 ```
 
-In this tutorial we show the use of supervised machine learning for text classification. The basic idea is to compute a model based on training data. Training data usually are hand-coded documents or text snippets associated with a specific category (class). From these texts, features (e.g. words) are extracted and associated with categories in the model. The model then can be utilized to categorize new texts.
+# Introduction
+
+This tutorial introduces classification using "R". The entire code for the sections below can be downloaded [here](https://slcladal.github.io/rscripts/textanalysisscript.r).  
+
+# Preparation
+
+As the following sections introduce classification using "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not installed yet, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
+
+In addition, certain "libraries" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the libraries needed for running the code below. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)
+# install libraries
+install.packages(c("LiblineaR", "tm"))
+```
+
+Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
+
+# Classification of textual data
+
+In this section we show the use of supervised machine learning for text classification. The basic idea is to compute a model based on training data. Training data usually are hand-coded documents or text snippets associated with a specific category (class). From these texts, features (e.g. words) are extracted and associated with categories in the model. The model then can be utilized to categorize new texts.
 
 We cover basic principles of the process such as cross-validation and feature engineering in the following steps:
 
@@ -31,9 +54,8 @@ As data, again we use the "State of the Union"-addresses. But this time, we oper
 As already known, we read the text source (21334 paragraphs from 231 speeches). For the moment, we apply very basic preprocessing.
 
 ```{r initalisierung, message=FALSE, warning=FALSE, results='hide', cache=T}
-options(stringsAsFactors = FALSE)
 library(tm)
-textdata <- read.csv("data/sotu_paragraphs.csv", sep = ";", encoding = "UTF-8")
+textdata <- read.delim("data/sotu_paragraphs.txt", sep = "\t", header = T, skipNul = T, quote = "")
 english_stopwords <- readLines("resources/stopwords_en.txt", encoding = "UTF-8")
 # Create corpus object
 corpus <- Corpus(DataframeSource(textdata))
@@ -46,13 +68,16 @@ processedCorpus <- tm_map(processedCorpus, stripWhitespace)
 
 # Load training data
 
-We provide 300 manually annotated example paragraphs as training data. In a CSV-file, the paragraph id and the corresponding category is stored.
+We provide 300 manually annotated example paragraphs as training data. In the file "paragraph_training_data.txt", the paragraph id and the corresponding category is stored.
 
 ```{r}
 # Read previously annotated training data
-trainingData <- read.csv2("data/paragraph_training_data_format.csv", stringsAsFactors = T)
+trainingData <- read.delim("data/paragraph_training_data.txt", sep = "\t", header = T, quote = "")
 # Training data format 
 colnames(trainingData)
+
+str(trainingData)
+
 # Example paragraph Foreign Affairs
 set.seed(13)
 domestic_example <- sample(trainingData$ID[trainingData$LABEL == "DOMESTIC"], 1)
@@ -93,7 +118,7 @@ Then, we split the annotated data into a training set (80%) and a test set (20%)
 ```{r classificationFirst, message=FALSE, warning=FALSE, cache=T}
 require(LiblineaR)
 require(SparseM)
-source("utils.R")
+source("rscripts/utils.R")
 annotatedDTM <- DTM[trainingData[, "ID"], ]
 annotatedDTM <- convertSlamToSparseM(annotatedDTM)
 annotatedLabels <- trainingData[, "LABEL"]
@@ -121,7 +146,7 @@ print(accuracy) # Accuracy = Anteil korrekt klassifizierter Elemente
 
 The accuracy of `r accuracy` appears moderate for a first try. But how does it actually relate to a base line? Think of the imbalanced class proportions in our training set. Let us create a pseudo classification as base line, in which we do not classify at all, but simply assume the label "DOMESTIC" or "FOREIGN" for each paragraph.
 
-We further employ a function called `F.measure` which gives more differentiated measures than simple accuracy (`A`)to determine the classification quality. The F.measure (`F`) is the harmonic mean of Precision (`P`) and Recall (`R`) (see https://en.wikipedia.org/wiki/Precision_and_recall#Definition_.28classification_context.29 for Details).
+We further employ a function called "F.measure" which gives more differentiated measures than simple accuracy ("A")to determine the classification quality. The F.measure ("F") is the harmonic mean of Precision ("P") and Recall ("R") (see https://en.wikipedia.org/wiki/Precision_and_recall#Definition_.28classification_context.29 for Details).
 
 ```{r}
 # Create pseudo classification
