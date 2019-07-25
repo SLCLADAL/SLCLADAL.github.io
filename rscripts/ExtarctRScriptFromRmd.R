@@ -1,0 +1,68 @@
+#####################################################
+# Title: Extracting R-code from R-Markdown documents
+# Author: Martin Schweinberger
+# Date: 20190725
+#####################################################
+# create function
+extractingR <- function(path){
+  require(stringr)
+  name <- str_replace_all(path, ".*/", "")
+  name <- str_replace_all(name, fixed(".Rmd"), "")
+  x <- readLines(path)
+  x <- str_replace_all(x, "^", "startlineelement")
+  x <- paste(x, collapse = "")
+  # remove non rscript sections
+  x <- gsub("```{", "QWERTZ", x, fixed = T)
+  x <- gsub("```", "qwertz", x, fixed = T)
+  x <- gsub("qwertz.*?QWERTZ", "\n", x)
+  x <- strsplit(x, "startlineelement")
+  x <- unlist(x)
+  # clean content
+  x <- str_replace_all(x, ".*knitr::include.*", "")
+  x <- str_replace_all(x, "QWERTZr.*", "")
+  x <- str_replace_all(x, ".*warning=.*", "")
+  x <- str_replace_all(x, ".*qwertz.*", "")
+  x <- str_replace_all(x, ".*r uq2.*", "")
+  x <- str_replace_all(x, "title:", "# ")
+  x <- str_replace_all(x, "author:", "#")
+  x <- str_replace_all(x, "output:.*", "#")
+  x <- str_replace_all(x, ".*bookdown.*", "")
+  x <- str_replace_all(x, ".*output:.*", "")  
+  x <- str_replace_all(x, ".*bibliography.bib.*", "")
+  x <- str_replace_all(x, "link-citations.*", "")
+  x <- str_replace_all(x, ".*---.*", "")
+  x <- str_replace_all(x, fixed("%Y-%m-%d"), "QWERTZ")
+  x <- str_replace_all(x, ".*QWERTZ.*", "")
+  x <- str_replace_all(x, fixed("#  "), "# ")
+  # remove empty elements
+  x <- str_replace_all(x, "^", "startlineelement")
+  x <- paste(x, collapse = "")
+  x <- str_replace_all(x, fixed("startlineelement\n"), "")
+  x <- str_replace_all(x, "startlineelement {0,}startlineelement", "startlineelement")
+  x <- str_replace_all(x, "startlineelementstartlineelement", "startlineelement")
+  x <- str_replace_all(x, "startlineelementstartlineelement", "startlineelement")
+  x <- strsplit(x, "startlineelement")
+  x <- unlist(x)  
+  write(x, file = paste("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\rscripts/", name, "rscript.r", sep = "", collapse = ""))
+}
+# apply function
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/collostructionalanalysis.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/advancedstatztrees.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/stringprocessing.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/textanalysis.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/basicstatzchi.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/fixedregressions.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/mixedregressions.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/basicgraphs.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/basicquant.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/groupingstatz.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/corplingr.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/descriptivestatz.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/introloading.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/intror.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/network.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/regularexpressions.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/tagging.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/topicmodels.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/webcrawling.Rmd")
+extractingR("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io/workingwithr.Rmd")
