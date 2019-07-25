@@ -13,11 +13,11 @@ knitr::include_graphics("images/uq1.jpg")
 
 # Introduction
 
-This tutorial introduces classification using "R". The entire code for the sections below can be downloaded [here](https://slcladal.github.io/rscripts/textanalysisscript.r).  
+This tutorial introduces classification using "R". The entire code for the sections below can be downloaded [here](https://slcladal.github.io/rscripts/classificationrscript.r).  
 
 # Preparation
 
-As the following sections introduce classification using "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not installed yet, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
+As all caluculations and visualizations in this tutorial rely on "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not installed yet, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
 
 In addition, certain "libraries" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the libraries needed for running the code below. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
@@ -53,42 +53,50 @@ As data, again we use the "State of the Union"-addresses. But this time, we oper
 
 As already known, we read the text source (21334 paragraphs from 231 speeches). For the moment, we apply very basic preprocessing.
 
-```{r initalisierung, message=FALSE, warning=FALSE, results='hide', cache=T}
+```{r class1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
 library(tm)
-textdata <- read.delim("data/sotu_paragraphs.txt", sep = "\t", header = T, skipNul = T, quote = "")
-english_stopwords <- readLines("resources/stopwords_en.txt", encoding = "UTF-8")
-# Create corpus object
-corpus <- Corpus(DataframeSource(textdata))
-# Preprocessing chain
+library(quanteda)
+# load data
+testdata <- read.delim("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/testparagraphs.txt", sep = "\t", header = T)
+str(testdata)
+```
+
+Now that the test data is loaded into "R", we load a list of stopwords into "R".
+
+```{r class2, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load stop words
+english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
+# inspect stop words
+head(english_stopwords)
+```
+
+```{r class3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# create corpus object
+corpus <- Corpus(DataframeSource(testdata))
+# preprocessing chain
 processedCorpus <- tm_map(corpus, content_transformer(tolower))
 processedCorpus <- tm_map(processedCorpus, removePunctuation, preserve_intra_word_dashes = TRUE)
 processedCorpus <- tm_map(processedCorpus, removeNumbers)
 processedCorpus <- tm_map(processedCorpus, stripWhitespace)
+# inspect corpus
+as.character(processedCorpus[[2]])
 ```
 
 # Load training data
 
 We provide 300 manually annotated example paragraphs as training data. In the file "paragraph_training_data.txt", the paragraph id and the corresponding category is stored.
 
-```{r}
-# Read previously annotated training data
-trainingData <- read.delim("data/paragraph_training_data.txt", sep = "\t", header = T, quote = "")
-# Training data format 
-colnames(trainingData)
-
-str(trainingData)
-
-# Example paragraph Foreign Affairs
-set.seed(13)
-domestic_example <- sample(trainingData$ID[trainingData$LABEL == "DOMESTIC"], 1)
-as.character(corpus[[domestic_example]])
-foreign_example <- sample(trainingData$ID[trainingData$LABEL == "FOREIGN"], 1)
-as.character(corpus[[foreign_example]])
+```{r class4, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load training data (already annotated)
+trainingData <- read.delim("https://slcladal.github.io/data/paragraph_training_data.txt", sep = "\t", header = T, quote = "")
+# inspect data 
+colnames(trainingData); str(trainingData)
 ```
 
 How is the ratio between domestic and foreign content in the training data?
 
-```{r}
+```{r class5, echo=T, eval = T, message=FALSE, warning=FALSE}
 classCounts <- table(trainingData[, "LABEL"])
 print(classCounts)
 numberOfDocuments <- nrow(trainingData)
@@ -96,7 +104,7 @@ numberOfDocuments <- nrow(trainingData)
 
 For our first classification attempt, we create a Document-Term Matrix from the preprocessed corpus and use the extracted single words (unigrams) as features for the classification. Since the resulting DTM might contain too many words, we restrict the vocabulary to a minimum frequency.
 
-```{r calcDTM, cache=TRUE}
+```{r class6, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Base line: create feature set out of unigrams
 DTM <- DocumentTermMatrix(processedCorpus)
 # How many features do we have?
@@ -115,10 +123,10 @@ First, we load the packages. Since Liblinear requires a special Sparse Matrix fo
 
 Then, we split the annotated data into a training set (80%) and a test set (20%) using a boolean selector. The expression assigned to `selector_idx` creates a boolean vector of length `r numberOfDocuments` containing a FALSE value in every fifths position. This selector is used to select to training set. Its inverted vector (!) is used to select the test set.
 
-```{r classificationFirst, message=FALSE, warning=FALSE, cache=T}
+```{r class7, echo=T, eval = T, message=FALSE, warning=FALSE}
 require(LiblineaR)
 require(SparseM)
-source("rscripts/utils.R")
+source("https://slcladal.github.io/rscripts/utils.R")
 annotatedDTM <- DTM[trainingData[, "ID"], ]
 annotatedDTM <- convertSlamToSparseM(annotatedDTM)
 annotatedLabels <- trainingData[, "LABEL"]
@@ -135,20 +143,21 @@ summary(model)
 
 The model created by the LiblineaR function can now be utilized to predict the labels of the test set. Then we compare the result of the automatic classification to our known labels to determine the accuracy of the process.
 
-```{r}
+```{r class8, echo=T, eval = T, message=FALSE, warning=FALSE}
 classification <- predict(model, testDTM) 
 predictedLabels <- classification$predictions
 contingencyTable <- table(predictedLabels, testLabels)
-print(contingencyTable) # Kontingenztabelle ausgeben
+print(contingencyTable) 
+# calculate accuracy
 accuracy <- sum(diag(contingencyTable)) / length(testLabels)
-print(accuracy) # Accuracy = Anteil korrekt klassifizierter Elemente
+print(accuracy) 
 ```
 
 The accuracy of `r accuracy` appears moderate for a first try. But how does it actually relate to a base line? Think of the imbalanced class proportions in our training set. Let us create a pseudo classification as base line, in which we do not classify at all, but simply assume the label "DOMESTIC" or "FOREIGN" for each paragraph.
 
 We further employ a function called "F.measure" which gives more differentiated measures than simple accuracy ("A")to determine the classification quality. The F.measure ("F") is the harmonic mean of Precision ("P") and Recall ("R") (see https://en.wikipedia.org/wiki/Precision_and_recall#Definition_.28classification_context.29 for Details).
 
-```{r}
+```{r class9, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Create pseudo classification
 pseudoLabelsDOM <- factor(rep("DOMESTIC", length(testLabels)), levels(testLabels))
 pseudoLabelsFOR <- factor(rep("FOREIGN", length(testLabels)), levels(testLabels))
@@ -176,7 +185,7 @@ The final result is determined from the average of the quality of the k runs. Th
 
 The `get_k_fold_logical_indexes` function introduced below returns a logical vector for the fold `j` for cross-validation. It splits a training data record of the size `n` into `k` folds. The resulting vector and its negated vector can be used for easy training data / test data selection.
 
-```{r}
+```{r class10, echo=T, eval = T, message=FALSE, warning=FALSE}
 get_k_fold_logical_indexes <- function(j, k, n) {
   if (j > k) stop("Cannot select fold larger than nFolds")
   fold_lidx <- rep(FALSE, k)
@@ -192,7 +201,7 @@ get_k_fold_logical_indexes(3, k = 10, n = 12)
 
 Now we run 1) splitting of the annotated data, 2) model computation and testing in one for-loop.
 
-```{r tenFoldCV, cache=T}
+```{r class11, echo=T, eval = T, message=FALSE, warning=FALSE}
 k <- 10
 evalMeasures <- NULL
 for (j in 1:k) {
@@ -240,7 +249,7 @@ High values of C lead to a high costs of misclassification. The decision boundar
 Low values of C lead to less strict decision boundaries, which accepts some misclassifications. Such a model might generalize better on unseen data. But in the end, there is now exact method to determine a good C-value beforehand. It rather is an empirical question. To choose an optimal C-value, we simply try from a range of values, run k-fold-cross-validation for each single value and decide for the C which resulted in the best classification accuracy / F-measure. This is realized in the following for-loop, which utilizes the function `k_fold_cross_validation`. The function (have a look into `F.measure.R`) simply wraps the code for cross-validation, we used above.
 
 
-```{r optimizeC, cache=T}
+```{r class12, echo=T, eval = T, message=FALSE, warning=FALSE}
 cParameterValues <- c(0.003, 0.01, 0.03, 0.1, 0.3, 1, 3 , 10, 30, 100)
 fValues <- NULL
 for (cParameter in cParameterValues) {
@@ -264,7 +273,7 @@ Not only the classification model has parameters which can be optimized to impro
 
 Stop words often do not contribute to the meaning of a text. For the decision between DOMESTIC and FOREIGN affairs, we do not expect any useful information from them. So let's remove them and if it improves the classifier.
 
-```{r, optimizePreprocessing1, cache = T, message=FALSE, warning=FALSE}
+```{r class13, echo=T, eval = T, message=FALSE, warning=FALSE}
 processedCorpus <- tm_map(corpus, content_transformer(tolower))
 processedCorpus <- tm_map(processedCorpus, removeWords, english_stopwords)
 processedCorpus <- tm_map(processedCorpus, removePunctuation, preserve_intra_word_dashes = TRUE)
@@ -283,7 +292,7 @@ Now let us see, if the use of bigrams, i.e. concatenations of sequences of two w
 
 **Bigrams**
 
-```{r, optimizePreprocessing2, cache = T, message=FALSE, warning=FALSE}
+```{r class14, echo=T, eval = T, message=FALSE, warning=FALSE}
 require(tokenizers)
 tokenize_ngrams("This is a test", n = 2, n_min = 1, ngram_delim = "_", simplify = T)
 bigram_corpus <- tm_map(processedCorpus, content_transformer(tokenize_ngrams), n = 2, n_min = 1, ngram_delim = "_", simplify = T)
@@ -300,7 +309,7 @@ k_fold_cross_validation(annotatedDTM, annotatedLabels, cost = best_C)
 
 Up to this point, we dropped features occurring less than five times in our data. Let's see if we include more features by decreasing the minimum frequency.
 
-```{r, optimizePreprocessing3, cache = T, message=FALSE, warning=FALSE}
+```{r class15, echo=T, eval = T, message=FALSE, warning=FALSE}
 # More features
 minimumFrequency <- 2
 DTM <- DocumentTermMatrix(bigram_corpus, control = list(bounds = list(global = c(minimumFrequency, Inf))))
@@ -314,7 +323,7 @@ k_fold_cross_validation(annotatedDTM, annotatedLabels, cost = best_C)
 
 As a last method, we utilize stemming (before bigram-concatenation) to unify different variants of the same semantic form (such as *nation* and *nations*).
 
-```{r, optimizePreprocessing4, cache = T, message=FALSE, warning=FALSE}
+```{r class16, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Stemming
 stemmed_corpus <- tm_map(processedCorpus, stemDocument, language = "english")
 stemmed_bigram_corpus <- tm_map(stemmed_corpus, content_transformer(tokenize_ngrams), n = 2, n_min = 1, ngram_delim = "_", simplify = T)
@@ -336,7 +345,7 @@ GENERAL ADVISE: For this tutorial we utilized a rather small training set of 300
 
 We now apply our best classification model to the entire data set, to determine the occurrence of FORGEIN/DOMESTIC affairs related content in each single speech.
 
-```{r finalClassification, cache = T, message=FALSE, warning=FALSE, fig.height=12, fig.width=10}
+```{r class17, cache = T, message=FALSE, warning=FALSE, fig.height=12, fig.width=10}
 # Final classification
 DTM <- DocumentTermMatrix(bigram_corpus, control = list(bounds = list(global = c(2, Inf))))
 annotatedDTM <- convertSlamToSparseM(DTM[trainingData[, "ID"], ])
@@ -348,13 +357,13 @@ table(final_labels) / sum(table(final_labels))
 
 We see that the classifier puts the majority of the around 21,000 paragraphs into the DOMESTIC category. We can visualize the result as a bar chart with `ggplot2`. For better readability
 
-```{r finalClassification2, cache = T, message=FALSE, warning=FALSE, fig.height=25, fig.width=10}
-speech_year <- substr(textdata$date, 0, 4)
-speech_id <- textdata$speech_doc_id
+```{r class18, cache = T, message=FALSE, warning=FALSE, fig.height=25, fig.width=10}
+speech_year <- substr(testdata$date, 0, 4)
+speech_id <- testdata$speech_doc_id
 paragraph_position <- unlist(sapply(table(speech_id), FUN = function(x) {1:x}))
 presidents_df <- data.frame(
   paragraph_position = paragraph_position,
-  speech = paste0(speech_id, ": ", textdata$president, "_", speech_year),
+  speech = paste0(speech_id, ": ", testdata$president, "_", speech_year),
   category = final_labels
 )
 # preserve speech order in chart by using factors

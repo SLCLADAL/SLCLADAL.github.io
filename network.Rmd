@@ -11,16 +11,40 @@ link-citations: yes
 knitr::include_graphics("images/uq1.jpg")
 ```
 
-This exercise will demonstrate how to perform co-occurrence analysis with **R** and the tm-package. It is shown how different significance measures can be used to extract semantic links between words. 
+# Introduction
+
+This Tutorial introduces network analysis and co-occurrence analysis with "R". It is shown how different significance measures can be used to extract semantic links between words and how such links can be displayed. The entire code for the sections below can be downloaded [here](https://slcladal.github.io/rscripts/networkrscript.r).
+
+# Preparation and session set up
+
+As all caluculations and visualizations in this tutorial rely on "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not already installed on your machine, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
+
+In addition, certain "libraries" or "packages" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the librariesby running the code below this paragraph. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # supress math annotation
+# install libraries
+install.packages(c("collostructions"))
+```
+
+Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
+
+
 
 Change to your working directory, create a new R script, load the tm-package and define a few already known default variables.
 
-```{r initalisierung, results='hide', message=FALSE, warning=FALSE}
-options(stringsAsFactors = FALSE)
+```{r net1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
 library(tm)
-textdata <- read.csv("data/sotu.csv", sep = ";", encoding = "UTF-8")
-english_stopwords <- readLines("resources/stopwords_en.txt", encoding = "UTF-8")
-# Create corpus object
+# load data
+textdata <- read.csv("https://slcladal.github.io/data/sotu.csv", sep = ";", encoding = "UTF-8")
+# load stopwords
+english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
+# create corpus object
 corpus <- Corpus(DataframeSource(textdata))
 ```
 
@@ -35,10 +59,10 @@ Important: The sentence segmentation must take place *before* the other preproce
 The following code defines two functions. One selects documents, the other decomposes a given document text into sentences with the help of a probabilistic model.
 
 
-```{r warning=F, message=F}
+```{r net2, echo=T, eval = T, message=FALSE, warning=FALSE}
 require(openNLP)
 # Function to convert a document in a vector of sentences
-convert_text_to_sentences <- function(text, lang = "en", SentModel = "resources/en-sent.bin") {
+convert_text_to_sentences <- function(text, lang = "en", SentModel = "https://slcladal.github.io/resources/en-sent.bin") {
   
   # Calculate sentenve boundaries as annotation with Apache OpenNLP Maxent-sentence-detector.
   sentence_token_annotator <- Maxent_Sent_Token_Annotator(language = lang, model = SentModel)
@@ -56,7 +80,7 @@ convert_text_to_sentences <- function(text, lang = "en", SentModel = "resources/
   return(sentences)
 }
 ```
-```{r warning=F, message=F}
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Function to convert a corpus of documents into a corpus of single sentences from documents
 reshape_corpus <- function(currentCorpus, ...) {
   
@@ -84,7 +108,7 @@ reshape_corpus <- function(currentCorpus, ...) {
 
 We apply the function `reshape_corpus` on our corpus of full speeches to receive a corpus of sentences.
 
-```{r reshapeCorpus, cache=TRUE}
+```{r net4, echo=T, eval = T, message=FALSE, warning=FALSE}
 # original corpus length and its first document
 length(corpus)
 substr(as.character(corpus[[1]]), 0, 200)
@@ -100,7 +124,7 @@ CAUTION: The newly decomposed corpus has now reached a considerable size of `r l
 
 Now we are returning to our usual pre-processing chain and apply it on the separated sentences.
 
-```{r preprocessCorpus, cache=TRUE}
+```{r net5, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Preprocessing chain
 sentenceCorpus <- tm_map(sentenceCorpus, content_transformer(tolower))
 sentenceCorpus <- tm_map(sentenceCorpus, removeWords, english_stopwords)
@@ -113,7 +137,7 @@ Again, we create a document-term-matrix. Only word forms which occur at least 10
 
 Additionally, we are interested in the joint occurrence of words in a sentence. For this, we do not need the exact count of how often the terms occur, but only the information whether they occur together or not. This can be encoded in a binary document-term-matrix. The parameter `weighting` in the control options calls the ` weightBin` function. This writes a 1 into the DTM if the term is contained in a sentence and 0 if not.
  
-```{r binDTM, cache=TRUE}
+```{r net6, echo=T, eval = T, message=FALSE, warning=FALSE}
 minimumFrequency <- 10
 binDTM <- DocumentTermMatrix(sentenceCorpus, control=list(bounds = list(global=c(minimumFrequency, Inf)), weighting = weightBin))
 ```
@@ -124,7 +148,7 @@ The counting of the joint word occurrence is easily possible via a matrix multip
 
 However, since we are working on very large matrices and the sparse matrix format (`slam`) which is used by the tm-package does not fully support the matrix multiplication, we first have to convert the `binDTM` into the format of the Matrix package which is more convenient to use.
 
-```{r message=FALSE}
+```{r net7, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Convert to sparseMatrix matrix
 require(Matrix)
 binDTM <- sparseMatrix(i = binDTM$i, j = binDTM$j, x = binDTM$v, dims = c(binDTM$nrow, binDTM$ncol), dimnames = dimnames(binDTM))
@@ -134,7 +158,7 @@ coocCounts <- t(binDTM) %*% binDTM
 
 Let's look at a snippet of the result. The matrix has `nTerms` rows and columns and is symmetric. Each cell contains the number of joint occurrences. In the diagonal, the frequencies of single occurrences of each term are encoded.
 
-```{r}
+```{r net8, echo=T, eval = T, message=FALSE, warning=FALSE}
 as.matrix(coocCounts[202:205, 202:205])
 ```
 
@@ -150,7 +174,7 @@ In order to not only count joint occurrence we have to determine their significa
 
 These quantities can be calculated for any term `coocTerm` as follows:
 
-```{r}
+```{r net9, echo=T, eval = T, message=FALSE, warning=FALSE}
 coocTerm <- "spain"
 k <- nrow(binDTM)
 ki <- sum(binDTM[, coocTerm])
@@ -161,7 +185,7 @@ kij <- coocCounts[coocTerm, ]
 
 An implementation in *R* for Mutual Information, Dice, and Log-Likelihood may look like this. At the end of each formula, the result is sorted so that the most significant co-occurrences are at the first ranks of the list.
 
-```{r results='hide', message=FALSE, warning=FALSE}
+```{r net10, echo=T, eval = T, message=FALSE, warning=FALSE}
 ########## MI: log(k*kij / (ki * kj) ########
 mutualInformationSig <- log(k * kij / (ki * kj))
 mutualInformationSig <- mutualInformationSig[order(mutualInformationSig, decreasing = TRUE)]
@@ -179,7 +203,7 @@ logsig <- logsig[order(logsig, decreasing=T)]
 
 The result of the four variants for the statistical extraction of co-occurrence terms is shown in a data frame below. It can be seen that frequency is a bad indicator of meaning constitution. Mutual information emphasizes rather rare events in the data. Dice and Log-likelihood yield very well interpretable contexts.
 
-```{r}
+```{r net11, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Put all significance statistics in one Data-Frame
 resultOverView <- data.frame(
   names(sort(kij, decreasing=T)[1:10]), sort(kij, decreasing=T)[1:10],
@@ -199,9 +223,9 @@ In the following, we create a network visualization of significant co-occurrence
 For this, we provide the calculation of the co-occurrence significance measures, which we have just introduced, as single function in the file `calculateCoocStatistics.R`.  This function can be imported into the current R-Session with the `source` command.
 
 
-```{r}
+```{r net12, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Read in the source code for the co-occurrence calculation
-source("rscripts/calculateCoocStatistics.R")
+source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # Definition of a parameter for the representation of the co-occurrences of a concept
 numberOfCoocs <- 15
 # Determination of the term of which co-competitors are to be measured.
@@ -210,7 +234,7 @@ coocTerm <- "california"
 
 We use the imported function `calculateCoocStatistics` to calculate the co-occurrences for the target term *"california"*.
 
-```{r}
+```{r net13, echo=T, eval = T, message=FALSE, warning=FALSE}
 coocs <- calculateCoocStatistics(coocTerm, binDTM, measure="LOGLIK")
 # Display the numberOfCoocs main terms
 print(coocs[1:numberOfCoocs])
@@ -222,7 +246,7 @@ Network graphs can be evaluated and visualized in R with the `igraph`-package. A
 
 For a term co-occurrence network, each triple consists of the target word, a co-occurring word and the significance of their joint occurrence. We denote the values with *from, to, sig*. 
 
-```{r warning=FALSE}
+```{r net14, echo=T, eval = T, message=FALSE, warning=FALSE}
 resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
 ```
 
@@ -230,7 +254,7 @@ The process of gathering the network for the target term runs in two steps. Firs
 
 Intermediate results for each term are stored as temporary triples named `tmpGraph`. With the `rbind` command ("row bind", used for concatenation of data-frames) all `tmpGraph` are appended to the complete network object stored in `resultGraph`.
 
-```{r}
+```{r net15, echo=T, eval = T, message=FALSE, warning=FALSE}
 # The structure of the temporary graph object is equal to that of the resultGraph
 tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
 # Fill the data.frame to produce the correct number of lines
@@ -267,7 +291,7 @@ for (i in 1:numberOfCoocs){
 
 As a result, `resultGraph` now contains all `numberOfCoocs * numberOfCoocs` edges of a term co-occurrence network.
 
-```{r}
+```{r net16, echo=T, eval = T, message=FALSE, warning=FALSE}
 # Sample of some examples from resultGraph
 resultGraph[sample(nrow(resultGraph), 6), ]
 ```
