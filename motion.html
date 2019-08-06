@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+<meta name="author" content="UQ SLC Digital Team" />
+
+<meta name="date" content="2019-08-05" />
+
+<title>Motion Charts in R</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-5.0.13/css/fa-svg-with-js.css" rel="stylesheet" />
+<script src="site_libs/font-awesome-5.0.13/js/fontawesome-all.min.js"></script>
+<script src="site_libs/font-awesome-5.0.13/js/fa-v4-shims.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+  padding-left: 25px;
+  text-indent: 0;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">LADAL</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-play-circle"></span>
+     
+    Basics
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Basics</li>
+    <li>
+      <a href="introquant.html">Introduction To Quantitative Reasoning</a>
+    </li>
+    <li>
+      <a href="basicquant.html">Basic Concepts In Quantitative Reasoning</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Research Designs</li>
+    <li>
+      <a href="researchdesigns.html">Overview</a>
+    </li>
+    <li>
+      <a href="corpling.html">Corpus Linguistics</a>
+    </li>
+    <li>
+      <a href="experiments.html">Experimental Designs</a>
+    </li>
+    <li>
+      <a href="acoustic.html">Acoustic Analysis</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Data Collection</li>
+    <li>
+      <a href="introdatacollection.html">Introduction</a>
+    </li>
+    <li>
+      <a href="questionnaires.html">Questionnaires and Surveys</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-gear"></span>
+     
+    Data Processing
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Data Processing</li>
+    <li>
+      <a href="intror.html">Basics: Getting started with R</a>
+    </li>
+    <li>
+      <a href="introloading.html">Loading and saving data</a>
+    </li>
+    <li>
+      <a href="stringprocessing.html">String processing</a>
+    </li>
+    <li>
+      <a href="regularexpressions.html">Regular expressions</a>
+    </li>
+    <li>
+      <a href="introtables.html">Tabulating data</a>
+    </li>
+    <li class="divider"></li>
+    <li>
+      <a href="dataprocessingexcel.html">Data Processing with Excel</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-bar-chart"></span>
+     
+    Visualization
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Visualization</li>
+    <li>
+      <a href="basicgraphs.html">Basic Visualization with R</a>
+    </li>
+    <li>
+      <a href="maps.html">Geo-Spatial Data Visualizaion in R</a>
+    </li>
+    <li>
+      <a href="motion.html">Motion Charts in R</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-eye"></span>
+     
+    Statistics
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Statistics</li>
+    <li>
+      <a href="descriptivestatz.html">Descriptive Statistics</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Basic Interential Statistics</li>
+    <li>
+      <a href="basicstatz.html">Basic Inferential Tests</a>
+    </li>
+    <li>
+      <a href="basicstatzchi.html">The Chi-Square Family</a>
+    </li>
+    <li>
+      <a href="basicstatzregression.html">Simple Linear Regression</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Advanced Interential Statistics</li>
+    <li>
+      <a href="fixedregressions.html">Fixed-Effects Regression Models</a>
+    </li>
+    <li>
+      <a href="mixedregressions.html">Mixed-Effects Regression Models</a>
+    </li>
+    <li>
+      <a href="advancedstatztrees.html">Tree-Based Models</a>
+    </li>
+    <li>
+      <a href="groupingstatz.html">Classification</a>
+    </li>
+    <li>
+      <a href="collostructionalanalysis.html">Collostructional Analysis</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    <span class="fa fa-bars"></span>
+     
+    Text Analysis/Corpus Linguistics
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Text Analysis</li>
+    <li>
+      <a href="textanalysis.html">Introduction</a>
+    </li>
+    <li>
+      <a href="webcrawling.html">Web Crawling</a>
+    </li>
+    <li>
+      <a href="network.html">Network Analysis</a>
+    </li>
+    <li>
+      <a href="topicmodels.html">Topic Modeling</a>
+    </li>
+    <li>
+      <a href="classification.html">Classification</a>
+    </li>
+    <li>
+      <a href="tagging.html">Tagging and Parsing</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Corpus Linguistics</li>
+    <li>
+      <a href="corplingr.html">Corpus Linguistics in R</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="about.html">
+    <span class="fa fa-info"></span>
+     
+    Contact
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Motion Charts in R</h1>
+<h4 class="author"><em>UQ SLC Digital Team</em></h4>
+<h4 class="date"><em>2019-08-05</em></h4>
+
+</div>
+
+
+<p><img src="images/uq1.jpg" width="100%" /></p>
+<div id="introduction" class="section level1">
+<h1><span class="header-section-number">1</span> Introduction</h1>
+<p>This tutorial introduces motion charts in “R”. The entire code for the sections below can be downloaded <a href="https://slcladal.github.io/rscripts/motionrscript.r">here</a>.</p>
+</div>
+<div id="preparation-and-session-set-up" class="section level1">
+<h1><span class="header-section-number">2</span> Preparation and session set up</h1>
+<p>As all visualizations in this tutorial rely on “R”, it is necessary to install “RStudio” (a programm which makes working with R particularly user-friendly). If “RStudio” is not already installed on your machine, please search for “RStudio” in your favorite search engine and add the term “download”. Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).</p>
+<p>In addition, we prepare our session by clearing the workspace, setting optionsinstalling certain “libraries” or “packages” that we need in this tutorial. Thus, please install the libraries by running the code below this paragraph - the installation may take some time (depending on the number and the nature of the libraries it may take a couple of minutes).</p>
+<pre class="r"><code># clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options(&quot;scipen&quot; = 100, &quot;digits&quot; = 4) # supress math annotation
+# install libraries
+install.packages(c(&quot;googleVis&quot;, &quot;dplyr&quot;))</code></pre>
+</div>
+<div id="getting-started-with-motion-charts" class="section level1">
+<h1><span class="header-section-number">3</span> Getting started with Motion Charts</h1>
+<p>To get started with motion charts, we load the “googleVis” package and use an in-built data set called “Fruits”.</p>
+<pre class="r"><code># load library
+library(googleVis)
+# inspect fruid data set
+str(Fruits)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    9 obs. of  7 variables:
+##  $ Fruit   : Factor w/ 3 levels &quot;Apples&quot;,&quot;Bananas&quot;,..: 1 1 1 3 2 3 2 3 2
+##  $ Year    : num  2008 2009 2010 2008 2008 ...
+##  $ Location: Factor w/ 2 levels &quot;East&quot;,&quot;West&quot;: 2 2 2 1 1 1 1 1 1
+##  $ Sales   : num  98 111 89 96 85 93 94 98 81
+##  $ Expenses: num  78 79 76 81 76 80 78 91 71
+##  $ Profit  : num  20 32 13 15 9 13 16 7 10
+##  $ Date    : Date, format: &quot;2008-12-31&quot; &quot;2009-12-31&quot; ...</code></pre>
+<pre class="r"><code># create motion chart object
+M &lt;- gvisMotionChart(Fruits, idvar = &quot;Fruit&quot;, timevar = &quot;Year&quot;)
+# display motion chart object
+plot(M)</code></pre>
+<p>A browser window should open and and if you accept Adobe Player, then motion chart showing the population size by country should pop up. You can hoover over any country and see its population size.</p>
+<p><img src="images/motionchart_fruits.png" width="100%" /></p>
+<p>The motion chart then shows changes in Sales (x-axis) and Expenses (y-axis) across time.</p>
+</div>
+<div id="linguistic-example-which-verbs-take-which-complement-clause-type" class="section level1">
+<h1><span class="header-section-number">4</span> Linguistic Example: which verbs take which complement clause type?</h1>
+<pre class="r"><code># read in data
+compdata &lt;- read.table(&quot;D:\\R\\MapsInR/compdata.txt&quot;, sep = &quot;\t&quot;, header = T)
+# inspect data structure
+str(compdata)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    660 obs. of  5 variables:
+##  $ x     : num  -0.2938 -0.3893 -0.5486 0.0155 0.0874 ...
+##  $ y     : num  0.135 0.232 0.312 -0.682 -0.759 ...
+##  $ decade: int  1860 1860 1860 1860 1860 1860 1860 1860 1860 1860 ...
+##  $ verb  : Factor w/ 44 levels &quot;acknowledge&quot;,..: 1 2 3 4 5 6 7 8 9 10 ...
+##  $ freq  : num  12.58 34.35 8.21 1.52 5.96 ...</code></pre>
+<pre class="r"><code># create motion chart object
+MC &lt;- gvisMotionChart(compdata, idvar = &quot;verb&quot;, timevar = &quot;decade&quot;)
+# display motion chart object
+plot(MC)</code></pre>
+</div>
+<div id="linguistic-example-which-verbs-take-which-complement-clause-type-1" class="section level1">
+<h1><span class="header-section-number">5</span> Linguistic Example: which verbs take which complement clause type?</h1>
+<pre class="r"><code># load data
+convdata &lt;- read.table(&quot;D:\\R\\MapsInR/convdata.txt&quot;, sep = &quot;\t&quot;, header = T)
+# inspect data structure
+str(convdata)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    1785 obs. of  6 variables:
+##  $ VERB      : Factor w/ 119 levels &quot;ACCOUNT&quot;,&quot;ACT&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ DECADE    : int  1860 1870 1880 1890 1900 1910 1920 1930 1940 1950 ...
+##  $ verbs     : num  40.2 42.3 40.2 38 36.8 ...
+##  $ nouns     : num  141 144 128 117 127 ...
+##  $ freq      : num  181 186 168 155 164 ...
+##  $ skewedness: num  -100.6 -101.5 -87.4 -79.5 -90 ...</code></pre>
+<pre class="r"><code># create motion chart object
+MC &lt;- gvisMotionChart(convdata, idvar = &quot;VERB&quot;, timevar = &quot;DECADE&quot;)
+# display motion chart object
+plot(MC)</code></pre>
+<pre class="r"><code># load data
+ampadjdata &lt;- read.table(&quot;D:\\Uni\\Projekte\\02-Intensification\\AmpCOHA/collex_decade.txt&quot;, sep = &quot;\t&quot;, header = T)
+# load library
+library(dplyr)
+# process data
+ampadjdata &lt;- ampadjdata %&gt;%
+  select(Decade, Amp, Adjective, OBS) %&gt;%
+  rename(Frequency = OBS) %&gt;%
+  mutate(Bigram = paste(Amp, Adjective, sep = &quot;&quot;)) %&gt;%
+  select(Decade, Bigram, Frequency)
+# inspect data
+head(ampadjdata)</code></pre>
+<pre><code>##   Decade         Bigram Frequency
+## 1   1870       otherbad         0
+## 2   1870 otherbeautiful         2
+## 3   1870      othergood         5
+## 4   1870     otherhappy         4
+## 5   1870      othernice         1
+## 6   1870     otherother        34</code></pre>
+<pre class="r"><code># create motion chart
+MC &lt;- gvisMotionChart(ampadjdata, idvar = &quot;Bigram&quot;, timevar = &quot;Decade&quot;)
+plot(MC)</code></pre>
+<pre class="r"><code>intsaus &lt;- read.table(&quot;D:\\Uni\\Projekte\\02-Intensification\\AmpAusENZE/datadf5.txt&quot;, 
+                      sep = &quot;\t&quot;, header = T)
+intsaus &lt;- intsaus[intsaus$int == 1,]
+intsaus &lt;- intsaus[intsaus$txtyp == &quot;PrivateDialogue&quot;,]
+# label infrequent amplifier as &quot;other&quot;
+freqpinttb &lt;- table(intsaus$pint)
+freqpint &lt;- names(freqpinttb)[which(freqpinttb &gt;= 10)]
+intsaus$pint &lt;- as.vector(unlist(sapply(intsaus$pint, function(x){
+  x &lt;- ifelse(x %in% freqpint, x, &quot;other&quot;)
+})))
+# label infrequent adjective as &quot;other&quot;
+freqadjtb &lt;- table(intsaus$adj)
+freqadj &lt;- names(freqadjtb)[which(freqadjtb &gt;= 20)]
+intsaus$adj &lt;- as.vector(unlist(sapply(intsaus$adj, function(x){
+  x &lt;- ifelse(x %in% freqadj, x, &quot;other&quot;)
+})))
+
+
+table(intsaus$pint)</code></pre>
+<pre><code>## 
+##    21    24    26    30 other 
+##    31   192   105   118   137</code></pre>
+<pre class="r"><code>str(intsaus)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    583 obs. of  21 variables:
+##  $ id          : int  6 8 19 31 55 68 76 77 84 86 ...
+##  $ flid        : Factor w/ 959 levels &quot;&lt;&lt;I&gt;&lt;#&gt;Ah, we were in full stream, ah, concerned with these associations between invertebrate animals and algae&quot;| __truncated__,..: 34 34 34 34 37 37 37 37 37 37 ...
+##  $ sf          : Factor w/ 35 levels &quot;&lt;&lt;I&gt;&lt;#&gt;Ah, we were in full stream, ah, concerned with these associations between invertebrate animals and algae&quot;| __truncated__,..: 32 32 32 32 32 32 32 32 32 32 ...
+##  $ spk         : Factor w/ 73 levels &quot;&lt;&lt;I&gt;&lt;#&gt;Ah, we were in full stream, ah, concerned with these associations between invertebrate animals and algae&quot;| __truncated__,..: 46 46 46 46 45 45 45 45 45 45 ...
+##  $ gender      : Factor w/ 2 levels &quot;F&quot;,&quot;M&quot;: 2 2 2 2 1 1 1 1 1 1 ...
+##  $ edlev       : Factor w/ 1 level &quot;college&quot;: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ age         : Factor w/ 5 levels &quot;17-25&quot;,&quot;26-30&quot;,..: 2 2 2 2 NA NA NA NA NA NA ...
+##  $ occupation  : Factor w/ 2 levels &quot;acmp&quot;,&quot;sml&quot;: 1 1 1 1 NA NA NA NA NA NA ...
+##  $ txtyp       : Factor w/ 4 levels &quot;PrivateDialogue&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ birthplace  : Factor w/ 13 levels &quot;Arrived Aust. age 4&quot;,..: NA NA NA NA NA NA NA NA NA NA ...
+##  $ mothertongue: Factor w/ 1 level &quot;English&quot;: NA NA NA NA NA NA NA NA NA NA ...
+##  $ date        : Factor w/ 132 levels &quot;1/10/92&quot;,&quot;1/11/92&quot;,..: 28 28 28 28 4 4 4 4 4 4 ...
+##  $ wordcount   : int  2012 2012 2012 2012 2010 2010 2010 2010 2010 2010 ...
+##  $ pint        : chr  &quot;24&quot; &quot;other&quot; &quot;21&quot; &quot;other&quot; ...
+##  $ adj         : chr  &quot;45&quot; &quot;45&quot; &quot;other&quot; &quot;45&quot; ...
+##  $ upcs        : Factor w/ 130 levels &quot;aggressive&quot;,&quot;analytic&quot;,..: 45 45 48 45 110 128 61 45 63 6 ...
+##  $ post1       : Factor w/ 2746 levels &quot;&#39;cause/,&quot;,&quot;&#39;cause/IN&quot;,..: 2269 1669 350 236 350 350 2465 2468 1715 158 ...
+##  $ strng       : Factor w/ 9453 levels &quot;&#39;/POS last/JJ hours/NNS were/VBD a/DT&quot;,..: 5795 3024 5530 3023 5903 3151 8825 8713 8846 2103 ...
+##  $ int         : int  1 1 1 1 1 1 1 1 1 1 ...
+##  $ fun         : Factor w/ 2 levels &quot;attributive&quot;,..: 1 1 2 1 2 2 1 1 1 2 ...
+##  $ priming     : int  0 1 0 0 0 0 0 1 0 1 ...</code></pre>
+<pre class="r"><code>t1 &lt;- ftable(intsaus$pint, intsaus$adj, intsaus$age)
+t1</code></pre>
+<pre><code>##              17-25 26-30 31-40 41-50 51-80
+##                                           
+## 21    45         6     0     0     0     0
+##       73         0     0     0     0     0
+##       76         0     0     0     0     0
+##       79         0     0     0     0     0
+##       other     15     5     0     1     2
+## 24    45        26     5     0     1     0
+##       73         0     0     0     0     0
+##       76         0     0     0     0     0
+##       79        17     1     5     0     0
+##       other     89    13    14     7     0
+## 26    45         3     2     0     0     0
+##       73        11     3     4     1     1
+##       76        12     1     4     2     2
+##       79         2     0     1     0     0
+##       other     37     4     7     0     1
+## 30    45         5     3     4     1     5
+##       73         0     0     0     0     0
+##       76         2     0     1     0     0
+##       79         6     2     1     0     1
+##       other     36    11    12     4    12
+## other 45         1     2     0     0     2
+##       73         0     0     0     0     0
+##       76         0     0     0     0     0
+##       79         0     0     0     0     0
+##       other     12     7     4     1     2</code></pre>
+<p><img src="images/uq2.jpg" width="100%" /></p>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

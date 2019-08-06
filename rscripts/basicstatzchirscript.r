@@ -48,8 +48,6 @@ critval <- matrix(c("Young", 61, 43, 104, "Old", 42, 36, 78, "Total", 103, 79, 1
 # add column names
 colnames(critval) <- c("", "1SGPN", "PN without 1SG", "Total")
 kable(critval, caption = "Table adapted from Gries (2014: 9)")
-#install.packages("knitr")      # install library (remove # to activate)
-#install.packages("kableExtra") # install library (remove # to activate)
 library(knitr)
 library(kableExtra)
 critval <- matrix(c("whatever", 17, 55, 71, "other words", 345128, 916552, 1261680, "Total", 345145, 916607, 1261752), ncol = 4, byrow = T)
@@ -137,4 +135,5 @@ configs <- cfadata %>%
 counts <- cfadata$Frequency
 # perform cfa
 hcfa(configs,counts) 
+According to the HCFA, only a single configuration (Variety : Age : Class) is significant (X2 = 12.21, p = .016). 
 # References

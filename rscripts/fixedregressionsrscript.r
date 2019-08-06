@@ -639,3 +639,5 @@ p_poverty <- f.robftest(rmodel, var = "poverty")
 p_single <- f.robftest(rmodel, var = "single")
 # inspect results
 p_poverty; p_single
+The output shows that poverty is not a significant predictor while single correlates highly significanty with crime.
+# References

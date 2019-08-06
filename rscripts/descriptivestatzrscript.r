@@ -7,7 +7,8 @@ rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)
 # install libraries
-install.packages(c("stringr", "VGAM", "fGarch"))
+install.packages(c("boot", "DescTools", "dplyr",  
+                   "psych", "Rmisc", "stringr"))
 library(knitr)
 Means <- c("(Arithmetic) mean (average)", "Median (middle value)", "Mode (most frequent value)", "Geometric mean (average factor)", "Harmonic mean (average rate)")
 Use <- c("Description of normally dsitributed numeric variables (most common measure of central tendency)", "Description of non-normal numeric variables or ordinal variables (skewed data or influential outliers)", "Description of nominal and categorical variables", "Description of dynamic processes such as growth rates", "Description of dynamic processes such as velocities")
@@ -192,11 +193,12 @@ library(knitr)
 kable(wordstb, caption = "20 most frequent words in the sample corpus of ICE Ireland.")
 sd(wordstb$Frequency, na.rm=TRUE) /  
    sqrt(length(wordstb$Frequency[!is.na(wordstb$Frequency)]))  
-#install.packages("psych")   # install psych library (remove # to activate)
-library(psych)               # activate psych library
+# load library
+library(psych)
 describe(wordstb$Frequency,  # vector to be described
                type=2)       # determine of skew and kurtosis
-library(stringr)                          # activate stringr library
+# load library
+library(stringr)                          
 # define path to corpus
 corpusfiles = list.files(path = "data/ICEIrelandSample", pattern = NULL, all.files = T, full.names = T, recursive = T, ignore.case = T, include.dirs = T)
 # load and clean corpus
@@ -218,35 +220,47 @@ colnames(wordstb) <- c("WordType", "POS", "Frequency")
 library(knitr)
 kable(wordstb, caption = "20 most frequent words in the sample corpus of ICE Ireland.")
 t.test(wordstb$Frequency, conf.level=0.95)  # extract mean and confidence intervals
-#install.packages("Rmisc") # install Rmisc library (remove # to activate)
-library(Rmisc)            # activate Rmisc library
-CI(wordstb$Frequency, ci=0.95)   # extract mean and confidence intervals
-#install.packages("DescTools") # install Rmisc library (remove # to activate)
-library(DescTools)            # activate Rmisc library
-MeanCI(wordstb$Frequency, conf.level=0.95)   # extract mean and confidence intervals
-#install.packages("DescTools") # install Rmisc library (remove # to activate)
-library(DescTools)            # activate Rmisc library
+# load library
+library(Rmisc) 
+# extract mean and confidence intervals
+CI(wordstb$Frequency, ci=0.95)   
+# load library
+library(DescTools)   
+# extract mean and confidence intervals
+MeanCI(wordstb$Frequency, conf.level=0.95)   
+# load library
+library(DescTools)            
+# extract mean CIs
 MeanCI(wordstb$Frequency, method="boot", type="norm", R=1000)
-#install.packages("DescTools") # install Rmisc library (remove # to activate)
-library(DescTools)            # activate Rmisc library
+# load library
+library(DescTools)
 MeanCI(wordstb$Frequency, method="boot", type="norm", R=1000)
-#install.packages("Rmisc") # install Rmisc library (remove # to activate)
-library(Rmisc)                    # activate Rmisc library
-summarySE(data=wordstb,           # apply summarySE function to data
-          measurevar="Frequency", # define variable representing ferquencies
-          groupvars="POS",        # define grouping variabel
-          conf.interval = 0.95)   # extract standard deviation, standard error, and confidence intervals
-#install.packages("boot") # install boot library (remove # to activate)
-library(boot)                    # activate boot library
-BootFunction = function(x, index) {                        # function to extract values
+# load library
+library(Rmisc)
+# apply summarySE function to data
+summarySE(data=wordstb,           
+          # define variable representing frequencies
+          measurevar="Frequency", 
+          # define grouping variabel
+          groupvars="POS",        
+          # extract standard deviation, standard error, 
+          # and confidence intervals
+          conf.interval = 0.95)   
+# load library
+library(boot) 
+# function to extract values
+BootFunction = function(x, index) {                        
                   return(c(mean(x[index]),
                            var(x[index]) / length(index)))
-                    }
-Bootstrapped = boot(data=wordstb$Frequency,                # apply function to data
+}
+# apply function to data
+Bootstrapped = boot(data=wordstb$Frequency,                
             statistic=BootFunction,
             R=1000)
-mean(Bootstrapped$t[,1])                                   # extract values
-boot.ci(Bootstrapped, conf=0.95)                           # alternative to extract values
+# extract values
+mean(Bootstrapped$t[,1])                                   
+# alternative to extract values
+boot.ci(Bootstrapped, conf=0.95)                           
 binom.test(2, 20, 0.5,              # binom.test(x, n, p = 0.5, ...)
            alternative="two.sided", # define sidedness
            conf.level=0.95)         # define confidence level
@@ -271,16 +285,15 @@ Expected = 0.5
 binom.test(Successes, Total, Expected,
            alternative="two.sided",
            conf.level=0.95)
-#install.packages("DescTools")        # install DescTools library (remove # to activate)
-library(DescTools)                    # activate DescTools library
+# load library
+library(DescTools)                    
 BinomCI(2, 20,                        # apply BinomCI function
         conf.level = 0.95,            # define ci
         method = "modified wilson")   # define method for ci extraction
-#install.packages("DescTools")        # install DescTools library (remove # to activate)
-library(DescTools)                    # activate DescTools library
-observed = c(35,74,22,69)             # define multinominal vector
-MultinomCI(observed,                  # apply MultinomCI function
-           conf.level=0.95,           # define ci
-           method="goodman")          # define method for ci extraction
+# load library
+library(DescTools) 
+observed = c(35,74,22,69)       # define multinominal vector
+MultinomCI(observed,            # apply MultinomCI function
+           conf.level=0.95,     # define ci
+           method="goodman")    # define method for ci extraction
 # References
- 

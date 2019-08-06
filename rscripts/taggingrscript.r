@@ -8,16 +8,13 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("boot", "car", "effects", "ggplot2",
-                   "Hmisc", "languageR", "lme4", "mlogit",
-                   "msm", "plyr", "QuantPsyc", "RLRsim", "rms",
-                   "sandwich", "sjPlot", "visreg"))
+install.packages(c("tm", "NLP", "openNLP", "openNLPdata"))
 options(stringsAsFactors = FALSE)
 library(tm)
 library(NLP)
 # read suto paragraphs
-textdata <- read.csv("data/sotu_paragraphs.csv", sep = ";", encoding = "UTF-8")
-english_stopwords <- readLines("resources/stopwords_en.txt", encoding = "UTF-8")
+textdata <- read.csv("https://slcladal.github.io/data/sotu_paragraphs.csv", sep = ";", encoding = "UTF-8")
+english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
 # Create corpus object
 corpus <- Corpus(DataframeSource(textdata))
 require(openNLP)

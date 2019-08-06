@@ -97,13 +97,19 @@ library(nlme)
 library(lme4)
 library(ggplot2)
 # load functions
-source("rscripts/multiplot_ggplot2.r")
+source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")
 # set options
-options("scipen" = 100, "digits" = 4)      # supress scientific notation
-options(stringsAsFactors = F)              # do not convert strings into factors
-mydata <- read.delim("data/lmemdata.txt", header = TRUE) # read in data
-mydata$date <- as.numeric(mydata$date)     # convert date into a numeric variable
-head(mydata); nrow(mydata)                 # inspect updated data set
+# supress scientific notation
+options("scipen" = 100, "digits" = 4)      
+# do not convert strings into factors
+options(stringsAsFactors = F)              
+# read in data
+mydata <- read.delim("https://slcladal.github.io/data/lmemdata.txt", 
+                     header = TRUE) 
+# convert date into a numeric variable
+mydata$date <- as.numeric(mydata$date)     
+# inspect updated data set
+head(mydata); nrow(mydata)                 
 # visualize variables (2 plots per row)
 # 3 plots in 1 window
 def.par <- par(no.readonly = TRUE)
@@ -161,8 +167,8 @@ ggplot(mydata, aes(date, pptw)) +
   labs(y = "Prepositions per 1,000 words") +
   coord_cartesian(ylim = c(0, 220))
 mydata$date <- scale(mydata$date, scale = F)
-head(mydata)
-str(mydata)
+# inspect data
+head(mydata); str(mydata)
 # generate a glm baseline model
 m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
 # generate a lm base-line model
@@ -342,17 +348,22 @@ library(languageR)  # activate library
 source("rscripts/multiplot_ggplot2.R")    # load multiplot function
 source("rscripts/PseudoR2lmerBinomial.R") # load pseudor2 function
 source("rscripts/meblr.summary.R")        # load summary function
-# read in existing s´data set mblrdata.txt
-mblrdata <- read.table("data/mblrdata.txt", # load data
-                       comment.char = "",   # data does not contain comments
-                       quote = "",          # data does not contain quotes
-                       sep = "\t",          # data is tab separated
-                       header = T)          # data has column names
-str(mblrdata)                               # inspect data structure
-vrs <- c("ID", "Age", "Gender", "ConversationType", "Priming")  # define variables to be factorized
-fctr <- which(colnames(mblrdata) %in% vrs)     # define vector with variables
-mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor) # factorize variables
-mblrdata$Age <- relevel(mblrdata$Age, "Young") # relevel Age (Young = Reference)
+# load data
+mblrdata <- read.table("https://slcladal.github.io/data/mblrdata.txt", 
+                       comment.char = "",# data does not contain comments
+                       quote = "",       # data does not contain quotes
+                       sep = "\t",       # data is tab separated
+                       header = T)       # data has column names
+# inspect data structure
+str(mblrdata)                               
+# def. variables to be factorized
+vrs <- c("ID", "Age", "Gender", "ConversationType", "Priming")
+# def. vector with variables
+fctr <- which(colnames(mblrdata) %in% vrs)     
+# factorize variables
+mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor)
+# relevel Age (Young = Reference)
+mblrdata$Age <- relevel(mblrdata$Age, "Young") 
 plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
      ylim = c(0,150),
       cex = .5)
@@ -419,15 +430,19 @@ multiplot(p1, p3, p5, p2, p4, p6, cols = 2)
 options(contrasts  =c("contr.treatment", "contr.poly"))
 mblrdata.dist <- datadist(mblrdata)
 options(datadist = "mblrdata.dist")
-m0.glm = glm(SUFlike ~ 1, family = binomial, data = mblrdata) # baseline model glm
-m0.lrm = lrm(SUFlike ~ 1, data = mblrdata, x = T, y = T) # baseline model lrm
-m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) # base-line mixed-model
+# baseline model glm
+m0.glm = glm(SUFlike ~ 1, family = binomial, data = mblrdata) 
+# baseline model lrm
+m0.lrm = lrm(SUFlike ~ 1, data = mblrdata, x = T, y = T) 
+# base-line mixed-model
+m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) 
 aic.glmer <- AIC(logLik(m0.glmer))
 aic.glm <- AIC(logLik(m0.glm))
 aic.glmer; aic.glm
 # test random effects
 null.id = -2 * logLik(m0.glm) + 2 * logLik(m0.glmer)
-pchisq(as.numeric(null.id), df=1, lower.tail=F) # sig m0.glmer better than m0.glm
+pchisq(as.numeric(null.id), df=1, lower.tail=F) 
+# sig m0.glmer better than m0.glm
 m0.glmer <- glmer(SUFlike ~ 1+ (1|ID), family = binomial, data = mblrdata, control=glmerControl(optimizer="bobyqa"))
 # add Priming
 ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
@@ -528,7 +543,8 @@ m1.glm = glm(SUFlike ~ Priming + Gender + ConversationType, family = binomial, d
 # we now create a lmer object equivalent to the final minimal adequate model
 mlr.lmer <- lmer(SUFlike ~ Age + Gender + ConversationType + (1|ID), data = mblrdata, family = binomial)
 cor.test(coef(mlr.lrm), fixef(mlr.lmer))
-library(Hmisc)   # activate Hmisc library
+# load library
+library(Hmisc)   
 probs = 1/(1+exp(-fitted(mlr.lmer)))
 probs = binomial()$linkinv(fitted(mlr.lmer))
 somers2(probs, as.numeric(mblrdata$SUFlike))

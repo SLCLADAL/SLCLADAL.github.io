@@ -2,15 +2,24 @@
 # "Network Analysis"
 # "UQ SLC Digital Team"
 #
-options(stringsAsFactors = FALSE)
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # supress math annotation
+# install libraries
+install.packages(c("collostructions"))
+# load library
 library(tm)
-textdata <- read.csv("data/sotu.csv", sep = ";", encoding = "UTF-8")
-english_stopwords <- readLines("resources/stopwords_en.txt", encoding = "UTF-8")
-# Create corpus object
+# load data
+textdata <- read.csv("https://slcladal.github.io/data/sotu.csv", sep = ";", encoding = "UTF-8")
+# load stopwords
+english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
+# create corpus object
 corpus <- Corpus(DataframeSource(textdata))
 require(openNLP)
 # Function to convert a document in a vector of sentences
-convert_text_to_sentences <- function(text, lang = "en", SentModel = "resources/en-sent.bin") {
+convert_text_to_sentences <- function(text, lang = "en", SentModel = "https://slcladal.github.io/resources/en-sent.bin") {
   # Calculate sentenve boundaries as annotation with Apache OpenNLP Maxent-sentence-detector.
   sentence_token_annotator <- Maxent_Sent_Token_Annotator(language = lang, model = SentModel)
   # Convert text to NLP string
@@ -39,7 +48,7 @@ reshape_corpus <- function(currentCorpus, ...) {
   # Create a new corpus of the segmented sentences
   newCorpus <- Corpus(VectorSource(docs))
   return(newCorpus)
-}r reshapeCorpus, cache=TRUE}
+}
 # original corpus length and its first document
 length(corpus)
 substr(as.character(corpus[[1]]), 0, 200)
@@ -48,21 +57,21 @@ sentenceCorpus <- reshape_corpus(corpus)
 # reshaped corpus length and its first 'document'
 length(sentenceCorpus)
 as.character(sentenceCorpus[[1]])
-as.character(sentenceCorpus[[2]])r preprocessCorpus, cache=TRUE}
+as.character(sentenceCorpus[[2]])
 # Preprocessing chain
 sentenceCorpus <- tm_map(sentenceCorpus, content_transformer(tolower))
 sentenceCorpus <- tm_map(sentenceCorpus, removeWords, english_stopwords)
 sentenceCorpus <- tm_map(sentenceCorpus, removePunctuation, preserve_intra_word_dashes = TRUE)
 sentenceCorpus <- tm_map(sentenceCorpus, removeNumbers)
-sentenceCorpus <- tm_map(sentenceCorpus, stripWhitespace)r binDTM, cache=TRUE}
+sentenceCorpus <- tm_map(sentenceCorpus, stripWhitespace)
 minimumFrequency <- 10
-binDTM <- DocumentTermMatrix(sentenceCorpus, control=list(bounds = list(global=c(minimumFrequency, Inf)), weighting = weightBin))r message=FALSE}
+binDTM <- DocumentTermMatrix(sentenceCorpus, control=list(bounds = list(global=c(minimumFrequency, Inf)), weighting = weightBin))
 # Convert to sparseMatrix matrix
 require(Matrix)
 binDTM <- sparseMatrix(i = binDTM$i, j = binDTM$j, x = binDTM$v, dims = c(binDTM$nrow, binDTM$ncol), dimnames = dimnames(binDTM))
 # Matrix multiplication for cooccurrence counts
-coocCounts <- t(binDTM) %*% binDTMr}
-as.matrix(coocCounts[202:205, 202:205])r}
+coocCounts <- t(binDTM) %*% binDTM
+as.matrix(coocCounts[202:205, 202:205])
 coocTerm <- "spain"
 k <- nrow(binDTM)
 ki <- sum(binDTM[, coocTerm])
@@ -80,7 +89,7 @@ logsig <- 2 * ((k * log(k)) - (ki * log(ki)) - (kj * log(kj)) + (kij * log(kij))
           + (k - ki - kj + kij) * log(k - ki - kj + kij) 
           + (ki - kij) * log(ki - kij) + (kj - kij) * log(kj - kij) 
           - (k - ki) * log(k - ki) - (k - kj) * log(k - kj))
-logsig <- logsig[order(logsig, decreasing=T)]r}
+logsig <- logsig[order(logsig, decreasing=T)]
 # Put all significance statistics in one Data-Frame
 resultOverView <- data.frame(
   names(sort(kij, decreasing=T)[1:10]), sort(kij, decreasing=T)[1:10],
@@ -89,17 +98,17 @@ resultOverView <- data.frame(
   names(logsig[1:10]), logsig[1:10],
   row.names = NULL)
 colnames(resultOverView) <- c("Freq-terms", "Freq", "MI-terms", "MI", "Dice-Terms", "Dice", "LL-Terms", "LL")
-print(resultOverView)r}
+print(resultOverView)
 # Read in the source code for the co-occurrence calculation
-source("rscripts/calculateCoocStatistics.R")
+source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # Definition of a parameter for the representation of the co-occurrences of a concept
 numberOfCoocs <- 15
 # Determination of the term of which co-competitors are to be measured.
-coocTerm <- "california"r}
+coocTerm <- "california"
 coocs <- calculateCoocStatistics(coocTerm, binDTM, measure="LOGLIK")
 # Display the numberOfCoocs main terms
 print(coocs[1:numberOfCoocs])
-resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))r}
+resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
 # The structure of the temporary graph object is equal to that of the resultGraph
 tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
 # Fill the data.frame to produce the correct number of lines
@@ -127,7 +136,7 @@ for (i in 1:numberOfCoocs){
   tmpGraph[, 3] <- coocs2[1:numberOfCoocs]
   #Append the result to the result graph
   resultGraph <- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
-}r}
+}
 # Sample of some examples from resultGraph
 resultGraph[sample(nrow(resultGraph), 6), ]r fig.width=10, fig.height=8, message=FALSE}
 require(igraph)
