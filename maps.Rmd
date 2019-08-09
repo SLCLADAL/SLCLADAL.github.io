@@ -17,9 +17,9 @@ This tutorial introduces geo-spatial data visualizaion in "R". The entire code f
 
 # Preparation and session set up
 
-As all visualizations in this tutorial rely on "R", it is necessary to install "R", "RStudio", and "Tinn-R". If these programms (or, in the case of "R", environments) are not already installed on your machine, please search for them in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
+As all visualizations in this tutorial rely on "R", it is necessary to install "RStudio" (a programm which makes working with R particularly user-friendly). If "RStudio" is not already installed on your machine, please search for "RStudio" in your favorite search engine and add the term "download". Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory). Once you have installed "RStudio", open it.
 
-In addition, certain "libraries" or "packages" need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the librariesby running the code below this paragraph. If you have already installed the libraries mentioned below, then you can skip ahead ignore this section. To install the necessary libraries, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+In addition, we prepare our session by clearing the workspace, setting options, and installing certain "libraries" or "packages" that we need in this tutorial. Thus, please install the libraries by running the code below this paragraph (simply copy and paste the code into the editor window of RStudio and select "Run" from the task bar above) - the installation may take some time (depending on the number and the nature of the libraries it may take a couple of minutes).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # clean current workspace
@@ -46,13 +46,14 @@ The package "OpenStreetMap" offers a range of maps with different features. To a
 # load library
 library(OpenStreetMap)
 # extract map
-australia <- openmap(c(-8,110),
+AustraliaMap <- openmap(c(-8,110),
 	c(-45,160),
-	type = "osm",
-#	type = "nps",
-	minNumTiles=6)
+#	type = "osm",
+#	type = "esri",
+	type = "nps",
+	minNumTiles=7)
 # plot map
-plot(australia)
+plot(AustraliaMap)
 ```
 
 In order to obtain different map types, we change the "type" argument. The following options are available for type: "osm", "osm-bw","maptoolkit-topo", "waze", "bing", "stamen-toner", "stamen-terrain", "stamen-watercolor", "osm-german", "osm-wanderreitkarte", "mapbox", "esri", "esri-topo", "nps", "apple-iphoto", "skobbler", "hillshade", "opencyclemap", "osm-transport", "osm-public-transport", "osm-bbike", "osm-bbike-german". Unfortunately, not all options work. If they do not work, then an error message is shown telling us that the number of tiles is not supported.
@@ -64,35 +65,53 @@ We can zoom in or out by either changing the "zoom" or the "minNumTiles" argumen
 queensland1 <- openmap(c(-8,135),
 	c(-30,160),
 	type = "osm",
-	minNumTiles=4)
+	minNumTiles=6)
 queensland2 <- openmap(c(-8,135),
 	c(-30,160),
-	type = "esri-topo",
-	minNumTiles=4)
+	type = "esri",
+	minNumTiles=6)
 # plot maps
 par(mfrow = c(1, 2)) # display plots in 1 row/2 columns
 plot(queensland1); plot(queensland2); par(mfrow = c(1, 1)) # restore original settings
+```
+
+The "leaflet" function from the "leaflet" package creates a Leaflet map widget using html-widgets. The widget can be rendered on HTML pages generated from R Markdown, Shiny, or other applications. The advantage in using this function lies in the fact that it offers very detailed maps which enable zooming in to very specific locations.
+
+```{r map3, echo=T, eval = F, message=FALSE, warning=FALSE}
+# load library
+library(leaflet)
+# load library
+m <- leaflet() %>% setView(lng = 153.05, lat = -27.45, zoom = 12)
+# display map
+m %>% addTiles()
+```
+
+```{r map4, echo=F, fig.cap="", out.width = '100%'}
+knitr::include_graphics("images/Brisbane.png")
 ```
 
 Another data base that is very useful when certaing maps is the "rworldmap" package. The "worldmap" package contains the shape files for countries but also more fine grained-shape files that display the states of selected countries. The most basic data, however, simply represents the shapes of the countries in the world.
 
 Using the "worldmap" package has the advantage that one is not dependent on third parties and their servers but can operate within "R" wihtout being denyed access due to e.g. copy right issues or server maintenance.
 
-```{r map3, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r map5, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load library
 library(rworldmap)
 # get map
 worldmap <- getMap(resolution = "coarse")
 # plot worldmap
-plot(worldmap, xlim = c(-180, 180), ylim = c(-90, 90), 
+plot(worldmap, col = "lightgrey", 
+     fill = T, border = "darkgray",
+     xlim = c(-180, 180), ylim = c(-90, 90),
+     bg = "aliceblue",
      asp = 1, wrap=c(-180,180))
 ```
 
 The basic map shown above can then be modified and enriched with color coding to convey geospatial data. The following shows how to customize the world map.
 
-```{r map4, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r map6, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load libraries
-library(maptools)
+#library(maptools)
 library(maps)
 # plot maps
 par(mfrow = c(1, 2)) # display plots in 1 row/3 columns
@@ -116,7 +135,8 @@ We load the "airports" data set which contains the longitude and latitude of air
 
 ```{r cus1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load data
-airports <- read.delim("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/airports.txt", sep = "\t", header = T)
+airports <- read.delim("https://slcladal.github.io/data/airports.txt", 
+                       sep = "\t", header = T)
 # inspect data
 head(airports)
 ```
@@ -128,14 +148,60 @@ To display the locations of airports on a map, we first plot the map and then ad
 plot(worldmap, xlim = c(-80, 160), ylim = c(-50, 100), 
      asp = 1, bg = "lightblue", col = "black", fill = T)
 # add points
-points(airports$Longitude, airports$Latitude, col = "red", cex = .01)
+points(airports$Longitude, airports$Latitude, 
+       col = "red", cex = .01)
 ```
+
+It is, of course, also possible to highlight individual countries. 
+
+```{r cus3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# create data frame with iso3 country codes and number of visits
+countriesvisited <- data.frame(country = c("AUS", "JPN", "FIN", 
+                                           "CZE", "POL", "AUT", 
+                                           "USA", "GBR", "IRL", 
+                                           "DEU", "DNK", "FRA", 
+                                           "NDL", "BEL", "ESP",
+                                           "HRV", "SVN", "NOR", 
+                                           "ITA", "HUN", "ROU", 
+                                           "BGR", "GRC", "TUR", 
+                                           "CHE", "ARE"),
+  visited = c(5, 1, 2, 1, 1, 3, 4, 4, 5, 11, 1, 1, 2, 2, 4, 4, 
+              1, 1, 3, 1, 1, 2, 1, 1, 3, 2))
+# inspect data
+head(countriesvisited)
+```
+
+```{r cus4, echo=T, eval = T, message=FALSE, warning=FALSE}
+# combine data frame with map
+visitedMap <- joinCountryData2Map(countriesvisited, 
+                                  joinCode = "ISO3",
+                                  nameJoinColumn = "country")
+# def. map parameters, e.g. def. colors
+mapParams <- mapCountryData(visitedMap, 
+                            nameColumnToPlot="visited",
+                            oceanCol = "azure2",
+                            catMethod = "categorical",
+                            missingCountryCol = gray(.8),
+                            colourPalette = c("coral",
+                                              "coral2",
+                                              "coral3", "orangered", 
+                                              "orangered3", "orangered4"),
+                            addLegend = F,
+                            mapTitle = "",
+                            border = NA)
+# add legend and display map
+do.call(addMapLegendBoxes, c(mapParams,
+                             x = 'bottom',
+                             title = "No. of visits",
+                             horiz = TRUE,
+                             bg = "transparent",
+                             bty = "n"))
+```
+
 
 It is, of course also possible to show only a part of the map by defining the x- and y-axes limits of the plot window. 
 
-```{r cus3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load library
-library(rworldmap)
+```{r cus5, echo=T, eval = T, message=FALSE, warning=FALSE}
 # get map
 newmap <- getMap(resolution = "low")
 # plot map
@@ -148,10 +214,10 @@ points(airports$Longitude, airports$Latitude, col = "red", cex = .5, pch = 20)
 
 This is of course also possible to show Australian airports.
 
-```{r cus4, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r cus6, echo=T, eval = T, message=FALSE, warning=FALSE}
 # plot data on world map
 plot(worldmap, xlim = c(120, 140), ylim = c(-45, -10), 
-     asp = 1, bg = "lightblue", border = "lightgrey", col = "wheat3", 
+     asp = 1, bg = "azure2", border = "lightgrey", col = "wheat1", 
      fill = T, wrap=c(-180,180))
 points(airports$Longitude, airports$Latitude, 
        col = "darkblue", cex = .5, pch = 20)
@@ -159,16 +225,17 @@ points(airports$Longitude, airports$Latitude,
 
 In addition to the location of airports, it is also possible to show how many flights arrive at an airport. As this information is not provided in the airport data, we load the routes data which contains information about the routes that airlines fly. 
 
-```{r cus5, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r cus7, echo=T, eval = T, message=FALSE, warning=FALSE}
 # read in routes data
-routes <- read.delim("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/routes.txt", sep = "\t", header=T)
+routes <- read.delim("https://slcladal.github.io/data/routes.txt", 
+                     sep = "\t", header=T)
 # inspect first 6 lines of routes data
 head(routes)
 ```
 
 To show the number of arrivals at an airport (only in terms of how mayn routes end at that airport), we extract the number of routes that end in each airport.
 
-```{r cus6, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r cus8, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load library
 library(plyr)
 # extract number of arrivals
@@ -180,7 +247,7 @@ head(arrivals)
 
 We can now merge the airports and the arrival data set to combine the information about the location with the information about the number of routes that end at each airport.
 
-```{r cus7, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r cus9, echo=T, eval = T, message=FALSE, warning=FALSE}
 # create arrival  table
 airportA <- merge(airports, arrivals, by.x = "ID", by.y = "destinationAirportID")
 # inspect arrival table
@@ -189,13 +256,13 @@ head(airportA)
 
 This table allows us to plot not only the location of airports but also the number of routes that end there.
 
-```{r cus8, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r cus10, echo=T, eval = T, message=FALSE, warning=FALSE}
 # get map
 australia <- getMap(resolution = "low")
 # plot data on world map
 plot(australia, xlim = c(110, 160), ylim = c(-45, -10), 
-     asp = 1, bg = "lightblue", border = "darkgrey", 
-     col = "wheat3", fill = T)
+     asp = 1, bg = "azure1", border = "darkgrey", 
+     col = "wheat2", fill = T)
 # add points
 points(airportA$Longitude, airportA$Latitude,
        # define colors as transparent
@@ -206,67 +273,190 @@ points(airportA$Longitude, airportA$Latitude,
 
 The same map can also be created using the "ggplot2" package which offers a very high degree of flexibility and allows for easy customization. 
 
-```{r col9, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r cus11, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load ggplot2 library
 library(ggplot2)
 # create a layer of borders
-map <- borders("world", colour="gray70", fill="wheat2") 
 AustralianAirports <- ggplot() +   
-  map +
+  borders("world", colour=NA, fill="wheat1")  +
   geom_point(aes(x=airportA$Longitude, y= airportA$Latitude), 
              color="blue", alpha = .2, size=airportA$flights/20) +
   scale_x_continuous(name="Longitude", limits=c(110, 160)) +
   scale_y_continuous(name="Latitude", limits=c(-45, -10)) +
-  theme(panel.background = element_rect(fill = "lightblue",
-                                colour = "lightblue"),
+  theme(panel.background = element_rect(fill = "azure1",
+                                colour = "azure1"),
         panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
 AustralianAirports
 ```
 
+In addition, it may be useful to overlay an area with 
+
+```{r cus12, echo=T, eval = T, message=FALSE, warning=FALSE}
+# create map with density layer
+AustralianAirportsDensity <- ggplot() +   
+  borders("world", colour=NA, fill="antiquewhite")  +
+  stat_density2d(aes(x = airportA$Longitude, y= airportA$Latitude, 
+                     fill = ..level..,  alpha = I(.2)),
+                 size = 1, bins = 5, data = airportA,
+                 geom = "polygon") +
+  geom_point(aes(x=airportA$Longitude, y= airportA$Latitude), 
+             color="red", alpha = .2, size=airportA$flights/20) +
+  geom_point(aes(x=airportA$Longitude, y= airportA$Latitude), 
+             color="red", alpha = .2, size=airportA$flights/20, pch = 1) +
+  # define color of density polygons
+  scale_fill_gradient(low = "grey50", high = "grey20") +
+  scale_x_continuous(name="Longitude", limits=c(110, 160)) +
+  scale_y_continuous(name="Latitude", limits=c(-47, -10)) +
+  theme(panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue"),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        # surpress legend
+        legend.position = "none",
+        axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+AustralianAirportsDensity
+```
+
+
+```{r cus13, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(ggmap)
+# define box
+sbbox <- make_bbox(lon = c(115, 155), lat = c(-12.5, -42), f = .1)
+# get map
+ausbg = get_map(location=sbbox, zoom=4,
+#                source = "google",
+                source = "osm",
+#                source = "stamen",
+                color = "bw",
+#                color = "color",
+#               maptype="terrain")
+#               maptype="terrain-background")
+                maptype="satellite")
+#               maptype="hybrid")
+#               maptype="toner")
+#               maptype="hybrid")
+#               maptype="terrain-labels")
+#               maptype="roadmap")
+# create map
+ausbg = ggmap(ausbg)
+# display map
+ausbg +
+  stat_density2d(data = airportA, aes(x = Longitude, y= Latitude, 
+                     fill = ..level..,  alpha = I(.2)),
+                 size = 1, bins = 5, geom = "polygon") +
+  geom_point(data = airportA, mapping = aes(x=Longitude, y= Latitude), 
+             color="gray20", alpha = .2, size=airportA$flights/20) +
+  # define color of density polygons
+  scale_fill_gradient(low = "grey50", high = "grey20") +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        panel.background = element_rect(fill = "aliceblue",
+                                colour = "aliceblue"),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        # surpress legend
+        legend.position = "none")
+```
+
+```{r cus14, echo=T, eval = T, message=FALSE, warning=FALSE}
+# define box
+sbbox <- make_bbox(lon = c(152.8, 153.4), lat = c(-27.1, -27.7), f = .1)
+# get map
+brisbane = get_map(location=sbbox, zoom=10,
+               maptype="terrain")
+# create map
+brisbanemap = ggmap(brisbane)
+# display map
+brisbanemap +
+  geom_point(data = airportA, mapping = aes(x = Longitude, y = Latitude), 
+               color = "red") +
+  geom_text(data = airportA, 
+            mapping = aes(x = Longitude+0.1,
+                          y = Latitude,
+                          label = "Brisbane Airport"),
+            size = 2, color = "gray20", 
+            fontface = "bold", 
+            check_overlap = T) 
+```
 
 # Color Coding Geospatial Information
 
 We can also use color coding of countries to convey information about different features of countries such as their population size (or results of political elecetions, etc.).
 
+We use the data provided in the "rnaturalearthdata" and "rnaturalearth" packages, which contain information about the population size of countries, to color code and thus visualize differences in population size by country.
+
 ```{r col1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load libraries
-library(maps)
+library("rnaturalearth")
+library("rnaturalearthdata")
+# extract world data
+world <- ne_countries(scale = "medium", returnclass = "sf")
+# create cut off points in Population
+world$pop_estC <- base::cut(world$pop_est,
+                        breaks = c(0, 500000, 1000000, 10000000, 
+                                   100000000, 200000000, 500000000,
+                                   10000000000), 
+                        labels = 1:7, right = F, ordered_result = T)
+# load library
 library(RColorBrewer)
-# load data
-worldpopulation <- read.delim("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/worldpopulation.txt", sep = "\t", header = T)
-# inspect data
-head(worldpopulation)
+# define colors
+palette = colorRampPalette(brewer.pal(n=7, name='Oranges'))(7)
+palette = c("white", palette)
+# create map
+worldpopmap <- ggplot() +
+  geom_sf(data = world, aes(fill = pop_estC)) +
+  scale_fill_manual(values = palette) +
+  # customize legend title
+  labs(fill = "Population Size") +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        # surpress legend
+        legend.position = "none")
+# display map
+worldpopmap
 ```
 
-We use this information about the population size of countries and use color coding to visualize differences in population size by country.
-
 ```{r col2, echo=T, eval = T, message=FALSE, warning=FALSE}
-# create a color palette
-palette = colorRampPalette(brewer.pal(n=9, name='Oranges'))(nrow(worldpopulation))
-# sort the colors in the same order as the countries' populations
-palette = palette[rank(-worldpopulation$Population)]
-# draw a map of the world
-map(database='world', fill = T, border = "darkgray", 
-    mar=c(0,0,0,0), col = palette, bg = "gray95", 
-    ylim = c(-60, 85))
+# start plot
+ggplot(data = world) +
+    geom_sf(aes(fill = pop_est)) +
+  scale_fill_viridis_c(option = "plasma", trans = "sqrt") +
+  # customize legend title
+  labs(fill = "Population Size")
 ```
 
 It is relatively easy to combine color coding with points. However, it is substantially easier if all countries have values. If this is not the case (as in the example below), we need to include an additional step so that countries that are not mentioned also receive a color coding.
 
-In a first setp, the work space is cleared, the options are set, and the relevant libraries are loaded.
+In a first step, the work space is cleared, the options are set, and the relevant libraries are loaded.
 
 ```{r col3, echo=T, eval = T, message=FALSE, warning=FALSE}
 # clean current workspace
-rm(list=ls(all=T))
+#rm(list=ls(all=T))
 # set options
-options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # supress math annotation
+#options(stringsAsFactors = F)         # no automatic data transformation
+#options("scipen" = 100, "digits" = 4) # supress math annotation
 # load libraries
-library(ggmap)
-library(maptools)
-library(maps)
-library(geonames)
+#library(ggmap)
+#library(maptools)
+#library(maps)
+#library(geonames)
 ```
 
 Then, the data that will be displayed is loaded. In the present case, the data contain countries and cities that I have visited along with their latitude and longitude.
@@ -379,11 +569,11 @@ The next part is tricky as we do not only need to determine the color for the co
 # load world data for plotting 
 data(wrld_simpl)
 # def. color (bias for contrast)
-pal <- colorRampPalette(brewer.pal(6, 'Reds'), 
+pal <- colorRampPalette(brewer.pal(6, 'Greens'), 
                         bias = 10)(length(visited$Freq))
 pal <- pal[with(visited, findInterval(Freq, sort(unique(Freq))))]
 # define color for countries not in visited
-countrycolor <- rep(grey(0.90), length(wrld_simpl@data$NAME))
+countrycolor <- rep("white", length(wrld_simpl@data$NAME))
 # define colors for countries in visited
 countrycolor[match(visited$Country, wrld_simpl@data$NAME)] <- pal
 ```
@@ -393,19 +583,19 @@ After assigning colors to all countries, we can proceed by plotting the color co
 ```{r col8, echo=T, eval = T, message=FALSE, warning=FALSE}
 # plot map
 plot(wrld_simpl, ylim=c(-40, 85), xlim = c(-180, 180),
-     mar=c(0,0,0,0), bg="white", border = "gray70", 
+     mar=c(0,0,0,0), bg="gray40", border = NA, 
      col=countrycolor)
 # add points
-points(visited$Longitude, visited$Latitude, col="black", pch=20, cex = .5)
+points(visited$Longitude, visited$Latitude, col="red", pch=20, cex = .5)
 ```
 
 A slightly more elegent way to achive the same goal is to plot the information using the "ggplot2" package.
 
-```{r col10, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r col9, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load libraries
-library(RColorBrewer)
-library(maptools)
-library(ggplot2)
+#library(maptools)
+#library(ggplot2)
+#library(ggmap)
 # load data
 data(wrld_simpl)
 # use the contry name instead of 3-letter ISO as id
@@ -413,24 +603,34 @@ wrld_simpl@data$id <- wrld_simpl@data$NAME
 wrld <- fortify(wrld_simpl, region="id")
 # remove Antarctica from map
 wrld <- subset(wrld, id != "Antarctica") 
+# change column names of visited
+colnames(visited) <- ifelse(colnames(visited) == "Country", 
+                            "id", 
+                            colnames(visited))
+# combine visited and wrld
+worlddata <- join(wrld, visited, by = "id")
+# change NA to 0
+worlddata$Freq <- ifelse(is.na(worlddata$Freq) == T, 0, worlddata$Freq)
+# convert freq into factor
+worlddata$Freq <- as.factor(worlddata$Freq)
 # start plotting
 ggmapplot <- ggplot() + 
-  geom_map(data=wrld, map=wrld, aes(map_id=id, x=long, y=lat), 
-           fill="wheat1", color="gray30", size=0.25) + 
-  geom_map(data=visited, map=wrld, 
-           aes(map_id=Country, fill=as.factor(Freq)),
-           color="gray30", size=0.25) +
+  geom_map(data=worlddata, map=worlddata, 
+           aes(map_id=id, x=long, y=lat, 
+           fill=Freq), color=NA, size=0.25) + 
+#  geom_map(data=visited, map=wrld, 
+#           aes(map_id=Country, fill=as.factor(Freq)),
+#           color=NA, size=0.25) +
   geom_point(data = visited,
              aes(x = Longitude, y = Latitude), 
              col = "red", size = .75) +
-  scale_fill_manual(
-    values=colorRampPalette(brewer.pal(6, 'Greens'), 
-                        bias = 5)(length(visited$Freq)), 
-                               name="No. cities visited") + 
-  coord_map("gilbert") +  # spherical
-#  coord_map() +           # for normal Mercator projection
+  scale_fill_manual(values=c("white", "gray80", "gray75", 
+                             "gray70",  "gray65", "gray60", "gray55"), 
+                    name="No. cities visited") + 
+#  coord_map("gilbert") +  # spherical
+  coord_map() +           # for normal Mercator projection
   labs(x="", y="") + 
-  theme(plot.background = element_rect(fill = "transparent", colour = NA),
+  theme(plot.background = element_rect(fill = "grey40", colour = NA),
                    panel.border = element_blank(),
                    panel.background = 
           element_rect(fill = "transparent", colour = NA),
@@ -441,7 +641,221 @@ ggmapplot <- ggplot() +
 ggmapplot
 ```
 
-# Creating Maps using Shape Files
+
+# Interactive Maps
+
+An easy way to create interactice maps is to use the "googleVis" package. An example showing the population size by country provided by an in-built data set is shown.
+
+```{r imap1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# load library
+library(googleVis)
+# create motion chart object
+Geo=gvisGeoMap(Population, locationvar="Country", numvar="Population", options = list(height=350, daatMode='regions'))
+# display motion chart
+plot(Geo)
+```
+
+A browser window should open and and if you accept and execute Adobe Flash, then the following interactive map showing the population size by country should pop up. You can hoover over any country and see its population size. 
+
+```{r imap2, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/motionchart_worldpopulation.png")
+```
+
+You can also use the "googleVis" package to create customized maps. To customize an interactive map, we need to load a data set.
+
+```{r imap3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load data 
+gapminderdata <- read.delim("https://slcladal.github.io/data/gapminder.txt",
+                            header = T, sep = "\t")
+# create map
+Map <- data.frame(gapminderdata$country, 
+                  gapminderdata$year, gapminderdata$lifeExp)
+# def. column names
+names(Map) <- c("Country", "Year", "LifeExpectancy")
+# inspect data
+head(Map)
+```
+
+We will only use the latest data (from 2007) and exclude all other data points and create the interactive map as we did above.
+
+```{r imap4, echo=F, eval = F, message=FALSE, warning=FALSE}
+# remove data point not from 2007
+Map <- Map[Map$Year == "2007",]
+# create motion chart object
+Geo=gvisGeoMap(Map, locationvar = "Country", numvar = "LifeExpectancy", 
+               options = list(height = 350, dataMode = 'regions'))
+# display motion chart
+plot(Geo)
+```
+
+```{r imap5, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/motionchart_lifeexpectancy.png")
+```
+
+# Creating Maps with tmap and Shape Files
+
+When creating more sophisticated maps, it is common to use shape files. Shape files define the edges of polygons and can be very complex depending on the number of edges of a polygon. 
+
+```{r shp1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load libraries
+library(sf)
+#library(raster)
+#library(dplyr)
+#library(spData)
+#library(spDataLarge)
+#library(rgdal)
+#library(tmap)    # for static and interactive maps
+#library(leaflet) # for interactive maps
+#library(mapview) # for interactive maps
+#library(ggplot2) # tidyverse data visualization package
+#library(shiny)   # for web applications
+```
+
+
+```{r shp12, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load shape file
+ausstates <- st_read("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data\\shapes/Ashmore and Cartier Islands_AL4-AL4.shp", stringsAsFactors = F)
+# plot australian admin shape file
+tm_shape(ausstates) +
+  tm_fill() +
+  tm_borders()
+```
+
+```{r shp3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load shape files
+ausstates <- readOGR(dsn = "https://slcladal.github.io/data/shapes/Ashmore and Cartier Islands_AL4-AL4.shp", stringsAsFactors = F)
+ausstatesadmin <- readOGR(dsn = "https://slcladal.github.io/data/shapes/Australia_admin_6.shp", stringsAsFactors = F)
+# plot australia and queensland
+ozmap <- ggplot() + 
+  geom_polygon(data = ausstates, 
+               aes(x = long, y = lat, group = group),
+               colour = "black", fill = NA) +
+  geom_polygon(data = ausstatesadmin, 
+                 aes(x = long, y = lat, group = group), 
+                 colour = "red", fill = NA) +
+  theme_void()
+# plot map
+ozmap
+```
+
+
+```{r shp4, echo=T, eval = T, message=FALSE, warning=FALSE}
+# inspect shape file
+summary(ausstates@data)
+
+table(ausstates@data$name)
+
+ausstates_df <- broom::tidy(ausstates, region = "name")
+```
+
+```{r shp5, echo=T, eval = T, message=FALSE, warning=FALSE}
+# extract names of states
+cnames <- aggregate(cbind(long, lat) ~ id, data=ausstates_df, FUN=mean)
+# define colors
+# Define the number of colors you want
+library(RColorBrewer)
+nb.cols <- 15
+newcolors <- colorRampPalette(brewer.pal(8, "Oranges"))(nb.cols)
+# plot australian admin shape file
+ausadminmap <- ggplot() +
+  # plot australian state shapes
+  geom_polygon(data = ausstates_df, 
+               aes(x = long, y = lat, group = group, fill = id), 
+               asp = 1, colour = NA) +
+  geom_text(data = cnames, aes(x = long, y = lat, label = id), 
+            size = 2, color = "gray20", fontface = "bold", 
+            check_overlap = T) +
+  # def. manual colors
+  scale_fill_manual(values = newcolors) +
+  # use empty theme
+  theme_void() +
+  scale_x_continuous(name="Longitude", limits=c(112, 155)) +
+  scale_y_continuous(name="Latitude", limits=c(-45, -10)) +
+  # def. background color
+  theme(panel.background = element_rect(fill = "slategray1",
+                                colour = "slategray1",
+                                size = 0.5, linetype = "solid"),
+        legend.position = "none")
+# plot map
+ausadminmap
+```
+
+```{r shp6, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+#library(ggsn)
+# cerate data frame with longitude and latitude values
+Latitude <- c(-25, -27.5, -25, -30, -30, -35, -25)
+Longitude <- c(150, 140, 130, 135, 140, 147.5, 150)
+mypolygon <- as.data.frame(cbind(Longitude,Latitude))
+# inspect data
+mypolygon
+```
+
+```{r shp7, echo=T, eval = T, message=FALSE, warning=FALSE}
+# plot australian admin shape file
+ausadminmap <- ggplot() +
+# plot state shapes
+  geom_polygon(data = ausstates_df, 
+               aes(x = long, y = lat, group = group), 
+               asp = 1,
+               fill = "wheat1", 
+               colour = "wheat3") +
+  ggplot2::geom_text(data = cnames, aes(x = long, y = lat, label = id), 
+            size = 2, color = "gray20", 
+            fontface = "bold", 
+            check_overlap = T) +
+  # add customized polygon
+  geom_polygon(data=mypolygon,aes(x=Longitude,y=Latitude),
+               alpha=0.5,colour="darkgray",fill="red") +
+#  geom_path(data=mypolygon,aes(x=Longitude,y=Latitude),
+#            colour="white",alpha=0.8,size=2) +
+  annotate("text", x = mean(Longitude),y = mean(Latitude),
+           label = "My Polygon Area", colour="white", size=3) +
+  # def. manual colors
+  scale_fill_manual(values = newcolors) +
+  # add north arrow
+  ggsn::north(ausstates_df, scale = .1) +
+  # use empty theme
+  theme_void() +
+  scale_x_continuous(name="Longitude", limits=c(112, 155)) +
+  scale_y_continuous(name="Latitude", limits=c(-45, -10)) +
+  # def. background color
+  theme(panel.background = element_rect(fill = "slategray1",
+                                colour = "slategray1",
+                                size = 0.5, linetype = "solid"))
+# plot map
+ausadminmap
+```
+
+
+
+
+# Using and customizing Google maps in R
+
+## The Google API
+
+Unfortunately, Google made accessing their database more restrictive which means that we need to register an API accessing the database. Before we can start creating maps we therefore need to obtain an (API key from Google)[https://developers.google.com/maps/documentation/geocoding/get-api-key]. Go to the (registration page)[https://cloud.google.com/maps-platform/#get-started], and follow the instructions (select all mapping options). The geocoding API is a free service, but you nevertheless need to associate a credit card with the account.
+
+## Installing the ggmap package
+
+The existing CRAN version of ggmap is 2.6.1. This version does unfortunately not yet enable using the Google API. The current version on GitHub is further advanced and fixes the issue. To install the GitHub version, you need to use the devtools package.
+
+
+```{r map19, echo=F, eval = F, message=FALSE, warning=FALSE}
+# load libraries
+library(sf)
+library(RgoogleMaps)
+# retrieve map
+map <- get_map(location = 'Australia', zoom = 4)
+ggmap(map)
+```
+
+```{r map20, echo=F, eval = F, message=FALSE, warning=FALSE}
+library(ggmap)
+library(mapproj)
+map <- get_map(location = 'Europe', zoom = 4)
+ggmap(map)
+```
 
 
 ```{r map17, echo=F, eval = F, message=FALSE, warning=FALSE}
@@ -477,167 +891,6 @@ mapPointsFacetsDA <- mapPointsLegendDA +
 mapPointsFacetsDA
 ```
 
-
-
-# Interactive Maps
-
-An easy way to create interactice maps is to use the "googleVis" package. An example showing the population size by country provided by an in-built data set is shown.
-
-```{r mot1, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load library
-library(googleVis)
-# create motion chart object
-Geo=gvisGeoMap(Population, locationvar="Country", numvar="Population", options = list(height=350, daatMode='regions'))
-# display motion chart
-plot(Geo)
-```
-
-A browser window should open and and if you accept and execute Adobe Flash, then the following interactive map showing the population size by country should pop up. You can hoover over any country and see its population size. 
-
-```{r mot2, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("images/motionchart_worldpopulation.png")
-```
-
-You can also use the "googleVis" package to create customized maps. To customize an interactive map, we need to load a data set.
-
-```{r mot3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load data 
-gapminderdata <- read.delim("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/gapminder.txt", header = T, sep = "\t")
-# create map
-Map <- data.frame(gapminderdata$country, 
-                  gapminderdata$year, gapminderdata$lifeExp)
-# def. column names
-names(Map) <- c("Country", "Year", "LifeExpectancy")
-# inspect data
-head(Map)
-```
-
-We will only use the latest data (from 2007) and exclude all other data points and create the interactive map as we did above.
-
-```{r mot4, echo=F, eval = F, message=FALSE, warning=FALSE}
-# remove data point not from 2007
-Map <- Map[Map$Year == "2007",]
-# create motion chart object
-Geo=gvisGeoMap(Map, locationvar = "Country", numvar = "LifeExpectancy", 
-               options = list(height = 350, dataMode = 'regions'))
-# display motion chart
-plot(Geo)
-```
-
-```{r mot5, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("images/motionchart_lifeexpectancy.png")
-```
-
-# Creating Maps with tmap and Shape Files
-
-```{r tmap1, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load libraries
-library(sf)
-library(raster)
-library(dplyr)
-library(spData)
-library(spDataLarge)
-library(rgdal)
-library(tmap)    # for static and interactive maps
-library(leaflet) # for interactive maps
-library(mapview) # for interactive maps
-library(ggplot2) # tidyverse data visualization package
-library(shiny)   # for web applications
-```
-
-
-```{r tmap3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load shape file
-ausstates <- st_read("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data\\shapes/Ashmore and Cartier Islands_AL4-AL4.shp", stringsAsFactors = F)
-# plot australian admin shape file
-tm_shape(ausstates) +
-  tm_fill() +
-  tm_borders()
-```
-
-```{r tmap4, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load shape files
-ausstates <- readOGR(dsn = "D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data\\shapes/Ashmore and Cartier Islands_AL4-AL4.shp", stringsAsFactors = F)
-ausstatesadmin <- readOGR(dsn = "D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data\\shapes/Australia_admin_6.shp", stringsAsFactors = F)
-# plot australia and queensland
-ozmap <- ggplot() + 
-  geom_polygon(data = ausstates, 
-               aes(x = long, y = lat, group = group),
-               colour = "black", fill = NA) +
-  geom_polygon(data = ausstatesadmin, 
-                 aes(x = long, y = lat, group = group), 
-                 colour = "lightgrey", fill = NA) +
-  theme_void()
-# plot map
-ozmap
-```
-
-
-```{r tmap5, echo=T, eval = T, message=FALSE, warning=FALSE}
-# inspect shape file
-summary(ausstates@data)
-
-table(ausstates@data$name)
-
-ausstates_df <- broom::tidy(ausstates, region = "name")
-```
-
-```{r tmap6, echo=T, eval = T, message=FALSE, warning=FALSE}
-# extract names of states
-cnames <- aggregate(cbind(long, lat) ~ id, data=ausstates_df, FUN=mean)
-# define colors
-# Define the number of colors you want
-library(RColorBrewer)
-nb.cols <- 15
-newcolors <- colorRampPalette(brewer.pal(8, "Set1"))(nb.cols)
-# plot australian admin shape file
-ausadminmap <- ggplot() +
-  # plot australia shape
-  geom_polygon(data = ausstates, aes(x = long, y = lat, group = group), 
-                 colour = "black", fill = "wheat1") + 
-  # plot state shapes
-  geom_polygon(data = ausstates_df, 
-               aes(x = long, y = lat, group = group, fill = id), 
-               colour = "black") +
-  geom_text(data = cnames, aes(x = long, y = lat, label = id), size = 2) +
-  # def. manual colors
-  scale_fill_manual(values = newcolors) +
-  # use empty theme
-  theme_void() +
-  # def. background color
-  theme(panel.background = element_rect(fill = "slategray1",
-                                colour = "slategray1",
-                                size = 0.5, linetype = "solid"))
-# plot map
-ausadminmap
-```
-
-# Using and customizing Google maps in R
-
-## The Google API
-
-Unfortunately, Google made accessing their database more restrictive which means that we need to register an API accessing the database. Before we can start creating maps we therefore need to obtain an (API key from Google)[https://developers.google.com/maps/documentation/geocoding/get-api-key]. Go to the (registration page)[https://cloud.google.com/maps-platform/#get-started], and follow the instructions (select all mapping options). The geocoding API is a free service, but you nevertheless need to associate a credit card with the account.
-
-## Installing the ggmap package
-
-The existing CRAN version of ggmap is 2.6.1. This version does unfortunately not yet enable using the Google API. The current version on GitHub is further advanced and fixes the issue. To install the GitHub version, you need to use the devtools package.
-
-
-```{r map19, echo=F, eval = F, message=FALSE, warning=FALSE}
-# load libraries
-library(sf)
-library(RgoogleMaps)
-# retrieve map
-map <- get_map(location = 'Australia', zoom = 4)
-ggmap(map)
-```
-
-```{r map20, echo=F, eval = F, message=FALSE, warning=FALSE}
-library(ggmap)
-library(mapproj)
-map <- get_map(location = 'Europe', zoom = 4)
-ggmap(map)
-```
 
 ```{r uq2, echo=F, fig.cap="", out.width = '100%'}
 knitr::include_graphics("images/uq2.jpg")
