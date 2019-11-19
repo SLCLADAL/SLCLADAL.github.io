@@ -162,30 +162,25 @@ The histogram in the lower left panel shows that, although the mean amount of mo
 
 The boxplot in the lower right panel confirms the existence of an interaction (a non-additive term) as men only spend more money on single women if the men are interested in the women. If men are not interested in the women, then the relationship has no effect as they spend an equal amount of money on the women regardless of whether they are in a relationship or not.
 
-We will now start to implement the regression model. In a first step, we initialize four base-line models: two minimal base-line models that only use the intercept as their sole predictor and two saturated base-line models that contain all possible predictors. The model pairs are generated with the "lm" and the "glm" function as these functions offer different model parameters in their output.
+We will now start to implement the regression model. In a first step, we create two saturated base-line models that contain all possible predictors (main effects and interactions). The two models are identical but one is generated with the "lm" and the other with the "glm" function as these functions offer different model parameters in their output.
 
 ```{r mlr4, eval = T, echo = T, message=FALSE, warning=FALSE}
-m0.mlr = lm(         # generate lm regression object
-  money ~ 1,         # def. rgression formula (1 = intercept)
-  data = mlrdata)    # def. data
-m0.glm = glm(        # generate glm regression object
-  money ~ 1,         # def. rgression formula (1 = intercept)
-  family = gaussian, # def. linkage function
-  data = mlrdata)    # def. data
-m1.mlr = lm(         # generate lm regression object
-  money ~ (status + attraction)^2, # def. rgression formula
-  data = mlrdata)    # def. data
-m1.glm = glm(        # generate glm regression object
-  money ~ status * attraction,     # def. rgression formula
-  family = gaussian, # def. linkage function
-  data = mlrdata)    # def. data set
+m1.mlr = lm(                      # generate lm regression object
+  money ~ 1 + attraction*status,  # def. rgression formula (1 = intercept)
+  data = mlrdata)                 # def. data
+m1.glm = glm(                     # generate glm regression object
+  money ~ 1 + attraction*status,  # def. rgression formula (1 = intercept)
+  family = gaussian,              # def. linkage function
+  data = mlrdata)                 # def. data
 ```
 
 After generating the saturated base-line models we can now start with the model fitting. Model fitting refers to a process that aims at find the model that explains a maximum of variance with a minimum of predictors [cf. @field2012discovering 318]. Model fitting is therefore based on the *principle of parsimony* which is related to Occam's razor according to which explanations that require fewer assumptions are more likely to be true.
 
-## Automatic Model Fitting
+## Automatic Model Fitting and Why You Should Not Use It
 
 In this section, we will use a step-wise step-down procedure that uses decreases in AIC (Akaike information criterion) as the criterion to minimize the model in a step-wise manner. This procedure aims at finding the model with the lowest AIC values by evaluating - step-by-step - whether the removal of a predictor (term) leads to a lower AIC value.
+
+We use this method here just so that you know it exists and how to implement it but you should rather avoid using automated model fitting. The reason for avoiding automated model fitting is that the algorithsm only checks if the AIC has decreased but not if the model is stable or reliable. Thus, automated model fitting has the problem that you can never be sure that the way that lead you to the final model is reliable and that all models were indeed stable. Imagine you want to climb down from a roof top and you have a ladder. The problem is that you do not know if and how many steps are broken. This is similar to using automated model fitting. In other sections, we will explore better methods to fit models (manual step-wise step-up and step-down procedures, for example).
 
 The AIC is calculated using the equation below. The lower the AIC value, the better the balance between explained variance and the number of predictors. AIC values can and should only be compared for models that are fit on the same dataset with the same (number of) cases ($LL$ stands for LogLikelihood and $k$ represents the number of predictors in the model).
 
@@ -253,7 +248,8 @@ Before continuing, we will calculate the confidence intervals of the coefficient
 ```{r mlr9, eval = T, echo = T, message=FALSE, warning=FALSE}
 # extract confidence intervals of the coefficients
 confint(m2.mlr)
-# compare baseline- and minimal adequate model
+# create and compare baseline- and minimal adequate model
+m0.mlr <- lm(money ~1, data = mlrdata)
 anova(m0.mlr, m2.mlr)
 ```
 
@@ -685,7 +681,7 @@ The plots in the lower panels do not indicate significant interactions between u
 
 ## Model Building
 
-As a first step, we need to define contrasts and add a distance matrix to the options. Contrasts define what should be tested and therefore has influence on how the results of the regression analysis are presented.
+As a first step, we need to define contrasts and add a distance matrix to the options. Contrasts define what should be compared and therefore influences how the results of the regression analysis are presented.
 
 ```{r blm7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # set contrasts
@@ -696,84 +692,111 @@ blrdata.dist <- datadist(blrdata)
 options(datadist = "blrdata.dist")
 ```
 
-Next, we generate four base-line models: two minimal models that predict the use of *eh* sole based on the intercept and two initial saturated regression models that include all variables and their interactions.
+Next, we generate two minimal models that predict the use of *eh* solely based on the intercept.
 
 ```{r blm8, eval = T, echo=T, message=FALSE, warning=FALSE}
 # baseline glm model
 m0.glm = glm(EH ~ 1, family = binomial, data = blrdata)
 # baseline lrm model
 m0.lrm = lrm(EH ~ 1, data = blrdata, x = T, y = T)
-m1.glm = glm(EH ~ Age*Gender*Ethnicity, family = binomial, data = blrdata)
-m1.lrm = lrm(EH ~ Age*Gender*Ethnicity, data = blrdata, x = T, y = T)
 ```
 
-A few words on "glm" vs "lrm":   Baayen (2008:196-197) states that lrm should be the function of choice in cases where each row contains exactly 1 success OR failure (1 or 0) while glm is preferable if there are two columns holding the number of successes and the number of failures respectively. I have tried it both ways and both functions work fine if each row contains exactly 1 success OR failure but only glm can handle the latter case.
+A few words on "glm" vs "lrm":   Baayen (2008:196-197) states that "lrm" should be the function of choice in cases where each row contains exactly 1 success OR failure (1 or 0) while "glm" is preferable if there are two columns holding the number of successes and the number of failures respectively. I have tried it both ways and both functions work fine if each row contains exactly 1 success OR failure but only glm can handle the latter case.
 
 ## Model fitting
 
-We will now start with the model building procedure. In the present case, we will use a manual step-wise step-down protocol during which predictors are removed from the model if they do not significantly to the model fit.
+We will now start with the model fitting procedure. In the present case, we will use a manual step-wise step-up procedure during which predictors are added to the model if they significantly improve the model fit. In addition, we will perform diagnostics as we fit the model ateach step of the model fitting process rather than after the fitting.
+
+We will test two things in particular: whether the data has incomplete information or complete separation and if the model suffers from multicollinearity. 
+
+Incomplete information or complete separation means that the data does not contain all combinations of the predictor or the dependent variable. This is important because if the data does not contain cases of all combinations, the model will assume that it has found a perfect predictor. In such cases the model overestimates the effect of that that predictor and the results of that model are no longer reliable. For example, if "EH" was only used by young speakers in the data, the model would jump on that fact and say "Ha! If there is an old speaker, that means that that speaker will never ever and under no circumstances say "EH" - I can therefore ignore all other factors!" 
+
+Multicollinearity means that predictors correlate and have shared variance. This means that whichever predictor is included first will take all the variance that it can explain and the remaining part of the variable that is shared will not be attributed to the other predictor. This may lead to reporting that a factor is not significant because all of the variance it can explain is already accounted for. However, if the other predictor were included first, then the orginal predictor would be returned as insignificant. This means that- depending on the order in which predictors are added - the results of the regression can differ dramatically and the model is therefore not reliable. Multicollinearity is actually a very comon problem and theer are various ways to deal with it but it cannot be ignored (at least in regression analyses).
+
+We will start by adding "Age" to the minimal adequate model.
 
 ```{r blm9, eval = T, echo=T, message=FALSE, warning=FALSE}
-# remove Age:Gender:Ethnicity
-m2.glm <- update(m1.glm, . ~ . -Age:Gender:Ethnicity)
-# check if removal significantly decreases model fit
-anova(m1.glm, m2.glm, test = "Chi")
+# check incomplete information
+ifelse(min(ftable(blrdata$Age, blrdata$EH)) == 0, "not possible", "possible")
+# add age to the model
+m1.glm = glm(EH ~ Age, family = binomial, data = blrdata)
+# check multicollinearity (vifs should have values of 3 or lower for main effects)
+ifelse(max(vif(m1.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+# check if adding Age significantly improves model fit
+anova(m1.glm, m0.glm, test = "Chi")
 ```
 
-The ANOVA shows that the fit of the saturated model (m1.glm) and the model without the interaction between Age, Gender, and Ethnicity (m2.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.63) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m3.glm) as this is the correct procedure based on the principle of parsimony.
+As the data does not contain incomplete information, the vif values are below 3, and adding "Age" has significantly imporved the mdel fit (the p-value of the anova is lower than .05). We therefore proceed with "Age" included.
+
+We continue by adding "Gender". We add a second ANOVA test to see if including Gender affects the significance of other predictors in the model. If this were the case - if adding Gender woudl cause Age to become insignificant - then we could change the ordering in which we include predictors into our model.
 
 ```{r blm10, eval = T, echo=T, message=FALSE, warning=FALSE}
-m3.glm <- update(m2.glm, . ~ . -Gender:Ethnicity)
-anova(m2.glm, m3.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Gender, blrdata$EH)) == 0, "not possible", "possible")
+m2.glm <- update(m1.glm, . ~ . +Gender)
+ifelse(max(vif(m2.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m2.glm, m1.glm, test = "Chi")
+Anova(m2.glm, test = "LR")
 ```
 
-The ANOVA shows that the fit of the saturated model (m2.glm) and the model without the interaction between Gender and Ethnicity (m3.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.94) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m3.glm) as this is the correct procedure based on the principle of parsimony.
+
+Again, including "Gender" significantly improves model fit and the data does not contain incomplete information or complete separation. Also, including "Gender" does not affect the significance of "Age". Now, we include "Ethnicity".
+
 
 ```{r blm11, eval = T, echo=T, message=FALSE, warning=FALSE}
-m4.glm <- update(m3.glm, . ~ . -Age:Gender)
-anova(m3.glm, m4.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m3.glm <- update(m2.glm, . ~ . +Ethnicity)
+ifelse(max(vif(m3.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m3.glm, m2.glm, test = "Chi")
 ```
 
-The ANOVA shows that the fit of the saturated model (m3.glm) and the model without the interaction between Age and Gender (m4.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.63) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m4.glm) as this is the correct procedure based on the principle of parsimony.
+Since adding "Ethnicity" does not significantly imporve the mdoel fit, we do not need to test if its inclusion affects the significance of other predictors. We continue without "Ethnicity" and include the interaction between "Age" and "Gender".
 
 ```{r blm12, eval = T, echo=T, message=FALSE, warning=FALSE}
-m5.glm <- update(m4.glm, . ~ . -Age:Ethnicity)
-anova(m4.glm, m5.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Age, blrdata$Gender, blrdata$EH)) == 0, "not possible", "possible")
+m4.glm <- update(m2.glm, . ~ . +Age*Gender)
+ifelse(max(vif(m4.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m4.glm, m2.glm, test = "Chi")
 ```
 
-The ANOVA shows that the fit of the saturated model (m4.glm) and the model without the interaction between Age and Ethnicity (m5.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.09) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m5.glm) as this is the correct procedure based on the principle of parsimony.
+The interaction between Age and Gender is not significant which means that men and women do not behave differently with respect to their use of "EH" as they age. Also, the data does not contain incomplete information and the model does not suffer from multicollinerity - the predictors are not collinear. We can now include if there is a significant interaction between "Age" and "Ethnicity".
 
 ```{r blm13, eval = T, echo=T, message=FALSE, warning=FALSE}
-m6.glm <- update(m5.glm, . ~ . -Ethnicity)
-anova(m5.glm, m6.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Age, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m5.glm <- update(m2.glm, . ~ . +Age*Ethnicity)
+ifelse(max(vif(m5.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m5.glm, m2.glm, test = "Chi")
 ```
 
-The ANOVA shows that the fit of the saturated model (m5.glm) and the model without the main effect for Ethnicity (m6.glm) do not differ significantly. The lack of a significant difference is provided in the value of Pr(>Chi) (0.61) which is higher than .05. Because the models do not differ significantly, we continue with the smaller model (m6.glm) as this is the correct procedure based on the principle of parsimony.
+Again, no incomplete information or multicollinearity and no significant interaction. Now, we test if there exists a significant interaction between "Gender" and "Ethnicity".
 
 ```{r blm14, eval = T, echo=T, message=FALSE, warning=FALSE}
-m7.glm <- update(m6.glm, . ~ . -Gender)
-anova(m7.glm, m6.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Gender, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m6.glm <- update(m2.glm, . ~ . +Gender*Ethnicity)
+ifelse(max(vif(m6.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m6.glm, m2.glm, test = "Chi")
 ```
 
-The ANOVA shows that the fit of the more saturated model (m6.glm) and the model without the main effect for Gender (m7.glm) differ significantly. The significant difference is provided in  the value of Pr(>Chi) (<0.0000000000000002 ***) which is smaller than .05. Because the models differ significantly, we continue with the more saturated model (m6.glm) as this is the correct procedure based on the principle of parsimony.
+
+As the interaction between "Gender" and "Ethnicity" is not significant, we continue without it. In a final step, we include the three-way interaction between "Age", "Gender", and "Ethnicity".
 
 ```{r blm15, eval = T, echo=T, message=FALSE, warning=FALSE}
-m8.glm <- update(m6.glm, . ~ . -Age)
-anova(m8.glm, m6.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Age, blrdata$Gender, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m7.glm <- update(m2.glm, . ~ . +Gender*Ethnicity)
+ifelse(max(vif(m7.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m7.glm, m2.glm, test = "Chi")
+
 ```
 
-The ANOVA shows that the fit of the more saturated model (m6.glm) and the model without the main effect for Age (m8.glm) differ significantly. The significant difference is provided in the value of Pr(>Chi) (<0.0000000000000002 ***) which is smaller than .05. Because the models differ significantly, we continue with the more saturated model (m6.glm) as this is the correct procedure based on the principle of parsimony.
-
-As we have now arrived at the final minimal adequate model (m6.glm), we generate a final minimal model using the "lrm" model.
+We have found our final minimal adequate model because the 3-way interaction is also insignificant. As we have now arrived at the final minimal adequate model (m2.glm), we generate a final minimal model using the "lrm" model.
 
 ```{r blm16, eval = T, echo=T, message=FALSE, warning=FALSE}
-m6.lrm <- lrm(EH ~ Age+Gender, data = blrdata, x = T, y = T, linear.predictors = T)
-m6.lrm
+m2.lrm <- lrm(EH ~ Age+Gender, data = blrdata, x = T, y = T, linear.predictors = T)
+m2.lrm
 ```
 
 
 ```{r blm17, eval = T, echo=T, message=FALSE, warning=FALSE}
-anova(m6.lrm)
+anova(m2.lrm)
 ```
 
 After fitting the model, we validate the model to avoid arriving at a final minimal model that is overfitted to the data at hand.
@@ -784,20 +807,21 @@ To validate the final minimal model, we apply the "validate" function and apply 
 
 ```{r blm18, eval = T, echo=T, message=FALSE, warning=FALSE}
 # model validation (remove # to activate: output too long for website)
-#validate(m1.lrm, bw = T, B = 200)
+m7.lrm <- lrm(EH ~ (Age+Gender+Ethnicity)^3, data = blrdata, x = T, y = T, linear.predictors = T)
+#validate(m7.lrm, bw = T, B = 200)
 ```
 
 The "validate" function shows that retaining two predictors (Age and Gender) is the best option and thereby confirms our final minimal adequate model as the best minimal model. In addition, we check whether we need to include a penalty for data points because they have too strong of an impact of the model fit. To see whether a penalty is warranted, we apply the "pentrace" function to the final minimal adequate model.
 
 ```{r blm19, eval = T, echo=T, message=FALSE, warning=FALSE}
-pentrace(m6.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
+pentrace(m2.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
 ```
 
 The "pentrace" function proposes a penalty of .8 but the values are so similar  that a penalty is unnecessary. In a next step, we rename the final models.
 
 ```{r blm20, eval = T, echo=T, message=FALSE, warning=FALSE}
-lr.glm <- m6.glm  # rename final minimal adeqaute glm model
-lr.lrm <- m6.lrm  # rename final minimal adeqaute lrm model
+lr.glm <- m2.glm  # rename final minimal adeqaute glm model
+lr.lrm <- m2.lrm  # rename final minimal adeqaute lrm model
 ```
 
 Now, we calculate a Model Likelihood Ratio Test to check if the final model performs significantly better than the initial minimal base-line model. The result of this test is provided as a default if we call a summary of the lrm object.
