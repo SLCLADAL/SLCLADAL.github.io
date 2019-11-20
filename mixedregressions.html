@@ -495,6 +495,7 @@ install.packages(c(&quot;RLRsim&quot;, &quot;nlme&quot;, &quot;lme4&quot;, &quot
 <pre class="r"><code># activate packages
 library(car)
 library(dplyr)
+library(effects)
 library(ggplot2)
 library(lme4)
 library(nlme)
@@ -576,28 +577,30 @@ multiplot(p8, p9, cols = 2)</code></pre>
   facet_wrap(~ Genre, nrow = 4) +
   geom_smooth(method = &quot;lm&quot;) +
   theme_bw() +
-  labs(x = &quot;Year&quot;) +
+  labs(x = &quot;Date of composition&quot;) +
   labs(y = &quot;Prepositions per 1,000 words&quot;) +
   coord_cartesian(ylim = c(0, 220))</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm6-1.png" width="672" /></p>
 <p>Centring or scaling numeric variables is useful for later interpretation of regression models: if the date variable was not centred, the regression would show the effects of variables at year 0(!). If numeric variables are scaled, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centring simply means that the mean of the numeric variable is subtracted from each value.</p>
-<pre class="r"><code>lmmdata$Date &lt;- scale(lmmdata$Date, scale = F)
+<pre class="r"><code>lmmdata$DateUnscaled &lt;- lmmdata$Date
+lmmdata$Date &lt;- scale(lmmdata$Date, scale = F)
 # inspect data
 head(lmmdata); str(lmmdata)</code></pre>
-<pre><code>##     Date         Genre    Text Prepositions Region
-## 1 109.87       Science   albin        166.0  North
-## 2  84.87     Education    anon        139.9  North
-## 3 181.87 PrivateLetter  austen        130.8  North
-## 4 251.87     Education    bain        151.3  North
-## 5 116.87     Education barclay        145.7  North
-## 6 281.87     Education  benson        120.8  North</code></pre>
-<pre><code>## &#39;data.frame&#39;:    537 obs. of  5 variables:
+<pre><code>##     Date         Genre    Text Prepositions Region DateUnscaled
+## 1 109.87       Science   albin        166.0  North         1736
+## 2  84.87     Education    anon        139.9  North         1711
+## 3 181.87 PrivateLetter  austen        130.8  North         1808
+## 4 251.87     Education    bain        151.3  North         1878
+## 5 116.87     Education barclay        145.7  North         1743
+## 6 281.87     Education  benson        120.8  North         1908</code></pre>
+<pre><code>## &#39;data.frame&#39;:    537 obs. of  6 variables:
 ##  $ Date        : num [1:537, 1] 109.9 84.9 181.9 251.9 116.9 ...
 ##   ..- attr(*, &quot;scaled:center&quot;)= num 1626
 ##  $ Genre       : chr  &quot;Science&quot; &quot;Education&quot; &quot;PrivateLetter&quot; &quot;Education&quot; ...
 ##  $ Text        : chr  &quot;albin&quot; &quot;anon&quot; &quot;austen&quot; &quot;bain&quot; ...
 ##  $ Prepositions: num  166 140 131 151 146 ...
-##  $ Region      : chr  &quot;North&quot; &quot;North&quot; &quot;North&quot; &quot;North&quot; ...</code></pre>
+##  $ Region      : chr  &quot;North&quot; &quot;North&quot; &quot;North&quot; &quot;North&quot; ...
+##  $ DateUnscaled: num  1736 1711 1808 1878 1743 ...</code></pre>
 <p>We now set up a fixed-effects model with the “glm” function and a mixed-effects model using the “glmer” function with Genre as a random effect.</p>
 <pre class="r"><code># generate models
 m0.glm &lt;- glm(Prepositions ~ 1, family = gaussian, data = lmmdata)
@@ -690,7 +693,8 @@ summary(m1.glmer)</code></pre>
 <pre class="r"><code>plot(m1.glmer, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm14-1.png" width="672" /></p>
 <p>The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values <span class="citation">(Pinheiro and Bates <a href="#ref-pinheiro2000mixedmodels">2000</a>, 175)</span>.</p>
-<pre class="r"><code>plot(m1.glmer, resid(., type = &quot;pearson&quot;) ~ fitted(.) | Genre, id = 0.05, adj = -0.3)</code></pre>
+<pre class="r"><code>plot(m1.glmer, resid(., type = &quot;pearson&quot;) ~ fitted(.) | Genre, id = 0.05, 
+     adj = -0.3, pch = 20, col = &quot;gray40&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm15-1.png" width="672" /></p>
 <p>The plot shows the standardized residuals (or Pearson’s residuals) versus fitted values and suggests that there are outliers in the data (the names elements in the plots). We create a new model which uses weights to compensate for inheterogeneity of variance and thus the influence of outliers - which is an alternative to removing the data points and rerunning the analysis <span class="citation">(Pinheiro and Bates <a href="#ref-pinheiro2000mixedmodels">2000</a>, 177)</span>. However, to do so, we need to use a different function (the “lmer” function) which measn that we have to create two models: the “old” minimal adequate model and the “new” minimal adequate model with added weights. After we have created these models, we will compare them to see if including weights has improved the fit.</p>
 <pre class="r"><code>m4.lme = lme(Prepositions ~ Date, random = ~1|Genre, data = lmmdata, method = &quot;ML&quot;)
@@ -801,14 +805,28 @@ intervals(m5.lme)      </code></pre>
 <pre class="r"><code>ef.lme &lt;- function(x) {
   df &lt;- summary(x)[[20]][6]
   t &lt;-  summary(x)[[20]][8]
-  #df &lt;- summary(x)$tTable[, 3]
-  #t &lt;- summary(x)$tTable[, 4]
   r &lt;- sqrt((t^2)/((t^2)+df))
   return(paste(&quot;Pearson&#39;s r = &quot;, round(r, 3)))
   }
 ef.lme(m5.lme)</code></pre>
 <pre><code>## [1] &quot;Pearson&#39;s r =  0.172&quot;</code></pre>
 <p>While we have already shown that the effect of Date is significant, it is small which means that the number of prepositions per text doe snot correlate evry stribgyl with time. This suggesta that other factors athat are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too).</p>
+<p>Before turning to the diagnostics, we will use the fitted (or predicted) and the observed values with a regression line for the predicted values. This will not only show how good the model fit the data but also the direction and magnitude of the effect.</p>
+<pre class="r"><code># extract predicted values
+lmmdata$Predicted &lt;- predict(m5.lme, lmmdata)
+# plot predicted values
+ggplot(lmmdata, aes(DateUnscaled, Predicted)) +
+  facet_wrap(~Genre) +
+  geom_point(aes(x = DateUnscaled, y = Prepositions), color = &quot;gray80&quot;, size = .5) +
+  geom_smooth(aes(y = Predicted), color = &quot;gray20&quot;, linetype = &quot;solid&quot;, 
+              se = T, method = &quot;lm&quot;) +
+  guides(color=guide_legend(override.aes=list(fill=NA))) +  
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position=&quot;top&quot;, legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  xlab(&quot;Date of composition&quot;)</code></pre>
+<p><img src="mixedregressions_files/figure-html/lmm21b-1.png" width="672" /></p>
 </div>
 <div id="model-diagnostics-1" class="section level2">
 <h2><span class="header-section-number">3.7</span> Model Diagnostics</h2>
@@ -820,7 +838,8 @@ plot(m5.lme, pch = 20, col = &quot;black&quot;, lty = &quot;dotted&quot;)</code>
 <pre class="r"><code>par(mfrow = c(1, 1))</code></pre>
 <p>What a wonderful unstructured cloud - the lack of structure tells us that the model is “healthy” and does not suffer from heteroscedasticity. We will now create more diagnostic plots to find potential problems <span class="citation">(Pinheiro and Bates <a href="#ref-pinheiro2000mixedmodels">2000</a>, 21)</span>.</p>
 <pre class="r"><code># fitted values by Genre
-plot(m5.lme, form = resid(., type = &quot;p&quot;) ~ fitted(.) | Genre, abline = 0, cex = .5)</code></pre>
+plot(m5.lme, form = resid(., type = &quot;p&quot;) ~ fitted(.) | Genre, abline = 0, 
+     cex = .5, pch = 20, col = &quot;black&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm23-1.png" width="672" /></p>
 <p>In contrast to the unweight model, no data points are named which indicates that the outliers do no longer have unwarrented influence on the model. Now, we check the residuals of fitted values against observed values <span class="citation">(Pinheiro and Bates <a href="#ref-pinheiro2000mixedmodels">2000</a>, 179)</span>. What we would like to see is a straight, upwards going line.</p>
 <pre class="r"><code># residuals of fitted values against observed
@@ -839,7 +858,7 @@ plot(m5.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3,
 </div>
 <div id="reporting-results" class="section level2">
 <h2><span class="header-section-number">3.8</span> Reporting Results</h2>
-<p>Before we do the write-up, we have a look at the model summayr one last time as this will provide us with at least some of the parameters that we want to report.</p>
+<p>Before we do the write-up, we have a look at the model summary as this will provide us with at least some of the parameters that we want to report.</p>
 <pre class="r"><code>summary(m5.lme)</code></pre>
 <pre><code>## Linear mixed-effects model fit by maximum likelihood
 ##  Data: lmmdata 
@@ -943,9 +962,10 @@ mblrdata[,fctr] &lt;- lapply(mblrdata[,fctr], factor)
 mblrdata$Age &lt;- relevel(mblrdata$Age, &quot;Young&quot;) </code></pre>
 <p>Before continuing, we check if speakers need to be collapsed because they nest too few data points. As a general rule of thumb, random effects should have a minimum of 20 data points per level.</p>
 <pre class="r"><code>plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
-     ylim = c(0,150), ylab = &quot;Frequency&quot;, cex = .5)</code></pre>
+     ylim = c(0,150), ylab = &quot;Frequency&quot;, cex = .5, col = &quot;gray80&quot;, xaxt=&quot;n&quot;)
+abline(h = 20,col = &quot;red&quot;, lty = &quot;dotted&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/blmm5-1.png" width="672" /></p>
-<p>The plot indicates that the vast majority of speakers represent more than 20 cases. However, we will collapse speakers that represent fewer data points.</p>
+<p>The plot indicates that the vast majority of speakers represent more than 20 cases and we collapse speakers with fewer data points.</p>
 <pre class="r"><code>collapsespeaker &lt;- table(mblrdata$ID)[which(table(mblrdata$ID) &lt; 21)]
 mblrdata$ID &lt;- ifelse(mblrdata$ID %in% collapsespeaker, &quot;Other&quot;, mblrdata$ID)</code></pre>
 <p>After preparing the data, we have a look at the first six lines of the data set.</p>
