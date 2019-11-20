@@ -165,6 +165,7 @@ To explore how to implement a mixed-effects model in "R" we revisit the preposit
 # activate packages
 library(car)
 library(dplyr)
+library(effects)
 library(ggplot2)
 library(lme4)
 library(nlme)
@@ -247,7 +248,7 @@ ggplot(lmmdata, aes(Date, Prepositions)) +
   facet_wrap(~ Genre, nrow = 4) +
   geom_smooth(method = "lm") +
   theme_bw() +
-  labs(x = "Year") +
+  labs(x = "Date of composition") +
   labs(y = "Prepositions per 1,000 words") +
   coord_cartesian(ylim = c(0, 220))
 ```
@@ -255,6 +256,7 @@ ggplot(lmmdata, aes(Date, Prepositions)) +
 Centring or scaling numeric variables is useful for later interpretation of regression models: if the date variable was not centred, the regression would show the effects of variables at year 0(!). If numeric variables are scaled, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centring simply means that the mean of the numeric variable is subtracted from each value.
 
 ```{r lmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
+lmmdata$DateUnscaled <- lmmdata$Date
 lmmdata$Date <- scale(lmmdata$Date, scale = F)
 # inspect data
 head(lmmdata); str(lmmdata)
@@ -337,7 +339,8 @@ plot(m1.glmer, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots
 The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values [@pinheiro2000mixedmodels 175].
 
 ```{r lmm15, eval = T, echo=T, message=FALSE, warning=FALSE}
-plot(m1.glmer, resid(., type = "pearson") ~ fitted(.) | Genre, id = 0.05, adj = -0.3)
+plot(m1.glmer, resid(., type = "pearson") ~ fitted(.) | Genre, id = 0.05, 
+     adj = -0.3, pch = 20, col = "gray40")
 ```
 
 The plot shows the standardized residuals (or Pearson's residuals) versus fitted values and suggests that there are outliers in the data (the names elements in the plots). We create a new model which uses weights to compensate for inheterogeneity of variance and thus the influence of outliers - which is an alternative to removing the data points and rerunning the analysis [@pinheiro2000mixedmodels 177]. However, to do so, we need to use a different function (the "lmer" function) which measn that we have to create two models: the "old" minimal adequate model and the "new" minimal adequate model with added weights. After we have created these models, we will compare them to see if including weights has improved the fit.
@@ -391,15 +394,32 @@ A brief word of warning is in order here: only apply this function to main effec
 ef.lme <- function(x) {
   df <- summary(x)[[20]][6]
   t <-  summary(x)[[20]][8]
-  #df <- summary(x)$tTable[, 3]
-  #t <- summary(x)$tTable[, 4]
   r <- sqrt((t^2)/((t^2)+df))
   return(paste("Pearson's r = ", round(r, 3)))
   }
 ef.lme(m5.lme)
 ```
 
-While we have already shown that the effect of Date is significant, it is small which means that the number of prepositions per text doe snot correlate evry stribgyl with time. This suggesta that other factors athat are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too). 
+While we have already shown that the effect of Date is significant, it is small which means that the number of prepositions per text doe snot correlate evry stribgyl with time. This suggesta that other factors athat are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too).
+
+Before turning to the diagnostics, we will use the fitted (or predicted) and the  observed values with a regression line for the predicted values. This will not only show how good the model fit the data but also the direction and magnitude of the effect.
+
+```{r lmm21b, eval = T, echo=T, message=FALSE, warning=FALSE}
+# extract predicted values
+lmmdata$Predicted <- predict(m5.lme, lmmdata)
+# plot predicted values
+ggplot(lmmdata, aes(DateUnscaled, Predicted)) +
+  facet_wrap(~Genre) +
+  geom_point(aes(x = DateUnscaled, y = Prepositions), color = "gray80", size = .5) +
+  geom_smooth(aes(y = Predicted), color = "gray20", linetype = "solid", 
+              se = T, method = "lm") +
+  guides(color=guide_legend(override.aes=list(fill=NA))) +  
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="top", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  xlab("Date of composition")
+```
 
 ## Model Diagnostics 
 
@@ -416,7 +436,8 @@ What a wonderful unstructured cloud - the lack of structure tells us that the mo
 
 ```{r lmm23, eval = T, echo=T, message=FALSE, warning=FALSE}
 # fitted values by Genre
-plot(m5.lme, form = resid(., type = "p") ~ fitted(.) | Genre, abline = 0, cex = .5)
+plot(m5.lme, form = resid(., type = "p") ~ fitted(.) | Genre, abline = 0, 
+     cex = .5, pch = 20, col = "black")
 
 ```
 
@@ -446,7 +467,7 @@ Although some data points are named, the plot does not show any structure, like 
 
 ## Reporting Results 
 
-Before we do the write-up, we have a look at the model summayr one last time as this will provide us with at least some of the parameters that we want to report. 
+Before we do the write-up, we have a look at the model summary as this will provide us with at least some of the parameters that we want to report. 
 
 ```{r lmm27, eval = T, echo=T, message=FALSE, warning=FALSE}
 summary(m5.lme)
@@ -619,10 +640,11 @@ Before continuing, we check if speakers need to be collapsed because they nest t
 
 ```{r blmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
 plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
-     ylim = c(0,150), ylab = "Frequency", cex = .5)
+     ylim = c(0,150), ylab = "Frequency", cex = .5, col = "gray80", xaxt="n")
+abline(h = 20,col = "red", lty = "dotted")
 ```
 
-The plot indicates that the vast majority of speakers represent more than 20 cases. However, we will collapse speakers that represent fewer data points.
+The plot indicates that the vast majority of speakers represent more than 20 cases and we collapse speakers with fewer data points.
 
 ```{r blmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
 collapsespeaker <- table(mblrdata$ID)[which(table(mblrdata$ID) < 21)]
