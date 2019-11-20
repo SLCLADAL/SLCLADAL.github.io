@@ -176,40 +176,12 @@ options("scipen" = 100, "digits" = 4)
 # do not convert strings into factors
 options(stringsAsFactors = F)              
 # read in data
-lmmdata <- read.delim("https://slcladal.github.io/data/lmemdata.txt", 
-                     header = TRUE) 
-str(lmmdata) 
-
-CapStr <- function(y) {
-  c <- strsplit(y, " ")[[1]]
-  paste(toupper(substring(c, 1,1)), substring(c, 2),
-      sep="", collapse=" ")
-}
-
-lmmdata <- lmmdata %>%
-  dplyr::rename(Date = date, Genre = genre, Text = text, Prepositions = pptw, Region = region) %>%
-  dplyr::mutate(Genre = ifelse(Genre == "BIBLE", "Bible",
-                               ifelse(Genre == "BIBLE", "Bible",
-                               ifelse(Genre == "BIOGRAPHY_OTHER", "Biography",
-                               ifelse(Genre == "DIARY_PRIV", "Diary",
-                               ifelse(Genre == "EDUC_TREATISE", "Education",
-                               ifelse(Genre == "FICTION", "Fiction",
-                               ifelse(Genre == "HANDBOOK_OTHER", "Handbook",
-                               ifelse(Genre == "HISTORY", "History",
-                               ifelse(Genre == "LAW", "Law",
-                               ifelse(Genre == "LETTERS_NON-PRIV", "PublicLetter",
-                               ifelse(Genre == "LETTERS_PRIV", "PrivateLetter",
-                               ifelse(Genre == "PHILOSOPHY", "Philosophy",
-                               ifelse(Genre == "PROCEEDINGS_TRIAL", "TrialProceeding",
-                               ifelse(Genre == "RELIG_TREATISE", "Religion",
-                               ifelse(Genre == "SCIENCE_OTHER", "Science",
-                               ifelse(Genre == "SERMON", "Sermon",
-                               ifelse(Genre == "TRAVELOGUE", "Travel", Genre))))))))))))))))))
-write.table(lmmdata, "data/lmmdata.txt", sep = "\t", row.names = F, col.names = T, quote = F)
+lmmdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", 
+                     header = TRUE) %>%
 # convert date into a numeric variable
-mydata$date <- as.numeric(mydata$date)     
+    dplyr::mutate(Date = as.numeric(Date))
 # inspect updated data set
-head(mydata); nrow(mydata)                 
+head(lmmdata); nrow(lmmdata) 
 ```
 
 The data set contains the date when the text was written (`date`), the genre of the text (`genre`), the name of the text (`text`), the relative frequency of prepositions in the text (`pptw`), and the region in which the text was written (`region`). We now plot the data to get a first impression of its structure.
@@ -219,31 +191,32 @@ The data set contains the date when the text was written (`date`), the genre of 
 # 3 plots in 1 window
 def.par <- par(no.readonly = TRUE)
 nf <- layout(matrix(c(1, 1, 2, 3), 2, 2, byrow = T))
-plot(mydata$pptw ~ mydata$date, ylab = "Frequency", xlab = "year of publication")
-abline(lm(mydata$pptw ~ mydata$date), lty = 3, lwd = 2, col = "red")
+plot(lmmdata$Prepositions ~ lmmdata$Date, ylab = "Frequency", xlab = "Year of publication", ylim = c(0, 200))
+abline(lm(lmmdata$Prepositions ~ lmmdata$Date), lty = 3, lwd = 2, col = "red")
 # re-set margins to fit the labels
 par(mar = c(7.2, 4, 1, 2) + 0.1)
-# reorder genre by median
-genrebymedian <- with(mydata, reorder(genre, -pptw, median))
+# reorder Genre by median
+Genrebymedian <- with(lmmdata, reorder(Genre, -Prepositions, median))
 #	generate plots
-plot(mydata$pptw ~ genrebymedian,
+plot(lmmdata$Prepositions ~ Genrebymedian,
   col = "lightgrey",
   ylab = "Frequency",
   xlab = "",
   las = 2,
   cex.axis = .7,
-  cex = .5)
+  cex = .5,
+  ylim = c(0,200))
 # re-set margins
 par(mar = c(5, 4, 1, 2) + 0.1)
-x = mydata$pptw
-h = hist(mydata$pptw,
-	ylim =c(0, 150),
+x = lmmdata$Prepositions
+h = hist(lmmdata$Prepositions,
+	ylim =c(0, 200),
 	xlim = c(50, 200),
-	xlab = "prepositions per text",
+	xlab = "Prepositions per text",
 	col = "lightgrey",
 	main = "")
-xfit <- seq(min(mydata$pptw), max(mydata$pptw), length = 40)
-yfit <- dnorm(xfit, mean = mean(mydata$pptw),sd = sd(mydata$pptw))
+xfit <- seq(min(lmmdata$Prepositions), max(lmmdata$Prepositions), length = 40)
+yfit <- dnorm(xfit, mean = mean(lmmdata$Prepositions),sd = sd(lmmdata$Prepositions))
 yfit <- yfit*diff(h$mids[1:2])*length(x)
 lines(xfit, yfit, lty = 2, lwd=2)
 # restore original graphic's parameters
@@ -254,14 +227,14 @@ The scatter plot in the upper panel indicates that the use of prepositions has m
 
 ```{r lmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot 8
-p8 <- ggplot(mydata, aes(date, pptw)) +
+p8 <- ggplot(lmmdata, aes(Date, Prepositions)) +
   geom_point() +
   labs(x = "Year") +
   labs(y = "Prepositions per 1,000 words") +
   geom_smooth(method = "lm")  + 
   theme_set(theme_bw(base_size = 10))
 # plot 9
-p9 <- ggplot(mydata, aes(region, pptw)) +
+p9 <- ggplot(lmmdata, aes(Region, Prepositions)) +
   geom_boxplot() +
   labs(x = "Region") +
   labs(y = "Prepositions per 1,000 words") +
@@ -271,9 +244,9 @@ multiplot(p8, p9, cols = 2)
 ```
 
 ```{r lmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
-ggplot(mydata, aes(date, pptw)) +
+ggplot(lmmdata, aes(Date, Prepositions)) +
   geom_point() +
-  facet_wrap(~ genre, nrow = 4) +
+  facet_wrap(~ Genre, nrow = 4) +
   geom_smooth(method = "lm") +
   theme_bw() +
   labs(x = "Year") +
@@ -284,22 +257,23 @@ ggplot(mydata, aes(date, pptw)) +
 Centering or scaling numeric variables is useful for later interpretation of regression models: if the date variable was not centered, the regression would show the effects of variables at year 0(!). If numeric variables are scaled, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centering simply means that the mean of the numeric variable is subtracted from each value.
 
 ```{r lmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
-mydata$date <- scale(mydata$date, scale = F)
+lmmdata$Date <- scale(lmmdata$Date, scale = F)
 # inspect data
-head(mydata); str(mydata)
+head(lmmdata); str(lmmdata)
 ```
 
+We now set up four models: two fixed-effects models (one model with the "glm" and another with the "lm" function) and two analogous mixed-effects models with Genre as random effect.
 
 ```{r lmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
-# generate a glm baseline model
-m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
-# generate a lm base-line model
-m0.lm <- lm(pptw ~ 1, data = mydata)
-# set up first lme model including only the random effect specifying the random intercepts
-m0.lme = lme(pptw ~ 1, random = ~1|genre, data = mydata, method = "ML")
-# set up first lmer model including only the random effect specifying the random intercepts
-m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
+# generate models
+m0.glm <- glm(Prepositions ~ 1, family = gaussian, data = lmmdata)
+m0.lm <- lm(Prepositions ~ 1, data = lmmdata)
+m0.lme = lme(Prepositions ~ 1, random = ~1|Genre, data = lmmdata, method = "ML")
+m0.lmer = lmer(Prepositions ~ 1 + (1|Genre), data = lmmdata, REML = F)
 ```
+
+Now that we have created base-line models, we will test whether including a random effect structure is mathamatically justified. It is importnat to note here that we are not going to test if including a random effect structure is theoretically motivated but simply if it causes a decrease in variance.
+
 
 ## Testing Random Effects
 
@@ -320,9 +294,9 @@ random effect structure has the highest explanatory power.
 We generate a m0.lmer model but using the "lmer" function from the "lme4" package. When we compare models, the REML specification must be FALSE or set to "method = "ML" (Maximum Likelihood) (depending on the function) when we use ANOVAs to compare models (cf. Field, Miles & Field 2012:). This is because "ML" produces more accurate estimates of fixed regression parameters, whereas "REML" produces more accurate estimates of random variances (Twisk 2006). [...] Also, if you want to compare models you must use ML" (Field, Miles & Field 2012:879).
 
 ```{r lmm10, eval = T, echo=T, message=FALSE, warning=FALSE}
-m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
-m0.lmer2 <- lmer(pptw ~ (1|region) + 1, data = mydata, REML = T)
-m0.lmer3 <- lmer(pptw ~ (1|genre/region) + 1, data = mydata, REML = T)
+m0.lmer1 <- lmer(Prepositions ~ (1|Genre) + 1, data = lmmdata, REML = T)
+m0.lmer2 <- lmer(Prepositions ~ (1|Region) + 1, data = lmmdata, REML = T)
+m0.lmer3 <- lmer(Prepositions ~ (1|Genre/Region) + 1, data = lmmdata, REML = T)
 anova(m0.lmer1, m0.lmer2, m0.lmer3)
 
 # the model with the random effect structure (1|genre/region) performs
@@ -338,9 +312,9 @@ exactRLRT(m0.lmer1)
 
 # create a second model with date as a fixed effect
 # m1.lme <- lme(m0.lme, .~. + date) # alternative way to update the model
-m1.lme = lme(pptw ~ date, random = ~1|genre/region, data = mydata, method = "ML")
+m1.lme = lme(Prepositions ~ Date, random = ~1|Genre/Region, data = lmmdata, method = "ML")
 # set up m1 model but using the lmer function from the lme4 package
-m1.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+m1.lmer = lmer(Prepositions ~ (1|Genre/Region) + Date, data = lmmdata, REML = F)
 
 # compare the models to see if including date has improved the model
 # the difference between the models is the effect (size) of date!
@@ -369,19 +343,19 @@ intervals(m1.lme)
 We can now evaluate the goodness of fit of the model and check if mathematical requirements and assumptions have been violated. In a first step, we generate diagnostic plots that focus on the random effect structure.
 
 ```{r lmm11, eval = T, echo=T, message=FALSE, warning=FALSE}
-plot(m1.lme, genre ~ resid(.), abline = 0 ) # generate diagnostic plots
+plot(m1.lme, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots
 ```
 
 The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values (Pinheiro & Bates 2000:175).
 
 ```{r lmm12, eval = T, echo=T, message=FALSE, warning=FALSE}
-plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
+plot(m1.lme, resid(., type = "p") ~ fitted(.) | Genre, id = 0.05, adj = -0.3)
 ```
 
 The plot showing the standardized residuals versus fitted values confirms that there are outliers in the letters because there are obviously differences in the variance, we create a new model which uses weights to compensate heterogeneity of variance (cf. Pinheiro & Bates 2000:177).
 
 ```{r lmm13, eval = T, echo=T, message=FALSE, warning=FALSE}
-m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
+m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | Genre))
 # test if m2.lme is more appropriate for the data than m1.lme
 anova(m1.lme, m2.lme)
 ```
@@ -428,7 +402,7 @@ ef.lme(m2.lme)
 We now generate another m1 model but we use the "lmer" function from the "lme4" package rather than the "glmer" function.
 
 ```{r lmm19, eval = T, echo=T, message=FALSE, warning=FALSE}
-m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+m2.lmer = lmer(Prepositions ~ (1|Genre/Region) + Date, data = lmmdata, REML = F)
 summary(m2.lmer)
 ```
 
@@ -442,7 +416,7 @@ WARNING: this method is not as good as applying a restricted likelihood ratio te
 
 
 ```{r lmm20, eval = T, echo=T, message=FALSE, warning=FALSE}
-m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
+m2.lmer = lmer(Prepositions ~ (1|Genre/Region) + Date, data = lmmdata, REML = F)
 2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)
 ```
 
@@ -461,7 +435,7 @@ par(mfrow = c(1, 1))
 
 ```{r lmm22, eval = T, echo=T, message=FALSE, warning=FALSE}
 # diagnostic plot (Pinheiro & Bates 2000:21)
-plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | genre, abline = 0, cex = .5)
+plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | Genre, abline = 0, cex = .5)
 
 ```
 
@@ -480,13 +454,13 @@ qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))
 
 ```{r lmm25, eval = T, echo=T, message=FALSE, warning=FALSE}
 # diagnostic plot: normal plots of the residuals by genre (cf. Pinheiro & Bates 2000:22, 179)
-qqnorm(m2.lme, ~resid(.) | genre )
+qqnorm(m2.lme, ~resid(.) | Genre )
 ```
 
 ```{r lmm26, eval = T, echo=T, message=FALSE, warning=FALSE}
 # inspect the observed responses versus the within-group fitted values
 # (cf. Pinheiro & Bates 2000:178)
-plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
+plot(m2.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
 ```
 
 ## Reporting Results 
@@ -661,8 +635,7 @@ Before continuing, we check if speakers need to be collapsed because they nest t
 
 ```{r blmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
 plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
-     ylim = c(0,150),
-      cex = .5)
+     ylim = c(0,150), ylab = "Frequency", cex = .5)
 ```
 
 The plot indicates that the vast majority of speakers represent more than 20 cases. However, we will collapse speakers that represent fewer data points.
@@ -683,14 +656,13 @@ We now plot the data to inspect the relationships within the data set.
 
 ```{r blmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
 p1 <- ggplot(mblrdata, aes(Gender, SUFlike, color = Gender)) +
-  scale_fill_brewer() +
   stat_summary(fun.y = mean, geom = "point") +
   stat_summary(fun.y = mean, geom = "line") +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
   theme_set(theme_bw(base_size = 10)) +
   coord_cartesian(ylim = c(0, 1)) +
   labs(x = "Sex", y = "Mean frequency of discourse like") +
-    guides(fill=FALSE, color=FALSE) +              # supress legend
+    guides(fill=FALSE, color=FALSE) + 
   scale_color_manual(values = c("blue", "red"))
 p2 <- ggplot(mblrdata, aes(Age, SUFlike, color = Age)) +
   stat_summary(fun.y = mean, geom = "point") +
@@ -725,6 +697,7 @@ p5 <- ggplot(mblrdata, aes(Age, SUFlike, colour = Gender)) +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
   coord_cartesian(ylim = c(0, 1)) +
   theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
     scale_color_manual(values = c("blue", "red")) +
   labs(x = "Age", y = "Mean frequency of discourse like", colour = "Gender")
 p6 <- ggplot(mblrdata, aes(Gender, SUFlike, colour = ConversationType)) +
@@ -733,6 +706,7 @@ p6 <- ggplot(mblrdata, aes(Gender, SUFlike, colour = ConversationType)) +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
   coord_cartesian(ylim = c(0, 1)) +
   theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
   labs(x = "Sex", y = "Mean frequency of discourse like", colour = "Age") +
   scale_color_manual(values = c("darkgreen", "lightgreen"))
 # display the plots
@@ -997,7 +971,7 @@ We now check on the lmer object if the fixed effects of the "lrm" and of the "lm
 cor.test(coef(mlr.lrm), fixef(mlr.lmer))
 ```
 
-The fixed effects correlate strongly (.8827) which is a good indicator as it suggests that the coefficient estimates are sufficiently stable. We now activate the "Hmisc" package (if not already active) to extract model fit parameters (cf. Baayen 2008:281).
+The fixed effects correlate strongly (.8827) which is a good indicator as it suggests that the coefficient estimates are sufficiently stable. We now activate the "Hmisc" package (if not already active) to extract model fit parameters [cf. @baayen2008analyzing 281).
 
 ```{r blmm37, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load library
@@ -1007,9 +981,7 @@ probs = binomial()$linkinv(fitted(mlr.lmer))
 somers2(probs, as.numeric(mblrdata$SUFlike))
 ```
 
-The model fit parameters indicate a sufficient but not very good fit. The C-value indicates a goodness of fit between predicted and observed responses (occurrences of SUFlike).  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicates real predictive capacity (Baayen 2008:204).
-
-Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction (Baayen 2008:204). This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.
+The model fit parameters indicate a suboptimal fit. Both the C-value and Somers's D~xy~ show poor fit between predicted and observed occurrences of SUFlike.  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicates real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204]. This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.
 
 ## Model Diagnostics
 
