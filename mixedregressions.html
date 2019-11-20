@@ -520,7 +520,7 @@ head(lmmdata); nrow(lmmdata) </code></pre>
 ## 5 1743     Education barclay        145.7  North
 ## 6 1908     Education  benson        120.8  North</code></pre>
 <pre><code>## [1] 537</code></pre>
-<p>The data set contains the date when the text was written (<code>Date</code>), the genre of the text (<code>Genre</code>), the name of the text (<code>Text</code>), the relative frequency of prepositions in the text (<code>Prepositions</code>), and the region in which the text was written (<code>Region</code>). We now plot the data to get a first impression of its structure.</p>
+<p>The data set contains the date when the text was written (Date), the genre of the text (Genre), the name of the text (Text), the relative frequency of prepositions in the text (Prepositions), and the region in which the text was written (Region). We now plot the data to get a first impression of its structure.</p>
 <pre class="r"><code># visualize variables (2 plots per row)
 # 3 plots in 1 window
 def.par &lt;- par(no.readonly = TRUE)
@@ -552,10 +552,8 @@ h = hist(lmmdata$Prepositions,
 xfit &lt;- seq(min(lmmdata$Prepositions), max(lmmdata$Prepositions), length = 40)
 yfit &lt;- dnorm(xfit, mean = mean(lmmdata$Prepositions),sd = sd(lmmdata$Prepositions))
 yfit &lt;- yfit*diff(h$mids[1:2])*length(x)
-lines(xfit, yfit, lty = 2, lwd=2)</code></pre>
+lines(xfit, yfit, lty = 2, lwd=2); par(def.par)# restore original graphic&#39;s parameters</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm4-1.png" width="672" /></p>
-<pre class="r"><code># restore original graphic&#39;s parameters
-par(def.par)</code></pre>
 <p>The scatter plot in the upper panel indicates that the use of prepositions has moderately increased over time while the boxplots in the lower left panel show that the genres differ quite substantially with respect to their median frequencies of prepositions per text. Finally, the histogram in the lower right panel show that preposition use is distributed normally with a mean of 132.2 prepositions per text.</p>
 <pre class="r"><code># plot 8
 p8 &lt;- ggplot(lmmdata, aes(Date, Prepositions)) +
@@ -600,240 +598,206 @@ head(lmmdata); str(lmmdata)</code></pre>
 ##  $ Text        : chr  &quot;albin&quot; &quot;anon&quot; &quot;austen&quot; &quot;bain&quot; ...
 ##  $ Prepositions: num  166 140 131 151 146 ...
 ##  $ Region      : chr  &quot;North&quot; &quot;North&quot; &quot;North&quot; &quot;North&quot; ...</code></pre>
-<p>We now set up four models: two fixed-effects models (one model with the “glm” and another with the “lm” function) and two analogous mixed-effects models with Genre as random effect.</p>
+<p>We now set up a fixed-effects model with the “glm” function and a mixed-effects model using the “glmer” function with Genre as a random effect.</p>
 <pre class="r"><code># generate models
 m0.glm &lt;- glm(Prepositions ~ 1, family = gaussian, data = lmmdata)
-m0.lm &lt;- lm(Prepositions ~ 1, data = lmmdata)
-m0.lme = lme(Prepositions ~ 1, random = ~1|Genre, data = lmmdata, method = &quot;ML&quot;)
-m0.lmer = lmer(Prepositions ~ 1 + (1|Genre), data = lmmdata, REML = F)</code></pre>
-<p>Now that we have created base-line models, we will test whether including a random effect structure is mathematically justified. It is important to note here that we are not going to test if including a random effect structure is theoretically motivated but simply if it causes a decrease in variance.</p>
+m0.glmer = glmer(Prepositions ~ 1 + (1|Genre), data = lmmdata, family = &quot;gaussian&quot;, REML = F)</code></pre>
+<p>Now that we have created the base-line models, we will test whether including a random effect structure is mathematically justified. It is important to note here that we are not going to test if including a random effect structure is theoretically motivated but simply if it causes a decrease in variance.</p>
 </div>
 <div id="testing-random-effects" class="section level2">
 <h2><span class="header-section-number">3.3</span> Testing Random Effects</h2>
 <p>As a first step in the modelling process, we now need to determine whether or not including a random effect structure is justified. We do so by comparing the base-line model without random intercepts to the model with random intercepts using a Likelihood Ratio Test. A short word of warning is in order here regarding the specific of the model: we need to set “REML = T” because Relative Estimate Maximum Likelihood (REML) provides better estimates for the random effects part of the model compared with the simpler Maximum Likelihood (ML) specification <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 879)</span>.</p>
-<pre class="r"><code>x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
+<pre class="r"><code>x2 = -2*logLik(m0.glm, REML = T)+2*logLik(m0.glmer, REML = T)
 x2 &lt;- x2 &lt;- x2[[1]]
 list(x2, pchisq(x2, df=2, lower.tail=F))</code></pre>
 <pre><code>## [[1]]
-## [1] 220.9
+## [1] 222.4
 ## 
 ## [[2]]
-## [1] 0.000000000000000000000000000000000000000000000001082</code></pre>
+## [1] 0.0000000000000000000000000000000000000000000000005128</code></pre>
 <p>The inclusion of a random effect structure with random intercepts is justified based on the Likelihood Ratio Test.</p>
-<p>However, we also want to test which random effects structure is the best. We therefore create several models with different random effect structures and compare these models to see which random effect structure has the highest explanatory power.</p>
-<p>We generate a m0.lmer model but using the “lmer” function from the “lme4” package. When we compare models, the REML specification must be FALSE or set to “method =”ML&quot; (Maximum Likelihood) (depending on the function) when we use ANOVAs to compare models <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 879)</span>. This is because “ML” produces more accurate estimates of fixed regression parameters, whereas “REML” produces more accurate estimates of random variances <span class="citation">(<span class="citeproc-not-found" data-reference-id="twisk2006multilevel"><strong>???</strong></span>)</span>. […] Also, if you want to compare models you must use ML&quot; <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 879)</span>.</p>
-<pre class="r"><code>m0.lmer1 &lt;- lmer(Prepositions ~ (1|Genre) + 1, data = lmmdata, REML = T)
-m0.lmer2 &lt;- lmer(Prepositions ~ (1|Region) + 1, data = lmmdata, REML = T)
-m0.lmer3 &lt;- lmer(Prepositions ~ (1|Genre/Region) + 1, data = lmmdata, REML = T)
-anova(m0.lmer1, m0.lmer2, m0.lmer3)</code></pre>
+<p>As a note on model comparisons: when we compare mixed-effects models, the REML specification must be “FALSE” or set to “method =”ML&quot; (Maximum Likelihood) <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 879)</span>. This is because “ML” produces more accurate estimates of fixed regression parameters. In contrast, one should use “REML” when compaing fixed to mixed models as REML produces more accurate estimates of random variances <span class="citation">(<span class="citeproc-not-found" data-reference-id="twisk2006multilevel"><strong>???</strong></span>)</span>.</p>
+</div>
+<div id="model-fitting" class="section level2">
+<h2><span class="header-section-number">3.4</span> Model Fitting</h2>
+<p>After having determined that including a random effect structure is justified, we can continue by fitting the model and including diagnostics as we go. Including diagnostocs in the model fitting porcess can save time and prevent relying on modles which only turn out to be unstable if we would perform the diagnostics after the fact.</p>
+<p>We begin fitting our model by adding Date as a fixed effect and compare this model to our mixed-effects base-line model to see if Date improved the model fit by explaining variance and if Date significantly correlates with our dependent variable (this means that the difference between the models is the effect (size) of “Date”!)</p>
+<pre class="r"><code>m1.glmer &lt;- glmer(Prepositions ~ (1|Genre) + Date, data = lmmdata, REML = T)
+anova(m1.glmer, m0.glmer, test = &quot;Chi&quot;)</code></pre>
 <pre><code>## Data: lmmdata
 ## Models:
-## m0.lmer1: Prepositions ~ (1 | Genre) + 1
-## m0.lmer2: Prepositions ~ (1 | Region) + 1
-## m0.lmer3: Prepositions ~ (1 | Genre/Region) + 1
-##          Df  AIC  BIC logLik deviance Chisq Chi Df          Pr(&gt;Chisq)    
-## m0.lmer1  3 4502 4515  -2248     4496                                     
-## m0.lmer2  3 4719 4731  -2356     4713     0      0                   1    
-## m0.lmer3  4 4501 4518  -2246     4493   220      1 &lt;0.0000000000000002 ***
+## m0.glmer: Prepositions ~ 1 + (1 | Genre)
+## m1.glmer: Prepositions ~ (1 | Genre) + Date
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)   
+## m0.glmer  3 4502 4515  -2248     4496                           
+## m1.glmer  4 4495 4512  -2244     4487  8.93      1     0.0028 **
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>The model with the random effect structure (1|Genre/Region) performs significantly better (also it has a much lower AIC and deviance) and it is thus our new m0 model. In addition, we also want to know if including the random effect is permitted by applying a restricted likelihood ratio test. This can, however, only be done for simple random effects, e.g. (1|Genre), but not for complex random effects such as (1|Genre/Date).</p>
-<pre class="r"><code># rename model
-m0.lmer &lt;- m0.lmer3
-# perform restricted likelihood ratio test
-exactRLRT(m0.lmer1)</code></pre>
-<pre><code>## 
-##  simulated finite sample distribution of RLRT.
-##  
-##  (p-value based on 10000 simulated values)
-## 
-## data:  
-## RLRT = 220, p-value &lt;0.0000000000000002</code></pre>
-<p>There is also another way to compare models with and without random effects (see below) which may be easier for you. Now, we create a second model with “Date” as a fixed effect and another analogous model using the “lmer” function. After that, we compare the models to see if including “Date” has improved the model - the difference between the models is the effect (size) of “Date”!</p>
-<pre class="r"><code># create a second model with date as a fixed effect
-m1.lme = lme(Prepositions ~ Date, random = ~1|Genre/Region, data = lmmdata, method = &quot;ML&quot;)
-# set up m1 model but using the lmer function from the lme4 package
-m1.lmer = lmer(Prepositions ~ (1|Genre/Region) + Date, data = lmmdata, REML = F)
-# compare the models 
-anova(m0.lme, m1.lme)</code></pre>
-<pre><code>##        Model df  AIC  BIC logLik   Test L.Ratio p-value
-## m0.lme     1  3 4502 4515  -2248                       
-## m1.lme     2  5 4496 4517  -2243 1 vs 2   10.12  0.0063</code></pre>
-<p>The model m1.lme is the better model (significant p-value and lower AIC). The significant p-value shows that “Date” correlates significantly with “Prepositions” (<span class="math inline">\(\chi\)</span>^2(1) = 8.81, p = .003); <span class="math inline">\(\chi\)</span>^2 here is the L.Ratio and the degrees of freedom are calculated by subtracting the smaller number of DFs from the larger number of DFs.</p>
+<p>The model with Date is the better model (significant p-value and lower AIC). The significant p-value shows that “Date” correlates significantly with “Prepositions” (<span class="math inline">\(\chi^2^\)</span>(1) = 8.93, p = .0028). The <span class="math inline">\(\chi^2^\)</span> value here is labeled “L.Ratio” and the degrees of freedom are calculated by subtracting the smaller number of DFs from the larger number of DFs.</p>
+<p>We now test whether Region should also be part of the final minimal adequate model. The easiest way to add predicors is by using the “predict” function (it saves time and typing).</p>
+<pre class="r"><code>m2.glmer &lt;- update(m1.glmer, .~.+Region)
+# compare models                
+anova(m2.glmer, m1.glmer, test = &quot;Chi&quot;)</code></pre>
+<pre><code>## Data: lmmdata
+## Models:
+## m1.glmer: Prepositions ~ (1 | Genre) + Date
+## m2.glmer: Prepositions ~ (1 | Genre) + Date + Region
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
+## m1.glmer  4 4495 4512  -2244     4487                        
+## m2.glmer  5 4495 4516  -2242     4485  2.39      1       0.12</code></pre>
+<p>Three things tell us that Region should not be included: (i) the AIC does not decrease, (ii) the BIC increases(!), and the p-value is higher than .05. This means, that we will continue fitting the model without having Region included. Well… not quite - just as a note on including variables: while Region is not significant as a main effect, it must still be included in a model if it were part of a significant interaction. To test if this is indeed the case, we fit another model with the interaction between Date and Region as predictor.</p>
+<pre class="r"><code>m3.glmer &lt;- update(m1.glmer, .~.+Region*Date)
+# compare models                
+anova(m3.glmer, m1.glmer, test = &quot;Chi&quot;)</code></pre>
+<pre><code>## Data: lmmdata
+## Models:
+## m1.glmer: Prepositions ~ (1 | Genre) + Date
+## m3.glmer: Prepositions ~ (1 | Genre) + Date + Region + Date:Region
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
+## m1.glmer  4 4495 4512  -2244     4487                        
+## m3.glmer  6 4496 4522  -2242     4484  2.89      2       0.24</code></pre>
+<p>Again, the high p-value and the incerase in AIC and BIC show that we have found our minimal adequate model with only contains Date as a main effect. In a next step, we can inspect the final minimal adequate model, i.e. the most parsimonous (the model that explains a maximum of variance with a minimum of predictors).</p>
 <pre class="r"><code># inspect results
-summary(m1.lme)</code></pre>
-<pre><code>## Linear mixed-effects model fit by maximum likelihood
-##  Data: lmmdata 
-##    AIC  BIC logLik
-##   4496 4517  -2243
+summary(m1.glmer)</code></pre>
+<pre><code>## Linear mixed model fit by REML [&#39;lmerMod&#39;]
+## Formula: Prepositions ~ (1 | Genre) + Date
+##    Data: lmmdata
+## 
+## REML criterion at convergence: 4491
+## 
+## Scaled residuals: 
+##    Min     1Q Median     3Q    Max 
+## -3.735 -0.657  0.006  0.661  3.597 
 ## 
 ## Random effects:
-##  Formula: ~1 | Genre
-##         (Intercept)
-## StdDev:       12.05
+##  Groups   Name        Variance Std.Dev.
+##  Genre    (Intercept) 159      12.6    
+##  Residual             229      15.1    
+## Number of obs: 537, groups:  Genre, 16
 ## 
-##  Formula: ~1 | Region %in% Genre
-##         (Intercept) Residual
-## StdDev:       3.453    14.97
+## Fixed effects:
+##              Estimate Std. Error t value
+## (Intercept) 133.88516    3.24749    41.2
+## Date          0.01894    0.00632     3.0
 ## 
-## Fixed effects: Prepositions ~ Date 
-##              Value Std.Error  DF t-value p-value
-## (Intercept) 133.95     3.183 505   42.09  0.0000
-## Date          0.02     0.007 505    2.70  0.0071
-##  Correlation: 
+## Correlation of Fixed Effects:
 ##      (Intr)
-## Date 0.003 
-## 
-## Standardized Within-Group Residuals:
-##      Min       Q1      Med       Q3      Max 
-## -3.74687 -0.66308  0.01827  0.64043  3.62269 
-## 
-## Number of Observations: 537
-## Number of Groups: 
-##             Genre Region %in% Genre 
-##                16                31</code></pre>
-<pre class="r"><code># alternative display of the results
-anova(m1.lme)</code></pre>
-<pre><code>##             numDF denDF F-value p-value
-## (Intercept)     1   505  1770.7  &lt;.0001
-## Date            1   505     7.3  0.0071</code></pre>
-<pre class="r"><code># extract estimates and sd for fixed and random effects
-intervals(m1.lme)</code></pre>
-<pre><code>## Approximate 95% confidence intervals
-## 
-##  Fixed effects:
-##                  lower      est.     upper
-## (Intercept) 127.713506 133.95499 140.19647
-## Date          0.004896   0.01787   0.03083
-## attr(,&quot;label&quot;)
-## [1] &quot;Fixed effects:&quot;
-## 
-##  Random Effects:
-##   Level: Genre 
-##                 lower  est. upper
-## sd((Intercept)) 8.191 12.05 17.73
-##   Level: Region 
-##                 lower  est. upper
-## sd((Intercept)) 1.174 3.453 10.15
-## 
-##  Within-group standard error:
-## lower  est. upper 
-## 14.07 14.97 15.93</code></pre>
+## Date 0.005</code></pre>
 </div>
 <div id="model-diagnostics" class="section level2">
-<h2><span class="header-section-number">3.4</span> Model Diagnostics</h2>
+<h2><span class="header-section-number">3.5</span> Model Diagnostics</h2>
 <p>We can now evaluate the goodness of fit of the model and check if mathematical requirements and assumptions have been violated. In a first step, we generate diagnostic plots that focus on the random effect structure.</p>
-<pre class="r"><code>plot(m1.lme, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots</code></pre>
-<p><img src="mixedregressions_files/figure-html/lmm11-1.png" width="672" /></p>
+<pre class="r"><code>plot(m1.glmer, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots</code></pre>
+<p><img src="mixedregressions_files/figure-html/lmm14-1.png" width="672" /></p>
 <p>The plot shows that there are some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
-<pre class="r"><code>plot(m1.lme, resid(., type = &quot;p&quot;) ~ fitted(.) | Genre, id = 0.05, adj = -0.3)</code></pre>
-<p><img src="mixedregressions_files/figure-html/lmm12-1.png" width="672" /></p>
-<p>The plot showing the standardized residuals versus fitted values confirms that there are outliers in the letters because there are obviously differences in the variance, we create a new model which uses weights to compensate heterogeneity of variance <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
-<pre class="r"><code>m2.lme &lt;- update(m1.lme, weights = varIdent(form = ~ 1 | Genre))
-# test if m2.lme is more appropriate for the data than m1.lme
-anova(m1.lme, m2.lme)</code></pre>
+<pre class="r"><code>plot(m1.glmer, resid(., type = &quot;pearson&quot;) ~ fitted(.) | Genre, id = 0.05, adj = -0.3)</code></pre>
+<p><img src="mixedregressions_files/figure-html/lmm15-1.png" width="672" /></p>
+<p>The plot shows the standardized residuals (or Pearson’s residuals) versus fitted values and suggests that there are outliers in the data (the names elements in the plots). We create a new model which uses weights to compensate for inheterogeneity of variance and thus the influence of outliers - which is an alternative to removing the data points and rerunning the analysis <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>. However, to do so, we need to use a different function (the “lmer” function) which measn that we have to create two models: the “old” minimal adequate model and the “new” minimal adequate model with added weights. After we have created these models, we will compare them to see if including weights has improved the fit.</p>
+<pre class="r"><code>m4.lme = lme(Prepositions ~ Date, random = ~1|Genre, data = lmmdata, method = &quot;ML&quot;)
+m5.lme &lt;- update(m4.lme, weights = varIdent(form = ~ 1 | Genre))
+# compare models
+anova(m5.lme, m4.lme)</code></pre>
 <pre><code>##        Model df  AIC  BIC logLik   Test L.Ratio p-value
-## m1.lme     1  5 4496 4517  -2243                       
-## m2.lme     2 20 4483 4569  -2222 1 vs 2   42.75  0.0002</code></pre>
-<p>The heteroscedastic model (i.e. m2.lme which uses weights to account for unequal variance) is performing significantly better than the homoscedasticity model m1.lme. We therefore inspect the results of the new heteroscedastic model.</p>
-<pre class="r"><code>summary(m2.lme)        # inspect results</code></pre>
+## m5.lme     1 19 4486 4567  -2224                       
+## m4.lme     2  4 4495 4512  -2244 1 vs 2   39.17  0.0006</code></pre>
+<p>The weight model (m5.lme) that uses weights to account for unequal variance is performing significantly better than the model without weights (m4.lme) and we therefore switch to the weight model and inspect its parameters.</p>
+<pre class="r"><code># inspect results
+summary(m5.lme)        </code></pre>
 <pre><code>## Linear mixed-effects model fit by maximum likelihood
 ##  Data: lmmdata 
 ##    AIC  BIC logLik
-##   4483 4569  -2222
+##   4486 4567  -2224
 ## 
 ## Random effects:
 ##  Formula: ~1 | Genre
-##         (Intercept)
-## StdDev:       12.14
-## 
-##  Formula: ~1 | Region %in% Genre
 ##         (Intercept) Residual
-## StdDev:       4.183    13.89
+## StdDev:       12.26    14.34
 ## 
 ## Variance function:
 ##  Structure: Different standard deviations per stratum
 ##  Formula: ~1 | Genre 
 ##  Parameter estimates:
 ##           Bible       Biography           Diary       Education 
-##          1.0000          0.3582          0.8994          0.7324 
+##          1.0000          0.3407          0.8695          0.7888 
 ##         Fiction        Handbook         History             Law 
-##          0.8895          1.1417          1.0185          0.7591 
+##          0.9117          1.0965          0.9787          0.7849 
 ##      Philosophy   PrivateLetter    PublicLetter        Religion 
-##          0.7753          1.2302          1.2641          1.0108 
+##          0.7370          1.1906          1.2189          0.9746 
 ##         Science          Sermon          Travel TrialProceeding 
-##          0.8293          0.9821          1.0663          1.2262 
+##          0.8486          0.9708          1.0862          1.2602 
 ## Fixed effects: Prepositions ~ Date 
 ##              Value Std.Error  DF t-value p-value
-## (Intercept) 134.01     3.209 505   41.77  0.0000
-## Date          0.02     0.006 505    3.36  0.0008
+## (Intercept) 133.96    3.1444 520   42.60  0.0000
+## Date          0.02    0.0055 520    3.99  0.0001
 ##  Correlation: 
 ##      (Intr)
-## Date 0.002 
+## Date 0.004 
 ## 
 ## Standardized Within-Group Residuals:
 ##      Min       Q1      Med       Q3      Max 
-## -3.29020 -0.67307  0.03261  0.64633  3.08448 
+## -3.31912 -0.67972  0.01469  0.69872  3.10388 
 ## 
 ## Number of Observations: 537
-## Number of Groups: 
-##             Genre Region %in% Genre 
-##                16                31</code></pre>
-<pre class="r"><code>anova(m2.lme)          # ANOVA display of the results</code></pre>
+## Number of Groups: 16</code></pre>
+<p>We can also use an ANOVA display which is more to the point.</p>
+<pre class="r"><code>anova(m5.lme)          </code></pre>
 <pre><code>##             numDF denDF F-value p-value
-## (Intercept)     1   505  1743.7  &lt;.0001
-## Date            1   505    11.3  0.0008</code></pre>
-<pre class="r"><code>anova(m0.lme, m2.lme)  # test if date is significant</code></pre>
+## (Intercept)     1   520  1813.9  &lt;.0001
+## Date            1   520    15.9  0.0001</code></pre>
+<p>As we did before, we now check, whether the final minimal model (with weights) outperforms an intercept-only base-line model.</p>
+<pre class="r"><code># creat base-line model
+m0.lme = lme(Prepositions ~ 1, random = ~1|Genre, data = lmmdata, method = &quot;ML&quot;, weights = varIdent(form = ~ 1 | Genre))
+anova(m5.lme, m0.lme)  # test if date is significant</code></pre>
 <pre><code>##        Model df  AIC  BIC logLik   Test L.Ratio p-value
-## m0.lme     1  3 4502 4515  -2248                       
-## m2.lme     2 20 4483 4569  -2222 1 vs 2   52.87  &lt;.0001</code></pre>
-<pre class="r"><code>intervals(m2.lme)      # extract estimates and sd for fixed and random effects</code></pre>
+## m5.lme     1 19 4486 4567  -2224                       
+## m0.lme     2 18 4496 4573  -2230 1 vs 2   12.44  0.0004</code></pre>
+<p>Our final minimal adequate model with weights performs significantly better than an intercept only base-line model. Before doing the final diagnostics, we well inspect the estimates for the random effect structure to check if there are values which require further inscpection (e.g. because they are drastically different from all other values).</p>
+<pre class="r"><code># extract estimates and sd for fixed and random effects
+intervals(m5.lme)      </code></pre>
 <pre><code>## Approximate 95% confidence intervals
 ## 
 ##  Fixed effects:
-##                  lower      est.     upper
-## (Intercept) 127.719492 134.01179 140.30409
-## Date          0.008413   0.02022   0.03203
+##                 lower      est.     upper
+## (Intercept) 127.79833 133.96402 140.12970
+## Date          0.01105   0.02174   0.03244
 ## attr(,&quot;label&quot;)
 ## [1] &quot;Fixed effects:&quot;
 ## 
 ##  Random Effects:
 ##   Level: Genre 
 ##                 lower  est. upper
-## sd((Intercept)) 8.252 12.14 17.87
-##   Level: Region 
-##                 lower  est. upper
-## sd((Intercept)) 2.088 4.183 8.379
+## sd((Intercept)) 8.525 12.26 17.64
 ## 
 ##  Variance function:
 ##                  lower   est.  upper
-## Biography       0.2268 0.3582 0.5658
-## Diary           0.6628 0.8994 1.2204
-## Education       0.5382 0.7324 0.9965
-## Fiction         0.6456 0.8895 1.2255
-## Handbook        0.8307 1.1417 1.5692
-## History         0.7361 1.0185 1.4093
-## Law             0.5559 0.7591 1.0366
-## Philosophy      0.4937 0.7753 1.2176
-## PrivateLetter   1.0187 1.2302 1.4857
-## PublicLetter    1.0167 1.2641 1.5717
-## Religion        0.6432 1.0108 1.5884
-## Science         0.5769 0.8293 1.1921
-## Sermon          0.7379 0.9821 1.3070
-## Travel          0.7610 1.0663 1.4940
-## TrialProceeding 0.8461 1.2262 1.7771
+## Biography       0.2139 0.3407 0.5427
+## Diary           0.6317 0.8695 1.1968
+## Education       0.5792 0.7888 1.0743
+## Fiction         0.6529 0.9117 1.2730
+## Handbook        0.7838 1.0965 1.5340
+## History         0.7325 0.9787 1.3076
+## Law             0.5557 0.7849 1.1088
+## Philosophy      0.4650 0.7370 1.1679
+## PrivateLetter   0.9512 1.1906 1.4902
+## PublicLetter    0.9472 1.2189 1.5686
+## Religion        0.6694 0.9746 1.4190
+## Science         0.5533 0.8486 1.3013
+## Sermon          0.7296 0.9708 1.2918
+## Travel          0.7927 1.0862 1.4883
+## TrialProceeding 0.8689 1.2602 1.8275
 ## attr(,&quot;label&quot;)
 ## [1] &quot;Variance function:&quot;
 ## 
 ##  Within-group standard error:
 ## lower  est. upper 
-## 11.98 13.89 16.11</code></pre>
+## 11.85 14.34 17.36</code></pre>
+<p>The random effect estimates do not show any outliers or dratsically increased or decreased values which measn that the random effect structure is fine.</p>
 </div>
 <div id="effect-sizes" class="section level2">
-<h2><span class="header-section-number">3.5</span> Effect Sizes</h2>
+<h2><span class="header-section-number">3.6</span> Effect Sizes</h2>
 <p>We will now extract effect sizes (in the example: the effect size of date) and calculate normalized effect size measures (this effect size measure works for all fixed effects). To calculate the effect size, take the square root of the squared t-value divided by the t-value squared plus the degrees of freedom:</p>
 <p>r = <code>sqrt(t^2^/(t^2^+df))</code>.</p>
-<p>A brief word of warning is in order here: only apply this function to main effects not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 641)</span>.</p>
+<p>A brief word of warning is in order here: only apply this function to main effects that are not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 641)</span>.</p>
 <pre class="r"><code>ef.lme &lt;- function(x) {
   df &lt;- summary(x)[[20]][6]
   t &lt;-  summary(x)[[20]][8]
@@ -842,102 +806,78 @@ anova(m1.lme, m2.lme)</code></pre>
   r &lt;- sqrt((t^2)/((t^2)+df))
   return(paste(&quot;Pearson&#39;s r = &quot;, round(r, 3)))
   }
-ef.lme(m2.lme)</code></pre>
-<pre><code>## [1] &quot;Pearson&#39;s r =  0.148&quot;</code></pre>
-<p>We now generate another m1 model but we use the “lmer” function from the “lme4” package rather than the “glmer” function.</p>
-<pre class="r"><code>m2.lmer = lmer(Prepositions ~ (1|Genre/Region) + Date, data = lmmdata, REML = F)
-summary(m2.lmer)</code></pre>
-<pre><code>## Linear mixed model fit by maximum likelihood  [&#39;lmerMod&#39;]
-## Formula: Prepositions ~ (1 | Genre/Region) + Date
-##    Data: lmmdata
-## 
-##      AIC      BIC   logLik deviance df.resid 
-##     4496     4517    -2243     4486      532 
-## 
-## Scaled residuals: 
-##    Min     1Q Median     3Q    Max 
-## -3.747 -0.663  0.018  0.640  3.623 
-## 
-## Random effects:
-##  Groups       Name        Variance Std.Dev.
-##  Region:Genre (Intercept)  11.9     3.45   
-##  Genre        (Intercept) 145.2    12.05   
-##  Residual                 224.1    14.97   
-## Number of obs: 537, groups:  Region:Genre, 31; Genre, 16
-## 
-## Fixed effects:
-##             Estimate Std. Error t value
-## (Intercept) 133.9550     3.1768   42.17
-## Date          0.0179     0.0066    2.71
-## 
-## Correlation of Fixed Effects:
-##      (Intr)
-## Date 0.003</code></pre>
-<p>We now calculate the variance explained when only a simple random effect is involved. This is done by dividing the variance of the random effect (145.2) by variance of random effect plus residual variance (145.2+224.1) times 100. The results represents the percentage of variance explained by the random effect: <code>(145.2/(145.2+2284.1))*100</code>.</p>
-<p>Create lmer with complex random effect structure</p>
-<p>An alternative for testing if including the random intercepts is permitted.</p>
-<p>WARNING: this method is not as good as applying a restricted likelihood ratio test(!) because the p-value is only an approximation IMPORTANT: the second model is a glm object</p>
-<pre class="r"><code>m2.lmer = lmer(Prepositions ~ (1|Genre/Region) + Date, data = lmmdata, REML = F)
-2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)</code></pre>
-<pre><code>## [1] 0.00000000000000000000000000000000000000000000000005159</code></pre>
+ef.lme(m5.lme)</code></pre>
+<pre><code>## [1] &quot;Pearson&#39;s r =  0.172&quot;</code></pre>
+<p>While we have already shown that the effect of Date is significant, it is small which means that the number of prepositions per text doe snot correlate evry stribgyl with time. This suggesta that other factors athat are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too).</p>
 </div>
-<div id="rerun-model-diagnostics" class="section level2">
-<h2><span class="header-section-number">3.6</span> Rerun Model Diagnostics</h2>
-<p>What we wish to see is a cloud of dots in the middle of the window without structure what we do not want to see: a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) in short: observed values against fitted values <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
+<div id="model-diagnostics-1" class="section level2">
+<h2><span class="header-section-number">3.7</span> Model Diagnostics</h2>
+<p>We now create diagnostic plots. What we wish to see in the diagnostic plost is a cloud of dots in the middle of the window without . What we do not want to see is a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
 <pre class="r"><code># start plotting
 par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
-plot(m2.lme)</code></pre>
-<p><img src="mixedregressions_files/figure-html/lmm21-1.png" width="672" /></p>
-<pre class="r"><code>par(mfrow = c(1, 1))</code></pre>
-<p>We will now create more diagnostic plots to find potential problems <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
-<pre class="r"><code># fitted values by Genre
-plot(m2.lme, form = resid(., type = &quot;p&quot;) ~ fitted(.) | Genre, abline = 0, cex = .5)</code></pre>
+plot(m5.lme, pch = 20, col = &quot;black&quot;, lty = &quot;dotted&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm22-1.png" width="672" /></p>
-<p>Now, we check the residuals of fitted values against observed values <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
-<pre class="r"><code># residuals of fitted values against observed
-qqnorm(m2.lme)</code></pre>
+<pre class="r"><code>par(mfrow = c(1, 1))</code></pre>
+<p>What a wonderful unstructured cloud - the lack of structure tells us that the model is “healthy” and does not suffer from heteroscedasticity. We will now create more diagnostic plots to find potential problems <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
+<pre class="r"><code># fitted values by Genre
+plot(m5.lme, form = resid(., type = &quot;p&quot;) ~ fitted(.) | Genre, abline = 0, cex = .5)</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm23-1.png" width="672" /></p>
-<pre class="r"><code># normal plot of the estimated date %in% genre random effects
-qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))</code></pre>
+<p>In contrast to the unweight model, no data points are named which indicates that the outliers do no longer have unwarrented influence on the model. Now, we check the residuals of fitted values against observed values <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>. What we would like to see is a straight, upwards going line.</p>
+<pre class="r"><code># residuals of fitted values against observed
+qqnorm(m5.lme, pch = 20, col = &quot;black&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm24-1.png" width="672" /></p>
-<p>Next, we check the residuals by “Genre” <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
+<p>A beautiful, straight line! The qqplot does not indicate any problems. It is, unfortunately, rather common that the dots deviate from the straight line at the very bottom or the very tp which means that the model is good at estimating values around the middle of the dependent variable but rather bad at estimating lower or higher values. Next, we check the residuals by “Genre” <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
 <pre class="r"><code># residuals by genre
-qqnorm(m2.lme, ~resid(.) | Genre )</code></pre>
+qqnorm(m5.lme, ~resid(.) | Genre, pch = 20, col = &quot;black&quot; )</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm25-1.png" width="672" /></p>
-<p>Now, we inspect the observed responses versus the within-group fitted values <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
+<p>Beautiful straight lines - perfection! Now, we inspect the observed responses versus the within-group fitted values <span class="citation">(<span class="citeproc-not-found" data-reference-id="pinheiro2000mixedmodels"><strong>???</strong></span>)</span>.</p>
 <pre class="r"><code># observed responses versus the within-group fitted values
-plot(m2.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)</code></pre>
+plot(m5.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3, 
+     xlim = c(80, 220), cex = .8, pch = 20, col = &quot;blue&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/lmm26-1.png" width="672" /></p>
+<p>Although some data points are named, the plot does not show any structure, like a funnel, which would have been problematic.</p>
 </div>
 <div id="reporting-results" class="section level2">
-<h2><span class="header-section-number">3.7</span> Reporting Results</h2>
-<pre class="r"><code>summary(m2.lmer)</code></pre>
-<pre><code>## Linear mixed model fit by maximum likelihood  [&#39;lmerMod&#39;]
-## Formula: Prepositions ~ (1 | Genre/Region) + Date
-##    Data: lmmdata
-## 
-##      AIC      BIC   logLik deviance df.resid 
-##     4496     4517    -2243     4486      532 
-## 
-## Scaled residuals: 
-##    Min     1Q Median     3Q    Max 
-## -3.747 -0.663  0.018  0.640  3.623 
+<h2><span class="header-section-number">3.8</span> Reporting Results</h2>
+<p>Before we do the write-up, we have a look at the model summayr one last time as this will provide us with at least some of the parameters that we want to report.</p>
+<pre class="r"><code>summary(m5.lme)</code></pre>
+<pre><code>## Linear mixed-effects model fit by maximum likelihood
+##  Data: lmmdata 
+##    AIC  BIC logLik
+##   4486 4567  -2224
 ## 
 ## Random effects:
-##  Groups       Name        Variance Std.Dev.
-##  Region:Genre (Intercept)  11.9     3.45   
-##  Genre        (Intercept) 145.2    12.05   
-##  Residual                 224.1    14.97   
-## Number of obs: 537, groups:  Region:Genre, 31; Genre, 16
+##  Formula: ~1 | Genre
+##         (Intercept) Residual
+## StdDev:       12.26    14.34
 ## 
-## Fixed effects:
-##             Estimate Std. Error t value
-## (Intercept) 133.9550     3.1768   42.17
-## Date          0.0179     0.0066    2.71
-## 
-## Correlation of Fixed Effects:
+## Variance function:
+##  Structure: Different standard deviations per stratum
+##  Formula: ~1 | Genre 
+##  Parameter estimates:
+##           Bible       Biography           Diary       Education 
+##          1.0000          0.3407          0.8695          0.7888 
+##         Fiction        Handbook         History             Law 
+##          0.9117          1.0965          0.9787          0.7849 
+##      Philosophy   PrivateLetter    PublicLetter        Religion 
+##          0.7370          1.1906          1.2189          0.9746 
+##         Science          Sermon          Travel TrialProceeding 
+##          0.8486          0.9708          1.0862          1.2602 
+## Fixed effects: Prepositions ~ Date 
+##              Value Std.Error  DF t-value p-value
+## (Intercept) 133.96    3.1444 520   42.60  0.0000
+## Date          0.02    0.0055 520    3.99  0.0001
+##  Correlation: 
 ##      (Intr)
-## Date 0.003</code></pre>
+## Date 0.004 
+## 
+## Standardized Within-Group Residuals:
+##      Min       Q1      Med       Q3      Max 
+## -3.31912 -0.67972  0.01469  0.69872  3.10388 
+## 
+## Number of Observations: 537
+## Number of Groups: 16</code></pre>
+<p>A mixed-effect linear regression model. which contained the genre of texts as random effect was fit to to the data. Due to presence of outliers in the data, weights were included into the model which led to a significantly imporved model fit compared to an unweight model (). The final minimal adequate model performed significantly better than an intercept-only base line model (<span class="math inline">\(\chi^2^\)</span>(1): 52.87, p &lt;.0001) and showed that the the frequency of prepositions increases significantly but only marginally with the date of composition (<span class="math inline">\(\chi^2^\)</span>(2): 10.12, p: 0.0063, Pearson’s <span class="math inline">\(r\)</span> = 0.172). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data.</p>
 </div>
 </div>
 <div id="mixed-effects-binomial-logistic-regression-models" class="section level1">
@@ -956,27 +896,26 @@ plot(m2.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220),
 <p><img src="mixedregressions_files/figure-html/blmm1-1.png" width="672" /></p>
 <p>The upper left panel merely shows the logistic curve representing the predictions of a fixed-effects logistic regression with a single intercept and slope. The upper right panel shows the logistic curves representing the predictions of a of a mixed-effects logistic regression with random intercepts for each level of a grouping variable. The lower left panel shows the logistic curves representing the predictions of a mixed-effects logistic regression with one intercept but random slopes for each level of a grouping variable. The lower right panel shows the logistic curves representing the predictions of a mixed-effects logistic regression with random intercepts and random slopes for each level of a grouping variable.</p>
 <p>After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.</p>
-<p>In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted <span class="citation">(vgl. A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>)</span>. We test whether including random effects is warranted by comparing a model, that bases its estimates of the dependent variable solely on the base intercept, with a model, that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the random-effect model explains significantly more variance than the simple model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified if they reduce residual deviance.</p>
+<p>In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>)</span>. We test whether including random effects is warranted by comparing a model, that bases its estimates of the dependent variable solely on the base intercept, with a model that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the mixed-effects model explains significantly more variance than the fixed-effects model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified if they reduce residual deviance.</p>
 </div>
 <div id="example-discourse-like-in-irish-english" class="section level2">
 <h2><span class="header-section-number">4.2</span> Example: Discourse LIKE in Irish English</h2>
 <p>In this example we will investigate which factors correlate with the use of <em>final discourse like</em> (e.g. “<em>The weather is shite, like!</em>”) in Irish English. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender (Gender: Men versus Women) and age of that speaker (Age: Old versus Young), whether the interlocutors were of the same or a different gender (ConversationType: SameGender versus MixedGender), and whether another <em>final discourse like</em> had been used up to three speech units before (Priming: NoPrime versus Prime), whether or not the speech unit contained an <em>final discourse like</em> (SUFLike: 1 = yes, 0 = no. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.</p>
-<pre class="r"><code>rm(list=ls(all=T))  # clean current workspace
-options(&quot;scipen&quot; = 100, &quot;digits&quot; = 4)     # set options
-library(Hmisc)      # activate library
-library(RLRsim)     # activate library
-library(sjPlot)     # activate library
-library(visreg)     # activate library
-library(mlogit)     # activate library
-library(plyr)       # activate library
-library(rms)        # activate library
-library(ggplot2)    # activate library
-library(effects)    # activate library
-library(lme4)       # activate library
-library(languageR)  # activate library
-source(&quot;rscripts/multiplot_ggplot2.R&quot;)    # load multiplot function
-source(&quot;rscripts/PseudoR2lmerBinomial.R&quot;) # load pseudor2 function
-source(&quot;rscripts/meblr.summary.R&quot;)        # load summary function</code></pre>
+<pre class="r"><code># activate library
+library(Hmisc)      
+library(RLRsim)     
+library(sjPlot)     
+library(visreg)     
+library(mlogit)     
+library(rms)        
+library(ggplot2)    
+library(effects)    
+library(lme4)       
+library(languageR)
+# load functions
+source(&quot;rscripts/multiplot_ggplot2.R&quot;)   
+source(&quot;rscripts/PseudoR2lmerBinomial.R&quot;) 
+source(&quot;rscripts/meblr.summary.R&quot;)       </code></pre>
 <p>Next, we load the data and inspect the structure of the data set,</p>
 <pre class="r"><code># load data
 mblrdata &lt;- read.table(&quot;https://slcladal.github.io/data/mblrdata.txt&quot;, 
@@ -1010,8 +949,6 @@ mblrdata$Age &lt;- relevel(mblrdata$Age, &quot;Young&quot;) </code></pre>
 <pre class="r"><code>collapsespeaker &lt;- table(mblrdata$ID)[which(table(mblrdata$ID) &lt; 21)]
 mblrdata$ID &lt;- ifelse(mblrdata$ID %in% collapsespeaker, &quot;Other&quot;, mblrdata$ID)</code></pre>
 <p>After preparing the data, we have a look at the first six lines of the data set.</p>
-<pre class="r"><code>library(knitr)    # load library
-kable(head(mblrdata), caption = &quot;First six rows of the data set.&quot;)</code></pre>
 <table>
 <caption>First six rows of the data set.</caption>
 <thead>
@@ -1166,7 +1103,7 @@ pchisq(as.numeric(null.id), df=1, lower.tail=F) </code></pre>
 <pre class="r"><code># sig m0.glmer better than m0.glm</code></pre>
 <p>The p-value of the Model Likelihood Ratio Test is lower than .05 which shows that the inclusion of the random-effects structure is warranted. We can now continue with the model fitting process.</p>
 </div>
-<div id="model-fitting" class="section level2">
+<div id="model-fitting-1" class="section level2">
 <h2><span class="header-section-number">4.5</span> Model Fitting</h2>
 <p>The next step is to fit the model which means that we aim to find the “best” model, i.e. the minimal adequate model. In this case, we will use a manual step-wise step-up, forward elimination procedure. Before we begin with the model fitting process we need to add ´control = glmerControl(optimizer = “bobyqa”)´ to avoid unnecessary failures to converge.</p>
 <pre class="r"><code>m0.glmer &lt;- glmer(SUFlike ~ 1+ (1|ID), family = binomial, data = mblrdata, control=glmerControl(optimizer=&quot;bobyqa&quot;))</code></pre>
@@ -1917,7 +1854,7 @@ somers2(probs, as.numeric(mblrdata$SUFlike))</code></pre>
 ##     0.6323     0.2646 10170.0000     0.0000</code></pre>
 <p>The model fit parameters indicate a suboptimal fit. Both the C-value and Somers’s D<sub>xy</sub> show poor fit between predicted and observed occurrences of SUFlike. If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicates real predictive capacity <span class="citation">(Baayen <a href="#ref-baayen2008analyzing">2008</a>, 204)</span>. Somers’ D<sub>xy</sub> is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D<sub>xy</sub> values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction <span class="citation">(Baayen <a href="#ref-baayen2008analyzing">2008</a>, 204)</span>. This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.</p>
 </div>
-<div id="model-diagnostics-1" class="section level2">
+<div id="model-diagnostics-2" class="section level2">
 <h2><span class="header-section-number">4.7</span> Model Diagnostics</h2>
 <p>We begin the model diagnostics by generating a diagnostic that plots the fitted or predicted values against the residuals.</p>
 <pre class="r"><code>plot(mlr.glmer, pch = 20, col = &quot;black&quot;, lty = &quot;dotted&quot;)</code></pre>
