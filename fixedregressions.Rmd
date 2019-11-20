@@ -46,10 +46,10 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("boot", "car", "effects", "ggplot2",
+install.packages(c("boot", "car", "caret", "effects", "ggplot2",
                    "Hmisc", "languageR", "lme4", "mlogit",
                    "msm", "plyr", "QuantPsyc", "RLRsim", "rms",
-                   "sandwich", "sjPlot", "visreg"))
+                   "sandwich", "sjPlot", "vcd", "visreg"))
 ```
 
 Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
@@ -86,10 +86,12 @@ The example we will go through here is taken from @field2012discovering. In this
 
 ```{r mlr1, eval = T, echo = T, message=FALSE, warning=FALSE}
 # load libraries
-library(ggplot2)
-library(car)
-library(QuantPsyc)
 library(boot)
+library(car)
+library(caret)
+library(ggplot2)
+library(QuantPsyc)
+library(vcd)
 # load functions
 source("rscripts/multiplot_ggplot2.r")
 source("rscripts/mlinr.summary.r")
@@ -553,7 +555,7 @@ multiplot(p1, p2, cols = 2)
 
 The left panel of the Figure above shows that a linear model would predict values for the relationship status, which represents a factor (0 = Not in Relationship and 1 = In Relationship), that are non-sensical because 1.1 does not make sense if the only options are 0 OR 1. The logistic function shown in the right panel of the Figure above solves this problem by working on the logged probabilities of an outcome rather than on the actual outcome.
 
-## Example 1: Eh in Kiwi English
+## Example 1: EH in Kiwi English
 
 To exemplify hot to implement a logistic regression in "R", we will analyse the use of the discourse particle *eh* in New Zealand English and test which factors correlate with its occurrence. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender, ethnicity, and age of that speaker and whether or not the speech unit contained an *eh*. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.
 
@@ -583,7 +585,7 @@ blrdata <- read.table("data/blrdata.txt",
 str(blrdata)
 ```
 
- The summary of the data show that the data set contains 25,821 observations of five variables. The variable "ID" contains strings that represent a combination file and speaker of a speech unit. The second variable represents the gender, the third the age, and the fourth the ethnicity of speakers. The fifth variable represents whether or not a speech unit contained the discourse particle *eh*. The first six lines of the data set are shown in the Table below.
+ The summary of the data show that the data set contains 25,821 observations of five variables. The variable "ID" contains strings that represent a combination file and speaker of a speech unit. The second variable represents the gender, the third the age, and the fourth the ethnicity of speakers. The fifth variable represents whether or not a speech unit contained the discourse particle *EH*. The first six lines of the data set are shown in the Table below.
 
 ```{r blm4, eval = T, echo=F, message=FALSE, warning=FALSE}
 library(knitr)
@@ -677,11 +679,11 @@ multiplot(p1, p4, p2, p5, p3, p6, cols = 3)
 
 With respect to main effects, the Figure above indicates that men use *eh* more frequently than women, that young speakers sue it more frequently compared with old speakers, and that speakers that are descendants of European settlers (Pakeha) use *eh* more frequently compared with Maori (the native inhabitants of New Zealand).
 
-The plots in the lower panels do not indicate significant interactions between use of *eh* and the Age, Gender, and Ethnicity of speakers. In a next step, we will start building the logistic regression model.
+The plots in the lower panels do not indicate significant interactions between use of *EH* and the Age, Gender, and Ethnicity of speakers. In a next step, we will start building the logistic regression model.
 
 ## Model Building
 
-As a first step, we need to define contrasts and add a distance matrix to the options. Contrasts define what should be compared and therefore influences how the results of the regression analysis are presented.
+As a first step, we need to define contrasts and add a distance matrix to the options. Contrasts define what and how variable levels should be compared and therefore influences how the results of the regression analysis are presented.
 
 ```{r blm7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # set contrasts
@@ -803,7 +805,7 @@ After fitting the model, we validate the model to avoid arriving at a final mini
 
 ## Model Validation
 
-To validate the final minimal model, we apply the "validate" function and apply it to the initial saturated model. The output of the "validate" function shows how often predictors are retained if the sample is re-selected with the same size but with placing back the drawn data point. The execution of the function requires some patience as it is rather computationally expensive.
+To validate a model, you can apply the "validate" function and apply it to a saturated model. The output of the "validate" function shows how often predictors are retained if the sample is re-selected with the same size but with placing back drawn data points. The execution of the function requires some patience as it is rather computationally expensive and it is, tehrefore, commented out below.
 
 ```{r blm18, eval = T, echo=T, message=FALSE, warning=FALSE}
 # model validation (remove # to activate: output too long for website)
@@ -817,7 +819,7 @@ The "validate" function shows that retaining two predictors (Age and Gender) is 
 pentrace(m2.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
 ```
 
-The "pentrace" function proposes a penalty of .8 but the values are so similar  that a penalty is unnecessary. In a next step, we rename the final models.
+The values are so similar  that a penalty is unnecessary. In a next step, we rename the final models.
 
 ```{r blm20, eval = T, echo=T, message=FALSE, warning=FALSE}
 lr.glm <- m2.glm  # rename final minimal adeqaute glm model
@@ -835,7 +837,7 @@ modelChi; chidf; chisq.prob
 
 The code above provides three values: a $\chi$^2^, the degrees of freedom, and a p-value. The p-value is lower than .05 and the results of the Model Likelihood Ratio Test therefore confirm that the final minimal adequate model performs significantly better than the initial minimal base-line model. Another way to extract the model likelihood test statistics is to use an ANOVA to compare the final minimal adequate model to the minimal base-line model.
 
-The Model Likelihood Ratio Test
+A handier way to get thses statistics is by performing an ANOVA on the final minimal model which, if used this way, is identical to a Model Likelihood Ratio test.
 
 ```{r blm22, eval = T, echo=T, message=FALSE, warning=FALSE}
 anova(m0.glm, lr.glm, test = "Chi") # Model Likelihood Ratio Test
@@ -867,29 +869,29 @@ logisticPseudoR2s(lr.glm)
 
 ```
 
-The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the variance in the data. Next, we extract the confidence intervals for the coefficients of the model.
+The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the variance in the logged likelihoods (to get the percentages, you simply multiply the pseudo-R^2^ values by 100). Next, we extract the confidence intervals for the coefficients of the model.
 
 ```{r blm24, eval = T, echo=T, message=FALSE, warning=FALSE}
 # extract the confidence intervals for the coefficients
 confint(lr.glm)
 ```
 
-Despite having low explanatory and predictive power, the age of speakers and their gender is  significant as the confidence intervals of the coefficients do not overlap with 0.
+Despite having low explanatory and predictive power, the age of speakers and their gender are significant as the confidence intervals of the coefficients do not overlap with 0.
 
 ## Effect Size
 
-In a next step, we compute odds ratios and their confidence intervals. Odds Ratios represent a common measure of effect size and can be used to compare effect sizes across models. Odds ratios rang between 0 and infinity. Values of 1 indicate that there is not effect. The further away the values from 1, the stronger the effect. If the values are lower than 1, then the variable level correlates negatively with the occurrence of the outcome (the likelihood decreases) while values above 1 indicate a positive correlation and show that the variable level causes an increase in the likelihood of the outcome (the occurrence of EH).
+In a next step, we compute odds ratios and their confidence intervals. Odds Ratios represent a common measure of effect size and can be used to compare effect sizes across models. Odds ratios rang between 0 and infinity. Values of 1 indicate that there is no effect. The further away the values are from 1, the stronger the effect. If the values are lower than 1, then the variable level correlates negatively with the occurrence of the outcome (the likelihood decreases) while values above 1 indicate a positive correlation and show that the variable level causes an increase in the likelihood of the outcome (the occurrence of EH).
 
 ```{r blm25, eval = T, echo=T, message=FALSE, warning=FALSE}
 exp(lr.glm$coefficients) # odds ratios
 exp(confint(lr.glm))     # confidence intervals of the coefficients
 ```
 
-The odds ratios confirm that older speakers use *eh* significantly less often compared with younger speakers and that women use *eh* less frequently than men as the confidence intervals of the odds rations do not overlap with 1. In a next step, we calculate the prediction accuracy of the model.
+The odds ratios confirm that older speakers use *EH* significantly less often compared with younger speakers and that women use *EH* less frequently than men as the confidence intervals of the odds rations do not overlap with 1. In a next step, we calculate the prediction accuracy of the model.
 
 ## Accuracy
 
-In order to calculate the prediction accuracy of the model, we rearrange the data so that it does not reflect one speech unit per row but the number of speech units with *eh* and the number of speech units without *eh* per speaker! Thus, we transform the data into a per speaker rather than a per speech-unit format.
+In order to calculate the prediction accuracy of the model, we rearrange the data so that it does not reflect one speech unit per row but the number of speech units with *EH* and the number of speech units without *EH* per speaker! Thus, we transform the data into a per speaker rather than a per speech-unit format.
 
 ```{r blm26, eval = T, echo=T, message=FALSE, warning=FALSE}
 blrdata_byspeaker <- table(blrdata$ID, blrdata$EH)
@@ -905,8 +907,7 @@ blrdata_byspeaker$EH <- NULL                  # remove EH column
 ```
 
 
-
-```{r blm27, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm27, eval = T, echo=F, message=FALSE, warning=FALSE}
 library(knitr)    # load library
 kable(head(blrdata_byspeaker), caption = "First six rows of the by-speaker data.")
 ```
@@ -934,7 +935,7 @@ predict.acc.base
 ```
 
 
-Both, the final-minimal and the minimal base-line model have the same prediction accuracy. This is interesting and we need to determine why this is the case. WE will extract the predictions based on both models to find out why the predictions are identical.
+Both, the final-minimal and the minimal base-line model have the same prediction accuracy. This is interesting and we need to determine why this is the case. We will extract the predictions based on both models to find out why the predictions are identical.
 
 
 ```{r blm30, eval = T, echo=T, message=FALSE, warning=FALSE}
@@ -946,9 +947,21 @@ which(lr.glm.spk.base$fitted > .5)
 
 The reason why both models arrive at the same predictions is that because both models always predict an absence of EH.
 
+```{r blm31, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create variable with contains the prediction of the model
+blrdata$Prediction <- predict(lr.glm, blrdata, type = "response")
+blrdata$Prediction <- ifelse(blrdata$Prediction > .5, 1, 0)
+# convert predicted and observed into factors with the same levels
+blrdata$Prediction <- factor(blrdata$Prediction, levels = c("0", "1"))
+blrdata$EH <- factor(blrdata$EH, levels = c("0", "1"))
+# create a confusion matrix with compares observed against predicted values
+caret::confusionMatrix(blrdata$Prediction, blrdata$EH)
+```
+
+
 We can now plot the effects using the visreg package [cf. @Breheny2013]
 
-```{r blm31, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm32, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create plot
 par(mfrow = c(1, 2))
 visreg(lr.glm, "Age", xlab = "Age",
@@ -969,13 +982,13 @@ We are now in a position to perform model diagnostics and test if the model viol
 
 To check whether the final minimal model contains predictors that correlate with each other, we extract variance inflation factors (VIF). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is completely unreliable and cannot claim the multicollinearity is absent [@myers1990classical]. Predictors causing such VIFs should be removed. Indeed, predictors with VIF values greater than 4 are usually already problematic but, for large data sets, even VIFs greater than 2 can lead inflated standard errors (Jaeger 2013:http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&do=view&target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf). Also, VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215] and [@zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed.
 
-```{r blm32, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm33, eval = T, echo=T, message=FALSE, warning=FALSE}
 vif(lr.glm)
 ```
 
 In addition, predictors with 1/VIF values $<$ .1 must be removed (data points with values above .2 are considered problematic) [@menard1995applied] and the mean value of VIFs should be $<$ 1 [@bowerman1990linear].
 
-```{r blm33, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm34, eval = T, echo=T, message=FALSE, warning=FALSE}
 mean(vif(lr.glm))
 ```
 
@@ -983,12 +996,12 @@ mean(vif(lr.glm))
 
 In order to detect potential outliers, we will calculate diagnostic parameters and add these to our data set.
 
-```{r blm34, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm35, eval = T, echo=T, message=FALSE, warning=FALSE}
 infl <- influence.measures(lr.glm) # calculate influence statistics
 blrdata <- data.frame(blrdata, infl[[1]], infl[[2]]) # add influence statistics
 ```
 
-```{r blm35, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm36, eval = T, echo=T, message=FALSE, warning=FALSE}
 library(knitr)    # load library
 kable(head(blrdata), caption = "First six rows of the data set with added influence statistics.")
 ```
@@ -1001,7 +1014,7 @@ We now check whether the sample size is sufficient for our analysis [@green1991m
 * if you are interested in individual predictors: 104 + k
 * if you are interested in both: take the higher value!
 
-```{r blm36, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm37, eval = T, echo=T, message=FALSE, warning=FALSE}
 # function to evaluate sample size
 smplesz <- function(x) {
   ifelse((length(x$fitted) < (104 + ncol(summary(x)$coefficients)-1)) == TRUE,
@@ -1018,7 +1031,7 @@ According to rule of thumb provided in @green1991many, the sample size is suffic
 
 ## Summarizing Results
 
-```{r blm37, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blm38, eval = T, echo=T, message=FALSE, warning=FALSE}
 blrmsummary <- blrm.summary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
 blrmsummary[, -c(4:5)] # remove columns with confidence intervals
 ```
@@ -1046,7 +1059,7 @@ blrmsummary[, -c(4:5)] # remove columns with confidence intervals
 **Somers’ Dxy**
 
  Somers’ Dxy is a rank correlation between predicted probabilities and observed
- responses ranges between 0 (randomness) and 1 (perfect prediction). (cf. @baayen2008analyzing 204).
+ responses ranges between 0 (randomness) and 1 (perfect prediction). Somers Dxy should have a value higher than .5 for the model to be meaningful (cf. @baayen2008analyzing 204).
 
 **C**
  C is an index of concordance between the predicted probability and the
@@ -1160,9 +1173,9 @@ References
 
 
 
-# Poissant Regression
+# Poisson Regression
 
-Poissant regressions is the most common type of regression model that is used to analyze data where the dependent variable represents counts of some sort. 
+Poisson regressions are used to analyze data where the dependent variable represents counts. However, the tricky thing about Poisson regressions is that the data has to conform to the Poisson distribution which is, accroding to my experience, rarely the case, unfortunately. 
 
 ```{r pr1, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load libraries
@@ -1170,70 +1183,100 @@ library(ggplot2)
 library(sandwich)
 library(msm)
 # load data
-p <- read.csv("https://stats.idre.ucla.edu/stat/data/poisson_sim.csv")
+poissondata <- read.delim("data/poissondata.txt", sep = "\t", header = T, skipNul = T, quote = "")
 # inspect data
-summary(p)
+summary(poissondata)
 ```
+
+We will clean the data by factorizing Id which is currentlx considered a numeric variable rather than a factor.
 
 ```{r pr2, eval = T, echo=T, message=FALSE, warning=FALSE}
-# factorize id and prog
-p$id <- factor(p$id)
-p$prog <- factor(p$prog, levels=1:3, labels=c("General", "Academic", 
-                                                     "Vocational"))
+# process data
+poissondata <- poissondata %>%
+  mutate(Id = factor(Id, levels = 1:200, labels = 1:200))
 # inspect data
-summary(p)
+summary(poissondata); str(poissondata)
 ```
 
+First, we check if the conditions for a Poisson regression are met.
+
+
 ```{r pr3, eval = T, echo=T, message=FALSE, warning=FALSE}
+# output the results
+gf = goodfit(poissondata$Awards,type= "poisson",method= "ML")
+summary(gf)
+```
+
+If the p-values is smaller than .05, then data is not Poisson distributed which means that it differs significantly from a Poisson distribution and is very likely overdispersed. We will check the divergence froma  Poisson distribution visually by plotting the observed counts against the expected counts if the data were Poisson distributed.
+
+```{r pr4, eval = T, echo=T, message=FALSE, warning=FALSE}
+plot(gf,main="Count data vs Poisson distribution")
+```
+
+Although the goodfit function reported that the data differs significantly from the Poisson distribution, the fit is rather good. We can use an additional Levene's test to check if variance homogeity is given. 
+
+```{r pr5, eval = T, echo=T, message=FALSE, warning=FALSE}
+# check homogeneity
+leveneTest(poissondata$Awards, poissondata$Progression, center = mean)
+```
+
+The Levene's test indicates that variance homogeneity is also violated. Since both the approximation to a Poisson distributuion and variance homogeineity are violated, we should switch either to a quasi-Poisson model or a negative binomial model. However, as we are only intersted in how to implement a Poisson model here, we continue despite the fact that this could not be recommended if we were actually interested in accurate results based on a reliable model. 
+
+In a next step, we summarize Progression by inspecting the means and standard deviations of the individual variable levels.
+
+```{r pr6, eval = T, echo=T, message=FALSE, warning=FALSE}
 # extract mean and standard devaiation
-with(p, tapply(num_awards, prog, function(x) {
+with(poissondata, tapply(Awards, Progression, function(x) {
   sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
 }))
 ```
 
-```{r pr4, eval = T, echo=T, message=FALSE, warning=FALSE}
+Now, we visualize the data.
+
+```{r pr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot data
-ggplot(p, aes(num_awards, fill = prog)) +
+ggplot(poissondata, aes(Awards, fill = Progression)) +
   geom_histogram(binwidth=.5, position="dodge")
 ```
 
-```{r pr5, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r pr8, eval = T, echo=T, message=FALSE, warning=FALSE}
 # calculate poissant regression
-poissantr <- glm(num_awards ~ prog + math, family="poisson", data=p)
+m1.poisson <- glm(Awards ~ Progression + MathScore, family="poisson", data=poissondata)
 # inspect model
-summary(poissantr)
+summary(m1.poisson)
 ```
 
-```{r pr6, eval = T, echo=T, message=FALSE, warning=FALSE}
-# 
-cov.m1 <- vcovHC(poissantr, type="HC0")
+In addition to the Estimates for the coefficients, we could also calculate the confidence intervals for the coefficients (LL stands for lwoer limit and UL for upper limit in the table below).
+
+
+```{r pr9, eval = T, echo=T, message=FALSE, warning=FALSE}
+cov.m1 <- vcovHC(m1.poisson, type="HC0")
 std.err <- sqrt(diag(cov.m1))
-r.est <- cbind(Estimate= coef(poissantr), "Robust SE" = std.err,
-"Pr(>|z|)" = 2 * pnorm(abs(coef(poissantr)/std.err), lower.tail=FALSE),
-LL = coef(poissantr) - 1.96 * std.err,
-UL = coef(poissantr) + 1.96 * std.err)
+r.est <- cbind(Estimate= coef(m1.poisson), "Robust SE" = std.err,
+"Pr(>|z|)" = 2 * pnorm(abs(coef(m1.poisson)/std.err), lower.tail=FALSE),
+LL = coef(m1.poisson) - 1.96 * std.err,
+UL = coef(m1.poisson) + 1.96 * std.err)
 # inspect data
 r.est
 ```
 
-```{r pr7, eval = T, echo=T, message=FALSE, warning=FALSE}
-
-with(poissantr, cbind(res.deviance = deviance, df = df.residual,
+```{r pr10, eval = T, echo=T, message=FALSE, warning=FALSE}
+with(m1.poisson, cbind(res.deviance = deviance, df = df.residual,
   p = pchisq(deviance, df.residual, lower.tail=FALSE)))
 ```
 
 
-```{r pr8, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r pr11, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## update m1 model dropping prog
-poissantr2 <- update(poissantr, . ~ . - prog)
+m2.poisson <- update(m1.poisson, . ~ . - Progression)
 ## test model differences with chi square test
-anova(poissantr2, poissantr, test="Chisq")
+anova(m2.poisson, m1.poisson, test="Chisq")
 ```
 
-```{r pr9, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r pr12, eval = T, echo=T, message=FALSE, warning=FALSE}
 
 s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
-                                                coef(poissantr), cov.m1)
+                                                coef(m1.poisson), cov.m1)
 
 ## exponentiate old estimates dropping the p values
 rexp.est <- exp(r.est[, -3])
@@ -1244,32 +1287,31 @@ rexp.est
 ```
 
 
-```{r pr10, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r pr13, eval = T, echo=T, message=FALSE, warning=FALSE}
+# extract predicted values
+(s1 <- data.frame(MathScore = mean(poissondata$MathScore),
+  Progression = factor(1:3, levels = 1:3, labels = levels(poissondata$Progression))))
 
-(s1 <- data.frame(math = mean(p$math),
-  prog = factor(1:3, levels = 1:3, labels = levels(p$prog))))
-
-predict(poissantr, s1, type="response", se.fit=TRUE)
+predict(m1.poisson, s1, type="response", se.fit=TRUE)
 ```
 
 
-```{r pr11, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r pr14, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## calculate and store predicted values
-p$phat <- predict(poissantr, type="response")
+poissondata$Predicted <- predict(m1.poisson, type="response")
 
 ## order by program and then by math
-p <- p[with(p, order(prog, math)), ]
+poissondata <- poissondata[with(poissondata, order(Progression, MathScore)), ]
 ```
 
-```{r pr12, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r pr15, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## create the plot
-ggplot(p, aes(x = math, y = phat, colour = prog)) +
-  geom_point(aes(y = num_awards), alpha=.5, 
+ggplot(poissondata, aes(x = MathScore, y = Predicted, colour = Progression)) +
+  geom_point(aes(y = Awards), alpha=.5, 
              position=position_jitter(h=.2)) +
   geom_line(size = 1) +
   labs(x = "Math Score", y = "Expected number of awards")
 ```
-
 
 
 # Robust Regression
