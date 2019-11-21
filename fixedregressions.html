@@ -471,10 +471,9 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options(&quot;scipen&quot; = 100, &quot;digits&quot; = 4) # supress math annotation
 # install libraries
-install.packages(c(&quot;boot&quot;, &quot;car&quot;, &quot;caret&quot;, &quot;effects&quot;, &quot;ggplot2&quot;,
-                   &quot;Hmisc&quot;, &quot;languageR&quot;, &quot;lme4&quot;, &quot;mlogit&quot;,
-                   &quot;msm&quot;, &quot;plyr&quot;, &quot;QuantPsyc&quot;, &quot;RLRsim&quot;, &quot;rms&quot;,
-                   &quot;sandwich&quot;, &quot;sjPlot&quot;, &quot;vcd&quot;, &quot;visreg&quot;))</code></pre>
+install.packages(c(&quot;boot&quot;, &quot;car&quot;, &quot;caret&quot;, &quot;effects&quot;, &quot;foreign&quot;, &quot;ggplot2&quot;, 
+                   &quot;Hmisc&quot;, &quot;knitr&quot;, &quot;MASS&quot;, &quot;mlogit&quot;, &quot;msm&quot;, &quot;QuantPsyc&quot;, 
+                   &quot;reshape2&quot;, &quot;rms&quot;, &quot;sandwich&quot;, &quot;sfsmisc&quot;, &quot;sjPlot&quot;, &quot;vcd&quot;, &quot;visreg&quot;))</code></pre>
 <p>Once you have installed “R”, “R-Studio”, “Tinn-R”, and have also initiated the session by executing the code shown above, you are good to go.</p>
 </div>
 <div id="multiple-linear-regression" class="section level1">
@@ -503,10 +502,25 @@ f_{(x)} = \alpha + \beta_{1}x_{i} + \beta_{2}x_{i+1} + \dots + \beta_{n}x_{i+n} 
 library(boot)
 library(car)
 library(caret)
+library(effects)
+library(foreign)
 library(ggplot2)
+library(Hmisc)
+library(knitr)
+library(MASS)
+library(mlogit)
+library(msm)
+library(plyr)
 library(QuantPsyc)
+library(reshape2)
+library(rms)
+library(sandwich)
+library(sfsmisc)
+library(sjPlot)
 library(vcd)
+library(visreg)
 # load functions
+source(&quot;rscripts/blr.summary.R&quot;)
 source(&quot;rscripts/multiplot_ggplot2.r&quot;)
 source(&quot;rscripts/mlinr.summary.r&quot;)
 source(&quot;rscripts/SampleSizeMLR.r&quot;)
@@ -943,16 +957,20 @@ which(mlrdata$leverage &gt;= (3*mean(mlrdata$leverage)))</code></pre>
 # Durbin-Watson test (optimal: grosser p-wert)
 dwt(m2.mlr)</code></pre>
 <pre><code>##  lag Autocorrelation D-W Statistic p-value
-##    1     -0.01433247      1.968042   0.646
+##    1     -0.01433247      1.968042   0.634
 ##  Alternative hypothesis: rho != 0</code></pre>
 <pre class="r"><code># 7: test multicolliniarity 1
 vif(m2.mlr)</code></pre>
-<pre><code>##            status        attraction status:attraction 
-##              2.00              1.96              2.96</code></pre>
+<pre><code>##                         statusSingle              attractionNotInterested 
+##                                 2.00                                 1.96 
+## statusSingle:attractionNotInterested 
+##                                 2.96</code></pre>
 <pre class="r"><code># 8: test multicolliniarity 2
 1/vif(m2.mlr)</code></pre>
-<pre><code>##            status        attraction status:attraction 
-##         0.5000000         0.5102041         0.3378378</code></pre>
+<pre><code>##                         statusSingle              attractionNotInterested 
+##                            0.5000000                            0.5102041 
+## statusSingle:attractionNotInterested 
+##                            0.3378378</code></pre>
 <pre class="r"><code># 9: mean vif should not exceed 1
 mean(vif(m2.mlr))</code></pre>
 <pre><code>## [1] 2.306667</code></pre>
@@ -1012,7 +1030,7 @@ mlrsummary[,-c(4:5)]</code></pre>
 </div>
 <div id="multiple-binomial-logistic-regression" class="section level1">
 <h1><span class="header-section-number">4</span> Multiple Binomial Logistic Regression</h1>
-<p>Logistic regression is a multivariate analysis technique that builds on and is very similar in terms of its implementation to linear regression but logistic regressions take dependent variables that represent nominal rather than numeric scaling. The difference requires that the linear regression must be modified in certain ways to avoid producing non-sensical outcomes. The most fundamental difference between logistic and linear regressions is that logistic regression work on the probabilities of an outcome (the likelihood), rather than the outcome itself. In addition, the likelihoods on which the logistic regression works must be logged (logarithmized) in order to avoid produce predictions that produce values greater than 1 (instance occurs) and 0 (instance does not occur).</p>
+<p>Logistic regression is a multivariate analysis technique that builds on and is very similar in terms of its implementation to linear regression but logistic regressions take dependent variables that represent nominal rather than numeric scaling <span class="citation">(Harrell Jr <a href="#ref-harrell2015regression">2015</a>)</span>. The difference requires that the linear regression must be modified in certain ways to avoid producing non-sensical outcomes. The most fundamental difference between logistic and linear regressions is that logistic regression work on the probabilities of an outcome (the likelihood), rather than the outcome itself. In addition, the likelihoods on which the logistic regression works must be logged (logarithmized) in order to avoid produce predictions that produce values greater than 1 (instance occurs) and 0 (instance does not occur).</p>
 <p>To understand what this mean, we will use a very simple example. In this example, we want to see whether the height of men affect their likelihood of being in a relationship. The data we use represents a data set consisting of two variables: height and relationship.</p>
 <table>
 <caption>Example data set representing the height and relationship status of a sample of men.</caption>
@@ -1024,108 +1042,93 @@ mlrsummary[,-c(4:5)]</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td align="right">162.6922</td>
+<td align="right">161.4840</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
-<td align="right">164.8087</td>
-<td align="right">0</td>
-</tr>
-<tr class="odd">
-<td align="right">167.5984</td>
-<td align="right">0</td>
-</tr>
-<tr class="even">
-<td align="right">170.6743</td>
+<td align="right">162.6226</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
-<td align="right">176.2979</td>
+<td align="right">167.8581</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
-<td align="right">176.8498</td>
-<td align="right">1</td>
-</tr>
-<tr class="odd">
-<td align="right">177.3199</td>
-<td align="right">0</td>
-</tr>
-<tr class="even">
-<td align="right">177.3734</td>
-<td align="right">1</td>
-</tr>
-<tr class="odd">
-<td align="right">179.1526</td>
-<td align="right">0</td>
-</tr>
-<tr class="even">
-<td align="right">179.4977</td>
+<td align="right">168.7836</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
-<td align="right">181.7498</td>
-<td align="right">1</td>
-</tr>
-<tr class="even">
-<td align="right">182.1185</td>
-<td align="right">1</td>
-</tr>
-<tr class="odd">
-<td align="right">183.9847</td>
+<td align="right">170.5480</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
-<td align="right">185.2744</td>
+<td align="right">171.3656</td>
 <td align="right">1</td>
 </tr>
 <tr class="odd">
-<td align="right">186.3303</td>
-<td align="right">1</td>
-</tr>
-<tr class="even">
-<td align="right">187.5768</td>
-<td align="right">1</td>
-</tr>
-<tr class="odd">
-<td align="right">193.2436</td>
+<td align="right">173.5221</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
-<td align="right">193.8981</td>
+<td align="right">177.2035</td>
 <td align="right">1</td>
 </tr>
 <tr class="odd">
-<td align="right">194.0000</td>
+<td align="right">177.2165</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">177.2870</td>
+<td align="right">0</td>
+</tr>
+<tr class="odd">
+<td align="right">179.3137</td>
 <td align="right">1</td>
 </tr>
 <tr class="even">
-<td align="right">200.9167</td>
+<td align="right">179.7941</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="right">180.6835</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">181.3335</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="right">182.2096</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td align="right">183.1877</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="right">184.4181</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td align="right">192.6345</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="right">192.7787</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td align="right">208.0056</td>
 <td align="right">1</td>
 </tr>
 </tbody>
 </table>
-<p><img src="fixedregressions_files/figure-html/blm2-1.png" width="672" /></p>
+<p><img src="fixedregressions_files/figure-html/blm2-1.png" width="672" /><img src="fixedregressions_files/figure-html/blm2-2.png" width="672" /><img src="fixedregressions_files/figure-html/blm2-3.png" width="672" /></p>
 <p>The left panel of the Figure above shows that a linear model would predict values for the relationship status, which represents a factor (0 = Not in Relationship and 1 = In Relationship), that are non-sensical because 1.1 does not make sense if the only options are 0 OR 1. The logistic function shown in the right panel of the Figure above solves this problem by working on the logged probabilities of an outcome rather than on the actual outcome.</p>
 <div id="example-1-eh-in-kiwi-english" class="section level2">
 <h2><span class="header-section-number">4.1</span> Example 1: EH in Kiwi English</h2>
-<p>To exemplify hot to implement a logistic regression in “R”, we will analyse the use of the discourse particle <em>eh</em> in New Zealand English and test which factors correlate with its occurrence. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender, ethnicity, and age of that speaker and whether or not the speech unit contained an <em>eh</em>. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.</p>
-<pre class="r"><code> # clean workspace
-rm(list=ls(all=T))
- # set options
-options(&quot;scipen&quot; = 100, &quot;digits&quot; = 4)
-# load libraries
-library(effects)
-library(ggplot2)
-library(mlogit)
-library(plyr)
-library(rms)
-library(sjPlot)
-library(visreg)
-# load functions
-source(&quot;rscripts/multiplot_ggplot2.R&quot;)
-source(&quot;rscripts/blr.summary.R&quot;)
-# load data
+<p>To exemplify hot to implement a logistic regression in “R” <span class="citation">(see Agresti <a href="#ref-agresti1996introduction">1996</a>, <span class="citation">Agresti and Kateri (<a href="#ref-agresti2011categorical">2011</a>)</span> for very good and thorough introductions to this topic)</span>, we will analyse the use of the discourse particle <em>eh</em> in New Zealand English and test which factors correlate with its occurrence. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender, ethnicity, and age of that speaker and whether or not the speech unit contained an <em>eh</em>. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.</p>
+<pre class="r"><code># load data
 blrdata &lt;- read.table(&quot;data/blrdata.txt&quot;,
                       comment.char = &quot;&quot;,  # data does not contain comments
                       quote = &quot;&quot;,         # data does not contain quotes
@@ -1253,9 +1256,9 @@ anova(m1.glm, m0.glm, test = &quot;Chi&quot;)</code></pre>
 ## 
 ## Model 1: EH ~ Age
 ## Model 2: EH ~ 1
-##   Resid. Df Resid. Dev Df Deviance            Pr(&gt;Chi)    
-## 1     25819      32377                                    
-## 2     25820      33008 -1     -631 &lt;0.0000000000000002 ***
+##   Resid. Df Resid. Dev Df Deviance  Pr(&gt;Chi)    
+## 1     25819      32377                          
+## 2     25820      33008 -1  -630.89 &lt; 2.2e-16 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>As the data does not contain incomplete information, the vif values are below 3, and adding “Age” has significantly imporved the mdel fit (the p-value of the anova is lower than .05). We therefore proceed with “Age” included.</p>
@@ -1270,18 +1273,18 @@ ifelse(max(vif(m2.glm)) &lt;= 3,  &quot;vifs ok&quot;, &quot;WARNING: high vifs!
 ## 
 ## Model 1: EH ~ Age + Gender
 ## Model 2: EH ~ Age
-##   Resid. Df Resid. Dev Df Deviance            Pr(&gt;Chi)    
-## 1     25818      32140                                    
-## 2     25819      32377 -1     -237 &lt;0.0000000000000002 ***
+##   Resid. Df Resid. Dev Df Deviance  Pr(&gt;Chi)    
+## 1     25818      32140                          
+## 2     25819      32377 -1  -237.32 &lt; 2.2e-16 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>Anova(m2.glm, test = &quot;LR&quot;)</code></pre>
 <pre><code>## Analysis of Deviance Table (Type II tests)
 ## 
 ## Response: EH
-##        LR Chisq Df          Pr(&gt;Chisq)    
-## Age         669  1 &lt;0.0000000000000002 ***
-## Gender      237  1 &lt;0.0000000000000002 ***
+##        LR Chisq Df Pr(&gt;Chisq)    
+## Age      668.64  1  &lt; 2.2e-16 ***
+## Gender   237.32  1  &lt; 2.2e-16 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>Again, including “Gender” significantly improves model fit and the data does not contain incomplete information or complete separation. Also, including “Gender” does not affect the significance of “Age”. Now, we include “Ethnicity”.</p>
@@ -1297,7 +1300,7 @@ ifelse(max(vif(m3.glm)) &lt;= 3,  &quot;vifs ok&quot;, &quot;WARNING: high vifs!
 ## Model 2: EH ~ Age + Gender
 ##   Resid. Df Resid. Dev Df Deviance Pr(&gt;Chi)
 ## 1     25817      32139                     
-## 2     25818      32140 -1   -0.261     0.61</code></pre>
+## 2     25818      32140 -1 -0.26101   0.6094</code></pre>
 <p>Since adding “Ethnicity” does not significantly imporve the mdoel fit, we do not need to test if its inclusion affects the significance of other predictors. We continue without “Ethnicity” and include the interaction between “Age” and “Gender”.</p>
 <pre class="r"><code>ifelse(min(ftable(blrdata$Age, blrdata$Gender, blrdata$EH)) == 0, &quot;not possible&quot;, &quot;possible&quot;)</code></pre>
 <pre><code>## [1] &quot;possible&quot;</code></pre>
@@ -1311,7 +1314,7 @@ ifelse(max(vif(m4.glm)) &lt;= 3,  &quot;vifs ok&quot;, &quot;WARNING: high vifs!
 ## Model 2: EH ~ Age + Gender
 ##   Resid. Df Resid. Dev Df Deviance Pr(&gt;Chi)
 ## 1     25817      32139                     
-## 2     25818      32140 -1   -0.124     0.72</code></pre>
+## 2     25818      32140 -1 -0.12424   0.7245</code></pre>
 <p>The interaction between Age and Gender is not significant which means that men and women do not behave differently with respect to their use of “EH” as they age. Also, the data does not contain incomplete information and the model does not suffer from multicollinerity - the predictors are not collinear. We can now include if there is a significant interaction between “Age” and “Ethnicity”.</p>
 <pre class="r"><code>ifelse(min(ftable(blrdata$Age, blrdata$Ethnicity, blrdata$EH)) == 0, &quot;not possible&quot;, &quot;possible&quot;)</code></pre>
 <pre><code>## [1] &quot;possible&quot;</code></pre>
@@ -1325,7 +1328,7 @@ ifelse(max(vif(m5.glm)) &lt;= 3,  &quot;vifs ok&quot;, &quot;WARNING: high vifs!
 ## Model 2: EH ~ Age + Gender
 ##   Resid. Df Resid. Dev Df Deviance Pr(&gt;Chi)
 ## 1     25816      32136                     
-## 2     25818      32140 -2    -3.07     0.22</code></pre>
+## 2     25818      32140 -2  -3.0686   0.2156</code></pre>
 <p>Again, no incomplete information or multicollinearity and no significant interaction. Now, we test if there exists a significant interaction between “Gender” and “Ethnicity”.</p>
 <pre class="r"><code>ifelse(min(ftable(blrdata$Gender, blrdata$Ethnicity, blrdata$EH)) == 0, &quot;not possible&quot;, &quot;possible&quot;)</code></pre>
 <pre><code>## [1] &quot;possible&quot;</code></pre>
@@ -1339,7 +1342,7 @@ ifelse(max(vif(m6.glm)) &lt;= 3,  &quot;vifs ok&quot;, &quot;WARNING: high vifs!
 ## Model 2: EH ~ Age + Gender
 ##   Resid. Df Resid. Dev Df Deviance Pr(&gt;Chi)
 ## 1     25816      32139                     
-## 2     25818      32140 -2   -0.272     0.87</code></pre>
+## 2     25818      32140 -2 -0.27225   0.8727</code></pre>
 <p>As the interaction between “Gender” and “Ethnicity” is not significant, we continue without it. In a final step, we include the three-way interaction between “Age”, “Gender”, and “Ethnicity”.</p>
 <pre class="r"><code>ifelse(min(ftable(blrdata$Age, blrdata$Gender, blrdata$Ethnicity, blrdata$EH)) == 0, &quot;not possible&quot;, &quot;possible&quot;)</code></pre>
 <pre><code>## [1] &quot;possible&quot;</code></pre>
@@ -1353,7 +1356,7 @@ ifelse(max(vif(m7.glm)) &lt;= 3,  &quot;vifs ok&quot;, &quot;WARNING: high vifs!
 ## Model 2: EH ~ Age + Gender
 ##   Resid. Df Resid. Dev Df Deviance Pr(&gt;Chi)
 ## 1     25816      32139                     
-## 2     25818      32140 -2   -0.272     0.87</code></pre>
+## 2     25818      32140 -2 -0.27225   0.8727</code></pre>
 <p>We have found our final minimal adequate model because the 3-way interaction is also insignificant. As we have now arrived at the final minimal adequate model (m2.glm), we generate a final minimal model using the “lrm” model.</p>
 <pre class="r"><code>m2.lrm &lt;- lrm(EH ~ Age+Gender, data = blrdata, x = T, y = T, linear.predictors = T)
 m2.lrm</code></pre>
@@ -1379,9 +1382,9 @@ m2.lrm</code></pre>
 <pre><code>##                 Wald Statistics          Response: EH 
 ## 
 ##  Factor     Chi-Square d.f. P     
-##  Age        614.0      1    &lt;.0001
-##  Gender     237.7      1    &lt;.0001
-##  TOTAL      802.6      2    &lt;.0001</code></pre>
+##  Age        614.04     1    &lt;.0001
+##  Gender     237.65     1    &lt;.0001
+##  TOTAL      802.65     2    &lt;.0001</code></pre>
 <p>After fitting the model, we validate the model to avoid arriving at a final minimal model that is overfitted to the data at hand.</p>
 </div>
 <div id="model-validation" class="section level2">
@@ -1395,27 +1398,27 @@ m7.lrm &lt;- lrm(EH ~ (Age+Gender+Ethnicity)^3, data = blrdata, x = T, y = T, li
 <pre><code>## 
 ## Best penalty:
 ## 
-##  penalty    df
-##      0.8 1.999
+##  penalty       df
+##      0.8 1.999254
 ## 
-##  penalty    df   aic   bic aic.c
-##     0.00 2.000 864.2 847.9 864.2
-##     0.05 2.000 864.2 847.9 864.2
-##     0.10 2.000 864.2 847.9 864.2
-##     0.15 2.000 864.2 847.9 864.2
-##     0.20 2.000 864.2 847.9 864.2
-##     0.25 2.000 864.2 847.9 864.2
-##     0.30 2.000 864.2 847.9 864.2
-##     0.35 2.000 864.2 847.9 864.2
-##     0.40 2.000 864.2 847.9 864.2
-##     0.45 2.000 864.2 847.9 864.2
-##     0.50 2.000 864.2 847.9 864.2
-##     0.55 1.999 864.2 847.9 864.2
-##     0.60 1.999 864.2 847.9 864.2
-##     0.65 1.999 864.2 847.9 864.2
-##     0.70 1.999 864.2 847.9 864.2
-##     0.75 1.999 864.2 847.9 864.2
-##     0.80 1.999 864.2 847.9 864.2</code></pre>
+##  penalty       df      aic      bic    aic.c
+##     0.00 2.000000 864.2138 847.8959 864.2133
+##     0.05 1.999953 864.2139 847.8964 864.2134
+##     0.10 1.999907 864.2140 847.8969 864.2135
+##     0.15 1.999860 864.2141 847.8973 864.2136
+##     0.20 1.999813 864.2142 847.8978 864.2137
+##     0.25 1.999767 864.2143 847.8983 864.2138
+##     0.30 1.999720 864.2143 847.8987 864.2139
+##     0.35 1.999674 864.2144 847.8992 864.2140
+##     0.40 1.999627 864.2145 847.8997 864.2140
+##     0.45 1.999580 864.2146 847.9001 864.2141
+##     0.50 1.999534 864.2147 847.9006 864.2142
+##     0.55 1.999487 864.2148 847.9011 864.2143
+##     0.60 1.999440 864.2148 847.9015 864.2144
+##     0.65 1.999394 864.2149 847.9020 864.2144
+##     0.70 1.999347 864.2150 847.9024 864.2145
+##     0.75 1.999301 864.2151 847.9029 864.2146
+##     0.80 1.999254 864.2151 847.9033 864.2147</code></pre>
 <p>The values are so similar that a penalty is unnecessary. In a next step, we rename the final models.</p>
 <pre class="r"><code>lr.glm &lt;- m2.glm  # rename final minimal adeqaute glm model
 lr.lrm &lt;- m2.lrm  # rename final minimal adeqaute lrm model</code></pre>
@@ -1424,7 +1427,7 @@ lr.lrm &lt;- m2.lrm  # rename final minimal adeqaute lrm model</code></pre>
 chidf &lt;- lr.glm$df.null - lr.glm$df.residual
 chisq.prob &lt;- 1 - pchisq(modelChi, chidf)
 modelChi; chidf; chisq.prob</code></pre>
-<pre><code>## [1] 868.2</code></pre>
+<pre><code>## [1] 868.2138</code></pre>
 <pre><code>## [1] 2</code></pre>
 <pre><code>## [1] 0</code></pre>
 <p>The code above provides three values: a <span class="math inline">\(\chi\)</span><sup>2</sup>, the degrees of freedom, and a p-value. The p-value is lower than .05 and the results of the Model Likelihood Ratio Test therefore confirm that the final minimal adequate model performs significantly better than the initial minimal base-line model. Another way to extract the model likelihood test statistics is to use an ANOVA to compare the final minimal adequate model to the minimal base-line model.</p>
@@ -1434,9 +1437,9 @@ modelChi; chidf; chisq.prob</code></pre>
 ## 
 ## Model 1: EH ~ 1
 ## Model 2: EH ~ Age + Gender
-##   Resid. Df Resid. Dev Df Deviance            Pr(&gt;Chi)    
-## 1     25820      33008                                    
-## 2     25818      32140  2      868 &lt;0.0000000000000002 ***
+##   Resid. Df Resid. Dev Df Deviance  Pr(&gt;Chi)    
+## 1     25820      33008                          
+## 2     25818      32140  2   868.21 &lt; 2.2e-16 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>In a next step, we calculate pseudo-R<sup>2</sup> values which represent the amount of residual variance that is explained by the final minimal adequate model. We cannot use the ordinary R<sup>2</sup> because the model works on the logged likelihoods rather than the values of the dependent variable.</p>
@@ -1466,10 +1469,10 @@ logisticPseudoR2s(lr.glm)</code></pre>
 <p>The low pseudo-R<sup>2</sup> values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the variance in the logged likelihoods (to get the percentages, you simply multiply the pseudo-R<sup>2</sup> values by 100). Next, we extract the confidence intervals for the coefficients of the model.</p>
 <pre class="r"><code># extract the confidence intervals for the coefficients
 confint(lr.glm)</code></pre>
-<pre><code>##               2.5 %  97.5 %
-## (Intercept) -0.2761 -0.1888
-## AgeOld      -0.8965 -0.7651
-## GenderWomen -0.4735 -0.3667</code></pre>
+<pre><code>##                  2.5 %     97.5 %
+## (Intercept) -0.2760509 -0.1887787
+## AgeOld      -0.8964864 -0.7650958
+## GenderWomen -0.4735310 -0.3667038</code></pre>
 <p>Despite having low explanatory and predictive power, the age of speakers and their gender are significant as the confidence intervals of the coefficients do not overlap with 0.</p>
 </div>
 <div id="effect-size" class="section level2">
@@ -1477,12 +1480,12 @@ confint(lr.glm)</code></pre>
 <p>In a next step, we compute odds ratios and their confidence intervals. Odds Ratios represent a common measure of effect size and can be used to compare effect sizes across models. Odds ratios rang between 0 and infinity. Values of 1 indicate that there is no effect. The further away the values are from 1, the stronger the effect. If the values are lower than 1, then the variable level correlates negatively with the occurrence of the outcome (the likelihood decreases) while values above 1 indicate a positive correlation and show that the variable level causes an increase in the likelihood of the outcome (the occurrence of EH).</p>
 <pre class="r"><code>exp(lr.glm$coefficients) # odds ratios</code></pre>
 <pre><code>## (Intercept)      AgeOld GenderWomen 
-##      0.7926      0.4358      0.6570</code></pre>
+##   0.7926425   0.4358154   0.6569723</code></pre>
 <pre class="r"><code>exp(confint(lr.glm))     # confidence intervals of the coefficients</code></pre>
-<pre><code>##              2.5 % 97.5 %
-## (Intercept) 0.7588 0.8280
-## AgeOld      0.4080 0.4653
-## GenderWomen 0.6228 0.6930</code></pre>
+<pre><code>##                 2.5 %    97.5 %
+## (Intercept) 0.7587743 0.8279697
+## AgeOld      0.4080007 0.4652893
+## GenderWomen 0.6227993 0.6930149</code></pre>
 <p>The odds ratios confirm that older speakers use <em>EH</em> significantly less often compared with younger speakers and that women use <em>EH</em> less frequently than men as the confidence intervals of the odds rations do not overlap with 1. In a next step, we calculate the prediction accuracy of the model.</p>
 </div>
 <div id="accuracy" class="section level2">
@@ -1493,7 +1496,7 @@ blrdata_byspeaker &lt;- data.frame(rownames(blrdata_byspeaker), blrdata_byspeake
 names(blrdata_byspeaker) &lt;- c(&quot;ID&quot;, &quot;NOEH&quot;, &quot;EH&quot;)
 rownames(blrdata_byspeaker) &lt;- 1:length(blrdata_byspeaker[,1])
 
-blrdata_byspeaker &lt;- join(blrdata_byspeaker,  # join by-speaker data and biodata
+blrdata_byspeaker &lt;- plyr::join(blrdata_byspeaker,  # join by-speaker data and biodata
                           blrdata, by = &quot;ID&quot;, # join by ID
                           type = &quot;left&quot;,      # only speakers for which bio data is provided
                           match = &quot;first&quot;)    #
@@ -1567,7 +1570,7 @@ correct &lt;- sum(blrdata_byspeaker$EH * (predict(lr.glm.spk, type = &quot;respo
 tot &lt;- sum(blrdata_byspeaker$EH) + sum(blrdata_byspeaker$NOEH)
 predict.acc &lt;- (correct/tot)*100
 predict.acc</code></pre>
-<pre><code>## [1] 99.6</code></pre>
+<pre><code>## [1] 99.60424</code></pre>
 <p>The models predicts 99.6 of cases accurately which appears to be a satisfactory result but in order to evaluate the prediction accuracy, we need to compare it to the accuracy of the minimal base-line model.</p>
 <pre class="r"><code># extract prediction accuracy
 lr.glm.spk.base &lt;- glm(cbind(EH, NOEH) ~ 1, data = blrdata_byspeaker, family = binomial)
@@ -1576,7 +1579,7 @@ tot.b &lt;- sum(blrdata_byspeaker$EH) + sum(blrdata_byspeaker$NOEH)
 predict.acc.base &lt;- (correct.b/tot.b)*100
 # inspect prediction accuracy
 predict.acc.base</code></pre>
-<pre><code>## [1] 99.6</code></pre>
+<pre><code>## [1] 99.60424</code></pre>
 <p>Both, the final-minimal and the minimal base-line model have the same prediction accuracy. This is interesting and we need to determine why this is the case. We will extract the predictions based on both models to find out why the predictions are identical.</p>
 <pre class="r"><code># compare preictions of final and base line model
 which(lr.glm.spk$fitted &gt; .5)</code></pre>
@@ -1598,25 +1601,25 @@ caret::confusionMatrix(blrdata$Prediction, blrdata$EH)</code></pre>
 ## Prediction     0     1
 ##          0 17114  8707
 ##          1     0     0
-##                                              
-##                Accuracy : 0.663              
-##                  95% CI : (0.657, 0.669)     
-##     No Information Rate : 0.663              
-##     P-Value [Acc &gt; NIR] : 0.503              
-##                                              
-##                   Kappa : 0                  
-##  Mcnemar&#39;s Test P-Value : &lt;0.0000000000000002
-##                                              
-##             Sensitivity : 1.000              
-##             Specificity : 0.000              
-##          Pos Pred Value : 0.663              
-##          Neg Pred Value :   NaN              
-##              Prevalence : 0.663              
-##          Detection Rate : 0.663              
-##    Detection Prevalence : 1.000              
-##       Balanced Accuracy : 0.500              
-##                                              
-##        &#39;Positive&#39; Class : 0                  
+##                                          
+##                Accuracy : 0.6628         
+##                  95% CI : (0.657, 0.6686)
+##     No Information Rate : 0.6628         
+##     P-Value [Acc &gt; NIR] : 0.5029         
+##                                          
+##                   Kappa : 0              
+##  Mcnemar&#39;s Test P-Value : &lt;2e-16         
+##                                          
+##             Sensitivity : 1.0000         
+##             Specificity : 0.0000         
+##          Pos Pred Value : 0.6628         
+##          Neg Pred Value :    NaN         
+##              Prevalence : 0.6628         
+##          Detection Rate : 0.6628         
+##    Detection Prevalence : 1.0000         
+##       Balanced Accuracy : 0.5000         
+##                                          
+##        &#39;Positive&#39; Class : 0              
 ## </code></pre>
 <p>We can now plot the effects using the visreg package <span class="citation">(cf. <span class="citeproc-not-found" data-reference-id="Breheny2013"><strong>???</strong></span>)</span></p>
 <pre class="r"><code># create plot
@@ -1651,18 +1654,17 @@ ggplot(blrdata, aes(Age, Predicted, color = Gender)) +
 <p>To check whether the final minimal model contains predictors that correlate with each other, we extract variance inflation factors (VIF). If a model contains predictors that have variance inflation factors (VIF) &gt; 10 the model is completely unreliable and cannot claim the multicollinearity is absent <span class="citation">(Myers <a href="#ref-myers1990classical">1990</a>)</span>. Predictors causing such VIFs should be removed. Indeed, predictors with VIF values greater than 4 are usually already problematic but, for large data sets, even VIFs greater than 2 can lead inflated standard errors (Jaeger 2013:<a href="http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&amp;do=view&amp;target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf" class="uri">http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&amp;do=view&amp;target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf</a>). Also, VIFs of 2.5 can be problematic <span class="citation">(Szmrecsanyi <a href="#ref-szmrecsanyi2006morphosyntactic">2006</a>, 215)</span> and <span class="citation">(Zuur, Ieno, and Elphick <a href="#ref-zuur2010protocol">2010</a>)</span> proposes that variables with VIFs exceeding 3 should be removed.</p>
 <pre class="r"><code>vif(lr.glm)</code></pre>
 <pre><code>##      AgeOld GenderWomen 
-##       1.005       1.005</code></pre>
+##    1.004815    1.004815</code></pre>
 <p>In addition, predictors with 1/VIF values <span class="math inline">\(&lt;\)</span> .1 must be removed (data points with values above .2 are considered problematic) <span class="citation">(Menard <a href="#ref-menard1995applied">1995</a>)</span> and the mean value of VIFs should be <span class="math inline">\(&lt;\)</span> 1 <span class="citation">(Bowerman and O’Connell <a href="#ref-bowerman1990linear">1990</a>)</span>.</p>
 <pre class="r"><code>mean(vif(lr.glm))</code></pre>
-<pre><code>## [1] 1.005</code></pre>
+<pre><code>## [1] 1.004815</code></pre>
 </div>
 <div id="outlier-detection-1" class="section level3">
 <h3><span class="header-section-number">4.7.2</span> Outlier detection</h3>
 <p>In order to detect potential outliers, we will calculate diagnostic parameters and add these to our data set.</p>
 <pre class="r"><code>infl &lt;- influence.measures(lr.glm) # calculate influence statistics
 blrdata &lt;- data.frame(blrdata, infl[[1]], infl[[2]]) # add influence statistics</code></pre>
-<pre class="r"><code>library(knitr)    # load library
-kable(head(blrdata), caption = &quot;First six rows of the data set with added influence statistics.&quot;)</code></pre>
+<pre class="r"><code>kable(head(blrdata), caption = &quot;First six rows of the data set with added influence statistics.&quot;)</code></pre>
 <table>
 <caption>First six rows of the data set with added influence statistics.</caption>
 <thead>
@@ -1698,14 +1700,14 @@ kable(head(blrdata), caption = &quot;First six rows of the data set with added i
 <td align="left">Pakeha</td>
 <td align="left">0</td>
 <td align="left">0</td>
-<td align="right">0.4422</td>
-<td align="right">-0.0107</td>
-<td align="right">0.0038</td>
-<td align="right">0.0079</td>
-<td align="right">-0.0107</td>
-<td align="right">1</td>
-<td align="right">0.0000</td>
-<td align="right">0.0001</td>
+<td align="right">0.4421643</td>
+<td align="right">-0.0107085</td>
+<td align="right">0.0037625</td>
+<td align="right">0.0079286</td>
+<td align="right">-0.0107085</td>
+<td align="right">1.000129</td>
+<td align="right">3.23e-05</td>
+<td align="right">0.0001223</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
@@ -1721,14 +1723,14 @@ kable(head(blrdata), caption = &quot;First six rows of the data set with added i
 <td align="left">Pakeha</td>
 <td align="left">1</td>
 <td align="left">0</td>
-<td align="right">0.4422</td>
-<td align="right">0.0127</td>
-<td align="right">-0.0044</td>
-<td align="right">-0.0094</td>
-<td align="right">0.0127</td>
-<td align="right">1</td>
-<td align="right">0.0001</td>
-<td align="right">0.0001</td>
+<td align="right">0.4421643</td>
+<td align="right">0.0126620</td>
+<td align="right">-0.0044489</td>
+<td align="right">-0.0093751</td>
+<td align="right">0.0126620</td>
+<td align="right">1.000086</td>
+<td align="right">5.14e-05</td>
+<td align="right">0.0001223</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
@@ -1744,14 +1746,14 @@ kable(head(blrdata), caption = &quot;First six rows of the data set with added i
 <td align="left">Pakeha</td>
 <td align="left">0</td>
 <td align="left">0</td>
-<td align="right">0.4422</td>
-<td align="right">-0.0107</td>
-<td align="right">0.0038</td>
-<td align="right">0.0079</td>
-<td align="right">-0.0107</td>
-<td align="right">1</td>
-<td align="right">0.0000</td>
-<td align="right">0.0001</td>
+<td align="right">0.4421643</td>
+<td align="right">-0.0107085</td>
+<td align="right">0.0037625</td>
+<td align="right">0.0079286</td>
+<td align="right">-0.0107085</td>
+<td align="right">1.000129</td>
+<td align="right">3.23e-05</td>
+<td align="right">0.0001223</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
@@ -1767,14 +1769,14 @@ kable(head(blrdata), caption = &quot;First six rows of the data set with added i
 <td align="left">Pakeha</td>
 <td align="left">0</td>
 <td align="left">0</td>
-<td align="right">0.4422</td>
-<td align="right">-0.0107</td>
-<td align="right">0.0038</td>
-<td align="right">0.0079</td>
-<td align="right">-0.0107</td>
-<td align="right">1</td>
-<td align="right">0.0000</td>
-<td align="right">0.0001</td>
+<td align="right">0.4421643</td>
+<td align="right">-0.0107085</td>
+<td align="right">0.0037625</td>
+<td align="right">0.0079286</td>
+<td align="right">-0.0107085</td>
+<td align="right">1.000129</td>
+<td align="right">3.23e-05</td>
+<td align="right">0.0001223</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
@@ -1790,14 +1792,14 @@ kable(head(blrdata), caption = &quot;First six rows of the data set with added i
 <td align="left">Pakeha</td>
 <td align="left">1</td>
 <td align="left">0</td>
-<td align="right">0.4422</td>
-<td align="right">0.0127</td>
-<td align="right">-0.0044</td>
-<td align="right">-0.0094</td>
-<td align="right">0.0127</td>
-<td align="right">1</td>
-<td align="right">0.0001</td>
-<td align="right">0.0001</td>
+<td align="right">0.4421643</td>
+<td align="right">0.0126620</td>
+<td align="right">-0.0044489</td>
+<td align="right">-0.0093751</td>
+<td align="right">0.0126620</td>
+<td align="right">1.000086</td>
+<td align="right">5.14e-05</td>
+<td align="right">0.0001223</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
@@ -1813,14 +1815,14 @@ kable(head(blrdata), caption = &quot;First six rows of the data set with added i
 <td align="left">Pakeha</td>
 <td align="left">1</td>
 <td align="left">0</td>
-<td align="right">0.4422</td>
-<td align="right">0.0127</td>
-<td align="right">-0.0044</td>
-<td align="right">-0.0094</td>
-<td align="right">0.0127</td>
-<td align="right">1</td>
-<td align="right">0.0001</td>
-<td align="right">0.0001</td>
+<td align="right">0.4421643</td>
+<td align="right">0.0126620</td>
+<td align="right">-0.0044489</td>
+<td align="right">-0.0093751</td>
+<td align="right">0.0126620</td>
+<td align="right">1.000086</td>
+<td align="right">5.14e-05</td>
+<td align="right">0.0001223</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
 <td align="left">FALSE</td>
@@ -1904,14 +1906,8 @@ blrmsummary[, -c(4:5)] # remove columns with confidence intervals</code></pre>
 </div>
 <div id="ordinal-regression" class="section level1">
 <h1><span class="header-section-number">5</span> Ordinal Regression</h1>
-<p>Ordinal regression is very similar to multiple linear regression but takes an ordinal dependent variable. For this reason, ordinal regression is one of the key methods in analyzing Likert data.</p>
-<pre class="r"><code># load libraries
-library(foreign)
-library(ggplot2)
-library(MASS)
-library(Hmisc)
-library(reshape2)
-# load data
+<p>Ordinal regression is very similar to multiple linear regression but takes an ordinal dependent variable <span class="citation">(Agresti <a href="#ref-agresti2010analysis">2010</a>)</span>. For this reason, ordinal regression is one of the key methods in analyzing Likert data.</p>
+<pre class="r"><code># load data
 ordata &lt;- read.delim(&quot;https://slcladal.github.io/data/ordinaldata.txt&quot;, sep = &quot;\t&quot;, header = T)
 colnames(ordata) &lt;- c(&quot;Recommend&quot;, &quot;Internal&quot;, &quot;Exchange&quot;, &quot;FinalScore&quot;)
 # inspect data
@@ -1960,8 +1956,8 @@ ftable(xtabs(~ Exchange + Recommend + Internal, data = ordata))</code></pre>
 ##          very likely                7   3</code></pre>
 <pre class="r"><code>summary(ordata$FinalScore); sd(ordata$FinalScore)</code></pre>
 <pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##    1.90    2.72    2.99    3.00    3.27    4.00</code></pre>
-<pre><code>## [1] 0.3979</code></pre>
+##   1.900   2.720   2.990   2.999   3.270   4.000</code></pre>
+<pre><code>## [1] 0.3979409</code></pre>
 <pre class="r"><code># visualize data
 ggplot(ordata, aes(x = Recommend, y = FinalScore)) +
   geom_boxplot(size = .75) +
@@ -1978,156 +1974,147 @@ summary(m)</code></pre>
 ##     data = ordata, Hess = TRUE)
 ## 
 ## Coefficients:
-##              Value Std. Error t value
-## Internal    1.0477      0.266   3.942
-## Exchange   -0.0588      0.298  -0.197
-## FinalScore  0.6159      0.261   2.363
+##               Value Std. Error t value
+## Internal    1.04769     0.2658  3.9418
+## Exchange   -0.05879     0.2979 -0.1974
+## FinalScore  0.61594     0.2606  2.3632
 ## 
 ## Intercepts:
-##                             Value  Std. Error t value
-## unlikely|somewhat likely     2.204  0.780      2.827 
-## somewhat likely|very likely  4.299  0.804      5.345 
+##                             Value   Std. Error t value
+## unlikely|somewhat likely     2.2039  0.7795     2.8272
+## somewhat likely|very likely  4.2994  0.8043     5.3453
 ## 
-## Residual Deviance: 717.02 
-## AIC: 727.02</code></pre>
+## Residual Deviance: 717.0249 
+## AIC: 727.0249</code></pre>
 <pre class="r"><code>## store table
 (ctable &lt;- coef(summary(m)))</code></pre>
-<pre><code>##                                Value Std. Error t value
-## Internal                     1.04769     0.2658  3.9418
-## Exchange                    -0.05879     0.2979 -0.1974
-## FinalScore                   0.61594     0.2606  2.3632
-## unlikely|somewhat likely     2.20391     0.7795  2.8272
-## somewhat likely|very likely  4.29936     0.8043  5.3453</code></pre>
+<pre><code>##                                   Value Std. Error    t value
+## Internal                     1.04769010  0.2657894  3.9418050
+## Exchange                    -0.05878572  0.2978614 -0.1973593
+## FinalScore                   0.61594057  0.2606340  2.3632399
+## unlikely|somewhat likely     2.20391473  0.7795455  2.8271792
+## somewhat likely|very likely  4.29936315  0.8043267  5.3452947</code></pre>
 <pre class="r"><code>## calculate and store p values
 p &lt;- pnorm(abs(ctable[, &quot;t value&quot;]), lower.tail = FALSE) * 2
 
 ## combined table
 (ctable &lt;- cbind(ctable, &quot;p value&quot; = p))</code></pre>
-<pre><code>##                                Value Std. Error t value       p value
-## Internal                     1.04769     0.2658  3.9418 0.00008087072
-## Exchange                    -0.05879     0.2979 -0.1974 0.84354636407
-## FinalScore                   0.61594     0.2606  2.3632 0.01811593663
-## unlikely|somewhat likely     2.20391     0.7795  2.8272 0.00469600407
-## somewhat likely|very likely  4.29936     0.8043  5.3453 0.00000009027</code></pre>
+<pre><code>##                                   Value Std. Error    t value      p value
+## Internal                     1.04769010  0.2657894  3.9418050 8.087072e-05
+## Exchange                    -0.05878572  0.2978614 -0.1973593 8.435464e-01
+## FinalScore                   0.61594057  0.2606340  2.3632399 1.811594e-02
+## unlikely|somewhat likely     2.20391473  0.7795455  2.8271792 4.696004e-03
+## somewhat likely|very likely  4.29936315  0.8043267  5.3452947 9.027008e-08</code></pre>
 <pre class="r"><code># default method gives profiled CIs
 (ci &lt;- confint(m)) </code></pre>
-<pre><code>##              2.5 % 97.5 %
-## Internal    0.5282 1.5722
-## Exchange   -0.6522 0.5191
-## FinalScore  0.1076 1.1309</code></pre>
+<pre><code>##                 2.5 %    97.5 %
+## Internal    0.5281768 1.5721750
+## Exchange   -0.6522060 0.5191384
+## FinalScore  0.1076202 1.1309148</code></pre>
 <pre class="r"><code># CIs assuming normality
 confint.default(m) </code></pre>
-<pre><code>##              2.5 % 97.5 %
-## Internal    0.5268  1.569
-## Exchange   -0.6426  0.525
-## FinalScore  0.1051  1.127</code></pre>
+<pre><code>##                 2.5 %    97.5 %
+## Internal    0.5267524 1.5686278
+## Exchange   -0.6425833 0.5250119
+## FinalScore  0.1051074 1.1267737</code></pre>
 <pre class="r"><code>## odds ratios
 exp(coef(m))</code></pre>
 <pre><code>##   Internal   Exchange FinalScore 
-##     2.8511     0.9429     1.8514</code></pre>
+##  2.8510579  0.9429088  1.8513972</code></pre>
 <pre class="r"><code>## OR and CI
 exp(cbind(OR = coef(m), ci))</code></pre>
-<pre><code>##                OR  2.5 % 97.5 %
-## Internal   2.8511 1.6958  4.817
-## Exchange   0.9429 0.5209  1.681
-## FinalScore 1.8514 1.1136  3.098</code></pre>
-<p>References</p>
-<pre><code>Agresti, A. (1996) An Introduction to Categorical Data Analysis. New York: John Wiley &amp; Sons, Inc
-Agresti, A. (2002) Categorical Data Analysis, Second Edition. Hoboken, New Jersey: John Wiley &amp; Sons, Inc.
-Harrell, F. E, (2001) Regression Modeling Strategies. New York: Springer-Verlag.
-Liao, T. F. (1994) Interpreting Probability Models: Logit, Probit, and Other Generalized Linear Models. Thousand Oaks, CA: Sage Publications, Inc.
-Powers, D. and Xie, Yu. Statistical Methods for Categorical Data Analysis.  Bingley, UK: Emerald Group Publishing Limited.</code></pre>
+<pre><code>##                   OR     2.5 %   97.5 %
+## Internal   2.8510579 1.6958376 4.817114
+## Exchange   0.9429088 0.5208954 1.680579
+## FinalScore 1.8513972 1.1136247 3.098490</code></pre>
 </div>
 <div id="poisson-regression" class="section level1">
 <h1><span class="header-section-number">6</span> Poisson Regression</h1>
 <p>Poisson regressions are used to analyze data where the dependent variable represents counts. However, the tricky thing about Poisson regressions is that the data has to conform to the Poisson distribution which is, accroding to my experience, rarely the case, unfortunately.</p>
-<pre class="r"><code># load libraries
-library(ggplot2)
-library(sandwich)
-library(msm)
-# load data
-poissondata &lt;- read.delim(&quot;data/poissondata.txt&quot;, sep = &quot;\t&quot;, header = T, skipNul = T, quote = &quot;&quot;)
+<pre class="r"><code># load data
+poissondata &lt;- read.delim(&quot;data/posdata.txt&quot;, sep = &quot;\t&quot;, header = T, skipNul = T, quote = &quot;&quot;)
 # inspect data
 summary(poissondata)</code></pre>
-<pre><code>##        Id            Awards         Progression    MathScore   
-##  Min.   :  1.0   Min.   :0.00   Academic  :105   Min.   :33.0  
-##  1st Qu.: 50.8   1st Qu.:0.00   General   : 45   1st Qu.:45.0  
-##  Median :100.5   Median :0.00   Vocational: 50   Median :52.0  
-##  Mean   :100.5   Mean   :0.63                    Mean   :52.6  
-##  3rd Qu.:150.2   3rd Qu.:1.00                    3rd Qu.:59.0  
-##  Max.   :200.0   Max.   :6.00                    Max.   :75.0</code></pre>
+<pre><code>##        Id             Pauses        Language      Alcohol     
+##  Min.   :  1.00   Min.   :0.00   English:105   Min.   :33.00  
+##  1st Qu.: 50.75   1st Qu.:0.00   German : 50   1st Qu.:45.00  
+##  Median :100.50   Median :0.00   Russian: 45   Median :52.00  
+##  Mean   :100.50   Mean   :0.63                 Mean   :52.65  
+##  3rd Qu.:150.25   3rd Qu.:1.00                 3rd Qu.:59.00  
+##  Max.   :200.00   Max.   :6.00                 Max.   :75.00</code></pre>
 <p>We will clean the data by factorizing Id which is currentlx considered a numeric variable rather than a factor.</p>
 <pre class="r"><code># process data
 poissondata &lt;- poissondata %&gt;%
   mutate(Id = factor(Id, levels = 1:200, labels = 1:200))
 # inspect data
 summary(poissondata); str(poissondata)</code></pre>
-<pre><code>##        Id          Awards         Progression    MathScore   
-##  1      :  1   Min.   :0.00   Academic  :105   Min.   :33.0  
-##  2      :  1   1st Qu.:0.00   General   : 45   1st Qu.:45.0  
-##  3      :  1   Median :0.00   Vocational: 50   Median :52.0  
-##  4      :  1   Mean   :0.63                    Mean   :52.6  
-##  5      :  1   3rd Qu.:1.00                    3rd Qu.:59.0  
-##  6      :  1   Max.   :6.00                    Max.   :75.0  
+<pre><code>##        Id          Pauses        Language      Alcohol     
+##  1      :  1   Min.   :0.00   English:105   Min.   :33.00  
+##  2      :  1   1st Qu.:0.00   German : 50   1st Qu.:45.00  
+##  3      :  1   Median :0.00   Russian: 45   Median :52.00  
+##  4      :  1   Mean   :0.63                 Mean   :52.65  
+##  5      :  1   3rd Qu.:1.00                 3rd Qu.:59.00  
+##  6      :  1   Max.   :6.00                 Max.   :75.00  
 ##  (Other):194</code></pre>
 <pre><code>## &#39;data.frame&#39;:    200 obs. of  4 variables:
-##  $ Id         : Factor w/ 200 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;,..: 45 108 15 67 153 51 164 133 2 53 ...
-##  $ Awards     : int  0 0 0 0 0 0 0 0 0 0 ...
-##  $ Progression: Factor w/ 3 levels &quot;Academic&quot;,&quot;General&quot;,..: 3 2 3 3 3 2 3 3 3 3 ...
-##  $ MathScore  : int  41 41 44 42 40 42 46 40 33 46 ...</code></pre>
+##  $ Id      : Factor w/ 200 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;,..: 45 108 15 67 153 51 164 133 2 53 ...
+##  $ Pauses  : int  0 0 0 0 0 0 0 0 0 0 ...
+##  $ Language: Factor w/ 3 levels &quot;English&quot;,&quot;German&quot;,..: 2 3 2 2 2 3 2 2 2 2 ...
+##  $ Alcohol : int  41 41 44 42 40 42 46 40 33 46 ...</code></pre>
 <p>First, we check if the conditions for a Poisson regression are met.</p>
 <pre class="r"><code># output the results
-gf = goodfit(poissondata$Awards,type= &quot;poisson&quot;,method= &quot;ML&quot;)
+gf = goodfit(poissondata$Pauses,type= &quot;poisson&quot;,method= &quot;ML&quot;)
 summary(gf)</code></pre>
 <pre><code>## 
 ##   Goodness-of-fit test for poisson distribution
 ## 
-##                    X^2 df    P(&gt; X^2)
-## Likelihood Ratio 33.01  5 0.000003742</code></pre>
+##                       X^2 df     P(&gt; X^2)
+## Likelihood Ratio 33.01229  5 3.742341e-06</code></pre>
 <p>If the p-values is smaller than .05, then data is not Poisson distributed which means that it differs significantly from a Poisson distribution and is very likely overdispersed. We will check the divergence froma Poisson distribution visually by plotting the observed counts against the expected counts if the data were Poisson distributed.</p>
 <pre class="r"><code>plot(gf,main=&quot;Count data vs Poisson distribution&quot;)</code></pre>
 <p><img src="fixedregressions_files/figure-html/pr4-1.png" width="672" /></p>
 <p>Although the goodfit function reported that the data differs significantly from the Poisson distribution, the fit is rather good. We can use an additional Levene’s test to check if variance homogeity is given.</p>
 <pre class="r"><code># check homogeneity
-leveneTest(poissondata$Awards, poissondata$Progression, center = mean)</code></pre>
+leveneTest(poissondata$Pauses, poissondata$Language, center = mean)</code></pre>
 <pre><code>## Levene&#39;s Test for Homogeneity of Variance (center = mean)
-##        Df F value     Pr(&gt;F)    
-## group   2    17.1 0.00000014 ***
-##       197                       
+##        Df F value    Pr(&gt;F)    
+## group   2  17.153 1.357e-07 ***
+##       197                      
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>The Levene’s test indicates that variance homogeneity is also violated. Since both the approximation to a Poisson distributuion and variance homogeineity are violated, we should switch either to a quasi-Poisson model or a negative binomial model. However, as we are only intersted in how to implement a Poisson model here, we continue despite the fact that this could not be recommended if we were actually interested in accurate results based on a reliable model.</p>
 <p>In a next step, we summarize Progression by inspecting the means and standard deviations of the individual variable levels.</p>
 <pre class="r"><code># extract mean and standard devaiation
-with(poissondata, tapply(Awards, Progression, function(x) {
+with(poissondata, tapply(Pauses, Language, function(x) {
   sprintf(&quot;M (SD) = %1.2f (%1.2f)&quot;, mean(x), sd(x))
 }))</code></pre>
-<pre><code>##               Academic                General             Vocational 
-## &quot;M (SD) = 1.00 (1.28)&quot; &quot;M (SD) = 0.20 (0.40)&quot; &quot;M (SD) = 0.24 (0.52)&quot;</code></pre>
+<pre><code>##                English                 German                Russian 
+## &quot;M (SD) = 1.00 (1.28)&quot; &quot;M (SD) = 0.24 (0.52)&quot; &quot;M (SD) = 0.20 (0.40)&quot;</code></pre>
 <p>Now, we visualize the data.</p>
 <pre class="r"><code># plot data
-ggplot(poissondata, aes(Awards, fill = Progression)) +
-  geom_histogram(binwidth=.5, position=&quot;dodge&quot;)</code></pre>
+ggplot(poissondata, aes(Pauses, fill = Language)) +
+  geom_histogram(binwidth=.5, position=&quot;dodge&quot;)+
+  scale_fill_manual(values=c(&quot;gray30&quot;, &quot;gray50&quot;, &quot;gray70&quot;))</code></pre>
 <p><img src="fixedregressions_files/figure-html/pr7-1.png" width="672" /></p>
 <pre class="r"><code># calculate poissant regression
-m1.poisson &lt;- glm(Awards ~ Progression + MathScore, family=&quot;poisson&quot;, data=poissondata)
+m1.poisson &lt;- glm(Pauses ~ Language + Alcohol, family=&quot;poisson&quot;, data=poissondata)
 # inspect model
 summary(m1.poisson)</code></pre>
 <pre><code>## 
 ## Call:
-## glm(formula = Awards ~ Progression + MathScore, family = &quot;poisson&quot;, 
+## glm(formula = Pauses ~ Language + Alcohol, family = &quot;poisson&quot;, 
 ##     data = poissondata)
 ## 
 ## Deviance Residuals: 
-##    Min      1Q  Median      3Q     Max  
-## -2.204  -0.844  -0.511   0.256   2.680  
+##     Min       1Q   Median       3Q      Max  
+## -2.2043  -0.8436  -0.5106   0.2558   2.6796  
 ## 
 ## Coefficients:
-##                       Estimate Std. Error z value       Pr(&gt;|z|)    
-## (Intercept)            -4.1633     0.6629   -6.28 0.000000000337 ***
-## ProgressionGeneral     -1.0839     0.3583   -3.03         0.0025 ** 
-## ProgressionVocational  -0.7140     0.3200   -2.23         0.0257 *  
-## MathScore               0.0702     0.0106    6.62 0.000000000036 ***
+##                 Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)     -4.16327    0.66288  -6.281 3.37e-10 ***
+## LanguageGerman  -0.71405    0.32001  -2.231  0.02566 *  
+## LanguageRussian -1.08386    0.35825  -3.025  0.00248 ** 
+## Alcohol          0.07015    0.01060   6.619 3.63e-11 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 ## 
@@ -2147,26 +2134,26 @@ LL = coef(m1.poisson) - 1.96 * std.err,
 UL = coef(m1.poisson) + 1.96 * std.err)
 # inspect data
 r.est</code></pre>
-<pre><code>##                       Estimate Robust SE         Pr(&gt;|z|)      LL       UL
-## (Intercept)           -4.16327   0.64809 0.00000000013286 -5.4335 -2.89300
-## ProgressionGeneral    -1.08386   0.32105 0.00073547448242 -1.7131 -0.45460
-## ProgressionVocational -0.71405   0.29864 0.01680312040112 -1.2994 -0.12871
-## MathScore              0.07015   0.01044 0.00000000001784  0.0497  0.09061</code></pre>
+<pre><code>##                   Estimate  Robust SE     Pr(&gt;|z|)          LL          UL
+## (Intercept)     -4.1632653 0.64809429 1.328638e-10 -5.43353007 -2.89300044
+## LanguageGerman  -0.7140499 0.29864225 1.680312e-02 -1.29938873 -0.12871111
+## LanguageRussian -1.0838591 0.32104816 7.354745e-04 -1.71311353 -0.45460476
+## Alcohol          0.0701524 0.01043516 1.783975e-11  0.04969947  0.09060532</code></pre>
 <pre class="r"><code>with(m1.poisson, cbind(res.deviance = deviance, df = df.residual,
   p = pchisq(deviance, df.residual, lower.tail=FALSE)))</code></pre>
-<pre><code>##      res.deviance  df      p
-## [1,]        189.4 196 0.6182</code></pre>
+<pre><code>##      res.deviance  df         p
+## [1,]     189.4496 196 0.6182274</code></pre>
 <pre class="r"><code>## update m1 model dropping prog
-m2.poisson &lt;- update(m1.poisson, . ~ . - Progression)
+m2.poisson &lt;- update(m1.poisson, . ~ . - Language)
 ## test model differences with chi square test
 anova(m2.poisson, m1.poisson, test=&quot;Chisq&quot;)</code></pre>
 <pre><code>## Analysis of Deviance Table
 ## 
-## Model 1: Awards ~ MathScore
-## Model 2: Awards ~ Progression + MathScore
-##   Resid. Df Resid. Dev Df Deviance Pr(&gt;Chi)    
-## 1       198        204                         
-## 2       196        189  2     14.6  0.00069 ***
+## Model 1: Pauses ~ Alcohol
+## Model 2: Pauses ~ Language + Alcohol
+##   Resid. Df Resid. Dev Df Deviance  Pr(&gt;Chi)    
+## 1       198     204.02                          
+## 2       196     189.45  2   14.572 0.0006852 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>s &lt;- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
@@ -2178,26 +2165,26 @@ rexp.est &lt;- exp(r.est[, -3])
 rexp.est[, &quot;Robust SE&quot;] &lt;- s
 
 rexp.est</code></pre>
-<pre><code>##                       Estimate Robust SE       LL      UL
-## (Intercept)            0.01556   0.01008 0.004368 0.05541
-## ProgressionGeneral     0.33829   0.10861 0.180304 0.63470
-## ProgressionVocational  0.48966   0.14623 0.272698 0.87923
-## MathScore              1.07267   0.01119 1.050955 1.09484</code></pre>
+<pre><code>##                   Estimate  Robust SE         LL         UL
+## (Intercept)     0.01555668 0.01008219 0.00436765 0.05540971
+## LanguageGerman  0.48965711 0.14623230 0.27269844 0.87922793
+## LanguageRussian 0.33828750 0.10860658 0.18030354 0.63469878
+## Alcohol         1.07267164 0.01119351 1.05095521 1.09483681</code></pre>
 <pre class="r"><code># extract predicted values
-(s1 &lt;- data.frame(MathScore = mean(poissondata$MathScore),
-  Progression = factor(1:3, levels = 1:3, labels = names(table(poissondata$Progression)))))</code></pre>
-<pre><code>##   MathScore Progression
-## 1     52.65    Academic
-## 2     52.65     General
-## 3     52.65  Vocational</code></pre>
+(s1 &lt;- data.frame(Alcohol = mean(poissondata$Alcohol),
+  Language = factor(1:3, levels = 1:3, labels = names(table(poissondata$Language)))))</code></pre>
+<pre><code>##   Alcohol Language
+## 1  52.645  English
+## 2  52.645   German
+## 3  52.645  Russian</code></pre>
 <pre class="r"><code>predict(m1.poisson, s1, type=&quot;response&quot;, se.fit=TRUE)</code></pre>
 <pre><code>## $fit
-##      1      2      3 
-## 0.6249 0.2114 0.3060 
+##         1         2         3 
+## 0.6249446 0.3060086 0.2114109 
 ## 
 ## $se.fit
-##       1       2       3 
-## 0.08628 0.07050 0.08834 
+##          1          2          3 
+## 0.08628117 0.08833706 0.07050108 
 ## 
 ## $residual.scale
 ## [1] 1</code></pre>
@@ -2205,48 +2192,45 @@ rexp.est</code></pre>
 poissondata$Predicted &lt;- predict(m1.poisson, type=&quot;response&quot;)
 
 ## order by program and then by math
-poissondata &lt;- poissondata[with(poissondata, order(Progression, MathScore)), ]</code></pre>
+poissondata &lt;- poissondata[with(poissondata, order(Language, Alcohol)), ]</code></pre>
 <pre class="r"><code>## create the plot
-ggplot(poissondata, aes(x = MathScore, y = Predicted, colour = Progression)) +
-  geom_point(aes(y = Awards), alpha=.5, 
+ggplot(poissondata, aes(x = Alcohol, y = Predicted, colour = Language)) +
+  geom_point(aes(y = Pauses), alpha=.5, 
              position=position_jitter(h=.2)) +
   geom_line(size = 1) +
-  labs(x = &quot;Math Score&quot;, y = &quot;Expected number of awards&quot;)</code></pre>
+  labs(x = &quot;Alcohol (ml)&quot;, y = &quot;Expected number of pauses&quot;)</code></pre>
 <p><img src="fixedregressions_files/figure-html/pr15-1.png" width="672" /></p>
 </div>
 <div id="robust-regression" class="section level1">
 <h1><span class="header-section-number">7</span> Robust Regression</h1>
-<pre class="r"><code># load libraries
-library(foreign)
-library(MASS)
-library(sfsmisc)
-# load data
+<p>Robust regressions are linear regressions with added weights <span class="citation">(Rousseeuw and Leroy <a href="#ref-rousseeuw2005robust">2005</a>)</span> and are thus used when a linear model is unduely affected by outliers but the data ponts should not be removed.</p>
+<pre class="r"><code># load data
 robustdata &lt;- read.delim(&quot;https://slcladal.github.io/data/robustdata.txt&quot;, sep = &quot;\t&quot;, header = T)
 # inspect data
 summary(robustdata)</code></pre>
-<pre><code>##       sid           state        crime          murder     
-##  Min.   : 1.0   ak     : 1   Min.   :  82   Min.   : 1.60  
-##  1st Qu.:13.5   al     : 1   1st Qu.: 326   1st Qu.: 3.90  
-##  Median :26.0   ar     : 1   Median : 515   Median : 6.80  
-##  Mean   :26.0   az     : 1   Mean   : 613   Mean   : 8.73  
-##  3rd Qu.:38.5   ca     : 1   3rd Qu.: 773   3rd Qu.:10.35  
-##  Max.   :51.0   co     : 1   Max.   :2922   Max.   :78.50  
-##                 (Other):45                                 
-##     pctmetro        pctwhite        pcths         poverty    
-##  Min.   : 24.0   Min.   :31.8   Min.   :64.3   Min.   : 8.0  
-##  1st Qu.: 49.5   1st Qu.:79.3   1st Qu.:73.5   1st Qu.:10.7  
-##  Median : 69.8   Median :87.6   Median :76.7   Median :13.1  
-##  Mean   : 67.4   Mean   :84.1   Mean   :76.2   Mean   :14.3  
-##  3rd Qu.: 84.0   3rd Qu.:92.6   3rd Qu.:80.1   3rd Qu.:17.4  
-##  Max.   :100.0   Max.   :98.5   Max.   :86.6   Max.   :26.4  
-##                                                              
-##      single    
-##  Min.   : 8.4  
-##  1st Qu.:10.1  
-##  Median :10.9  
-##  Mean   :11.3  
-##  3rd Qu.:12.1  
-##  Max.   :22.1  
+<pre><code>##       sid           state        crime            murder      
+##  Min.   : 1.0   ak     : 1   Min.   :  82.0   Min.   : 1.600  
+##  1st Qu.:13.5   al     : 1   1st Qu.: 326.5   1st Qu.: 3.900  
+##  Median :26.0   ar     : 1   Median : 515.0   Median : 6.800  
+##  Mean   :26.0   az     : 1   Mean   : 612.8   Mean   : 8.727  
+##  3rd Qu.:38.5   ca     : 1   3rd Qu.: 773.0   3rd Qu.:10.350  
+##  Max.   :51.0   co     : 1   Max.   :2922.0   Max.   :78.500  
+##                 (Other):45                                    
+##     pctmetro         pctwhite         pcths          poverty     
+##  Min.   : 24.00   Min.   :31.80   Min.   :64.30   Min.   : 8.00  
+##  1st Qu.: 49.55   1st Qu.:79.35   1st Qu.:73.50   1st Qu.:10.70  
+##  Median : 69.80   Median :87.60   Median :76.70   Median :13.10  
+##  Mean   : 67.39   Mean   :84.12   Mean   :76.22   Mean   :14.26  
+##  3rd Qu.: 83.95   3rd Qu.:92.60   3rd Qu.:80.10   3rd Qu.:17.40  
+##  Max.   :100.00   Max.   :98.50   Max.   :86.60   Max.   :26.40  
+##                                                                  
+##      single     
+##  Min.   : 8.40  
+##  1st Qu.:10.05  
+##  Median :10.90  
+##  Mean   :11.33  
+##  3rd Qu.:12.05  
+##  Max.   :22.10  
 ## </code></pre>
 <pre class="r"><code># create model
 slm &lt;- lm(crime ~ poverty + single, data = robustdata)
@@ -2257,20 +2241,20 @@ summary(slm)</code></pre>
 ## lm(formula = crime ~ poverty + single, data = robustdata)
 ## 
 ## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -811.1 -114.3  -22.4  121.9  689.8 
+##     Min      1Q  Median      3Q     Max 
+## -811.14 -114.27  -22.44  121.86  689.82 
 ## 
 ## Coefficients:
-##             Estimate Std. Error t value       Pr(&gt;|t|)    
-## (Intercept) -1368.19     187.21   -7.31 0.000000002479 ***
-## poverty         6.79       8.99    0.76           0.45    
-## single        166.37      19.42    8.57 0.000000000031 ***
+##              Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept) -1368.189    187.205  -7.308 2.48e-09 ***
+## poverty         6.787      8.989   0.755    0.454    
+## single        166.373     19.423   8.566 3.12e-11 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
 ## 
-## Residual standard error: 244 on 48 degrees of freedom
-## Multiple R-squared:  0.707,  Adjusted R-squared:  0.695 
-## F-statistic:   58 on 2 and 48 DF,  p-value: 0.000000000000158</code></pre>
+## Residual standard error: 243.6 on 48 degrees of freedom
+## Multiple R-squared:  0.7072, Adjusted R-squared:  0.695 
+## F-statistic: 57.96 on 2 and 48 DF,  p-value: 1.578e-13</code></pre>
 <p>We now check whether the model is well fitted using diagnostic plots.</p>
 <pre class="r"><code># create model diagnost plots
 opar &lt;- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
@@ -2287,42 +2271,42 @@ plot(slm, las = 1)</code></pre>
 r &lt;- stdres(slm)
 a &lt;- cbind(robustdata, d1, r)
 a[d1 &gt; 4/51, ]</code></pre>
-<pre><code>##    sid state crime murder pctmetro pctwhite pcths poverty single     d1
-## 1    1    ak   761    9.0     41.8     75.2  86.6     9.1   14.3 0.1255
-## 9    9    fl  1206    8.9     93.0     83.5  74.4    17.8   10.6 0.1426
-## 25  25    ms   434   13.5     30.7     63.3  64.3    24.7   14.7 0.6139
-## 51  51    dc  2922   78.5    100.0     31.8  73.1    26.4   22.1 2.6363
-##         r
-## 1  -1.397
-## 9   2.903
-## 25 -3.563
-## 51  2.616</code></pre>
+<pre><code>##    sid state crime murder pctmetro pctwhite pcths poverty single        d1
+## 1    1    ak   761    9.0     41.8     75.2  86.6     9.1   14.3 0.1254750
+## 9    9    fl  1206    8.9     93.0     83.5  74.4    17.8   10.6 0.1425891
+## 25  25    ms   434   13.5     30.7     63.3  64.3    24.7   14.7 0.6138721
+## 51  51    dc  2922   78.5    100.0     31.8  73.1    26.4   22.1 2.6362519
+##            r
+## 1  -1.397418
+## 9   2.902663
+## 25 -3.562990
+## 51  2.616447</code></pre>
 <pre class="r"><code>rabs &lt;- abs(r)
 a &lt;- cbind(robustdata, d1, r, rabs)
 asorted &lt;- a[order(-rabs), ]
 asorted[1:10, ]</code></pre>
-<pre><code>##    sid state crime murder pctmetro pctwhite pcths poverty single      d1
-## 25  25    ms   434   13.5     30.7     63.3  64.3    24.7   14.7 0.61387
-## 9    9    fl  1206    8.9     93.0     83.5  74.4    17.8   10.6 0.14259
-## 51  51    dc  2922   78.5    100.0     31.8  73.1    26.4   22.1 2.63625
-## 46  46    vt   114    3.6     27.0     98.4  80.8    10.0   11.0 0.04272
-## 26  26    mt   178    3.0     24.0     92.6  81.0    14.9   10.8 0.01676
-## 21  21    me   126    1.6     35.7     98.5  78.8    10.7   10.6 0.02233
-## 1    1    ak   761    9.0     41.8     75.2  86.6     9.1   14.3 0.12548
-## 31  31    nj   627    5.3    100.0     80.8  76.7    10.9    9.6 0.02229
-## 14  14    il   960   11.4     84.0     81.0  76.2    13.6   11.5 0.01266
-## 20  20    md   998   12.7     92.8     68.9  78.4     9.7   12.0 0.03570
-##         r  rabs
-## 25 -3.563 3.563
-## 9   2.903 2.903
-## 51  2.616 2.616
-## 46 -1.742 1.742
-## 26 -1.461 1.461
-## 21 -1.427 1.427
-## 1  -1.397 1.397
-## 31  1.354 1.354
-## 14  1.338 1.338
-## 20  1.287 1.287</code></pre>
+<pre><code>##    sid state crime murder pctmetro pctwhite pcths poverty single
+## 25  25    ms   434   13.5     30.7     63.3  64.3    24.7   14.7
+## 9    9    fl  1206    8.9     93.0     83.5  74.4    17.8   10.6
+## 51  51    dc  2922   78.5    100.0     31.8  73.1    26.4   22.1
+## 46  46    vt   114    3.6     27.0     98.4  80.8    10.0   11.0
+## 26  26    mt   178    3.0     24.0     92.6  81.0    14.9   10.8
+## 21  21    me   126    1.6     35.7     98.5  78.8    10.7   10.6
+## 1    1    ak   761    9.0     41.8     75.2  86.6     9.1   14.3
+## 31  31    nj   627    5.3    100.0     80.8  76.7    10.9    9.6
+## 14  14    il   960   11.4     84.0     81.0  76.2    13.6   11.5
+## 20  20    md   998   12.7     92.8     68.9  78.4     9.7   12.0
+##            d1         r     rabs
+## 25 0.61387212 -3.562990 3.562990
+## 9  0.14258909  2.902663 2.902663
+## 51 2.63625193  2.616447 2.616447
+## 46 0.04271548 -1.742409 1.742409
+## 26 0.01675501 -1.460885 1.460885
+## 21 0.02233128 -1.426741 1.426741
+## 1  0.12547500 -1.397418 1.397418
+## 31 0.02229184  1.354149 1.354149
+## 14 0.01265689  1.338192 1.338192
+## 20 0.03569623  1.287087 1.287087</code></pre>
 <pre class="r"><code># create robust regression model
 rmodel &lt;- rlm(crime ~ poverty + single, data = robustdata)
 # inspect model
@@ -2330,71 +2314,71 @@ summary(rmodel)</code></pre>
 <pre><code>## 
 ## Call: rlm(formula = crime ~ poverty + single, data = robustdata)
 ## Residuals:
-##    Min     1Q Median     3Q    Max 
-## -846.1 -125.8  -16.5  119.2  679.9 
+##     Min      1Q  Median      3Q     Max 
+## -846.09 -125.80  -16.49  119.15  679.94 
 ## 
 ## Coefficients:
-##             Value     Std. Error t value  
-## (Intercept) -1423.037   167.590     -8.491
-## poverty         8.868     8.047      1.102
-## single        168.986    17.388      9.719
+##             Value      Std. Error t value   
+## (Intercept) -1423.0373   167.5899    -8.4912
+## poverty         8.8677     8.0467     1.1020
+## single        168.9858    17.3878     9.7186
 ## 
-## Residual standard error: 182 on 48 degrees of freedom</code></pre>
+## Residual standard error: 181.8 on 48 degrees of freedom</code></pre>
 <pre class="r"><code>hweights &lt;- data.frame(state = robustdata$state, resid = rmodel$resid, weight = rmodel$w)
 hweights2 &lt;- hweights[order(rmodel$w), ]
 hweights2[1:15, ]</code></pre>
-<pre><code>##    state   resid weight
-## 25    ms -846.09 0.2890
-## 9     fl  679.94 0.3595
-## 46    vt -410.48 0.5956
-## 51    dc  376.34 0.6494
-## 26    mt -356.14 0.6865
-## 21    me -337.10 0.7252
-## 31    nj  331.12 0.7384
-## 14    il  319.10 0.7661
-## 1     ak -313.16 0.7807
-## 20    md  307.19 0.7958
-## 19    ma  291.21 0.8395
-## 18    la -266.96 0.9159
-## 2     al  105.40 1.0000
-## 3     ar   30.54 1.0000
-## 4     az  -43.25 1.0000</code></pre>
+<pre><code>##    state      resid    weight
+## 25    ms -846.08536 0.2889618
+## 9     fl  679.94327 0.3595480
+## 46    vt -410.48310 0.5955740
+## 51    dc  376.34468 0.6494131
+## 26    mt -356.13760 0.6864625
+## 21    me -337.09622 0.7252263
+## 31    nj  331.11603 0.7383578
+## 14    il  319.10036 0.7661169
+## 1     ak -313.15532 0.7807432
+## 20    md  307.19142 0.7958154
+## 19    ma  291.20817 0.8395172
+## 18    la -266.95752 0.9159411
+## 2     al  105.40319 1.0000000
+## 3     ar   30.53589 1.0000000
+## 4     az  -43.25299 1.0000000</code></pre>
 <pre class="r"><code>rr.bisquare &lt;- rlm(crime ~ poverty + single, data=robustdata, psi = psi.bisquare)
 summary(rr.bisquare)</code></pre>
 <pre><code>## 
 ## Call: rlm(formula = crime ~ poverty + single, data = robustdata, psi = psi.bisquare)
 ## Residuals:
-##    Min     1Q Median     3Q    Max 
-##   -906   -141    -15    115    668 
+##     Min      1Q  Median      3Q     Max 
+## -905.59 -140.97  -14.98  114.65  668.38 
 ## 
 ## Coefficients:
-##             Value     Std. Error t value  
-## (Intercept) -1535.334   164.506     -9.333
-## poverty        11.690     7.899      1.480
-## single        175.930    17.068     10.308
+##             Value      Std. Error t value   
+## (Intercept) -1535.3338   164.5062    -9.3330
+## poverty        11.6903     7.8987     1.4800
+## single        175.9303    17.0678    10.3077
 ## 
-## Residual standard error: 202 on 48 degrees of freedom</code></pre>
+## Residual standard error: 202.3 on 48 degrees of freedom</code></pre>
 <pre class="r"><code>biweights &lt;- data.frame(state = robustdata$state, 
                         resid = rr.bisquare$resid,
                         weight = rr.bisquare$w)
 biweights2 &lt;- biweights[order(rr.bisquare$w), ]
 biweights2[1:15, ]</code></pre>
-<pre><code>##    state  resid   weight
-## 25    ms -905.6 0.007653
-## 9     fl  668.4 0.252871
-## 46    vt -402.8 0.671495
-## 26    mt -360.9 0.731137
-## 31    nj  346.0 0.751348
-## 18    la -332.7 0.768938
-## 21    me -328.6 0.774103
-## 1     ak -325.9 0.777662
-## 14    il  313.1 0.793659
-## 20    md  308.8 0.799066
-## 19    ma  297.6 0.812597
-## 51    dc  260.6 0.854442
-## 50    wy -234.2 0.881661
-## 5     ca  201.4 0.911714
-## 10    ga -186.6 0.924033</code></pre>
+<pre><code>##    state     resid      weight
+## 25    ms -905.5931 0.007652565
+## 9     fl  668.3844 0.252870542
+## 46    vt -402.8031 0.671495418
+## 26    mt -360.8997 0.731136908
+## 31    nj  345.9780 0.751347695
+## 18    la -332.6527 0.768938330
+## 21    me -328.6143 0.774103322
+## 1     ak -325.8519 0.777662383
+## 14    il  313.1466 0.793658594
+## 20    md  308.7737 0.799065530
+## 19    ma  297.6068 0.812596833
+## 51    dc  260.6489 0.854441716
+## 50    wy -234.1952 0.881660897
+## 5     ca  201.4407 0.911713981
+## 10    ga -186.5799 0.924033113</code></pre>
 <p>After inspecting the weights, we also want to extract the p-values for the predictors. The p-values have to be calculated separately using the “f.robftest” fucntion from the “sfsmisc” library.</p>
 <pre class="r"><code>p_poverty &lt;- f.robftest(rmodel, var = &quot;poverty&quot;)
 p_single &lt;- f.robftest(rmodel, var = &quot;single&quot;)
@@ -2404,13 +2388,13 @@ p_poverty; p_single</code></pre>
 ##  robust F-test (as if non-random weights)
 ## 
 ## data:  from rlm(formula = crime ~ poverty + single, data = robustdata)
-## F = 1.2, p-value = 0.3
+## F = 1.1691, p-value = 0.285
 ## alternative hypothesis: true poverty is not equal to 0</code></pre>
 <pre><code>## 
 ##  robust F-test (as if non-random weights)
 ## 
 ## data:  from rlm(formula = crime ~ poverty + single, data = robustdata)
-## F = 83, p-value = 0.000000000005
+## F = 83.124, p-value = 4.77e-12
 ## alternative hypothesis: true single is not equal to 0</code></pre>
 <p>The output shows that poverty is not a significant predictor while single correlates highly significanty with crime.</p>
 </div>
@@ -2419,6 +2403,15 @@ p_poverty; p_single</code></pre>
 <div id="refs" class="references">
 <div id="ref-achen1982interpreting">
 <p>Achen, Christopher H. 1982. <em>Interpreting and Using Regression</em>. Vol. 29. Sage.</p>
+</div>
+<div id="ref-agresti1996introduction">
+<p>Agresti, Alan. 1996. <em>An Introduction to Categorical Data Analysis</em>. Hoboken, NJ: JohnWiley &amp; Sons.</p>
+</div>
+<div id="ref-agresti2010analysis">
+<p>———. 2010. <em>Analysis of Ordinal Categorical Data</em>. Vol. 656. John Wiley &amp; Sons.</p>
+</div>
+<div id="ref-agresti2011categorical">
+<p>Agresti, Alan, and Maria Kateri. 2011. <em>Categorical Data Analysis</em>. Springer.</p>
 </div>
 <div id="ref-baayen2008analyzing">
 <p>Baayen, R Harald. 2008. <em>Analyzing Linguistic Data. a Practical Introduction to Statistics Using R</em>. Cambridge: Cambridge University press.</p>
@@ -2447,11 +2440,17 @@ p_poverty; p_single</code></pre>
 <div id="ref-gries2009statistics">
 <p>Gries, Stefan Th. 2009. <em>Statistics for Linguistics Using R: A Practical Introduction</em>. Berlin &amp; New York: Mouton de Gruyter.</p>
 </div>
+<div id="ref-harrell2015regression">
+<p>Harrell Jr, Frank E. 2015. <em>Regression Modeling Strategies: With Applications to Linear Models, Logistic and Ordinal Regression, and Survival Analysis</em>. Springer.</p>
+</div>
 <div id="ref-menard1995applied">
 <p>Menard, Scott. 1995. <em>Applied Logistic Regression Analysis: Sage University Series on Quantitative Applications in the Social Sciences</em>. Thousand Oaks, CA: Sage.</p>
 </div>
 <div id="ref-myers1990classical">
 <p>Myers, Raymond H. 1990. <em>Classical and Modern Regression with Applications</em>. Vol. 2. Duxbury Press Belmont, CA.</p>
+</div>
+<div id="ref-rousseeuw2005robust">
+<p>Rousseeuw, Peter J, and Annick M Leroy. 2005. <em>Robust Regression and Outlier Detection</em>. Vol. 589. John wiley &amp; sons.</p>
 </div>
 <div id="ref-szmrecsanyi2006morphosyntactic">
 <p>Szmrecsanyi, Benedikt. 2006. <em>Morphosyntactic Persistence in Spoken English: A Corpus Study at the Intersection of Variationist Sociolinguistics, Psycholinguistics, and Discourse Analysis</em>. Berlin &amp; New York: Walter de Gruyter.</p>

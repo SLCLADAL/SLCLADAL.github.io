@@ -46,10 +46,9 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("boot", "car", "caret", "effects", "ggplot2",
-                   "Hmisc", "languageR", "lme4", "mlogit",
-                   "msm", "plyr", "QuantPsyc", "RLRsim", "rms",
-                   "sandwich", "sjPlot", "vcd", "visreg"))
+install.packages(c("boot", "car", "caret", "effects", "foreign", "ggplot2", 
+                   "Hmisc", "knitr", "MASS", "mlogit", "msm", "QuantPsyc", 
+                   "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", "vcd", "visreg"))
 ```
 
 Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the session by executing the code shown above, you are good to go.
@@ -89,10 +88,25 @@ The example we will go through here is taken from @field2012discovering. In this
 library(boot)
 library(car)
 library(caret)
+library(effects)
+library(foreign)
 library(ggplot2)
+library(Hmisc)
+library(knitr)
+library(MASS)
+library(mlogit)
+library(msm)
+library(plyr)
 library(QuantPsyc)
+library(reshape2)
+library(rms)
+library(sandwich)
+library(sfsmisc)
+library(sjPlot)
 library(vcd)
+library(visreg)
 # load functions
+source("rscripts/blr.summary.R")
 source("rscripts/multiplot_ggplot2.r")
 source("rscripts/mlinr.summary.r")
 source("rscripts/SampleSizeMLR.r")
@@ -512,7 +526,7 @@ Furthermore, the final minimal adequate regression model reports a highly signif
 
 # Multiple Binomial Logistic Regression
 
-Logistic regression is a multivariate analysis technique that builds on and is very similar in terms of its implementation to linear regression but logistic regressions take dependent variables that represent nominal rather than numeric scaling. The difference requires that the linear regression must be modified in certain ways to avoid producing non-sensical outcomes. The most fundamental difference between logistic and linear regressions is that logistic regression work on the probabilities of an outcome (the likelihood), rather than the outcome itself. In addition, the likelihoods on which the logistic regression works must be logged (logarithmized) in order to avoid produce predictions that produce values greater than 1 (instance occurs) and 0 (instance does not occur).
+Logistic regression is a multivariate analysis technique that builds on and is very similar in terms of its implementation to linear regression but logistic regressions take dependent variables that represent nominal rather than numeric scaling [@harrell2015regression]. The difference requires that the linear regression must be modified in certain ways to avoid producing non-sensical outcomes. The most fundamental difference between logistic and linear regressions is that logistic regression work on the probabilities of an outcome (the likelihood), rather than the outcome itself. In addition, the likelihoods on which the logistic regression works must be logged (logarithmized) in order to avoid produce predictions that produce values greater than 1 (instance occurs) and 0 (instance does not occur).
 
 To understand what this mean, we will use a very simple example. In this example, we want to see whether the height of men affect their likelihood of being in a relationship. The data we use represents a data set consisting of two variables: height and relationship.
 
@@ -521,16 +535,12 @@ bodyheight=rnorm(20,180,10) # generates 20 values, with mean of 30 & s.d.=2
 bodyheight=sort(bodyheight) # sorts these values in ascending order.
 relationship=c(0,0,0,0,0,1,0,1,0,0,1,1,0,1,1,1,0,1,1,1) # assign 'survival' to these 20 individuals non-randomly... most mortality occurs at smaller body size
 blrex=as.data.frame(cbind(bodyheight,relationship)) # saves data frame with two columns: body size & survival
-library(knitr)
 kable(blrex, caption = "Example data set representing the height and relationship status of a sample of men.")
 ```
 
 ```{r blm2, eval = T, echo=F, message=FALSE, warning=FALSE}
-# load library
-library(ggplot2)
 # plot 1
-p1 <- ggplot(blrex,
-             aes(bodyheight, relationship)) +
+ggplot(blrex, aes(bodyheight, relationship)) +
   geom_point() +
   geom_smooth(method = "lm", se = F) +
   labs(x = "Height") +
@@ -540,7 +550,7 @@ p1 <- ggplot(blrex,
   scale_y_continuous(breaks=seq(0, 1, 1), labels = c("Not in Relationship", "In Relationship")) +
   guides(fill = FALSE)
 # plot 2
-p2 <- ggplot(blrex, aes(x=bodyheight, y=relationship)) +
+ggplot(blrex, aes(x=bodyheight, y=relationship)) +
   geom_point() +
   geom_smooth(method = "glm",
     method.args = list(family = "binomial"),
@@ -557,24 +567,9 @@ The left panel of the Figure above shows that a linear model would predict value
 
 ## Example 1: EH in Kiwi English
 
-To exemplify hot to implement a logistic regression in "R", we will analyse the use of the discourse particle *eh* in New Zealand English and test which factors correlate with its occurrence. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender, ethnicity, and age of that speaker and whether or not the speech unit contained an *eh*. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.
+To exemplify hot to implement a logistic regression in "R" [see @agresti1996introduction, @agresti2011categorical for very good and thorough introductions to this topic], we will analyse the use of the discourse particle *eh* in New Zealand English and test which factors correlate with its occurrence. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender, ethnicity, and age of that speaker and whether or not the speech unit contained an *eh*. To begin with, we clean the current work space, set option, install and activate relevant packages, load customized functions, and load the example data set.
 
 ```{r blm3, eval = T, echo=T, message=FALSE, warning=FALSE}
- # clean workspace
-rm(list=ls(all=T))
- # set options
-options("scipen" = 100, "digits" = 4)
-# load libraries
-library(effects)
-library(ggplot2)
-library(mlogit)
-library(plyr)
-library(rms)
-library(sjPlot)
-library(visreg)
-# load functions
-source("rscripts/multiplot_ggplot2.R")
-source("rscripts/blr.summary.R")
 # load data
 blrdata <- read.table("data/blrdata.txt",
                       comment.char = "",  # data does not contain comments
@@ -588,7 +583,6 @@ str(blrdata)
  The summary of the data show that the data set contains 25,821 observations of five variables. The variable "ID" contains strings that represent a combination file and speaker of a speech unit. The second variable represents the gender, the third the age, and the fourth the ethnicity of speakers. The fifth variable represents whether or not a speech unit contained the discourse particle *EH*. The first six lines of the data set are shown in the Table below.
 
 ```{r blm4, eval = T, echo=F, message=FALSE, warning=FALSE}
-library(knitr)
 kable(head(blrdata), caption = "First six line of the blrdata data set.")
 ```
 
@@ -838,7 +832,7 @@ blrdata_byspeaker <- data.frame(rownames(blrdata_byspeaker), blrdata_byspeaker[,
 names(blrdata_byspeaker) <- c("ID", "NOEH", "EH")
 rownames(blrdata_byspeaker) <- 1:length(blrdata_byspeaker[,1])
 
-blrdata_byspeaker <- join(blrdata_byspeaker,  # join by-speaker data and biodata
+blrdata_byspeaker <- plyr::join(blrdata_byspeaker,  # join by-speaker data and biodata
                           blrdata, by = "ID", # join by ID
                           type = "left",      # only speakers for which bio data is provided
                           match = "first")    #
@@ -847,7 +841,6 @@ blrdata_byspeaker$EH <- NULL                  # remove EH column
 
 
 ```{r blm27, eval = T, echo=F, message=FALSE, warning=FALSE}
-library(knitr)    # load library
 kable(head(blrdata_byspeaker), caption = "First six rows of the by-speaker data.")
 ```
 
@@ -957,7 +950,6 @@ blrdata <- data.frame(blrdata, infl[[1]], infl[[2]]) # add influence statistics
 ```
 
 ```{r blm36, eval = T, echo=T, message=FALSE, warning=FALSE}
-library(knitr)    # load library
 kable(head(blrdata), caption = "First six rows of the data set with added influence statistics.")
 ```
 
@@ -1029,15 +1021,9 @@ Akaike information criteria (AlC = -2LL + 2k) provide a value that reflects a ra
 
 # Ordinal Regression
 
-Ordinal regression is very similar to multiple linear regression but takes an ordinal dependent variable. For this reason, ordinal regression is one of the key methods in analyzing Likert data. 
+Ordinal regression is very similar to multiple linear regression but takes an ordinal dependent variable [@agresti2010analysis]. For this reason, ordinal regression is one of the key methods in analyzing Likert data. 
 
 ```{r orr1, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load libraries
-library(foreign)
-library(ggplot2)
-library(MASS)
-library(Hmisc)
-library(reshape2)
 # load data
 ordata <- read.delim("https://slcladal.github.io/data/ordinaldata.txt", sep = "\t", header = T)
 colnames(ordata) <- c("Recommend", "Internal", "Exchange", "FinalScore")
@@ -1118,13 +1104,7 @@ exp(cbind(OR = coef(m), ci))
 
 ```
 
-References
 
-    Agresti, A. (1996) An Introduction to Categorical Data Analysis. New York: John Wiley & Sons, Inc
-    Agresti, A. (2002) Categorical Data Analysis, Second Edition. Hoboken, New Jersey: John Wiley & Sons, Inc.
-    Harrell, F. E, (2001) Regression Modeling Strategies. New York: Springer-Verlag.
-    Liao, T. F. (1994) Interpreting Probability Models: Logit, Probit, and Other Generalized Linear Models. Thousand Oaks, CA: Sage Publications, Inc.
-    Powers, D. and Xie, Yu. Statistical Methods for Categorical Data Analysis.  Bingley, UK: Emerald Group Publishing Limited.
 
 
 
@@ -1133,12 +1113,8 @@ References
 Poisson regressions are used to analyze data where the dependent variable represents counts. However, the tricky thing about Poisson regressions is that the data has to conform to the Poisson distribution which is, accroding to my experience, rarely the case, unfortunately. 
 
 ```{r pr1, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load libraries
-library(ggplot2)
-library(sandwich)
-library(msm)
 # load data
-poissondata <- read.delim("data/poissondata.txt", sep = "\t", header = T, skipNul = T, quote = "")
+poissondata <- read.delim("data/posdata.txt", sep = "\t", header = T, skipNul = T, quote = "")
 # inspect data
 summary(poissondata)
 ```
@@ -1158,7 +1134,7 @@ First, we check if the conditions for a Poisson regression are met.
 
 ```{r pr3, eval = T, echo=T, message=FALSE, warning=FALSE}
 # output the results
-gf = goodfit(poissondata$Awards,type= "poisson",method= "ML")
+gf = goodfit(poissondata$Pauses,type= "poisson",method= "ML")
 summary(gf)
 ```
 
@@ -1172,7 +1148,7 @@ Although the goodfit function reported that the data differs significantly from 
 
 ```{r pr5, eval = T, echo=T, message=FALSE, warning=FALSE}
 # check homogeneity
-leveneTest(poissondata$Awards, poissondata$Progression, center = mean)
+leveneTest(poissondata$Pauses, poissondata$Language, center = mean)
 ```
 
 The Levene's test indicates that variance homogeneity is also violated. Since both the approximation to a Poisson distributuion and variance homogeineity are violated, we should switch either to a quasi-Poisson model or a negative binomial model. However, as we are only intersted in how to implement a Poisson model here, we continue despite the fact that this could not be recommended if we were actually interested in accurate results based on a reliable model. 
@@ -1181,7 +1157,7 @@ In a next step, we summarize Progression by inspecting the means and standard de
 
 ```{r pr6, eval = T, echo=T, message=FALSE, warning=FALSE}
 # extract mean and standard devaiation
-with(poissondata, tapply(Awards, Progression, function(x) {
+with(poissondata, tapply(Pauses, Language, function(x) {
   sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
 }))
 ```
@@ -1190,13 +1166,14 @@ Now, we visualize the data.
 
 ```{r pr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # plot data
-ggplot(poissondata, aes(Awards, fill = Progression)) +
-  geom_histogram(binwidth=.5, position="dodge")
+ggplot(poissondata, aes(Pauses, fill = Language)) +
+  geom_histogram(binwidth=.5, position="dodge")+
+  scale_fill_manual(values=c("gray30", "gray50", "gray70"))
 ```
 
 ```{r pr8, eval = T, echo=T, message=FALSE, warning=FALSE}
 # calculate poissant regression
-m1.poisson <- glm(Awards ~ Progression + MathScore, family="poisson", data=poissondata)
+m1.poisson <- glm(Pauses ~ Language + Alcohol, family="poisson", data=poissondata)
 # inspect model
 summary(m1.poisson)
 ```
@@ -1223,7 +1200,7 @@ with(m1.poisson, cbind(res.deviance = deviance, df = df.residual,
 
 ```{r pr11, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## update m1 model dropping prog
-m2.poisson <- update(m1.poisson, . ~ . - Progression)
+m2.poisson <- update(m1.poisson, . ~ . - Language)
 ## test model differences with chi square test
 anova(m2.poisson, m1.poisson, test="Chisq")
 ```
@@ -1244,8 +1221,8 @@ rexp.est
 
 ```{r pr13, eval = T, echo=T, message=FALSE, warning=FALSE}
 # extract predicted values
-(s1 <- data.frame(MathScore = mean(poissondata$MathScore),
-  Progression = factor(1:3, levels = 1:3, labels = names(table(poissondata$Progression)))))
+(s1 <- data.frame(Alcohol = mean(poissondata$Alcohol),
+  Language = factor(1:3, levels = 1:3, labels = names(table(poissondata$Language)))))
 
 predict(m1.poisson, s1, type="response", se.fit=TRUE)
 ```
@@ -1256,26 +1233,24 @@ predict(m1.poisson, s1, type="response", se.fit=TRUE)
 poissondata$Predicted <- predict(m1.poisson, type="response")
 
 ## order by program and then by math
-poissondata <- poissondata[with(poissondata, order(Progression, MathScore)), ]
+poissondata <- poissondata[with(poissondata, order(Language, Alcohol)), ]
 ```
 
 ```{r pr15, eval = T, echo=T, message=FALSE, warning=FALSE}
 ## create the plot
-ggplot(poissondata, aes(x = MathScore, y = Predicted, colour = Progression)) +
-  geom_point(aes(y = Awards), alpha=.5, 
+ggplot(poissondata, aes(x = Alcohol, y = Predicted, colour = Language)) +
+  geom_point(aes(y = Pauses), alpha=.5, 
              position=position_jitter(h=.2)) +
   geom_line(size = 1) +
-  labs(x = "Math Score", y = "Expected number of awards")
+  labs(x = "Alcohol (ml)", y = "Expected number of pauses")
 ```
 
 
 # Robust Regression
 
+Robust regressions are linear regressions with added weights [@rousseeuw2005robust] and are thus used when a linear model is unduely affected by outliers but the data ponts should not be removed. 
+
 ```{r rr1, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load libraries
-library(foreign)
-library(MASS)
-library(sfsmisc)
 # load data
 robustdata <- read.delim("https://slcladal.github.io/data/robustdata.txt", sep = "\t", header = T)
 # inspect data
