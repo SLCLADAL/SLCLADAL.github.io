@@ -38,17 +38,21 @@ Once you have installed "R", "R-Studio", "Tinn-R", and have also initiated the s
 
 # Conditional Inference Trees
 
-This section deals with tree-structure models, the most basic type is a conditional inference tree. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements. In addition, tree-structure models are very useful because they can deal with different types of variables. Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. The tree structure represents recursive partitioning of the data to minimize residual deviance.
+This section deals with tree-structure models, the most basic type is a conditional inference tree. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements (or at least on fewer). The tree structure represents recursive partitioning of the data to minimize residual deviance. There are several advatages to using tree-based models:
+
+* Tree-structure models are very useful because they can deal with different types of variables and provide a very good understaning of the structure in the data. 
+* Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. 
+* Tree-based models can be used as variable-selection procedure which informs about which variables have any sort of significant relationship with the dependent varabe and can thereby inform model fitting.
 
 Before we implement a conditional inference tree in R, we will have a look at how it works. We will do this in more detail here as random forests and Boruta anlyses are extensions of conditional inference trees and are therefore based on the same concepts.
 
-Below is a conditional inference tree of the iris-data set. All conditional inference trees answer a simple question, namely "How do we classify elements based on the given predictors?". The answer that conditional inference trees provide is the classification of the elements based on the levels of the predictors. If predictors are not significant or all elements can be classified correctly without them (i.e. if these predictors are unneccessary), then they are not included in the decision tree.  The conditional inference tree shows that the best predictor for discourse *like* use is age as it is the highest node. Among young speakers, those with high status use like more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
+Below is a conditional inference tree which shows how and what factors contribute to the use of discourse like. All conditional inference trees answer a simple question, namely "How do we classify elements based on the given predictors?". The answer that conditional inference trees provide is the classification of the elements based on the levels of the predictors. If predictors are not significant or all elements can be classified correctly without them (i.e. if these predictors are unneccessary), then they are not included in the decision tree (or in the model fitting process).  The conditional inference tree shows that the best predictor for discourse *like* use is age as it is the highest node. Among young speakers, those with high status use like more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r cit1, echo=F, message=FALSE, warning=FALSE}
 library(partykit)              # activate partykit library
 library(dplyr)                 # activate dplyr library
 options(stringsAsFactors = T)  # set options: do not convert strings
-citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t")
+citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
 set.seed(111)        # set.seed
 # apply bonferroni correction (1 minus alpha multiplied by n of predictors)
 control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
@@ -62,27 +66,63 @@ Before going through how this conditional decision tree is generated, let us fir
 
 Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. The first six lines of this ficticious data set are displayed in the table below:
 
-```{r echo=F, message=FALSE, warning=FALSE}
+```{r cit2, echo=F, message=FALSE, warning=FALSE}
 library(knitr)                 # activate library for tabulating
-citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
 attach(citdata)
 kable(head(citdata), caption = "Example data set to illustrate conditional inference trees.")
 ```
 
 In a first step, we initialize our R session by activating relevant libraries, setting options and setting a seed. Then, we load the data into R.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-library(partykit)              # activate partykit library
-library(dplyr)                 # activate dplyr library
-options(stringsAsFactors = T)  # set options: do not convert strings
-set.seed(111)                  # set.seed
-citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t")
+```{r cit3, echo=T, message=FALSE, warning=FALSE}
+# activate libraries
+library(partykit)              
+library(dplyr)  
+library(grid)
+library(Gmisc) 
+library(Rling) 
+library(ggplot2)       
+library(cowplot)       
+library(randomForest)
+library(party)
+library(Hmisc)
+library(Boruta) 
+library(RCurl)
+# to install the caret library, it was neccessary to go through the installation 
+# process below - once caret is installed once, you do not need to go through 
+# these steps again
+# install caret library
+#source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
+#install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
+#                                      "http://cran.rstudio.com/", dependencies=TRUE))
+#install.packages("dimRed", dependencies = TRUE)
+#install.packages('caret', dependencies = TRUE)
+# activate caret library
+library(caret) 
+# set options
+options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.print=10000)
+# load data
+citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
+# inspect data
+head(citdata); str(citdata)
 ```
 
-After initializing the R session, it needs to be determined, what the root of the decision tree should be. This means that we have to determine which of the variables represents the root node. In order to do so, we tabulate for each variable level, how many speakers of that level have used discourse *like* (LikeUsers) and how many have not used discourse *like* (NonLikeUsers).
+The "str" functions output tells us that the data is not factorized yet. As tree-based models require either numeric or factorized data, we factorize the "character" variables in our data.
 
+```{r cit4, echo=T, message=FALSE, warning=FALSE}
+# factorize variables (cit require factors instead of character vectors)
+fcts <- c("Age", "Gender", "Status", "LikeUser")
+citdata[fcts] <- lapply(citdata[fcts], factor)
+# inspect data
+str(citdata)
+```
 
-```{r echo=T, message=FALSE, warning=FALSE}
+The data now consists of of factors which two levels each. After initializing the R session, it needs to be determined, what the root of the decision tree should be. This means that we have to determine which of the variables represents the root node. In order to do so, we tabulate for each variable level, how many speakers of that level have used discourse *like* (LikeUsers) and how many have not used discourse *like* (NonLikeUsers).
+
+```{r cit5, echo=T, message=FALSE, warning=FALSE}
 # tabulate data
 table(citdata$LikeUser, citdata$Gender)
 
@@ -127,52 +167,83 @@ G_{Gender} = \frac{159} {303} \times 0.4602235 +  \frac{144} {303} \times 0.4358
 
 \end{equation}
 
-In R, we would do the calculations like below.
+Before we do these calculations in R, we will just briefly revisit the gender distribution and perform a \chi^2^-test to see whether testing gender makes sense in the first place.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-# Gini: men
+```{r cit6, echo=T, message=FALSE, warning=FALSE}
+
+# GENDER
+# re-inspect gender distribution
+tblikegender <- table(citdata$LikeUser, citdata$Gender)
+tblikegender
+
+chisq.test(tblikegender) # sig difference: data can be split!
+```
+
+The \chi^2^-test shows that testing if we should split by gender does make sense as there are significant differences between men and women. We will now perform the gini-calculation for gender (see below).
+
+```{r cit7, echo=T, message=FALSE, warning=FALSE}
+# calculate Gini for men
 gini_men <- 1-(42/(42+75))^2 - (75/(42+75))^2
-# Gini: women
+# calculate Gini for women
 gini_women <- 1-(91/(91+43))^2 - (43/(91+43))^2
-# Weighted Average of Gini: Gender
+# calculate weighted average of Gini for Gender
 gini_gender <- 42/(42+75)* gini_men +  91/(91+43) * gini_women
 gini_gender
 ```
 
-We would now have to calculate the Gini values for all predictors in our data set. 
-See below for the how to perform the calculations in R:
+The gini for gender is .461. In a next step, we revisit the age distribution and also perform a \chi^2^-test.
 
-```{r echo=T, message=FALSE, warning=FALSE}
+```{r cit8, echo=T, message=FALSE, warning=FALSE}
+# re-inspect age distribution
+tblikeage <- table(citdata$LikeUser, citdata$Age)
+tblikeage
+
+chisq.test(tblikeage) # sig difference: data can be split!
+```
+
+As the \chi^2^-test returns a significant result, we continue to calculate the gini value for age.
+
+```{r cit9, echo=T, message=FALSE, warning=FALSE}
+# calculate Gini for age groups
 gini_young <- 1-(92/(92+34))^2 - (34/(92+34))^2  # Gini: young
 gini_old <- 1-(41/(41+84))^2 - (84/(41+84))^2    # Gini: old
-# Weighted Average of Gini: Gender
+# calculate weighted average of Gini for Age
 gini_age <- 92/(92+34)* gini_young +  41/(41+84) * gini_old
 gini_age
 
-### Status
-gini_high <- 1-(73/(33+73))^2 - (33/(33+73))^2   # Gini: high
-gini_low <- 1-(60/(60+85))^2 - (85/(60+85))^2    # Gini: low
-# Weighted Average of Gini: Status
-gini_status <- 73/(33+73)* gini_high +  60/(60+85) * gini_low
-gini_status
-
 ```
 
-\begin{equation} 
+The gini for age is .432 and we continue by revisiting the status distribution and also perform a \chi^2^-test.
 
-G_{Gender} = 0.4611915
+```{r cit10, echo=T, message=FALSE, warning=FALSE}
+# re-inspect status distribution
+tblikestatus <- table(citdata$LikeUser, citdata$Status)
+tblikestatus
 
-G_{Age} = 0.4323148
+chisq.test(tblikestatus) # sig difference: data can be split!
+```
 
-G_{Status} = 0.4960521
+As the \chi^2^-test returns a significant result, we continue to calculate the gini value for status.
 
-\end{equation}
+```{r cit11, echo=T, message=FALSE, warning=FALSE}
+gini_high <- 1-(73/(33+73))^2 - (33/(33+73))^2   # Gini: high
+gini_low <- 1-(60/(60+85))^2 - (85/(60+85))^2    # Gini: low
+# calculate weighted average of Gini for Status
+gini_status <- 73/(33+73)* gini_high +  60/(60+85) * gini_low
+gini_status
+```
 
-Age has the lowest Gini impurity value and therefore separates LikeUsers from NonLikeUsers better than Gender or Social Status. Therefore, age will be the root of our tree.
+The gini for status is .496 and we can now compare the gini values for age, gender, and status.
 
-```{r echo=F, message=FALSE, warning=FALSE}
-library(grid)
-library(Gmisc)
+```{r cit12, echo=T, message=FALSE, warning=FALSE}
+# compare age, gender, and status ginis
+gini_age; gini_gender; gini_status
+```
+
+Since age has the lowest gini (impurity) value, our first split is by age and age, thus, represents our root node. Our manually calculated conditional inference tree right  now looks as below.
+
+```{r cit13, echo=F, message=FALSE, warning=FALSE}
+# plot tree we have so far!
 grid.newpage()
 # set some parameters to use repeatedly
 leftx <- .25
@@ -182,205 +253,193 @@ width <- .4
 gp <- gpar(fill = "lightgrey")
 # create boxes
 (rando <- boxGrob("Age", 
- x=midx, y=.9, box_gp = gp, width = width))
+                  x=midx, y=.9, box_gp = gp, width = width))
 # connect boxes like this
-(g1 <- boxGrob("15-40\n NonLikeUsers  LikeUsers \n 34                  92", 
- x=leftx, y=.5, box_gp = gp, width = width))
-(g2 <- boxGrob("41-80\n  NonLikeUsers  LikeUsers \n 84                 41", 
- x=rightx, y=.5, box_gp = gp, width = width))
+(g1 <- boxGrob("41-80\n  NonLikeUsers  LikeUsers \n 84                 41", 
+               x=leftx, y=.5, box_gp = gp, width = width))
+(g2 <- boxGrob("15-40\n NonLikeUsers  LikeUsers \n 34                  92", 
+               x=rightx, y=.5, box_gp = gp, width = width))
 connectGrob(rando, g1, "N")
 connectGrob(rando, g2, "N")
-```
-
-In a next step, we need to find out which of the remaining variables best separates the speakers who use discourse *like* from those that do not under the first node. In order to do so, we calculate the Gini values for Gender and SocialStatus for the "15-40" node.
-
-```{r echo=T, message=FALSE, warning=FALSE}
-### 2nd node: gender
-young <- citdata[citdata$Age == "15-40",]
-tbyounggender <- table(young$LikeUser, young$Gender)
-tbyounggender
-# Gini: men
-gini_youngmen <- 1-(tbyounggender[2,2]/sum(tbyounggender[,2]))^2 - (tbyounggender[1,2]/sum(tbyounggender[,2]))^2
-# Gini: women
-gini_youngwomen <- 1-(tbyounggender[2,1]/sum(tbyounggender[,1]))^2 - (tbyounggender[1,1]/sum(tbyounggender[,1]))^2
-# Weighted Average of Gini: Gender
-gini_younggender <- sum(tbyounggender[,2])/sum(tbyounggender)* gini_youngmen +  sum(tbyounggender[,1])/sum(tbyounggender) * gini_youngwomen
-gini_younggender
-```
-
-
-```{r echo=T, message=FALSE, warning=FALSE}
-### 2nd node: status
-young <- citdata[citdata$Age == "15-40",]
-tbyoungstatus <- table(young$LikeUser, young$Status)
-tbyoungstatus
-# Gini: low
-gini_younglow <- 1-(tbyoungstatus[2,2]/sum(tbyoungstatus[,2]))^2 - (tbyoungstatus[1,2]/sum(tbyoungstatus[,2]))^2
-# Gini: high
-gini_younghigh <- 1-(tbyoungstatus[2,1]/sum(tbyoungstatus[,1]))^2 - (tbyoungstatus[1,1]/sum(tbyoungstatus[,1]))^2
-# Weighted Average of Gini: Gender
-gini_youngstatus <- sum(tbyoungstatus[,2])/sum(tbyoungstatus)* gini_younglow +  sum(tbyoungstatus[,1])/sum(tbyoungstatus) * gini_younghigh
-gini_youngstatus
 
 ```
 
-As "Status" has a lower Gini value, we have determined "Status" as the next split. Next, we check whether we need to include another split by "Gender".
+In a next step, we need to find out which of the remaining variables best separates the speakers who use discourse *like* from those that do not under the first node. In order to do so, we calculate the Gini values for Gender and SocialStatus for the "41-80" node.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-### 3nd node: gender
-younghigh <- citdata %>%
-  filter(Age == "15-40") %>%
-  filter(Status == "high")
-tbyounghighgender <- table(younghigh$LikeUser, younghigh$Gender)
-tbyounghighgender
-# Gini: men
-gini_younghighmen <- 1-(tbyounghighgender[2,2]/sum(tbyounghighgender[,2]))^2 - (tbyounghighgender[1,2]/sum(tbyounghighgender[,2]))^2
-# Gini: women
-gini_younghighwomen <- 1-(tbyounghighgender[2,1]/sum(tbyounghighgender[,1]))^2 - (tbyounghighgender[1,1]/sum(tbyounghighgender[,1]))^2
-# Weighted Average of Gini: Gender
-gini_younghighgender <- sum(tbyounghighgender[,2])/sum(tbyounghighgender)* gini_younghighmen +  sum(tbyounghighgender[,1])/sum(tbyounghighgender) * gini_younghighwomen
-gini_younghighgender
+In a first step, we tabulate the old speakers by gender, inspect the distribution, and use a \chi^2^-test to evaluate whether splitting makes sense.
 
-# compare with younghigh
-gini_younghigh
-```
-
-Because the Gini value of Status:high among young speakers is lower than the Gini value that results if we include "Gender", we do not include another split. This means that the left branch is finished.
-
-Now, we focus on the right branch. Again, we determine whether to include a split for "Gender" or for "Status". As a first step, we calculate the Gini value for "Gender.
-
-```{r echo=T, message=FALSE, warning=FALSE}
-### 3rd node: gender
+```{r cit14, echo=T, message=FALSE, warning=FALSE}
+# 2ND NODE
+# split data according to first split (only old data for now)
 old <- citdata[citdata$Age == "41-80",]
+# inspect distribution
 tboldgender <- table(old$LikeUser, old$Gender)
 tboldgender
-# Gini: men
+
+chisq.test(tboldgender) # sig difference: data can be split!
+```
+
+As the \chi^2^-test returns a significant result, we continue to calculate the gini value for gender among old speakers.
+
+```{r cit15, echo=T, message=FALSE, warning=FALSE}
+# calculate Gini for Gender
+# calculate Gini for men
 gini_oldmen <- 1-(tboldgender[2,2]/sum(tboldgender[,2]))^2 - (tboldgender[1,2]/sum(tboldgender[,2]))^2
-# Gini: women
-gini_oldwomen <- 1-(tboldgender[2,1]/sum(tboldgender[,1]))^2 - (tboldgender[2,1]/sum(tboldgender[,1]))^2
-# Weighted Average of Gini: Gender
+# calculate Gini for women
+gini_oldwomen <- 1-(tboldgender[2,1]/sum(tboldgender[,1]))^2 - (tboldgender[1,1]/sum(tboldgender[,1]))^2
+# # calculate weighted aAverage of Gini for Gender
 gini_oldgender <- sum(tboldgender[,2])/sum(tboldgender)* gini_oldmen +  sum(tboldgender[,1])/sum(tboldgender) * gini_oldwomen
 gini_oldgender
 ```
 
-Now, we calclate the Gini value for Status.
+The gini values for gender among old speakers is .345. We continue byinspecting the status distribution among old speakers.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-### 3rd node: status
+```{r cit16, echo=T, message=FALSE, warning=FALSE}
+# calculate Gini for Status
+# inspect distribution
 tboldstatus <- table(old$LikeUser, old$Status)
 tboldstatus
-# Gini: low
-gini_oldlow <- 1-(tboldstatus[2,2]/sum(tboldstatus[,2]))^2 - (tboldstatus[2,1]/sum(tboldstatus[,2]))^2
-# Gini: high
-gini_oldhigh <- 1-(tboldstatus[2,1]/sum(tboldstatus[,1]))^2 - (tboldstatus[2,1]/sum(tboldstatus[,1]))^2
-# Weighted Average of Gini: Gender
-gini_oldstatus <- sum(tboldstatus[,2])/sum(tboldstatus)* gini_oldlow +  sum(tboldstatus[,1])/sum(tboldstatus) * gini_oldhigh
-gini_oldstatus
 
-# compare with gini gender
-gini_oldgender
+chisq.test(tboldstatus) # sig difference: data can be split!
 ```
 
-Since the Gini value for "Gender" is lower, we include a "Gender" node.
+Since the \chi^2^-test returns a non-significant result, we do not need to calculate the gini value for status and split the old speakers by gender without further calculation. In a next step, we determine if we need to further divide the 3^rd^ node (old male speakers) by status. To do so, we inspect the status distribution for old male speakers and perform a  \chi^2^-test. 
 
-Now, we determine, wehther we also need to include a split for "Status".
+```{r cit17, echo=T, message=FALSE, warning=FALSE}
+# 3RD NODE
+# split data according to first split (only old data for now)
+oldmale <- citdata %>%
+  dplyr::filter(Age == "41-80") %>%
+  dplyr::filter(Gender == "male")
+# inspect distribution
+tboldmalestatus <- table(oldmale$LikeUser, oldmale$Status)
+tboldmalestatus
 
-```{r echo=T, message=FALSE, warning=FALSE}
-### 3nd node: gender
+chisq.test(tboldmalestatus) # no sig difference: no more splits!
+```
+
+Since the  \chi^2^-test reports no significant differences, we have reached an end ("leave") of this brach of out tree. We will now move on and check if we need to split the 4^th^ node (old female speakers) by status.
+
+```{r cit18, echo=T, message=FALSE, warning=FALSE}
+# 4TH NODE
+# split data according to first split (only old data for now)
 oldfemale <- citdata %>%
-  filter(Age == "41-80") %>%
-  filter(Gender == "female")
+  dplyr::filter(Age == "41-80") %>%
+  dplyr::filter(Gender == "female")
+# inspect distribution
 tboldfemalestatus <- table(oldfemale$LikeUser, oldfemale$Status)
 tboldfemalestatus
+
+chisq.test(tboldfemalestatus) # no sig difference: no more splits!
+
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
-# Gini: low
-gini_oldfemalelow <- 1-(tboldfemalestatus[2,2]/sum(tboldfemalestatus[,2]))^2 - (tboldfemalestatus[1,2]/sum(tboldfemalestatus[,2]))^2
-# Gini: high
-gini_oldfemalehigh <- 1-(tboldfemalestatus[2,1]/sum(tboldfemalestatus[,1]))^2 - (tboldfemalestatus[1,1]/sum(tboldfemalestatus[,1]))^2
-# Weighted Average of Gini: Status
-gini_oldgenderstatus <- sum(tboldfemalestatus[,2])/sum(tboldfemalestatus)* gini_oldfemalelow +  sum(tboldfemalestatus[,1])/sum(tboldfemalestatus) * gini_oldfemalehigh
-gini_oldgenderstatus   # gini of status for old plus female
-gini_oldgender         # compare with younghigh
+Here, too, we have reached the end of this branch ("leave") because the \chi^2^-test reports no significant differences. We can thus move on to the young speakers (the 5^th^ node) and test if and how to split this branch. 
+
+```{r cit19, echo=T, message=FALSE, warning=FALSE}
+# 5TH NODE
+# split data according to first split (only young data)
+young <- citdata[citdata$Age == "15-40",]
+# inspect distribution
+tbyounggender <- table(young$LikeUser, young$Gender)
+tbyounggender
+
+chisq.test(tbyounggender) # no sig difference: do not split!
 ```
 
-Because the Gini value for Status is higher than the value for Gender, we do not include another split. This means that our conditional inference tree is finished.
+As the \chi^2^-test does not report significant differences, we inspect the status distribution and check if low an high status speakers differ significantly.
 
-Below you see, how to implement a conditional inference tree in R. First, we prepare the session by activating the libraries that we will need (and installing them in case we have not done so before). Then, we set the options and read in the data.
+```{r cit20, echo=T, message=FALSE, warning=FALSE}
+# calculate Gini for Status
+# inspect distribution
+tbyoungstatus <- table(young$LikeUser, young$Status)
+tbyoungstatus
 
-```{r echo=T, message=FALSE, warning=FALSE}
-#install.packages(Rling)       # install Rling library (remove # to activate)
-library(Rling)                 # activate Rling library
-library(partykit)              # activate partykit library
-library(dplyr)                 # activate dplyr library
-options(stringsAsFactors = T)  # set options: do not convert strings
-options(scipen = 999)          # set options: supress math. notation
-options(max.prAmplified=10000) # set options
-# load data
-citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
-head(citdata)
+chisq.test(tbyoungstatus) # sig difference: split!
+
 ```
 
+Since the \chi^2^-test reports a significant result and gender was reported as being insignificant, we split by status without having to calculate the gini for status here. In a next step, we inspect the distribution of young low status speakers and test if we should split by gender.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-set.seed(111)        # set.seed
+```{r cit21, echo=T, message=FALSE, warning=FALSE}
+# 6TH NODE
+# split data according to first and second split (young and low status data)
+younglow <- citdata %>%
+  filter(Age == "15-40") %>%
+  filter(Status == "low")
+# inspect gender distribution
+tbyounglowgender <- table(younglow$LikeUser, younglow$Gender)
+tbyounglowgender
+
+chisq.test(tbyounglowgender) # no sig difference: no more splits!
+```
+
+Here, too, we have reached the end of this branch ("leave") because the \chi^2^-test reports no significant differences. We can thus move on to the young high status speakers (the 7^th^ node) and test if we need to split this branch by gender. Again, we inspect the distribution and perform a \chi^2^-test.
+
+```{r cit22, echo=T, message=FALSE, warning=FALSE}
+# 7TH node
+# split data according to first and second split (young and high status data)
+younghigh <- citdata %>%
+  filter(Age == "15-40") %>%
+  filter(Status == "high")
+# inspect gender distribution
+tbyounghighgender <- table(younghigh$LikeUser, younghigh$Gender)
+tbyounghighgender
+
+chisq.test(tbyounghighgender) # no sig difference: no more splits!
+```
+
+The lack of a significant difference reported by the \chi^2^-test tells us that we have reached our final tree as all branches end in leaves now. 
+
+This analysis can be implemented much more smoothly in R, of course, which we will do below. Just a quick word on setting seeds. When we assign or set a seed, this measn that any random number that is generated will be stored which makes analyses reproducible. Otherwise we would, of course, get different results if we relied n newly randomly generated numbers. 
+
+```{r cit23, echo=T, message=FALSE, warning=FALSE}
+# set.seed (to store random numbers and thus make results reporducible)
+set.seed(2019120202) 
 # apply bonferroni correction (1 minus alpha multiplied by n of predictors)
-control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
+control = ctree_control(mincriterion = 1-(.05*(ncol(citdata)-1)))
 # create initial conditional inference tree model
-citd.ctree <- ctree(LikeUser ~ Age + Gender + Status,
-                    data = citdata)
+citd.ctree <- ctree(LikeUser ~ Age + Gender + Status, data = citdata)
 plot(citd.ctree, gp = gpar(fontsize = 8)) # plot final ctree
 ```
 
-In addition to simply plotting the conditional inference tree, we can also check its accuracy. In a first step, we calculate the percentage of correct predictions made by our tree.
+In addition to plotting the conditional inference tree, we can also check its accuracy. To do so, we predict the use of like based on the conditional inference tree and compare them to the observed uses of like. Then we use the "confusionMatrix" function from the "caret" package to get an overview of the accuracy statistics.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-# test prediction accuracy
-ptb <- table(predict(citd.ctree), citdata$LikeUser)
-(((ptb[1]+ptb[4])+(ptb[2]+ptb[3]))/sum(table(predict(citd.ctree), citdata$LikeUser)))*100
+```{r cit24, echo=T, message=FALSE, warning=FALSE}
+citprediction <- predict(citd.ctree)
+confusionMatrix(citprediction, citdata$LikeUser)
 ```
 
-Next, we calculate the baseline accuracy, so see how much better the conditional decision tree performs compared with a chance distribution.
-
-```{r echo=T, message=FALSE, warning=FALSE}
-# determine baseline
-(table(citdata$LikeUser)[[2]]/sum(table(citdata$LikeUser)))*100
-```
+The conditional inference tree has an accuracy of 72.91 percent which is significantly better than the base-line accuracy of 52.99 percent. To understand what the other statistics refer to and how they are calculated, run the command "?confusionMatrix". 
 
 ## Splitting numeric, ordinal, and true categorical variables
 
 While it is rather straight forward to calculate the Gini values for categorical variables, it may not seem quite as apparent how to calculate splits for numeric or ordinal variables. To illustrate how the algorithm works on such variables, consider the example data set shown below.
 
-```{r echo=F, message=FALSE, warning=FALSE}
+```{r citn1, echo=F, message=FALSE, warning=FALSE}
 library(knitr)                 # activate library for tabulating
-citdata <- read.delim("data/numerictreedata.txt", header = T, sep = "\t")
-kable(citdata, caption = "Example data set to illustrate numeric splits in conditional inference trees.")
+citdata2 <- read.delim("https://slcladal.github.io/data/numerictreedata.txt", header = T, sep = "\t")
+kable(citdata2, caption = "Example data set to illustrate numeric splits in conditional inference trees.")
 ```
 
 In a first step, we order the numeric variable so that we arrive at the follwoing table.
 
-```{r echo=F, message=FALSE, warning=FALSE}
-library(knitr)                 # activate library for tabulating
-library(dplyr)                 # activate library for tabulating
-citdata2 <- read.delim("data/numerictreedata.txt", header = T, sep = "\t")
+```{r citn2, echo=F, message=FALSE, warning=FALSE}
 citdata2 <- citdata2 %>%
   arrange(Age)
-kable(citdata2, caption = "Ordered data set to illustrate numeric splits in conditional inference trees.")
+kable(citdata2, caption = "Example data set to illustrate numeric splits in conditional inference trees.")
 ```
 
 Next, we calculate the means for each level of "Age".
 
-```{r echo=F, message=FALSE, warning=FALSE}
-library(knitr)                 # activate library for tabulating
-library(dplyr)                 # activate library for tabulating
+```{r citn3, echo=F, message=FALSE, warning=FALSE}
 Age <- c(15, ((15+22)/2), 22, ((22+27)/2), 27, ((27+37)/2), 37, ((37+42)/2), 42, ((42+63)/2), 63)
 LikeUser <- c("yes", "", "yes", "", "yes", "", "no", "", "yes", "", "no")
 citdata3 <- data.frame(Age, LikeUser)
 kable(citdata3, caption = "Ordered data set with mean age levels to illustrate numeric splits in conditional inference trees.")
 ```
 
-Now, we calculate the Gini values for each average level of age.
+Now, we calculate the Gini values for each average level of age. How this is done is shown below for the first split.
 
 \begin{equation}
 
@@ -414,9 +473,9 @@ G_{split18.5} = \frac{1} {6} \times 0.0 +  \frac{5} {6} \times 0.48 = 0.4
 
 \end{equation}
 
-We now have to calculate the Gini values for all possible age splits which yields the follwoing results:
+We then have to calculate the gini values for all possible age splits which yields the following results:
 
-```{r echo=F, eval = F, message=FALSE, warning=FALSE, results='hide'}
+```{r citn4, echo=F, message=FALSE, warning=FALSE}
 # 18.5
 1-(1/(1+0))^2 - (0/(1+0))^2
 1-(2/(2+3))^2 - (3/(2+3))^2
@@ -440,9 +499,7 @@ We now have to calculate the Gini values for all possible age splits which yield
 ```
 
 
-```{r echo=F, message=FALSE, warning=FALSE}
-library(knitr)                 # activate library for tabulating
-library(dplyr)                 # activate library for tabulating
+```{r citn5, echo=F, message=FALSE, warning=FALSE}
 AgeSplit <- c(((15+22)/2), ((22+27)/2), ((27+37)/2), ((37+42)/2), ((42+63)/2))
 Gini <- c(0.4, 0.5,0.444, 0.41, 0.267)
 citdata3 <- data.frame(AgeSplit, Gini)
@@ -460,7 +517,13 @@ When dealing with categorical variables with more than two levels, the situation
 
 ## Problems of Conditional Inference Trees
 
-Conditional Inference Trees are very intuitive, multivariate, non-parametric, they do not reuire large datasets and they are easy to implement. However, they are prone to overfitting and do not perform well why they are applied to new data. An extension which remedies these problems is to grow many varied trees - this is called a Random Forest Analysis and will will have a look at how Random Forests work and how to implement them in R in the next section. 
+Conditional Inference Trees are very intuitive, multivariate, non-parametric, they do not require large data sets, and they are easy to implement. Despite these obvious advatages, they have at least two major short comings: 
+
+* they are prone to overfitting;
+
+* they do not perform well why they are applied to new data. 
+
+An extension which remedies these problems is to grow many varied trees - this is called a Random Forest Analysis and will have a look at how Random Forests work and how to implement them in R in the next section. 
 
 #  Random Forests
 
@@ -472,9 +535,7 @@ Random Forests do not work on one-and-the-same data set (as CITs do) but in Rand
 
 Imagine, we are dealing with a very small data set to which we want to apply a Random Forest Analysis. The original data set is displayed below. 
 
-```{r echo=F, message=FALSE, warning=FALSE}
-library(knitr)               # activate knitr library
-library(dplyr)               # activate dplyr library
+```{r rf1, echo=F, message=FALSE, warning=FALSE}
 citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
 citdata <- head(citdata)
 citdata$ID <- 1:nrow(citdata)
@@ -485,7 +546,7 @@ kable(citdata, caption = "Example data set to illustrate Random Forests.")
 
 We now draw a sample from this data set and receive the following data set.
 
-```{r echo=F, message=FALSE, warning=FALSE}
+```{r rf2, echo=F, message=FALSE, warning=FALSE}
 citdata <- citdata[c(6, 3, 4, 1, 2, 2),]
 rownames(citdata) <- NULL
 kable(citdata, caption = "Bootstrapped data set to illustrate Random Forests.")
@@ -501,96 +562,36 @@ Because the data is reshuffeled for every new tree, a part of the data (on avera
 
 Random Forests also differ from simple CITs in that at each step, not all possible variables are considered for a node, but only a subset. For example, we have a data set with five predicting independent variables and one dependent variable. When generating a CIT, all possible variables (variables that do not represent a node further up in the tree) are consiederd as splitting candidates. In Random Forests, only a fixed number (typically the square-root of the number of independent variables) are considered as candidates for a node. So at each potential split, a fixed number of randomly selected variables is considered potential node candidates.
 
-## Random Forests in R: Heart Disease
+## Random Forests in R
 
-This section is adapted from https://statquest.org/2018/02/26/statquest-random-forests-in-r/. We start the procedure by activating the packages that we will need for the analysis.
+This section shows how a Random Forest Analysis can be implemented in R. Ina first step, we load and inspect the data.
 
-```{r echo=T, message=FALSE, warning=FALSE}
-library(ggplot2)       # activate ggplot2 library for plotting
-library(cowplot)       # activate cowplot library for modifying ggplot2
-library(randomForest)  # activate randomForest library for random forests
-```
-
-The data used in this demo comes from the UCI machine learning repository ( http://archive.ics.uci.edu/ml/index.php). Specifically, this is the heart disease data set ( http://archive.ics.uci.edu/ml/datasets/Heart+Disease).
-
-```{r echo=T, message=FALSE, warning=FALSE} 
-# define path to data
-url <- "http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
-# load data 
-data <- read.csv(url, header=FALSE)
+```{r rf3, echo=T, message=FALSE, warning=FALSE}
+# load random forest data
+rfdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/rfdata.txt", header = T, sep = "\t")
 # inspect data
-head(data) 
+head(rfdata); str(rfdata)
+
 ```
 
-Because the data does not have variable names, we have to add variable names manually. In additon, we need to rReformat the data so that it is easy to use and interpreted correctly by randomForest.
+The data consists of four categorical variables (Gender, Age, ConversationType, and SUFLike). Our dependent variable is SUFLike which stands for speech-unit final like (a pragmatic marker that is common in Irish English and is used as in "A wee girl of her age, like"). While Age and Gender are pretty straight forward what they are called, ConversationType encodes whether a conversation has taken place between interlocutors of the same or of different genders.
 
-```{r echo=T, message=FALSE, warning=FALSE} 
-colnames(data) <- c(
-  "age",
-  "sex",# 0 = female, 1 = male
-  "cp", # chest pain
-          # 1 = typical angina,
-          # 2 = atypical angina,
-          # 3 = non-anginal pain,
-          # 4 = asymptomatic
-  "trestbps", # resting blood pressure (in mm Hg)
-  "chol", # serum cholestoral in mg/dl
-  "fbs",  # fasting blood sugar greater than 120 mg/dl, 1 = TRUE, 0 = FALSE
-  "restecg", # resting electrocardiographic results
-          # 1 = normal
-          # 2 = having ST-T wave abnormality
-          # 3 = showing probable or definite left ventricular hypertrophy
-  "thalach", # maximum heart rate achieved
-  "exang",   # exercise induced angina, 1 = yes, 0 = no
-  "oldpeak", # ST depression induced by exercise relative to rest
-  "slope", # the slope of the peak exercise ST segment
-          # 1 = upsloping
-          # 2 = flat
-          # 3 = downsloping
-  "ca", # number of major vessels (0-3) colored by fluoroscopy
-  "thal", # this is short of thalium heart scan
-          # 3 = normal (no cold spots)
-          # 6 = fixed defect (cold spots during rest and exercise)
-          # 7 = reversible defect (when cold spots only appear during exercise)
-  "hd" # (the predicted attribute) - diagnosis of heart disease
-          # 0 if less than or equal to 50% diameter narrowing
-          # 1 if greater than 50% diameter narrowing
-  )
-head(data) # now we have data and column names
+Before going any further,w e need to factorize the variables as tree-based modesl require factors instead of character variables (but tehy can, of course, handle numeric and ordinal variables). In addition, we will check if the data contains missing values (NAs).
+
+```{r rf4, echo=T, message=FALSE, warning=FALSE}
+# factorize variables (rf require factors instead of character vectors)
+fcts <- c("Gender", "Age", "ConversationType", "Priming", "SUFLike")
+rfdata[fcts] <- lapply(rfdata[fcts], factor)
+# inspect data
+str(rfdata)
+
+# check for NAs
+natest <- rfdata %>%
+  na.omit()
+nrow(natest) # no NAs present in data (same number of rows with NAs omitted)
 ```
 
-```{r echo=T, message=FALSE, warning=FALSE}
- 
-str(data) 
-```
 
-This shows that we need to tell R which columns contain factors and it also shows us that there are some missing values For example, there are "?"s in the dataset. First, replace "?"s with NAs. And then, we add factors for variables that are factors and clean up the factors that had missing data...
-
-```{r echo=T, message=FALSE, warning=FALSE}
-data[data == "?"] <- NA
-data[data$sex == 0,]$sex <- "F"
-data[data$sex == 1,]$sex <- "M"
-data$sex <- as.factor(data$sex)
-data$cp <- as.factor(data$cp)
-data$fbs <- as.factor(data$fbs)
-data$restecg <- as.factor(data$restecg)
-data$exang <- as.factor(data$exang)
-data$slope <- as.factor(data$slope)
-data$ca <- as.integer(data$ca) 
-```
-
-Since "ca" had "?"s in it (which we have since converted to NAs) R thinks that the levels for the factor are strings, but  we know they are integers, so we'll first  convert the strings to integiers...
-
-```{r echo=T, message=FALSE, warning=FALSE}
-data$ca <- as.factor(data$ca)  # ...then convert the integers to factor levels
-data$thal <- as.integer(data$thal) # "thal" also had "?"s in it.
-data$thal <- as.factor(data$thal)
-data$hd <- ifelse(test=data$hd == 0, yes="Healthy", no="Unhealthy")
-data$hd <- as.factor(data$hd) # Now convert to a factor
-str(data) 
-```
-
-This shows that the correct columns are factors and we've replaced "?"s with NAs because "?" no longer appears in the list of factors for "ca" and "thal". 
 
 Note that for most machine learning methods, you need to divide the data manually into a "training" set and a "test" set. This allows you to train the method using the training data, and then test it on data it was not originally trained on.
 
@@ -710,9 +711,6 @@ varImpPlot(model, main = "", pch = 20)
 We now use a similar but slightly more elaborate method of going through a random forest analysis. Again, we start the procedure by activating libraries that we will need and by loading the data and setting a seed. A seed allows us to replicate this analysis.
 
 ```{r echo=T, message=FALSE, warning=FALSE}
-library(knitr)         # activate knitr library
-library(dplyr)         # activate dplyr library
-library(randomForest)  # activate randomForest library
 rfd <- read.delim("data/treedata.txt", header = T, sep = "\t")
 set.seed(222)                       # set seed
 ```
