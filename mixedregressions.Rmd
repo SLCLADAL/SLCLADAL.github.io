@@ -163,20 +163,26 @@ To explore how to implement a mixed-effects model in "R" we revisit the preposit
 
 ```{r lmm3, eval = T, echo=T, message=FALSE, warning=FALSE}
 # activate packages
+library(Boruta)
 library(car)
 library(dplyr)
+library(FSA)
 library(effects)
 library(ggplot2)
 library(Hmisc)
 library(knitr)
 library(languageR)
 library(lme4)
+library(MASS)
 library(mlogit)
 library(nlme)
 library(RLRsim)
 library(rms)
-library(sjPlot)     
-library(visreg)     
+library(sjPlot)
+library(stringr)
+library(tidyr)
+library(vcd)
+library(visreg)
 # load functions
 source("rscripts/multiplot_ggplot2.R")   
 source("rscripts/PseudoR2lmerBinomial.R") 
@@ -978,10 +984,161 @@ plot(mlr.glmer, pch = 20, col = "black", lty = "dotted")
 
 As a final step, we summarize our findings in tabulated form.
 
-```{r blmm41, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r blmm41, eval = T, echo=F, message=FALSE, warning=FALSE}
 # summarize final model
 mblrmtb <- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
 kable(mblrmtb[, -c(4:5)], caption = "Summary of the final minimal adequate binomial logistic mixed-effects regression model which was fitted to predictors of discourse like in New Zealand English.")
+```
+
+# Mixed-Effects (Quasi-)Poisson Regression Models
+
+Like fixed-effects, mixed-effects Poisson models take counts as dependent variables. In this case, data was collected on three separate evenings (Trial) and the dependent variable represents instances of the filler "uhm" (UHM) occuring in two-minute conversations in which speakers of English, German, Russian, and Mandarin (Language). The number of shots that speakers had had before they talked was recorded (Shots).
+
+```{r qpmm1, eval = T, echo=T, message=FALSE, warning=FALSE}
+# load data
+countdata <- read.table("https://slcladal.github.io/data/countdata.txt", 
+                       comment.char = "",quote = "", sep = "\t", header = T) 
+# inspect data
+str(countdata)
+```
+
+Since the data contains character variables, we need to factorize the data before we can analyze it further and remove the ID column.
+
+```{r qpmm2, eval = T, echo=T, message=FALSE, warning=FALSE}
+# factorize variables
+countdata <- countdata %>%
+  dplyr::select(-ID)
+clfct <- c("Trial", "Language", "Gender")
+countdata[clfct] <- lapply(countdata[clfct], factor)
+ # inspect data
+str(countdata); head(countdata)
+```
+
+After the data is factorized, we can visualize the data.
+
+```{r qpmm3, eval = T, echo=T, message=FALSE, warning=FALSE}
+p1d <- countdata %>%
+  dplyr::select(Language, Shots) %>%
+  dplyr::group_by(Language) %>%
+  dplyr::mutate(Mean = round(mean(Shots), 1)) %>%
+  dplyr::mutate(SD = round(sd(Shots), 1))
+# start plot
+ggplot(p1d, aes(Language, Shots, color = Language, fill = Language)) +
+  geom_violin(trim=FALSE, color = "gray20")+ 
+  geom_boxplot(width=0.1, fill="white", color = "gray20") +
+  geom_text(aes(y=-4,label=paste("mean: ", Mean, sep = "")), size = 3, color = "black") +
+  geom_text(aes(y=-5,label=paste("SD: ", SD, sep = "")), size = 3, color = "black") +
+  scale_fill_manual(values=rep("grey90",4)) + 
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="none", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-5, 15) +
+  labs(x = "Language", y = "Shots")
+```
+
+The violine plots show that the English speakers drank more shots than speakesr of other languages with Mandarin speakesr drinking the fewest shots.
+
+In the present case, we will a Boruta variable selection procedure to streamline the model fitting process. Thus, before fitting the model, we will test which variables have any kind of relationsship with the dependent variable and therefore deserve to be evaluated in the regression modelling. As this is just an example, we will only consider variables which are deemed important and disregard both unimportnat and tentative variables. We start the Boruta analysis by setting a seed and running an initial Boruta analysis.
+
+```{r qpmm4, eval = T, echo=T, message=FALSE, warning=FALSE}
+# perform variable selection
+set.seed(20191220)
+boruta <- Boruta(UHM ~.,data=countdata)
+print(boruta)
+```
+
+As only Shots is confirmed as important, we will remove all the other tentative and unimportnat variables and continue by checking if the data does indeed approximate a Poisson distribution visually. 
+
+```{r qpmm5, eval = T, echo=T, message=FALSE, warning=FALSE}
+rejected <- names(boruta1$finalDecision)[which(boruta1$finalDecision == "Rejected"| boruta1$finalDecision == "Tentative")]
+# update data for boruta
+countdata <- countdata %>%
+  dplyr::select(-rejected)
+# output the results
+gf = goodfit(countdata$UHM,type= "poisson",method= "ML")
+plot(gf,main="Count data vs Poisson distribution")
+```
+
+The data does not perfectly match a distributin that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then data is NOT Poisson distributed and, given the visualization is likely over-dispersed. In that case, we may have to use a quasi-Poisson model rather than a Poisson model as quasi-Poisson models are specifically designed to handle overdispersed data that does not fully approximate to a Poisson distribution.  
+
+
+```{r qpmm6, eval = T, echo=T, message=FALSE, warning=FALSE}
+summary(gf)
+```
+
+The p-values is indeed substantially smaller than .05 which means that we cannot use a simple Poisson model. We will now use a Levene's test to check if the variance is distributed homogeniously (homoscedasticity) or whether the assumption of variance homogeneity is violated.
+
+
+```{r qpmm7, eval = T, echo=T, message=FALSE, warning=FALSE}
+# check homogeneity
+leveneTest(countdata$UHM, countdata$Shots, center = mean)
+```
+
+The Levene test indicates that the data is heteroscedastic and in this case, we should actually transform the data into normalized frequencies rather than counts. As this is just an example, we will ignore this and proceed to fit a quasi-Poisson mixed-effects model.
+
+We begin the model fitting process by creating an intercept-only base-line model.
+
+```{r qpmm8, eval = T, echo=T, message=FALSE, warning=FALSE}
+# base-line mixed-model
+m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | ID, data = countdata, 
+                   family = quasipoisson(link='log'))
+# create glm base line model
+m0.glm = glm(UHM ~ 1, data = countdata, family = quasipoisson(link='log'))
+# add Shots
+m1.glm <- update(m0.glm, .~.+ Shots)
+m1.glmer <- update(m0.glmer, .~.+ Shots)
+Anova(m1.glmer, test = "Chi")           # SIG! (p<0.0000000000000002 ***)
+```
+
+```{r qpmm9, eval = T, echo=T, message=FALSE, warning=FALSE}
+# diagnostic plot
+plot(m1.glmer, pch = 20, col = "black", lty= "dotted", ylab = "Pearson's residuals")
+```
+
+
+```{r qpmm10, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create effect plot for comparison purposes
+plot(predictorEffects(m14.glmer)) 
+```
+
+```{r qpmm11, eval = T, echo=T, message=FALSE, warning=FALSE}
+# create data frame with effects
+eff_cf <- predictorEffects(m1.glmer)
+eff_df <- data.frame(eff_cf)
+# create data frame with effects
+ef <- as.data.frame(effect("Shots", m1.glmer), xlevels=list(Shots=seq(0, 13, 1)))
+ef$Type <- rep("Predicted", 28)
+ef$lower <- NULL
+ef$upper <- NULL
+ef <- ef %>%
+  dplyr::filter(Shots != 11)
+# create table
+Shots_mean <- t(tapply(countdata$UHM, countdata$Shots, mean))
+Shots_se <- t(tapply(countdata$UHM, countdata$Shots, se))
+Shots_obs <- c(seq(0,10,1), 12:13, seq(0,10,1), 12:13)  
+Errors_obs <- c(Errors_mean[,1], Errors_mean[,2])
+Shots <- c(Errors_se[,1], Errors_se[,2])
+df <- data.frame(UHM_obs, UHM_obs)
+colnames(df) <- c("Shots", "fit", "se")
+df$Type <- rep("Observed", 26)
+# inspect data
+head(df); head(ef)
+```
+
+```{r qpmm12, eval = T, echo=T, message=FALSE, warning=FALSE}
+# combine tables
+tbd <- rbind(ef, df)
+ggplot(tbd, aes(Shots, fit, color = Type)) +
+  geom_point(position = position_dodge(width = 0.5)) + 
+  geom_errorbar(aes(ymin=fit-se, ymax=fit+se), width=0.5) +
+  theme_set(theme_bw(base_size = 20)) +
+  scale_color_manual(values = c("grey20")) +
+  theme(legend.position="none", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-2.5, 5) +
+  labs(x = "Shots", y = "Number of uhm fillers")
 ```
 
 # References
