@@ -26,7 +26,8 @@
 ###############################################################
 
 mlr.summary <- function(mlr, glm, ia = T) {
-options(warn=-1)
+  require(lm.beta)
+  options(warn=-1)
 p.nice <- function(z) {
   as.vector(unlist(sapply(z, function(w) {
     ifelse(w < .001, return("p < .001***"),
@@ -38,7 +39,7 @@ ciupr <- confint(glm)[, 2]
   coef.df <- data.frame(
     round(coefs[, 1], 2),
     c("", round(vif(mlr), 2)),
-    c("", round(lm.beta(mlr), 4)),
+ #   c("", round(lm.beta(mlr), 4)),
     round(cilwr, 2),
     round(ciupr, 2),
     round(coefs[, 2], 2),
