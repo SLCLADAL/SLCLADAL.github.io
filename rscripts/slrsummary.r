@@ -17,7 +17,7 @@ p.nice <- function(z) {
     ifelse(w < .05, return("p < .05*"), return(w)))) } ))) }
   intercept <- c(
     round(summary(x)[[4]][1], 2),
-    "", "",
+    "", 
     round(summary(x)[[4]][3], 2),
     round(summary(x)[[4]][5], 2),
     round(summary(x)[[4]][7], 4),
