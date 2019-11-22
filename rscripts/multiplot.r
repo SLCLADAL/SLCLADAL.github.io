@@ -9,6 +9,7 @@
 #' @examples \dontrun{
 #' Example code will come later!
 #' }
+
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   require(grid)
   plots <- c(list(...), plotlist)
@@ -17,10 +18,8 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
     layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
                      ncol = cols, nrow = ceiling(numPlots/cols))
   }
-  
   if (numPlots==1) {
     print(plots[[1]])
-    
   } else {
     grid.newpage()
     pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
