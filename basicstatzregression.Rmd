@@ -103,7 +103,8 @@ In a first step, we load the libraries and functions.
 
 ```{r slr2, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load libraries
-library(car)  
+library(car)
+library(dplyr)
 library(ggplot2)
 library(knitr)         
 library(QuantPsyc)           
@@ -114,21 +115,16 @@ source("https://slcladal.github.io/rscripts/slrsummary.r")
 
 After preparing our session, we can now load and inspect the data to get a first impression of its properties.
 
-```{r slr3, eval = F, echo=T, message=FALSE, warning=FALSE}
+```{r slr3, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load data
 slrdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE)
 # inspect data
 head(slrdata)                                   
 ```
 
-```{r slr4, eval = T, echo=F, message=FALSE, warning=FALSE}
-slrdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE)
-kable(head(slrdata), caption = "First six lines of the data set.")
-```
+Inspecting the data is very important because it can happen that a data set may not load completely or that variables which should be numeric have been converted to character variables. If unchecked, then such issues could go unnoticed and cause trouble.
 
-Inspecting the data is very important because it can happen that a data set may not load completely or that variables which should be numeric have been converted in character variables. If unchecked, then such hidden data issues could go unnoticed and cause much trouble once you realize that the data you have been working with is different from what you had in mind.
-
-We will now plot the data to get a more thorough impression of the structure of the data.
+We will now plot the data to get a better understanding of what the data looks like.
 
 ```{r slr5, eval = T, echo=T, message=FALSE, warning=FALSE}
 ggplot(slrdata, aes(Date, Prepositions)) +
@@ -200,7 +196,7 @@ The graphic in the upper right panel indicates whether the residuals are normall
 
 The graphic in the lower left panel provides information about *homoscedasticity*. Homoscedasticity means that the variance of the residuals remains constant and does not correlate with any independent variable. In unproblematic cases, the graphic shows a flat line. If there is a trend in the line, we are dealing with heteroscedasticity, that is, a correlation between independent variables and the residuals, which is very problematic for regressions.
 
-The graph in the lower right panel shows problematic influential data points that disproportionately affect the regression (this would be problematic). If such influential data points are present, they should be either weighted (one could generate a robust rather than a simple linear regression) or they must be removed. The graph displays Cook's distance, which shows how the regression changes when a model without this data point is calculated. The cook distance thus shows the influence a data point has on the regression as a whole. Data points that have a Cook's distance value greater than 1 are problematic [@field2012discovering, pp. 269].
+The graph in the lower right panel shows problematic influential data points that disproportionately affect the regression (this would be problematic). If such influential data points are present, they should be either weighted (one could generate a robust rather than a simple linear regression) or they must be removed. The graph displays Cook's distance, which shows how the regression changes when a model without this data point is calculated. The cook distance thus shows the influence a data point has on the regression as a whole. Data points that have a Cook's distance value greater than 1 are problematic [@field2012discovering 269].
 
 The so-called leverage is also a measure that indicates how strongly a data point affects the accuracy of the regression. Leverage values range between 0 (no influence) and 1 (strong influence: suboptimal!). To test whether a specific data point has a high leverage value, we calculate a cut-off point that indicates whether the leverage is too strong or still acceptable. The following two formulas are used for this:
 
@@ -222,14 +218,14 @@ We will look more closely at leverage in the context of multiple linear regressi
 
 ```{r slr11, eval = F, echo=T, message=FALSE, warning=FALSE}
 # create summary table
-slrsummary <- slrsummary(m1.lm)  
+slrresults <- slrsummary(m1.lm)  
 # show summary table
-slrsummary
+slrresults
 ```
 
-```{r slr11, eval = T, echo=T, message=FALSE, warning=FALSE}
-slrsummary <- slrsummary(m1.lm) 
-kable(slrsummary, caption = "Results of a simple linear regression analysis.")
+```{r slr11b, eval = T, echo=T, message=FALSE, warning=FALSE}
+slrresults <- slrsummary(m1.lm) 
+kable(slrresults, caption = "Results of a simple linear regression analysis.")
 ```
 
 Typically, the results of regression analyses are presented in such tables as they include all important measures of model quality and significance, as well as the magnitude of the effects.
@@ -242,18 +238,9 @@ A simple linear regression has been fitted to the data. A visual assessment of t
 
 In the previous example, we dealt with two numeric variables, while the following example deals with a categorical independent variable and a numeric dependent variable. The ability for regressions to handle very different types of variables makes regressions a widely used and robust method of analysis.
 
-In this example, we are dealing with two groups of students that have been randomly assigned to groups which are exposed to different teaching methods. Both groups undergo a language learning test after the lesson with a maximum score of 20 points. 
+In this example, we are dealing with two groups of students that have been randomly assigned to be exposed to different teaching methods. Both groups undergo a language learning test after the lesson with a maximum score of 20 points. 
 
-The students of the first group (group A) have reached the following scores:
-
-* Group A: 15, 12, 11, 18, 15, 15, 9, 19, 14, 13, 11, 12, 18, 15, 16, 14, 16, 17, 15, 17, 13, 14, 13, 15, 17, 19, 17, 18, 16, 14 (mean: 14,93)
-
-The students of the second group (group B) have reached the following scores:
-
-* Group B: 11, 16, 14, 18, 6, 8, 9, 14, 12, 12, 10, 15, 12, 9, 13, 16, 17, 12, 8, 7, 15, 5, 14, 13, 13, 12, 11, 13, 11, 7 (mean: 11,77)
-
-Our question is whether group A has performed significantly better than group B which would indicate that the teaching method to which group A was exposed works better than the teaching method to which group B was exposed.
-
+The question that we will try to answer is whether the students in group A have performed significantly better than those in group B which would indicate that the teaching method to which group A was exposed works better than the teaching method to which group B was exposed.
 
 Let's move on to implementing the regression in "R". In a first step, we load the data set and inspect its structure.
 
@@ -267,31 +254,28 @@ head(slrdata2)
 Now, we graphically display the data. In this case, a boxplot represents a good way to visualize the data.
 
 ```{r slr14, eval = T, echo = T, fig.cap="Darstellung der Sprachtestdaten"}
-boxplot(Score ~ Group,               # create box plot
-data = slrdata2,                     # the data we want to display
-main = "",                           # empty title
-ylab = "Score",                      # y-axis label
-ylim = c(0, 20),                     # y-axis rage
-xlab = c("Group"),                   # x-axis albel
-notch = T,                           # show notches 
-col = c("lightgreen", "lightblue"))  # define colours
-text(1:2,                            # add text
-c(4.0, 4.0),                         # y-axis position
-cex = 0.85,                          # font size
-labels = paste("mean\n",
-c(round(as.vector(by(slrdata2$Score, slrdata2$Group, mean))[1], 2),
-round(as.vector(by(slrdata2$Score, slrdata2$Group, mean))[2], 2),
-sep = "")))
-rug(jitter(slrdata2$Score),
-side=4)
-box()
+# extract means
+means <- slrdata2 %>%
+  dplyr::group_by(Group) %>%
+  dplyr::summarise(Mean = round(mean(Score), 1))
+# start plot
+ggplot(slrdata2, aes(Group, Score)) + 
+  geom_boxplot(fill=c("orange", "darkgray")) +
+  geom_text(data = means, aes(label = Mean, y = 1)) +
+  theme_set(theme_bw(base_size = 15)) +
+  labs(x = "Group") +                      
+  labs(y = "Test score (Points)", cex = .75) +   
+  coord_cartesian(ylim = c(0, 20)) +  
+  guides(fill = FALSE)                
 ```
 
 The data indicate that group A did significantly better than group B. We will test this impression by generating the regression model and creating the model diagnostic graphics in the next step.
 
 ```{r slr15, eval = T, echo=T, message=FALSE, warning=FALSE}
-m2.lm <- lm(Score ~ Group, data = slrdata2) # generate regression model
-summary(m2.lm)                              # inspect results
+# generate regression model
+m2.lm <- lm(Score ~ Group, data = slrdata2) 
+# inspect results
+summary(m2.lm)                             
 ```
 
 
@@ -316,17 +300,16 @@ plot(m2.lm); par(mfrow = c(1, 1)) # restore normal plot window
 
 These graphics also show no problems. In this case, the data can be summarized in the next step.
 
-```{r slr18, eval = F, echo=T, message=FALSE, warning=FALSE}
+```{r slr18, eval = T, echo=T, message=FALSE, warning=FALSE}
 # tabulate results
-slrsummary2 <- slrsummary(m2.lm)
-slrsummary2
+slrresults2 <- slrsummary(m2.lm)
+slrresults2
 ```
 
-```{r slr18, eval = T, echo=F, message=FALSE, warning=FALSE}
+```{r slr18b, eval = T, echo=F, message=FALSE, warning=FALSE}
 # tabulate results
-slrsummary2 <- slrsummary(m2.lm)
-library(knitr)
-kable(slrsummary2, caption = "Results of a simple linear regression analysis.")
+slrresults2 <- slrsummary(m2.lm)
+kable(slrresults2, caption = "Results of the regression model.")
 ```
 
 The results of this second simple linear regressions can be summarized as follows: 

@@ -7,7 +7,8 @@
 #' @seealso
 #' @return NULL
 #' @examples \dontrun{
-#' Example code will come later!
+#' model <- lm(depvar ~ indepvar, data = data)
+#' slrsummary(model)
 #' }
 slrsummary <- function(x) {
 p.nice <- function(z) {
