@@ -1,4 +1,15 @@
-slr.summary <- function(x) {
+#' @title Summary Tables for Simple Linear Regressions
+#'
+#' @description This function produces summary tables for simple linear regressions by extracting the relevent information from a regression object created with the lm function.
+#' @param x A simple linear regressions by extracting the relevent information from a regression object created with the lm function.
+#' @export
+#' @keywords regression, linear regression, summary table, function
+#' @seealso
+#' @return NULL
+#' @examples \dontrun{
+#' Example code will come later!
+#' }
+slrsummary <- function(x) {
 p.nice <- function(z) {
   as.vector(unlist(sapply(z, function(w) {
     ifelse(w < .001, return("p < .001***"),
@@ -13,22 +24,21 @@ p.nice <- function(z) {
     p.nice(summary(x)[[4]][7]))
   predictor <- c(
     round(summary(x)[[4]][2], 2),
-    round(lm.beta(x)[[1]], 4),
     round(sqrt(summary(x)[[8]]), 2),
     round(summary(x)[[4]][4], 2),
     round(summary(x)[[4]][6], 2),
     round(summary(x)[[4]][8], 4),
     p.nice(summary(x)[[4]][8]))
-  mdl.statz <- c("", "", "", "", "", "", "Value")
-  nbcases <- c("", "", "", "", "", "", length(summary(x)[[3]]))
-  rse <- c("", "", "", "", "", "", round(summary(x)[[6]], 2))
-  multR2 <- c("", "", "", "", "", "", round(summary(x)[[8]], 4))
-  adjR2 <- c("", "", "", "", "", "", round(summary(x)[[9]], 4))
-  F <- c("", "", "", "", "", "",
+  mdl.statz <- c(rep("", 5), "Value")
+  nbcases <- c(rep("", 5), length(summary(x)[[3]]))
+  rse <- c(rep("", 5), round(summary(x)[[6]], 2))
+  multR2 <- c(rep("", 5), round(summary(x)[[8]], 4))
+  adjR2 <- c(rep("", 5), round(summary(x)[[9]], 4))
+  F <- c(rep("", 5),
     round(summary(x)[[10]][1], 2))
-  p <- c("", "", "", "", "", "", round(summary(x)[[4]][8], 4))
+  p <- c(rep("", 5), round(summary(x)[[4]][8], 4))
   slrm.tb <- rbind(intercept, predictor, mdl.statz, nbcases, rse, multR2, adjR2, F, p )
-  colnames(slrm.tb) <- c(colnames(summary(x)[[4]])[1], "Std. Beta",  "Pearson's r",
+  colnames(slrm.tb) <- c(colnames(summary(x)[[4]])[1], "Pearson's r",
   colnames(summary(x)[[4]])[c(2:4)], "P-value sig.")
   rownames(slrm.tb) <- c(
     rownames(summary(x)[[4]])[1],
