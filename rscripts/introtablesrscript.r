@@ -8,8 +8,7 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("rtweet", "ggplot2", "dplyr", "tidytext",
-                   "twitteR"))
+install.packages(c("xlsx", "dplyr", "tidyr"))
 # load data with read.delim
 mytable <- read.delim("https://slcladal.github.io/data/mlrdata.txt", header = TRUE)
 # show first 6 lines of table
@@ -25,3 +24,16 @@ library(xlsx)
 mytable <- read.xlsx("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/testdata1.xlsx", 1)
 # show first 6 lines of table
 head(mytable)
+# load libraries
+library(dplyr)
+library(tidyr)
+# inspect data before processing
+nrow(myothertable); str(myothertable); table(myothertable$attraction)
+# select and filter
+mytable <- myothertable %>%
+  # select the columns attraction and money
+  dplyr::select(attraction, money) %>%
+  # extract rows which represent cases where the person was intersted in someone
+  dplyr::filter(attraction == "Interested")
+# inspect data before processing
+nrow(mytable); table(mytable$attraction)

@@ -8,30 +8,44 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("boot", "car", "effects", "ggplot2",
-                   "Hmisc", "languageR", "lme4", "mlogit",
-                   "msm", "plyr", "QuantPsyc", "RLRsim", "rms",
-                   "sandwich", "sjPlot", "visreg"))
+install.packages(c("boot", "car", "caret", "effects", "foreign", "ggplot2", 
+                   "Hmisc", "knitr", "MASS", "mlogit", "msm", "QuantPsyc", 
+                   "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", "vcd", "visreg"))
 # load libraries
-library(ggplot2)
-library(car)
-library(QuantPsyc)
 library(boot)
+library(car)
+library(caret)
+library(effects)
+library(foreign)
+library(ggplot2)
+library(Hmisc)
+library(knitr)
+library(MASS)
+library(mlogit)
+library(msm)
+library(plyr)
+library(QuantPsyc)
+library(reshape2)
+library(rms)
+library(sandwich)
+library(sfsmisc)
+library(sjPlot)
+library(vcd)
+library(visreg)
 # load functions
-source("rscripts/multiplot_ggplot2.r")
-source("rscripts/mlinr.summary.r")
-source("rscripts/SampleSizeMLR.r")
-source("rscripts/ExpR.r")
+source("https://slcladal.github.io/rscripts/blr.summary.r")
+source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")
+source("https://slcladal.github.io/rscripts/mlinr.summary.r")
+source("https://slcladal.github.io/rscripts/SampleSizeMLR.r")
+source("https://slcladal.github.io/rscripts/ExpR.r")
 # load data
 mlrdata <- read.delim("https://slcladal.github.io/data/mlrdata.txt", header = TRUE)
 head(mlrdata)    # inspect first 6 lines
 str(mlrdata)     # inspect structure
 summary(mlrdata) # summarize data
-# create plot
-# plot 1
-p1 <- ggplot(mlrdata,                   # def. data
-             aes(status, money)) +      # def. x/y-axes
-  geom_boxplot(fill=c("gold", "indianred4")) + # def. col.
+# create plots
+p1 <- ggplot(mlrdata, aes(status, money)) +   # data + x/y-axes
+  geom_boxplot(fill=c("grey30", "grey70")) + # def. col.
   theme_set(theme_bw(base_size = 8))+   # black and white theme
   labs(x = "") +                        # x-axis label
   labs(y = "Money spent on present (AUD)", cex = .75) +   # y-axis label
@@ -39,50 +53,43 @@ p1 <- ggplot(mlrdata,                   # def. data
   guides(fill = FALSE) +                # no legend
   ggtitle("Status")                     # title
 # plot 2
-p2 <- ggplot(mlrdata,
-             aes(attraction, money)) +
+p2 <- ggplot(mlrdata, aes(attraction, money)) +
   geom_boxplot(fill=c("grey30", "grey70")) +
-theme_set(theme_bw(base_size = 8))+
+  theme_set(theme_bw(base_size = 8))+
   labs(x = "") +                              # x-axis label
   labs(y = "Money spent on present (AUD)") +  # y-axis label
   coord_cartesian(ylim = c(0, 250)) +
   guides(fill = FALSE) +
   ggtitle("Attraction")
 # plot 3
-p3 <- ggplot(mlrdata,
-             aes(x = money)) +
+p3 <- ggplot(mlrdata, aes(x = money)) +
   geom_histogram(aes(y=..density..),    # add density statistic
                  binwidth = 10,         # def. bin width
                  colour = "black",      # def. bar edge colour
                  fill = "white") +      # def. bar col.
     theme_bw() +                        # black-white theme
-  geom_density(alpha=.2, fill = "#FF6666") # def. col. of overlay
+  geom_density(alpha=.2, fill = "gray50") + # def. col. of overlay
+    labs(x = "Money spent on present (AUD)") +
+  labs(y = "Density of frequency")
 # plot 4
 p4 <- ggplot(mlrdata, aes(status, money)) +
   geom_boxplot(notch = F, aes(fill = factor(status))) + # create boxplot
-  scale_fill_brewer(palette="Set1") +   # def. col. palette
+  scale_fill_manual(values = c("grey30", "grey70")) +   # def. col. palette
   facet_wrap(~ attraction, nrow = 1) +  # separate panels for attraction
-theme_set(theme_bw(base_size = 8)) +
+  theme_set(theme_bw(base_size = 8)) +
   labs(x = "") +
-  labs(y = "Money spent on present (Euro)") +
+  labs(y = "Money spent on present (AUD)") +
   coord_cartesian(ylim = c(0, 250)) +
   guides(fill = FALSE)
 # show plots
 multiplot(p1, p3, p2, p4, cols = 2)
-m0.mlr = lm(         # generate lm regression object
-  money ~ 1,         # def. rgression formula (1 = intercept)
-  data = mlrdata)    # def. data
-m0.glm = glm(        # generate glm regression object
-  money ~ 1,         # def. rgression formula (1 = intercept)
-  family = gaussian, # def. linkage function
-  data = mlrdata)    # def. data
-m1.mlr = lm(         # generate lm regression object
-  money ~ (status + attraction)^2, # def. rgression formula
-  data = mlrdata)    # def. data
-m1.glm = glm(        # generate glm regression object
-  money ~ status * attraction,     # def. rgression formula
-  family = gaussian, # def. linkage function
-  data = mlrdata)    # def. data set
+m1.mlr = lm(                      # generate lm regression object
+  money ~ 1 + attraction*status,  # def. rgression formula (1 = intercept)
+  data = mlrdata)                 # def. data
+m1.glm = glm(                     # generate glm regression object
+  money ~ 1 + attraction*status,  # def. rgression formula (1 = intercept)
+  family = gaussian,              # def. linkage function
+  data = mlrdata)                 # def. data
 # automated AIC based model fitting
 step(m1.mlr, direction = "both")
 m2.mlr = lm(                       # generate lm regression object
@@ -105,7 +112,8 @@ prediction <- predict(m2.mlr, newdata = mlrdata)
 table(round(prediction,2))
 # extract confidence intervals of the coefficients
 confint(m2.mlr)
-# compare baseline- and minimal adequate model
+# create and compare baseline- and minimal adequate model
+m0.mlr <- lm(money ~1, data = mlrdata)
 anova(m0.mlr, m2.mlr)
 # compare baseline- and minimal adequate model
 Anova(m0.mlr, m2.mlr, type = "III")
@@ -243,13 +251,9 @@ bodyheight=rnorm(20,180,10) # generates 20 values, with mean of 30 & s.d.=2
 bodyheight=sort(bodyheight) # sorts these values in ascending order.
 relationship=c(0,0,0,0,0,1,0,1,0,0,1,1,0,1,1,1,0,1,1,1) # assign 'survival' to these 20 individuals non-randomly... most mortality occurs at smaller body size
 blrex=as.data.frame(cbind(bodyheight,relationship)) # saves data frame with two columns: body size & survival
-library(knitr)
 kable(blrex, caption = "Example data set representing the height and relationship status of a sample of men.")
-# load library
-library(ggplot2)
 # plot 1
-p1 <- ggplot(blrex,
-             aes(bodyheight, relationship)) +
+p1 <- ggplot(blrex, aes(bodyheight, relationship)) +
   geom_point() +
   geom_smooth(method = "lm", se = F) +
   labs(x = "Height") +
@@ -270,21 +274,6 @@ p2 <- ggplot(blrex, aes(x=bodyheight, y=relationship)) +
   labs(y = "Relationship", cex = .75)
 # draw two plots in one window
 multiplot(p1, p2, cols = 2)
- # clean workspace
-rm(list=ls(all=T))
- # set options
-options("scipen" = 100, "digits" = 4)
-# load libraries
-library(effects)
-library(ggplot2)
-library(mlogit)
-library(plyr)
-library(rms)
-library(sjPlot)
-library(visreg)
-# load functions
-source("rscripts/multiplot_ggplot2.R")
-source("rscripts/blr.summary.R")
 # load data
 blrdata <- read.table("data/blrdata.txt",
                       comment.char = "",  # data does not contain comments
@@ -293,7 +282,6 @@ blrdata <- read.table("data/blrdata.txt",
                       header = T)         # variables have headers
 # inspect data
 str(blrdata)
-library(knitr)
 kable(head(blrdata), caption = "First six line of the blrdata data set.")
 vrs <- c("Age", "Gender", "Ethnicity", "ID")  # define variables to be factorized
 fctr <- which(colnames(blrdata) %in% vrs)     # define vector with variables
@@ -301,75 +289,14 @@ blrdata[,fctr] <- lapply(blrdata[,fctr], factor) # factorize variables
 blrdata$Age <- relevel(blrdata$Age, "Young") # relevel Age (Young = Reference)
 blrdata$Ethnicity <- relevel(                # relevel Ethnicity
   blrdata$Ethnicity, "Pakeha") # define Pakeha as Reference level)
-p1 <- ggplot(blrdata,
-             aes(Gender, EH, color = Gender)) +
+ggplot(blrdata, aes(Age, EH, color = Gender)) +
+  facet_wrap(~Ethnicity) +
   stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot,
-               geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 0.5)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
   theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Gender", y = "Probability of EH")+
-  guides(fill=FALSE, color=FALSE) +
-  scale_color_manual(values = c("blue", "red"))
-p2 <- ggplot(blrdata,
-             aes(Age, EH, color = Age)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot,
-               geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 0.5)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Age", y = "Probability of EH") +
-  guides(fill=FALSE, color=FALSE) +
-  scale_color_manual(values = c("darkblue", "lightblue"))
-p3 <- ggplot(blrdata,
-             aes(Ethnicity, EH, colour = Ethnicity)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot,
-               geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 0.5)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Ethnicity", y = "Probability of EH", colour = "Ethnicity") +
-  guides(fill=FALSE, color=FALSE) +
-  scale_color_manual(values = c("darkgreen", "lightgreen"))
-p4 <- ggplot(blrdata,
-             aes(Ethnicity, EH, colour = Gender)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot,
-               geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 0.5)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Ethnicity", y = "Probability of EH", colour = "Gender")+
-  scale_color_manual(values = c("blue", "red"))
-p5 <- ggplot(blrdata,
-             aes(Gender, EH, colour = Age)) +
-  stat_summary(fun.y = mean, geom = "point",
-               aes(group= Age)) +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot,
-               geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 0.5)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Sex", y = "Probability of EH", colour = "Age") +
-  guides(fill = FALSE) +
-  scale_color_manual(values = c("darkblue", "lightblue"))
-p6 <- ggplot(blrdata,
-             aes(Age, EH, colour = Ethnicity)) +
-  stat_summary(fun.y = mean, geom = "point",
-               aes(group= Ethnicity)) +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot,
-               geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 0.5)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Age", y = "Probability of EH", colour = "Ethnicity") +
-  guides(fill = FALSE) +
-  scale_color_manual(values = c("darkgreen", "lightgreen"))
-# display the plots
-multiplot(p1, p4, p2, p5, p3, p6, cols = 3)
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Probabilty of eh") +
+  scale_color_manual(values = c("gray20", "gray70"))
 # set contrasts
 options(contrasts  =c("contr.treatment", "contr.poly"))
 # create distance matrix
@@ -380,32 +307,48 @@ options(datadist = "blrdata.dist")
 m0.glm = glm(EH ~ 1, family = binomial, data = blrdata)
 # baseline lrm model
 m0.lrm = lrm(EH ~ 1, data = blrdata, x = T, y = T)
-m1.glm = glm(EH ~ Age*Gender*Ethnicity, family = binomial, data = blrdata)
-m1.lrm = lrm(EH ~ Age*Gender*Ethnicity, data = blrdata, x = T, y = T)
-# remove Age:Gender:Ethnicity
-m2.glm <- update(m1.glm, . ~ . -Age:Gender:Ethnicity)
-# check if removal significantly decreases model fit
-anova(m1.glm, m2.glm, test = "Chi")
-m3.glm <- update(m2.glm, . ~ . -Gender:Ethnicity)
-anova(m2.glm, m3.glm, test = "Chi")
-m4.glm <- update(m3.glm, . ~ . -Age:Gender)
-anova(m3.glm, m4.glm, test = "Chi")
-m5.glm <- update(m4.glm, . ~ . -Age:Ethnicity)
-anova(m4.glm, m5.glm, test = "Chi")
-m6.glm <- update(m5.glm, . ~ . -Ethnicity)
-anova(m5.glm, m6.glm, test = "Chi")
-m7.glm <- update(m6.glm, . ~ . -Gender)
-anova(m7.glm, m6.glm, test = "Chi")
-m8.glm <- update(m6.glm, . ~ . -Age)
-anova(m8.glm, m6.glm, test = "Chi")
-m6.lrm <- lrm(EH ~ Age+Gender, data = blrdata, x = T, y = T, linear.predictors = T)
-m6.lrm
-anova(m6.lrm)
-# model validation
-validate(m1.lrm, bw = T, B = 200)
-pentrace(m6.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
-lr.glm <- m6.glm  # rename final minimal adeqaute glm model
-lr.lrm <- m6.lrm  # rename final minimal adeqaute lrm model
+# check incomplete information
+ifelse(min(ftable(blrdata$Age, blrdata$EH)) == 0, "not possible", "possible")
+# add age to the model
+m1.glm = glm(EH ~ Age, family = binomial, data = blrdata)
+# check multicollinearity (vifs should have values of 3 or lower for main effects)
+ifelse(max(vif(m1.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+# check if adding Age significantly improves model fit
+anova(m1.glm, m0.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Gender, blrdata$EH)) == 0, "not possible", "possible")
+m2.glm <- update(m1.glm, . ~ . +Gender)
+ifelse(max(vif(m2.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m2.glm, m1.glm, test = "Chi")
+Anova(m2.glm, test = "LR")
+ifelse(min(ftable(blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m3.glm <- update(m2.glm, . ~ . +Ethnicity)
+ifelse(max(vif(m3.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m3.glm, m2.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Age, blrdata$Gender, blrdata$EH)) == 0, "not possible", "possible")
+m4.glm <- update(m2.glm, . ~ . +Age*Gender)
+ifelse(max(vif(m4.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m4.glm, m2.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Age, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m5.glm <- update(m2.glm, . ~ . +Age*Ethnicity)
+ifelse(max(vif(m5.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m5.glm, m2.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Gender, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m6.glm <- update(m2.glm, . ~ . +Gender*Ethnicity)
+ifelse(max(vif(m6.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m6.glm, m2.glm, test = "Chi")
+ifelse(min(ftable(blrdata$Age, blrdata$Gender, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
+m7.glm <- update(m2.glm, . ~ . +Gender*Ethnicity)
+ifelse(max(vif(m7.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
+anova(m7.glm, m2.glm, test = "Chi")
+m2.lrm <- lrm(EH ~ Age+Gender, data = blrdata, x = T, y = T, linear.predictors = T)
+m2.lrm
+anova(m2.lrm)
+# model validation (remove # to activate: output too long for website)
+m7.lrm <- lrm(EH ~ (Age+Gender+Ethnicity)^3, data = blrdata, x = T, y = T, linear.predictors = T)
+#validate(m7.lrm, bw = T, B = 200)
+pentrace(m2.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
+lr.glm <- m2.glm  # rename final minimal adeqaute glm model
+lr.lrm <- m2.lrm  # rename final minimal adeqaute lrm model
 modelChi <- lr.glm$null.deviance - lr.glm$deviance
 chidf <- lr.glm$df.null - lr.glm$df.residual
 chisq.prob <- 1 - pchisq(modelChi, chidf)
@@ -438,12 +381,11 @@ blrdata_byspeaker <- table(blrdata$ID, blrdata$EH)
 blrdata_byspeaker <- data.frame(rownames(blrdata_byspeaker), blrdata_byspeaker[, 1], blrdata_byspeaker[, 2])
 names(blrdata_byspeaker) <- c("ID", "NOEH", "EH")
 rownames(blrdata_byspeaker) <- 1:length(blrdata_byspeaker[,1])
-blrdata_byspeaker <- join(blrdata_byspeaker,  # join by-speaker data and biodata
+blrdata_byspeaker <- plyr::join(blrdata_byspeaker,  # join by-speaker data and biodata
                           blrdata, by = "ID", # join by ID
                           type = "left",      # only speakers for which bio data is provided
                           match = "first")    #
 blrdata_byspeaker$EH <- NULL                  # remove EH column
-library(knitr)    # load library
 kable(head(blrdata_byspeaker), caption = "First six rows of the by-speaker data.")
 # use by.spk data to fit another model which we will use to test the accuracy of the model
 lr.glm.spk <- glm(cbind(EH, NOEH) ~ Age*Gender + Ethnicity + Age:Ethnicity, data = blrdata_byspeaker, family = binomial)
@@ -461,6 +403,14 @@ predict.acc.base
 # compare preictions of final and base line model
 which(lr.glm.spk$fitted > .5)
 which(lr.glm.spk.base$fitted > .5)
+# create variable with contains the prediction of the model
+blrdata$Prediction <- predict(lr.glm, blrdata, type = "response")
+blrdata$Prediction <- ifelse(blrdata$Prediction > .5, 1, 0)
+# convert predicted and observed into factors with the same levels
+blrdata$Prediction <- factor(blrdata$Prediction, levels = c("0", "1"))
+blrdata$EH <- factor(blrdata$EH, levels = c("0", "1"))
+# create a confusion matrix with compares observed against predicted values
+caret::confusionMatrix(blrdata$Prediction, blrdata$EH)
 # create plot
 par(mfrow = c(1, 2))
 visreg(lr.glm, "Age", xlab = "Age",
@@ -470,12 +420,21 @@ visreg(lr.glm, "Gender", xlab = "Gender",
        ylab = "Logged Odds (EH)",
        ylim = c(-3, 0))
 par(mfrow = c(1, 1))
+# extract predicted probabilities
+blrdata$Predicted <- predict(lr.glm, blrdata, type = "response")
+# plot
+ggplot(blrdata, aes(Age, Predicted, color = Gender)) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+    ylim(0, .75) +
+  labs(x = "", y = "Predicted Probabilty of eh") +
+  scale_color_manual(values = c("gray20", "gray70"))
 vif(lr.glm)
 mean(vif(lr.glm))
 infl <- influence.measures(lr.glm) # calculate influence statistics
 blrdata <- data.frame(blrdata, infl[[1]], infl[[2]]) # add influence statistics
-library(knitr)    # load library
-kable(head(blrdata), caption = "First six rows of the data set with added influence statistics.")
 # function to evaluate sample size
 smplesz <- function(x) {
   ifelse((length(x$fitted) < (104 + ncol(summary(x)$coefficients)-1)) == TRUE,
@@ -487,13 +446,7 @@ smplesz <- function(x) {
 # apply unction to model
 smplesz(lr.glm)
 blrmsummary <- blrm.summary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
-blrmsummary[, -c(4:5)] # remove columns with confidence intervals
-# load libraries
-library(foreign)
-library(ggplot2)
-library(MASS)
-library(Hmisc)
-library(reshape2)
+kable(blrmsummary[, -c(4:5)], caption = "Summary of the final minimal adequate binomial logistic fixed-effects regression model which was fitted to predictors of eh in New Zealand English.")
 # load data
 ordata <- read.delim("https://slcladal.github.io/data/ordinaldata.txt", sep = "\t", header = T)
 colnames(ordata) <- c("Recommend", "Internal", "Exchange", "FinalScore")
@@ -536,70 +489,69 @@ confint.default(m)
 exp(coef(m))
 ## OR and CI
 exp(cbind(OR = coef(m), ci))
-# load libraries
-library(ggplot2)
-library(sandwich)
-library(msm)
 # load data
-p <- read.csv("https://stats.idre.ucla.edu/stat/data/poisson_sim.csv")
+poissondata <- read.delim("data/posdata.txt", sep = "\t", header = T, skipNul = T, quote = "")
 # inspect data
-summary(p)
-# factorize id and prog
-p$id <- factor(p$id)
-p$prog <- factor(p$prog, levels=1:3, labels=c("General", "Academic", 
-                                                     "Vocational"))
+summary(poissondata)
+# process data
+poissondata <- poissondata %>%
+  mutate(Id = factor(Id, levels = 1:200, labels = 1:200))
 # inspect data
-summary(p)
+summary(poissondata); str(poissondata)
+# output the results
+gf = goodfit(poissondata$Pauses,type= "poisson",method= "ML")
+summary(gf)
+plot(gf,main="Count data vs Poisson distribution")
+# check homogeneity
+leveneTest(poissondata$Pauses, poissondata$Language, center = mean)
 # extract mean and standard devaiation
-with(p, tapply(num_awards, prog, function(x) {
+with(poissondata, tapply(Pauses, Language, function(x) {
   sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
 }))
 # plot data
-ggplot(p, aes(num_awards, fill = prog)) +
-  geom_histogram(binwidth=.5, position="dodge")
+ggplot(poissondata, aes(Pauses, fill = Language)) +
+  geom_histogram(binwidth=.5, position="dodge") +
+  scale_fill_manual(values=c("gray30", "gray50", "gray70"))
 # calculate poissant regression
-poissantr <- glm(num_awards ~ prog + math, family="poisson", data=p)
+m1.poisson <- glm(Pauses ~ Language + Alcohol, family="poisson", data=poissondata)
 # inspect model
-summary(poissantr)
-# 
-cov.m1 <- vcovHC(poissantr, type="HC0")
+summary(m1.poisson)
+cov.m1 <- vcovHC(m1.poisson, type="HC0")
 std.err <- sqrt(diag(cov.m1))
-r.est <- cbind(Estimate= coef(poissantr), "Robust SE" = std.err,
-"Pr(>|z|)" = 2 * pnorm(abs(coef(poissantr)/std.err), lower.tail=FALSE),
-LL = coef(poissantr) - 1.96 * std.err,
-UL = coef(poissantr) + 1.96 * std.err)
+r.est <- cbind(Estimate= coef(m1.poisson), "Robust SE" = std.err,
+"Pr(>|z|)" = 2 * pnorm(abs(coef(m1.poisson)/std.err), lower.tail=FALSE),
+LL = coef(m1.poisson) - 1.96 * std.err,
+UL = coef(m1.poisson) + 1.96 * std.err)
 # inspect data
 r.est
-with(poissantr, cbind(res.deviance = deviance, df = df.residual,
+with(m1.poisson, cbind(res.deviance = deviance, df = df.residual,
   p = pchisq(deviance, df.residual, lower.tail=FALSE)))
 ## update m1 model dropping prog
-poissantr2 <- update(poissantr, . ~ . - prog)
+m2.poisson <- update(m1.poisson, . ~ . - Language)
 ## test model differences with chi square test
-anova(poissantr2, poissantr, test="Chisq")
+anova(m2.poisson, m1.poisson, test="Chisq")
 s <- deltamethod(list(~ exp(x1), ~ exp(x2), ~ exp(x3), ~ exp(x4)), 
-                                                coef(poissantr), cov.m1)
+                                                coef(m1.poisson), cov.m1)
 ## exponentiate old estimates dropping the p values
 rexp.est <- exp(r.est[, -3])
 ## replace SEs with estimates for exponentiated coefficients
 rexp.est[, "Robust SE"] <- s
 rexp.est
-(s1 <- data.frame(math = mean(p$math),
-  prog = factor(1:3, levels = 1:3, labels = levels(p$prog))))
-predict(poissantr, s1, type="response", se.fit=TRUE)
+# extract predicted values
+(s1 <- data.frame(Alcohol = mean(poissondata$Alcohol),
+  Language = factor(1:3, levels = 1:3, labels = names(table(poissondata$Language)))))
+predict(m1.poisson, s1, type="response", se.fit=TRUE)
 ## calculate and store predicted values
-p$phat <- predict(poissantr, type="response")
+poissondata$Predicted <- predict(m1.poisson, type="response")
 ## order by program and then by math
-p <- p[with(p, order(prog, math)), ]
+poissondata <- poissondata[with(poissondata, order(Language, Alcohol)), ]
 ## create the plot
-ggplot(p, aes(x = math, y = phat, colour = prog)) +
-  geom_point(aes(y = num_awards), alpha=.5, 
+ggplot(poissondata, aes(x = Alcohol, y = Predicted, colour = Language)) +
+  geom_point(aes(y = Pauses), alpha=.5, 
              position=position_jitter(h=.2)) +
   geom_line(size = 1) +
-  labs(x = "Math Score", y = "Expected number of awards")
-# load libraries
-library(foreign)
-library(MASS)
-library(sfsmisc)
+  labs(x = "Alcohol (ml)", y = "Expected number of pauses") +
+  scale_color_manual(values=c("gray30", "gray50", "gray70"))
 # load data
 robustdata <- read.delim("https://slcladal.github.io/data/robustdata.txt", sep = "\t", header = T)
 # inspect data

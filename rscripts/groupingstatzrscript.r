@@ -329,3 +329,101 @@ library("factoextra")
 library("seriation")
 library("NbClust")
 library("pvclust")
+# load libraries
+library("FactoMineR")
+library("factoextra")
+# load preinstalled data
+data(housetasks)
+# inspect data
+head(housetasks)
+# load library
+library("gplots")
+# 1. convert the data as a table
+dt <- as.table(as.matrix(housetasks))
+# 2. Graph
+balloonplot(t(dt), main ="housetasks", xlab ="", ylab="",
+            label = FALSE, show.margins = FALSE)
+chisq <- chisq.test(housetasks)
+chisq
+library("FactoMineR")
+res.ca <- CA(housetasks, graph = FALSE)
+print(res.ca)
+# Chi-square statistics
+chi2 <- 1944.456
+# Degree of freedom
+df <- (nrow(housetasks) - 1) * (ncol(housetasks) - 1)
+# P-value
+pval <- pchisq(chi2, df = df, lower.tail = FALSE)
+pval
+library("factoextra")
+eig.val <- get_eigenvalue(res.ca)
+eig.val
+fviz_screeplot(res.ca) +
+ geom_hline(yintercept=33.33, linetype=2, color="red", addlabels = TRUE, ylim = c(0, 50))
+# repel= TRUE to avoid text overlapping (slow if many point)
+fviz_ca_biplot(res.ca, repel = TRUE)
+# inspect data
+data(iris)
+head(iris, 3)
+# log transform 
+log.ir <- log(iris[, 1:4])
+ir.species <- iris[, 5]
+# apply PCA - scale. = TRUE is highly 
+# advisable, but default is FALSE. 
+ir.pca <- prcomp(log.ir, center = TRUE, scale. = TRUE) 
+# print method
+print(ir.pca)
+# plot method
+plot(ir.pca, type = "l")
+# summary method
+summary(ir.pca)
+# predict PCs
+predict(ir.pca, newdata=tail(log.ir, 2))
+# load library
+#library(devtools)
+# install library from github
+#install_github("vqv/ggbiplot")
+# load installed library
+library(ggbiplot)
+# create plot
+g <- ggbiplot(ir.pca, obs.scale = 1, var.scale = 1, 
+              groups = ir.species, ellipse = TRUE, 
+              circle = TRUE)
+g <- g + scale_color_discrete(name = '')
+g <- g + theme(legend.direction = 'horizontal', 
+               legend.position = 'top')
+print(g)
+require(caret)
+trans = preProcess(iris[,1:4], 
+                   method=c("BoxCox", "center", 
+                            "scale", "pca"))
+PC = predict(trans, iris[,1:4])
+# inspect retained PCs
+head(PC, 3)
+# inspect loadings
+trans$rotation
+# Classical MDS
+# N rows (objects) x p columns (variables)
+# each row identified by a unique row name
+d <- dist(clus) # euclidean distances between the rows
+fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
+fit # view results
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Metric MDS", type="n")
+text(x, y, labels = row.names(clus), cex=.7) 
+# Nonmetric MDS
+# N rows (objects) x p columns (variables)
+# each row identified by a unique row name
+library(MASS)
+d <- dist(clus) # euclidean distances between the rows
+fit <- isoMDS(d, k=2) # k is the number of dim
+fit # view results
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Nonmetric MDS", type="n")
+text(x, y, labels = row.names(clus), cex=.7) 

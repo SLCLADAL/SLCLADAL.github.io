@@ -1,5 +1,5 @@
 
-# "Basic data visualization using R"
+# "Visualizing Data with R"
 # "UQ SLC Digital Team"
 #
 # clean current workspace

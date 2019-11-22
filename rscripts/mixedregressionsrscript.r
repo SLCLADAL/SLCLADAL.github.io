@@ -8,9 +8,9 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("RLRsim", "nlme", "lme4", "Hmisc", "RLRsim", 
-                   "sjPlot", "visreg", "mlogit", "plyr", "rms", 
-                   "ggplot2", "effects", "lme4", "languageR", "Hmisc"))
+install.packages(c("car", "dplyr", "effects", "ggplot2", "Hmisc", "knitr",
+                   "languageR", "lme4", "mlogit", "nlme", "RLRsim", "rms", 
+                   "sjPlot", "visreg"))
 # random intercepts and random slops
 x <- 0:10
 y = 0:10
@@ -92,165 +92,163 @@ text(b[,1], b[,2], "+")
 text(c[,1], c[,2], "*")
 par(mfrow = c(1, 1))
 # activate packages
-library(RLRsim)
-library(nlme)
-library(lme4)
+library(Boruta)
+library(car)
+library(dplyr)
+library(FSA)
+library(effects)
 library(ggplot2)
+library(Hmisc)
+library(knitr)
+library(languageR)
+library(lme4)
+library(MASS)
+library(mlogit)
+library(nlme)
+library(RLRsim)
+library(rms)
+library(sjPlot)
+library(stringr)
+library(tidyr)
+library(vcd)
+library(visreg)
 # load functions
-source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")
-# set options
+source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")   
+source("https://slcladal.github.io/rscripts/PseudoR2lmerBinomial.r") 
+source("https://slcladal.github.io/rscripts/meblr.summary.r")  
+source("https://slcladal.github.io/rscripts/eflme.r")
+source("https://slcladal.github.io/rscripts/ModelFittingSummarySWSU.r") 
 # supress scientific notation
 options("scipen" = 100, "digits" = 4)      
 # do not convert strings into factors
 options(stringsAsFactors = F)              
 # read in data
-mydata <- read.delim("https://slcladal.github.io/data/lmemdata.txt", 
-                     header = TRUE) 
+lmmdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE) %>%
 # convert date into a numeric variable
-mydata$date <- as.numeric(mydata$date)     
+    dplyr::mutate(Date = as.numeric(Date))
 # inspect updated data set
-head(mydata); nrow(mydata)                 
+head(lmmdata); nrow(lmmdata) 
 # visualize variables (2 plots per row)
 # 3 plots in 1 window
 def.par <- par(no.readonly = TRUE)
 nf <- layout(matrix(c(1, 1, 2, 3), 2, 2, byrow = T))
-plot(mydata$pptw ~ mydata$date, ylab = "Frequency", xlab = "year of publication")
-abline(lm(mydata$pptw ~ mydata$date), lty = 3, lwd = 2, col = "red")
+plot(lmmdata$Prepositions ~ lmmdata$Date, ylab = "Frequency", xlab = "Year of publication", ylim = c(0, 200))
+abline(lm(lmmdata$Prepositions ~ lmmdata$Date), lty = 3, lwd = 2, col = "red")
 # re-set margins to fit the labels
 par(mar = c(7.2, 4, 1, 2) + 0.1)
-# reorder genre by median
-genrebymedian <- with(mydata, reorder(genre, -pptw, median))
+# reorder Genre by median
+Genrebymedian <- with(lmmdata, reorder(Genre, -Prepositions, median))
 #	generate plots
-plot(mydata$pptw ~ genrebymedian,
+plot(lmmdata$Prepositions ~ Genrebymedian,
   col = "lightgrey",
   ylab = "Frequency",
   xlab = "",
   las = 2,
   cex.axis = .7,
-  cex = .5)
+  cex = .5,
+  ylim = c(0,200))
 # re-set margins
 par(mar = c(5, 4, 1, 2) + 0.1)
-x = mydata$pptw
-h = hist(mydata$pptw,
-	ylim =c(0, 150),
+x = lmmdata$Prepositions
+h = hist(lmmdata$Prepositions,
+	ylim =c(0, 200),
 	xlim = c(50, 200),
-	xlab = "prepositions per text",
+	xlab = "Prepositions per text",
 	col = "lightgrey",
 	main = "")
-xfit <- seq(min(mydata$pptw), max(mydata$pptw), length = 40)
-yfit <- dnorm(xfit, mean = mean(mydata$pptw),sd = sd(mydata$pptw))
+xfit <- seq(min(lmmdata$Prepositions), max(lmmdata$Prepositions), length = 40)
+yfit <- dnorm(xfit, mean = mean(lmmdata$Prepositions),sd = sd(lmmdata$Prepositions))
 yfit <- yfit*diff(h$mids[1:2])*length(x)
-lines(xfit, yfit, lty = 2, lwd=2)
-# restore original graphic's parameters
-par(def.par)
+lines(xfit, yfit, lty = 2, lwd=2); par(def.par)# restore original graphic's parameters
 # plot 8
-p8 <- ggplot(mydata, aes(date, pptw)) +
+p8 <- ggplot(lmmdata, aes(Date, Prepositions)) +
   geom_point() +
   labs(x = "Year") +
   labs(y = "Prepositions per 1,000 words") +
   geom_smooth(method = "lm")  + 
   theme_set(theme_bw(base_size = 10))
 # plot 9
-p9 <- ggplot(mydata, aes(region, pptw)) +
+p9 <- ggplot(lmmdata, aes(Region, Prepositions)) +
   geom_boxplot() +
   labs(x = "Region") +
   labs(y = "Prepositions per 1,000 words") +
   geom_smooth(method = "lm") # with linear model smoothing!
 # include genre (lowess)
 multiplot(p8, p9, cols = 2)
-ggplot(mydata, aes(date, pptw)) +
+ggplot(lmmdata, aes(Date, Prepositions)) +
   geom_point() +
-  facet_wrap(~ genre, nrow = 4) +
+  facet_wrap(~ Genre, nrow = 4) +
   geom_smooth(method = "lm") +
   theme_bw() +
-  labs(x = "Year") +
+  labs(x = "Date of composition") +
   labs(y = "Prepositions per 1,000 words") +
   coord_cartesian(ylim = c(0, 220))
-mydata$date <- scale(mydata$date, scale = F)
+lmmdata$DateUnscaled <- lmmdata$Date
+lmmdata$Date <- scale(lmmdata$Date, scale = F)
 # inspect data
-head(mydata); str(mydata)
-# generate a glm baseline model
-m0.glm <- glm(pptw ~ 1, family = gaussian, data = mydata)
-# generate a lm base-line model
-m0.lm <- lm(pptw ~ 1, data = mydata)
-# set up first lme model including only the random effect specifying the random intercepts
-m0.lme = lme(pptw ~ 1, random = ~1|genre, data = mydata, method = "ML")
-# set up first lmer model including only the random effect specifying the random intercepts
-m0.lmer = lmer(pptw ~ 1 + (1|genre), data = mydata, REML = F)
-x2 = -2*logLik(m0.lm, REML = T)+2*logLik(m0.lmer, REML = T)
+head(lmmdata); str(lmmdata)
+# generate models
+m0.glm <- glm(Prepositions ~ 1, family = gaussian, data = lmmdata)
+m0.glmer = glmer(Prepositions ~ 1 + (1|Genre), data = lmmdata, family = "gaussian", REML = F)
+x2 = -2*logLik(m0.glm, REML = T)+2*logLik(m0.glmer, REML = T)
 x2 <- x2 <- x2[[1]]
 list(x2, pchisq(x2, df=2, lower.tail=F))
-m0.lmer1 <- lmer(pptw ~ (1|genre) + 1, data = mydata, REML = T)
-m0.lmer2 <- lmer(pptw ~ (1|region) + 1, data = mydata, REML = T)
-m0.lmer3 <- lmer(pptw ~ (1|genre/region) + 1, data = mydata, REML = T)
-anova(m0.lmer1, m0.lmer2, m0.lmer3)
-# the model with the random effect structure (1|genre/region) performs
-# significantly better (also it has a much lower AIC and deviance)
-# therefore, m0.lmer3 is our new m0 model
-m0.lmer <- m0.lmer3
-# test if including the random effect is permitted by applying a restricted likelihood ratio test
-# WARNING: this test can only take simple random effect (1|genre) but not
-# (1|genre/date)
-exactRLRT(m0.lmer1)
-# there is another way to compare model with and without random effects: see below!
-# create a second model with date as a fixed effect
-# m1.lme <- lme(m0.lme, .~. + date) # alternative way to update the model
-m1.lme = lme(pptw ~ date, random = ~1|genre/region, data = mydata, method = "ML")
-# set up m1 model but using the lmer function from the lme4 package
-m1.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
-# compare the models to see if including date has improved the model
-# the difference between the models is the effect (size) of date!
-anova(m0.lme, m1.lme)
-# m1.lme is the better model (sig. p-value & lower AIC)
-# date correlates significantly with pptw (X2(1) = 8.81, p = .003);
-# X2 = L.Ratio;
-# df = subtract df smaller from df larger model
+m1.glmer <- glmer(Prepositions ~ (1|Genre) + Date, data = lmmdata, REML = T)
+anova(m1.glmer, m0.glmer, test = "Chi")
+m2.glmer <- update(m1.glmer, .~.+Region)
+# compare models                
+anova(m2.glmer, m1.glmer, test = "Chi")
+m3.glmer <- update(m1.glmer, .~.+Region*Date)
+# compare models                
+anova(m3.glmer, m1.glmer, test = "Chi")
 # inspect results
-summary(m1.lme)
-# alternative display of the results
-anova(m1.lme)
-# test if date is significant
-anova(m0.lmer, m1.lmer)
+summary(m1.glmer)
+plot(m1.glmer, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots
+plot(m1.glmer, resid(., type = "pearson") ~ fitted(.) | Genre, id = 0.05, 
+     adj = -0.3, pch = 20, col = "gray40")
+m4.lme = lme(Prepositions ~ Date, random = ~1|Genre, data = lmmdata, method = "ML")
+m5.lme <- update(m4.lme, weights = varIdent(form = ~ 1 | Genre))
+# compare models
+anova(m5.lme, m4.lme)
+# inspect results
+summary(m5.lme)        
+anova(m5.lme)          
+# creat base-line model
+m0.lme = lme(Prepositions ~ 1, random = ~1|Genre, data = lmmdata, method = "ML", weights = varIdent(form = ~ 1 | Genre))
+anova(m5.lme, m0.lme)  # test if date is significant
 # extract estimates and sd for fixed and random effects
-intervals(m1.lme)
-plot(m1.lme, genre ~ resid(.), abline = 0 ) # generate diagnostic plots
-plot(m1.lme, resid(., type = "p") ~ fitted(.) | genre, id = 0.05, adj = -0.3)
-m2.lme <- update(m1.lme, weights = varIdent(form = ~ 1 | genre))
-# test if m2.lme is more appropriate for the data than m1.lme
-anova(m1.lme, m2.lme)
-summary(m2.lme)        # inspect results
-anova(m2.lme)          # ANOVA display of the results
-anova(m0.lme, m2.lme)  # test if date is significant
-intervals(m2.lme)      # extract estimates and sd for fixed and random effects
-ef.lme <- function(x) {
-  df <- summary(x)[[20]][6]
-  t <-  summary(x)[[20]][8]
-  #df <- summary(x)$tTable[, 3]
-  #t <- summary(x)$tTable[, 4]
-  r <- sqrt((t^2)/((t^2)+df))
-  return(paste("Pearson's r = ", round(r, 3)))
-  }
-ef.lme(m2.lme)
-m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
-summary(m2.lmer)
-m2.lmer = lmer(pptw ~ (1|genre/region) + date, data = mydata, REML = F)
-2*pchisq(2*as.numeric(logLik(m2.lmer)-logLik(m0.glm)), 2, lower.tail = FALSE)
+intervals(m5.lme)      
+# calculate effect size 
+ef.lme(m5.lme)
+# extract predicted values
+lmmdata$Predicted <- predict(m5.lme, lmmdata)
+# plot predicted values
+ggplot(lmmdata, aes(DateUnscaled, Predicted)) +
+  facet_wrap(~Genre) +
+  geom_point(aes(x = DateUnscaled, y = Prepositions), color = "gray80", size = .5) +
+  geom_smooth(aes(y = Predicted), color = "gray20", linetype = "solid", 
+              se = T, method = "lm") +
+  guides(color=guide_legend(override.aes=list(fill=NA))) +  
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="top", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  xlab("Date of composition")
 # start plotting
 par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
-plot(m2.lme)
+plot(m5.lme, pch = 20, col = "black", lty = "dotted")
 par(mfrow = c(1, 1))
-# diagnostic plot (Pinheiro & Bates 2000:21)
-plot(m2.lme, form = resid(., type = "p") ~ fitted(.) | genre, abline = 0, cex = .5)
-# diagnostic plot: residuals of fitted values against observed values (cf. Pinheiro & Bates 2000:182)
-qqnorm(m2.lme)
-# normal plot of the estimated date %in% genre random effects
-qqnorm(m2.lme, ~ranef(., level = 2), id = 0.05, cex = 0.7, xlim = c(-40, 40))
-# diagnostic plot: normal plots of the residuals by genre (cf. Pinheiro & Bates 2000:22, 179)
-qqnorm(m2.lme, ~resid(.) | genre )
-# inspect the observed responses versus the within-group fitted values
-# (cf. Pinheiro & Bates 2000:178)
-plot(m2.lme, pptw ~ fitted(.), id = 0.05, adj = -0.3, xlim = c(80, 220), cex = .8)
-summary(m2.lmer)
+# fitted values by Genre
+plot(m5.lme, form = resid(., type = "p") ~ fitted(.) | Genre, abline = 0, 
+     cex = .5, pch = 20, col = "black")
+# residuals of fitted values against observed
+qqnorm(m5.lme, pch = 20, col = "black")
+# residuals by genre
+qqnorm(m5.lme, ~resid(.) | Genre, pch = 20, col = "black" )
+# observed responses versus the within-group fitted values
+plot(m5.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3, 
+     xlim = c(80, 220), cex = .8, pch = 20, col = "blue")
+summary(m5.lme)
 x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
 x2 <- x1-2
 x3 <- x2-2
@@ -332,22 +330,6 @@ curve(predict(m15,data.frame(x15=x),type="response"), lty=1, lwd=1, col="darkgre
 curve(predict(m16,data.frame(x16=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
 curve(predict(m17,data.frame(x17=x),type="response"), lty=1, lwd=1, col="darkgrey", add=TRUE)
 par(mfrow = c(1, 1))
-rm(list=ls(all=T))  # clean current workspace
-options("scipen" = 100, "digits" = 4)     # set options
-library(Hmisc)      # activate library
-library(RLRsim)     # activate library
-library(sjPlot)     # activate library
-library(visreg)     # activate library
-library(mlogit)     # activate library
-library(plyr)       # activate library
-library(rms)        # activate library
-library(ggplot2)    # activate library
-library(effects)    # activate library
-library(lme4)       # activate library
-library(languageR)  # activate library
-source("rscripts/multiplot_ggplot2.R")    # load multiplot function
-source("rscripts/PseudoR2lmerBinomial.R") # load pseudor2 function
-source("rscripts/meblr.summary.R")        # load summary function
 # load data
 mblrdata <- read.table("https://slcladal.github.io/data/mblrdata.txt", 
                        comment.char = "",# data does not contain comments
@@ -355,7 +337,7 @@ mblrdata <- read.table("https://slcladal.github.io/data/mblrdata.txt",
                        sep = "\t",       # data is tab separated
                        header = T)       # data has column names
 # inspect data structure
-str(mblrdata)                               
+str(mblrdata)
 # def. variables to be factorized
 vrs <- c("ID", "Age", "Gender", "ConversationType", "Priming")
 # def. vector with variables
@@ -363,69 +345,19 @@ fctr <- which(colnames(mblrdata) %in% vrs)
 # factorize variables
 mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor)
 # relevel Age (Young = Reference)
-mblrdata$Age <- relevel(mblrdata$Age, "Young") 
-plot(table(mblrdata$ID)[order(table(mblrdata$ID), decreasing = T)],
-     ylim = c(0,150),
-      cex = .5)
-collapsespeaker <- table(mblrdata$ID)[which(table(mblrdata$ID) < 21)]
-mblrdata$ID <- ifelse(mblrdata$ID %in% collapsespeaker, "Other", mblrdata$ID)
-library(knitr)    # load library
+mblrdata$Age <- relevel(mblrdata$Age, "Young")
+# order data by ID
+mblrdata <- mblrdata %>%
+  dplyr::arrange(ID)
 kable(head(mblrdata), caption = "First six rows of the data set.")
-p1 <- ggplot(mblrdata, aes(Gender, SUFlike, color = Gender)) +
-  scale_fill_brewer() +
+ggplot(mblrdata, aes(Gender, SUFlike, color = Priming)) +
+  facet_wrap(Age~ConversationType) +
   stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
   theme_set(theme_bw(base_size = 10)) +
-  coord_cartesian(ylim = c(0, 1)) +
-  labs(x = "Sex", y = "Mean frequency of discourse like") +
-    guides(fill=FALSE, color=FALSE) +              # supress legend
-  scale_color_manual(values = c("blue", "red"))
-p2 <- ggplot(mblrdata, aes(Age, SUFlike, color = Age)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Age", y = "Mean frequency of discourse like") +
-    guides(fill=FALSE, color=FALSE) +              # supress legend
-  scale_color_manual(values = c("darkblue", "lightblue"))
-p3 <- ggplot(mblrdata, aes(ConversationType, SUFlike, colour = ConversationType)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "ConversationType", y = "Mean frequency of discourse like", colour = "ConversationType") +
-    guides(fill=FALSE, color=FALSE) +              # supress legend
-  scale_color_manual(values = c("darkgreen", "lightgreen"))
-p4 <- ggplot(mblrdata, aes(Priming, SUFlike, colour = Priming)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "line") +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Priming", y = "Mean frequency of discourse like", colour = "Priming") +
-    guides(fill=FALSE, color=FALSE) +              # supress legend
-  scale_color_manual(values = c("grey30", "grey60"))
-p5 <- ggplot(mblrdata, aes(Age, SUFlike, colour = Gender)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "point", aes(group= Gender)) +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_set(theme_bw(base_size = 10)) +
-    scale_color_manual(values = c("blue", "red")) +
-  labs(x = "Age", y = "Mean frequency of discourse like", colour = "Gender")
-p6 <- ggplot(mblrdata, aes(Gender, SUFlike, colour = ConversationType)) +
-  stat_summary(fun.y = mean, geom = "point") +
-  stat_summary(fun.y = mean, geom = "point", aes(group= ConversationType)) +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  coord_cartesian(ylim = c(0, 1)) +
-  theme_set(theme_bw(base_size = 10)) +
-  labs(x = "Sex", y = "Mean frequency of discourse like", colour = "Age") +
-  scale_color_manual(values = c("darkgreen", "lightgreen"))
-# display the plots
-multiplot(p1, p3, p5, p2, p4, p6, cols = 2)
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Probabilty of discourse like") +
+  scale_color_manual(values = c("gray20", "gray70"))
 # set options
 options(contrasts  =c("contr.treatment", "contr.poly"))
 mblrdata.dist <- datadist(mblrdata)
@@ -448,115 +380,235 @@ m0.glmer <- glmer(SUFlike ~ 1+ (1|ID), family = binomial, data = mblrdata, contr
 ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m1.glm <- update(m0.glm, .~.+Priming)
 m1.glmer <- update(m0.glmer, .~.+Priming)
-anova(m1.glmer, m0.glmer, test = "Chi") # SIG (p<.001***) 
+anova(m1.glmer, m0.glmer, test = "Chi") 
 # add Age
 ifelse(min(ftable(mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m2.glm <- update(m1.glm, .~.+Age)
-ifelse(max(vif(m2.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m2.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") 
 m2.glmer <- update(m1.glmer, .~.+Age)
-anova(m2.glmer, m1.glmer, test = "Chi") #mar sig (p=.0.61) BUT BIC inflation  
+anova(m2.glmer, m1.glmer, test = "Chi")   
+Anova(m2.glmer, test = "Chi")
 # add Gender
 ifelse(min(ftable(mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m3.glm <- update(m1.glm, .~.+Gender)
-ifelse(max(vif(m3.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m3.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") 
 m3.glmer <- update(m1.glmer, .~.+Gender)
-anova(m3.glmer, m1.glmer, test = "Chi") # SIG (p<.001***)  
+anova(m3.glmer, m1.glmer, test = "Chi")
+Anova(m3.glmer, test = "Chi")
 # add ConversationType
 ifelse(min(ftable(mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m4.glm <- update(m3.glm, .~.+ConversationType)
-ifelse(max(vif(m4.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m4.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") 
 m4.glmer <- update(m3.glmer, .~.+ConversationType)
-anova(m4.glmer, m3.glmer, test = "Chi") # SIG (p<.001***)  
+anova(m4.glmer, m3.glmer, test = "Chi") 
+Anova(m4.glmer, test = "Chi")
 # add Priming*Age
 ifelse(min(ftable(mblrdata$Priming, mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m5.glm <- update(m4.glm, .~.+Priming*Age)
-ifelse(max(vif(m5.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
+ifelse(max(vif(m5.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!") # VIFs ok
 m5.glmer <- update(m4.glmer, .~.+Priming*Age)
-anova(m5.glmer, m4.glmer, test = "Chi") # not sig (p=0.6)  
+anova(m5.glmer, m4.glmer, test = "Chi") 
 # add Priming*Gender
 ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m6.glm <- update(m4.glm, .~.+Priming*Gender)
-ifelse(max(vif(m6.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m6.glmer <- update(m4.glmer, .~.+Priming*Gender)
+anova(m6.glmer, m4.glmer, test = "Chi") 
+Anova(m6.glmer, test = "Chi")
 # add Priming*ConversationType
 ifelse(min(ftable(mblrdata$Priming, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m7.glm <- update(m4.glm, .~.+Priming*ConversationType)
-ifelse(max(vif(m7.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m7.glm <- update(m6.glm, .~.+Priming*ConversationType)
+ifelse(max(vif(m7.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+m7.glmer <- update(m6.glmer, .~.+Priming*ConversationType)
+anova(m7.glmer, m6.glmer, test = "Chi")
 # add Age*Gender
 ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m8.glm <- update(m4.glm, .~.+Age*Gender)
-ifelse(max(vif(m8.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m8.glm <- update(m6.glm, .~.+Age*Gender)
+ifelse(max(vif(m8.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+m8.glmer <- update(m6.glmer, .~.+Age*Gender)
+anova(m8.glmer, m6.glmer, test = "Chi") 
 # add Age*ConversationType
 ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m9.glm <- update(m4.glm, .~.+Age*ConversationType)
-ifelse(max(vif(m9.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs ok
-m9.glmer <- update(m4.glmer, .~.+Age*ConversationType)
-anova(m9.glmer, m4.glmer, test = "Chi") # not sig (p=0.3)  
+m9.glm <- update(m6.glm, .~.+Age*ConversationType)
+ifelse(max(vif(m9.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!") 
+m9.glmer <- update(m6.glmer, .~.+Age*ConversationType)
+anova(m9.glmer, m6.glmer, test = "Chi") 
 # add Gender*ConversationType
 ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m10.glm <- update(m4.glm, .~.+Gender*ConversationType)
-ifelse(max(vif(m10.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m10.glm <- update(m6.glm, .~.+Gender*ConversationType)
+ifelse(max(vif(m10.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+m10.glmer <- update(m6.glmer, .~.+Gender*ConversationType)
+anova(m10.glmer, m6.glmer, test = "Chi") 
 # add Priming*Age*Gender
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m11.glm <- update(m4.glm, .~.+Priming*Age*Gender)
-ifelse(max(vif(m11.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m11.glm <- update(m6.glm, .~.+Priming*Age*Gender)
+ifelse(max(vif(m11.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+m11.glmer <- update(m6.glmer, .~.+Priming*Age*Gender)
+anova(m11.glmer, m6.glmer, test = "Chi") 
 # add Priming*Age*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m12.glm <- update(m4.glm, .~.+Priming*Age*ConversationType)
-ifelse(max(vif(m12.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m12.glm <- update(m6.glm, .~.+Priming*Age*ConversationType)
+ifelse(max(vif(m12.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+m12.glmer <- update(m6.glmer, .~.+Priming*Age*ConversationType)
+anova(m12.glmer, m6.glmer, test = "Chi")
 # add Priming*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m13.glm <- update(m4.glm, .~.+Priming*Gender*ConversationType)
-ifelse(max(vif(m13.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m13.glm <- update(m6.glm, .~.+Priming*Gender*ConversationType)
+ifelse(max(vif(m13.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+vif(m13.glm)
+m13.glmer <- update(m6.glmer, .~.+Priming*Gender*ConversationType)
+anova(m13.glmer, m6.glmer, test = "Chi")
+Anova(m13.glmer, test = "Chi")
 # add Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m14.glm <- update(m4.glm, .~.+Age*Gender*ConversationType)
-ifelse(max(vif(m14.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m14.glm <- update(m13.glm, .~.+Age*Gender*ConversationType)
+ifelse(max(vif(m14.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!")
+vif(m14.glm)
 # add Priming*Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m15.glm <- update(m4.glm, .~.+Priming*Age*Gender*ConversationType)
-ifelse(max(vif(m15.glm)) <= 3,  "VIFs okay", "VIFs unacceptable") # VIFs unacceptable
+m15.glm <- update(m13.glm, .~.+Priming*Age*Gender*ConversationType)
+ifelse(max(vif(m15.glm)) <= 20,  "VIFs okay", "WARNING: high VIFs!") 
+vif(m15.glm)
 # comparisons of glmer objects
 m1.m0 <- anova(m1.glmer, m0.glmer, test = "Chi") 
-m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi") 
-m3.m1 <- anova(m3.glmer, m1.glmer, test = "Chi") 
+m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi")   
+m3.m1 <- anova(m3.glmer, m1.glmer, test = "Chi")
 m4.m3 <- anova(m4.glmer, m3.glmer, test = "Chi") 
 m5.m4 <- anova(m5.glmer, m4.glmer, test = "Chi") 
-m9.m4 <- anova(m9.glmer, m4.glmer, test = "Chi") 
+m6.m4 <- anova(m6.glmer, m4.glmer, test = "Chi") 
+m7.m6 <- anova(m7.glmer, m6.glmer, test = "Chi")
+m8.m6 <- anova(m8.glmer, m6.glmer, test = "Chi") 
+m9.m6 <- anova(m9.glmer, m6.glmer, test = "Chi") 
+m10.m6 <- anova(m10.glmer, m6.glmer, test = "Chi") 
+m11.m6 <- anova(m11.glmer, m6.glmer, test = "Chi") 
+m12.m6 <- anova(m12.glmer, m6.glmer, test = "Chi")
+m13.m6 <- anova(m13.glmer, m6.glmer, test = "Chi")
 # create a list of the model comparisons
-mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m9.m4)
-# load function for summary
-source("rscripts/ModelFittingSummarySWSU.R") # for GLMEM (step-wise step-up)
+mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m6.m4, m7.m6, m8.m6, m9.m6, m10.m6, m11.m6, m12.m6, m13.m6)
+# summary table for model fitting
 mdlft <- mdl.fttng.swsu(mdlcmp)
 mdlft <- mdlft[,-2]
-library(knitr)    # load library
 kable(mdlft, caption = "Model fitting process summary.")
-mlr.glmer <- m4.glmer # rename final minimal adequate model
-mlr.glm <- m4.glm # rename final minimal adequate fixed-effects model
+mlr.glmer <- m13.glmer # rename final minimal adequate model
+mlr.glm <- m13.glm # rename final minimal adequate fixed-effects model
 anova(mlr.glmer, m0.glmer, test = "Chi") # final model better than base-line model
 print(mlr.glmer, corr = F) # inspect final minimal adequate model
-anova(mlr.glmer)  # ANOVA summary
-anova(m1.glmer, m0.glmer, test = "Chi") # Priming effect
-anova(m3.glmer, m1.glmer, test = "Chi") # Gender effect
-anova(m4.glmer, m3.glmer, test = "Chi") # ConversationType effect
+anova(m1.glmer, m0.glmer, test = "Chi") 
+# extract predicted values
+mblrdata$Predicted <- predict(m13.glmer, mblrdata, type = "response")
+# plot
+ggplot(mblrdata, aes(Gender, Predicted, color = Priming)) +
+  facet_wrap(~ConversationType) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+    ylim(0, .75) +
+  labs(x = "", y = "Predicted Probabilty of discourse like") +
+  scale_color_manual(values = c("gray20", "gray70"))
 mlr.lrm <- lrm(SUFlike ~ Priming + Gender + ConversationType, data = mblrdata, x = T, y = T)
 m1.glm = glm(SUFlike ~ Priming + Gender + ConversationType, family = binomial, data = mblrdata) # baseline model glm
 # we now create a lmer object equivalent to the final minimal adequate model
 mlr.lmer <- lmer(SUFlike ~ Age + Gender + ConversationType + (1|ID), data = mblrdata, family = binomial)
 cor.test(coef(mlr.lrm), fixef(mlr.lmer))
-# load library
-library(Hmisc)   
 probs = 1/(1+exp(-fitted(mlr.lmer)))
 probs = binomial()$linkinv(fitted(mlr.lmer))
 somers2(probs, as.numeric(mblrdata$SUFlike))
-plot(mlr.glmer)
-# plot residuals against fitted
-stripParams <- list(cex=.3, lines=1.5)
-plot(mlr.glmer, form = resid(., type = "response") ~ fitted(.) | ID, abline = 0, par.strip.text = stripParams,cex = .3,id = 0.05, adj = -0.3)
-# diagnostic plot: examining residuals (Pinheiro & Bates 2000:175)
-plot(mlr.glmer, ID ~ resid(.), abline = 0 , cex = .5)
+plot(mlr.glmer, pch = 20, col = "black", lty = "dotted")
 # summarize final model
 mblrmtb <- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
-mblrmtb <- mblrmtb[, -c(4:5)]
-library(knitr)    # load library
-kable(mblrmtb, caption = "Results of a Mixed-Effects Binomial Logistic Regression Model.")
+kable(mblrmtb[, -c(4:5)], caption = "Summary of the final minimal adequate binomial logistic mixed-effects regression model which was fitted to predictors of discourse like in New Zealand English.")
+# load data
+countdata <- read.table("https://slcladal.github.io/data/countdata.txt", 
+                       comment.char = "",quote = "", sep = "\t", header = T) 
+# inspect data
+str(countdata)
+# factorize variables
+countdata <- countdata %>%
+  dplyr::select(-ID)
+clfct <- c("Trial", "Language", "Gender")
+countdata[clfct] <- lapply(countdata[clfct], factor)
+ # inspect data
+str(countdata); head(countdata)
+p1d <- countdata %>%
+  dplyr::select(Language, Shots) %>%
+  dplyr::group_by(Language) %>%
+  dplyr::mutate(Mean = round(mean(Shots), 1)) %>%
+  dplyr::mutate(SD = round(sd(Shots), 1))
+# start plot
+ggplot(p1d, aes(Language, Shots, color = Language, fill = Language)) +
+  geom_violin(trim=FALSE, color = "gray20")+ 
+  geom_boxplot(width=0.1, fill="white", color = "gray20") +
+  geom_text(aes(y=-4,label=paste("mean: ", Mean, sep = "")), size = 3, color = "black") +
+  geom_text(aes(y=-5,label=paste("SD: ", SD, sep = "")), size = 3, color = "black") +
+  scale_fill_manual(values=rep("grey90",4)) + 
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="none", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-5, 15) +
+  labs(x = "Language", y = "Shots")
+# perform variable selection
+set.seed(20191220)
+boruta <- Boruta(UHM ~.,data=countdata)
+print(boruta)
+# output the results
+gf = goodfit(countdata$UHM,type= "poisson",method= "ML")
+plot(gf,main="Count data vs Poisson distribution")
+summary(gf)
+# check homogeneity
+leveneTest(countdata$UHM, countdata$Shots, center = mean)
+# base-line mixed-model
+m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
+                   family = quasipoisson(link='log'))
+# create glm base line model
+m0.glm = glm(UHM ~ 1, data = countdata, family = quasipoisson(link='log'))
+# add Shots
+m1.glm <- update(m0.glm, .~.+ Shots)
+m1.glmer <- update(m0.glmer, .~.+ Shots)
+Anova(m1.glmer, test = "Chi")           # SIG! (p<0.0000000000000002 ***)
+summary(m1.glmer)
+#summary(m1.glm)
+exp(coef(m1.glm))
+# diagnostic plot
+plot(m1.glmer, pch = 20, col = "black", lty= "dotted", ylab = "Pearson's residuals")
+# generate diagnostic plots
+plot(m1.glmer, Language ~ resid(.), abline = 0, fill = "gray70") 
+# create effect plot for comparison purposes
+plot(predictorEffects(m1.glmer)) 
+# create table with predicted values for uhms by shots
+eff_cf <- predictorEffects(m1.glmer)
+eff_df <- data.frame(eff_cf)
+# create data frame with effects
+ef <- as.data.frame(effect("Shots", m1.glmer, xlevels=list(Shots=seq(0, 13, 1))))
+ef$Type <- rep("Predicted", 14)
+ef$lower <- NULL
+ef$upper <- NULL
+ef <- ef %>%
+  dplyr::filter(Shots < 10) # remove predictions for 10 shots or more
+# create table with observed values for uhms by shots
+UHM_mean <- t(tapply(countdata$UHM, countdata$Shots, mean))
+UHM_se <- t(tapply(countdata$UHM, countdata$Shots, se))
+Shots <- c(seq(0,10,1), 12:13)  
+df <- data.frame(Shots, UHM_mean[1,], UHM_se[1,])
+colnames(df) <- c("Shots", "fit", "se")
+df$Type <- rep("Observed", 13)
+df <- df %>%
+  dplyr::filter(Shots < 10) # remove predictions for 10 shots or more
+# combine observed and predicted table
+tbd <- rbind(ef, df)
+# inspect data
+head(tbd)
+# plot observed and expected
+ggplot(tbd, aes(Shots, fit, color = Type)) +
+  geom_point() + 
+  geom_errorbar(aes(ymin=fit-se, ymax=fit+se), width=0.5) +
+  theme_set(theme_bw(base_size = 20)) +
+  scale_color_manual(values = c("grey20", "gray70")) +
+  theme(legend.position="none", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-2.5, 5) +
+  labs(x = "Shots", y = "Number of uhm fillers")
+The effect plot shows that the predicted number of shots incerases linearly with each shot, the observed number of shots plateus once a speaker had 5 shots (or more). We will now summarize the results as if the violations had NOT occurred(!) - again: thsi is onyl because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
+A mixed-effect pseudo-Poisson regression model which contained the trial as random effect was fit to to the data. Prior to the model fitting process, a Boruta analysis was applied to determine whether any of the predictors had a meaningful relationship with the dependent variable (instances of *uhm*). Since the Boruta analysis indicated that only the number of shots that speakers have had was important, only "Shots" was tested during model fitting. The final minimal adequate model showed that the number of *uhm* as fillers increases significantly, and near-linearly with the number of shots speakers had ($\chi$^2^(1):276.0, p <.0001, $\beta$: 1.2632). An inspection of the random effect structure conveyed that there was almost no variability between languages.
 # References
