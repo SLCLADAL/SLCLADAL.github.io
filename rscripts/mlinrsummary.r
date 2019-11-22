@@ -46,8 +46,7 @@ ciupr <- confint(glm)[, 2]
     round(coefs[, 4], 5),
     p.nice(coefs[, 4]))
   colnames(coef.df) <- c(colnames(coefs)[1],
-    "VIF",
-    "Std. beta", "CI(2.5%)", "CI(97.5%)",
+    "VIF", "CI(2.5%)", "CI(97.5%)",
     colnames(coefs)[2],
     colnames(coefs)[3],
     colnames(coefs)[4],
