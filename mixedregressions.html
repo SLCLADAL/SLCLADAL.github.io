@@ -11,7 +11,7 @@
 
 <meta name="author" content="UQ SLC Digital Team" />
 
-<meta name="date" content="2019-11-21" />
+<meta name="date" content="2019-11-22" />
 
 <title>Mixed-Effects Regression Models</title>
 
@@ -441,7 +441,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Mixed-Effects Regression Models</h1>
 <h4 class="author"><em>UQ SLC Digital Team</em></h4>
-<h4 class="date"><em>2019-11-21</em></h4>
+<h4 class="date"><em>2019-11-22</em></h4>
 
 </div>
 
@@ -493,26 +493,32 @@ install.packages(c(&quot;car&quot;, &quot;dplyr&quot;, &quot;effects&quot;, &quo
 <h2><span class="header-section-number">3.2</span> Example: Preposition Use across Time by Genre</h2>
 <p>To explore how to implement a mixed-effects model in “R” we revisit the preposition data that contains relative frequencies of prepositions in English texts written between 1150 and 1913. As a first step, and to prepare our analysis, we load necessary “R” packages, specify options, and load as well as provide an overview of the data.</p>
 <pre class="r"><code># activate packages
+library(Boruta)
 library(car)
 library(dplyr)
+library(FSA)
 library(effects)
 library(ggplot2)
 library(Hmisc)
 library(knitr)
 library(languageR)
 library(lme4)
+library(MASS)
 library(mlogit)
 library(nlme)
 library(RLRsim)
 library(rms)
-library(sjPlot)     
-library(visreg)     
+library(sjPlot)
+library(stringr)
+library(tidyr)
+library(vcd)
+library(visreg)
 # load functions
-source(&quot;rscripts/multiplot_ggplot2.R&quot;)   
-source(&quot;rscripts/PseudoR2lmerBinomial.R&quot;) 
-source(&quot;rscripts/meblr.summary.R&quot;)  
-source(&quot;https://slcladal.github.io/rscripts/multiplot_ggplot2.r&quot;)
-# set options
+source(&quot;https://slcladal.github.io/rscripts/multiplot_ggplot2.r&quot;)   
+source(&quot;https://slcladal.github.io/rscripts/PseudoR2lmerBinomial.r&quot;) 
+source(&quot;https://slcladal.github.io/rscripts/meblr.summary.r&quot;)  
+source(&quot;https://slcladal.github.io/rscripts/eflme.r&quot;)
+source(&quot;https://slcladal.github.io/rscripts/ModelFittingSummarySWSU.r&quot;) 
 # supress scientific notation
 options(&quot;scipen&quot; = 100, &quot;digits&quot; = 4)      
 # do not convert strings into factors
@@ -812,12 +818,7 @@ intervals(m5.lme)      </code></pre>
 <p>We will now extract effect sizes (in the example: the effect size of date) and calculate normalized effect size measures (this effect size measure works for all fixed effects). To calculate the effect size, take the square root of the squared t-value divided by the t-value squared plus the degrees of freedom:</p>
 <p>r = <code>sqrt(t^2^/(t^2^+df))</code>.</p>
 <p>A brief word of warning is in order here: only apply this function to main effects that are not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 641)</span>.</p>
-<pre class="r"><code>ef.lme &lt;- function(x) {
-  df &lt;- summary(x)[[20]][6]
-  t &lt;-  summary(x)[[20]][8]
-  r &lt;- sqrt((t^2)/((t^2)+df))
-  return(paste(&quot;Pearson&#39;s r = &quot;, round(r, 3)))
-  }
+<pre class="r"><code># calculate effect size 
 ef.lme(m5.lme)</code></pre>
 <pre><code>## [1] &quot;Pearson&#39;s r =  0.172&quot;</code></pre>
 <p>While we have already shown that the effect of Date is significant, it is small which means that the number of prepositions per text doe snot correlate evry stribgyl with time. This suggesta that other factors athat are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too).</p>
@@ -906,7 +907,7 @@ plot(m5.lme, Prepositions ~ fitted(.), id = 0.05, adj = -0.3,
 ## 
 ## Number of Observations: 537
 ## Number of Groups: 16</code></pre>
-<p>A mixed-effect linear regression model. which contained the genre of texts as random effect was fit to to the data. Due to presence of outliers in the data, weights were included into the model which led to a significantly imporved model fit compared to an unweight model (). The final minimal adequate model performed significantly better than an intercept-only base line model (<span class="math inline">\(\chi\)</span><sup>2</sup>(1): 52.87, p &lt;.0001) and showed that the the frequency of prepositions increases significantly but only marginally with the date of composition (<span class="math inline">\(\chi\)</span><sup>2</sup>(2): 10.12, p: 0.0063, Pearson’s <span class="math inline">\(r\)</span> = 0.172). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data.</p>
+<p>A mixed-effect linear regression model which contained the genre of texts as random effect was fit to to the data in a step-wise-step up procedure. Due to the presence of outliers in the data, weights were included into the model which led to a significantly improved model fit compared to an unweight model (<span class="math inline">\(\chi\)</span><sup>2</sup>(2): 39.17, p: 0.0006). The final minimal adequate model performed significantly better than an intercept-only base line model (<span class="math inline">\(\chi\)</span><sup>2</sup>(1): 52.87, p &lt;.0001) and showed that the the frequency of prepositions increases significantly but only marginally with the date of composition (<span class="math inline">\(\chi\)</span><sup>2</sup>(2): 10.12, p: 0.0063, Pearson’s <span class="math inline">\(r\)</span> = 0.172). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data.</p>
 </div>
 </div>
 <div id="mixed-effects-binomial-logistic-regression-models" class="section level1">
@@ -937,14 +938,14 @@ mblrdata &lt;- read.table(&quot;https://slcladal.github.io/data/mblrdata.txt&quo
                        sep = &quot;\t&quot;,       # data is tab separated
                        header = T)       # data has column names
 # inspect data structure
-str(mblrdata)                               </code></pre>
-<pre><code>## &#39;data.frame&#39;:    10170 obs. of  6 variables:
-##  $ ID              : chr  &quot;S1A-001$A&quot; &quot;S1A-001$A&quot; &quot;S1A-001$A&quot; &quot;S1A-001$A&quot; ...
-##  $ Gender          : chr  &quot;Men&quot; &quot;Men&quot; &quot;Men&quot; &quot;Men&quot; ...
-##  $ Age             : chr  &quot;Old&quot; &quot;Old&quot; &quot;Old&quot; &quot;Old&quot; ...
-##  $ ConversationType: chr  &quot;SameGender&quot; &quot;SameGender&quot; &quot;SameGender&quot; &quot;SameGender&quot; ...
-##  $ Priming         : chr  &quot;Prime&quot; &quot;NoPrime&quot; &quot;NoPrime&quot; &quot;NoPrime&quot; ...
-##  $ SUFlike         : int  1 0 0 0 0 0 0 0 0 0 ...</code></pre>
+str(mblrdata)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    2000 obs. of  6 variables:
+##  $ ID              : chr  &quot;S1A-061$C&quot; &quot;S1A-023$B&quot; &quot;S1A-054$A&quot; &quot;S1A-090$B&quot; ...
+##  $ Gender          : chr  &quot;Women&quot; &quot;Women&quot; &quot;Women&quot; &quot;Women&quot; ...
+##  $ Age             : chr  &quot;Young&quot; &quot;Young&quot; &quot;Young&quot; &quot;Young&quot; ...
+##  $ ConversationType: chr  &quot;MixedGender&quot; &quot;MixedGender&quot; &quot;SameGender&quot; &quot;MixedGender&quot; ...
+##  $ Priming         : chr  &quot;NoPrime&quot; &quot;NoPrime&quot; &quot;NoPrime&quot; &quot;NoPrime&quot; ...
+##  $ SUFlike         : int  0 0 0 0 0 1 1 0 0 1 ...</code></pre>
 <p>As all variables except for the dependent variable (SUFlike) are character strings, we factorize the independent variables.</p>
 <pre class="r"><code># def. variables to be factorized
 vrs &lt;- c(&quot;ID&quot;, &quot;Age&quot;, &quot;Gender&quot;, &quot;ConversationType&quot;, &quot;Priming&quot;)
@@ -953,7 +954,10 @@ fctr &lt;- which(colnames(mblrdata) %in% vrs)
 # factorize variables
 mblrdata[,fctr] &lt;- lapply(mblrdata[,fctr], factor)
 # relevel Age (Young = Reference)
-mblrdata$Age &lt;- relevel(mblrdata$Age, &quot;Young&quot;) </code></pre>
+mblrdata$Age &lt;- relevel(mblrdata$Age, &quot;Young&quot;)
+# order data by ID
+mblrdata &lt;- mblrdata %&gt;%
+  dplyr::arrange(ID)</code></pre>
 <p>Before continuing, a few words about the minimum number of random efect levels and the minimum number of observations per random effect level are in order.</p>
 <p>While many data points per random variable level increases statistical power and thus to more robust estimates of the random effects <span class="citation">(Austin and Leckie <a href="#ref-austin2018multilevel">2018</a>)</span>, it has been shown that small numbers of observations per random effect variable level do not cause serious bias and it does not negatively effect the estimates of the fixed-effects coefficients <span class="citation">(Bell, Ferron, and Kromrey <a href="#ref-bell2008multilevel">2008</a>, <span class="citation">Clarke (<a href="#ref-clarke2008can">2008</a>)</span>, <span class="citation">Clarke and Wheaton (<a href="#ref-clarke2007addressing">2007</a>)</span>, <span class="citation">Maas and Hox (<a href="#ref-maas2005sufficient">2005</a>)</span>)</span>. Thhe minimum number of observations per random effect variable level is therefore 1.</p>
 <p>In simulation study, <span class="citation">(Bell, Ferron, and Kromrey <a href="#ref-bell2008multilevel">2008</a>)</span> tested the impact of random variable levels with only a single observation ranging from 0 to 70 percent. As long as there was a relatively high number of random effect variable levels (500 or more), small numbers of observations had almost no impact on bias and Type 1 error control.</p>
@@ -976,8 +980,8 @@ mblrdata$Age &lt;- relevel(mblrdata$Age, &quot;Young&quot;) </code></pre>
 <td align="left">Men</td>
 <td align="left">Old</td>
 <td align="left">SameGender</td>
-<td align="left">Prime</td>
-<td align="right">1</td>
+<td align="left">NoPrime</td>
+<td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="left">S1A-001$A</td>
@@ -1054,13 +1058,13 @@ m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) </code></
 <pre class="r"><code>aic.glmer &lt;- AIC(logLik(m0.glmer))
 aic.glm &lt;- AIC(logLik(m0.glm))
 aic.glmer; aic.glm</code></pre>
-<pre><code>## [1] 9193</code></pre>
-<pre><code>## [1] 9310</code></pre>
+<pre><code>## [1] 1828</code></pre>
+<pre><code>## [1] 1838</code></pre>
 <p>The AIC of the glmer object is smaller which shows that including the random intercepts is justified. To confirm whether the AIC reduction is sufficient for justifying the inclusion of a random-effect structure, we also test whether the mixed-effects minimal base-line model explains significantly more variance by applying a Model Likelihood Ratio Test to the fixed- and the mixed effects minimal base-line models.</p>
 <pre class="r"><code># test random effects
 null.id = -2 * logLik(m0.glm) + 2 * logLik(m0.glmer)
 pchisq(as.numeric(null.id), df=1, lower.tail=F) </code></pre>
-<pre><code>## [1] 0.000000000000000000000000001273</code></pre>
+<pre><code>## [1] 0.0006314</code></pre>
 <pre class="r"><code># sig m0.glmer better than m0.glm</code></pre>
 <p>The p-value of the Model Likelihood Ratio Test is lower than .05 which shows that the inclusion of the random-effects structure is warranted. We can now continue with the model fitting process.</p>
 </div>
@@ -1080,8 +1084,8 @@ anova(m1.glmer, m0.glmer, test = &quot;Chi&quot;) </code></pre>
 ## m0.glmer: SUFlike ~ 1 + (1 | ID)
 ## m1.glmer: SUFlike ~ (1 | ID) + Priming
 ##          Df  AIC  BIC logLik deviance Chisq Chi Df          Pr(&gt;Chisq)    
-## m0.glmer  2 9193 9208  -4595     9189                                     
-## m1.glmer  3 8688 8710  -4341     8682   507      1 &lt;0.0000000000000002 ***
+## m0.glmer  2 1828 1840   -912     1824                                     
+## m1.glmer  3 1703 1720   -848     1697   128      1 &lt;0.0000000000000002 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>Since the tests do not show problems relating to incomplete information, because including Priming significantly improves the model fit (decrease in AIC and BIC values), and since it correlates significantly with our dependent variable, we include Priming into our model.</p>
@@ -1097,21 +1101,20 @@ anova(m2.glmer, m1.glmer, test = &quot;Chi&quot;)   </code></pre>
 ## Models:
 ## m1.glmer: SUFlike ~ (1 | ID) + Priming
 ## m2.glmer: SUFlike ~ (1 | ID) + Priming + Age
-##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)  
-## m1.glmer  3 8688 8710  -4341     8682                          
-## m2.glmer  4 8687 8716  -4339     8679  3.44      1      0.064 .
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
+## m1.glmer  3 1703 1720   -848     1697                        
+## m2.glmer  4 1704 1727   -848     1696  0.56      1       0.45</code></pre>
 <pre class="r"><code>Anova(m2.glmer, test = &quot;Chi&quot;)</code></pre>
 <pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
 ## Response: SUFlike
 ##          Chisq Df          Pr(&gt;Chisq)    
-## Priming 537.95  1 &lt;0.0000000000000002 ***
-## Age       3.48  1               0.062 .  
+## Priming 129.51  1 &lt;0.0000000000000002 ***
+## Age       0.57  1                0.45    
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>The ANOVAs show that Age is marginally significant but, more importantly, the first ANOVA report also shows that the BIC has increased which indicates that Age does not substantially decrease variance. In such cases, the variable should not be included. A case could be made, however, if the second ANOVA would report Age as being significant but before simply continuing with the model fitting, it would be better to change the ordering in which predictors are added to the model.</p>
+<p>The ANOVAs show that Age is not significant and the first ANOVA also shows that the BIC has increased which indicates that Age does not decrease variance. In such cases, the variable should not be included.</p>
+<p>However, if the second ANOVA would report Age as being marginally significant, a case could be made for including it but it would be better to change the ordering in which predictors are added to the model. This is, however, just a theretical issue heer as Age is clearly not significant.</p>
 <pre class="r"><code># add Gender
 ifelse(min(ftable(mblrdata$Gender, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
@@ -1124,18 +1127,18 @@ anova(m3.glmer, m1.glmer, test = &quot;Chi&quot;)</code></pre>
 ## Models:
 ## m1.glmer: SUFlike ~ (1 | ID) + Priming
 ## m3.glmer: SUFlike ~ (1 | ID) + Priming + Gender
-##          Df  AIC  BIC logLik deviance Chisq Chi Df          Pr(&gt;Chisq)    
-## m1.glmer  3 8688 8710  -4341     8682                                     
-## m3.glmer  4 8597 8626  -4294     8589  93.6      1 &lt;0.0000000000000002 ***
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)    
+## m1.glmer  3 1703 1720   -848     1697                            
+## m3.glmer  4 1679 1702   -836     1671  25.4      1 0.00000047 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>Anova(m3.glmer, test = &quot;Chi&quot;)</code></pre>
 <pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
 ## Response: SUFlike
-##         Chisq Df          Pr(&gt;Chisq)    
-## Priming   507  1 &lt;0.0000000000000002 ***
-## Gender    144  1 &lt;0.0000000000000002 ***
+##         Chisq Df           Pr(&gt;Chisq)    
+## Priming 124.4  1 &lt; 0.0000000000000002 ***
+## Gender   28.6  1           0.00000009 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>Gender is significant and will therefore be included as a predictor (you can also observe that including Gender has substantially decreased both AIC and BIC).</p>
@@ -1151,9 +1154,9 @@ anova(m4.glmer, m3.glmer, test = &quot;Chi&quot;) </code></pre>
 ## Models:
 ## m3.glmer: SUFlike ~ (1 | ID) + Priming + Gender
 ## m4.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType
-##          Df  AIC  BIC logLik deviance Chisq Chi Df    Pr(&gt;Chisq)    
-## m3.glmer  4 8597 8626  -4294     8589                               
-## m4.glmer  5 8560 8596  -4275     8550  39.2      1 0.00000000038 ***
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)    
+## m3.glmer  4 1679 1702   -836     1671                            
+## m4.glmer  5 1669 1697   -829     1659  12.8      1    0.00034 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>Anova(m4.glmer, test = &quot;Chi&quot;)</code></pre>
@@ -1161,9 +1164,9 @@ anova(m4.glmer, m3.glmer, test = &quot;Chi&quot;) </code></pre>
 ## 
 ## Response: SUFlike
 ##                  Chisq Df           Pr(&gt;Chisq)    
-## Priming          522.2  1 &lt; 0.0000000000000002 ***
-## Gender            97.9  1 &lt; 0.0000000000000002 ***
-## ConversationType  44.3  1       0.000000000029 ***
+## Priming          130.7  1 &lt; 0.0000000000000002 ***
+## Gender            13.4  1              0.00025 ***
+## ConversationType  13.0  1              0.00031 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>ConversationType improves model fit (AIC and BIC decrease and it is reported as being significant) and will, therefore, be included in the model.</p>
@@ -1181,20 +1184,8 @@ anova(m5.glmer, m4.glmer, test = &quot;Chi&quot;) </code></pre>
 ## m5.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Age + 
 ## m5.glmer:     Priming:Age
 ##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
-## m4.glmer  5 8560 8596  -4275     8550                        
-## m5.glmer  7 8563 8613  -4274     8549  1.03      2        0.6</code></pre>
-<pre class="r"><code>Anova(m5.glmer, test = &quot;Chi&quot;)</code></pre>
-<pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
-## 
-## Response: SUFlike
-##                   Chisq Df           Pr(&gt;Chisq)    
-## Priming          522.08  1 &lt; 0.0000000000000002 ***
-## Gender            94.28  1 &lt; 0.0000000000000002 ***
-## ConversationType  45.20  1       0.000000000018 ***
-## Age                0.19  1                 0.66    
-## Priming:Age        0.83  1                 0.36    
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+## m4.glmer  5 1669 1697   -829     1659                        
+## m5.glmer  7 1672 1711   -829     1658  0.98      2       0.61</code></pre>
 <p>The interaction between Priming and Age is not significant and will thus not be included.</p>
 <pre class="r"><code># add Priming*Gender
 ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
@@ -1206,20 +1197,20 @@ anova(m6.glmer, m4.glmer, test = &quot;Chi&quot;) </code></pre>
 ## Models:
 ## m4.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType
 ## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
-##          Df  AIC  BIC logLik deviance Chisq Chi Df      Pr(&gt;Chisq)    
-## m4.glmer  5 8560 8596  -4275     8550                                 
-## m6.glmer  6 8514 8557  -4251     8502  47.6      1 0.0000000000053 ***
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)   
+## m4.glmer  5 1669 1697   -829     1659                           
+## m6.glmer  6 1663 1697   -826     1651  7.42      1     0.0065 **
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>Anova(m6.glmer, test = &quot;Chi&quot;)</code></pre>
 <pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
 ## Response: SUFlike
-##                  Chisq Df           Pr(&gt;Chisq)    
-## Priming          535.5  1 &lt; 0.0000000000000002 ***
-## Gender           107.5  1 &lt; 0.0000000000000002 ***
-## ConversationType  38.1  1      0.0000000006765 ***
-## Priming:Gender    47.8  1      0.0000000000048 ***
+##                   Chisq Df           Pr(&gt;Chisq)    
+## Priming          131.96  1 &lt; 0.0000000000000002 ***
+## Gender            13.58  1              0.00023 ***
+## ConversationType  10.71  1              0.00107 ** 
+## Priming:Gender     7.45  1              0.00633 ** 
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <p>The interaction between Priming and Gender improved model fit (AIC and BIC reduction) and significantly correlates with the use of speech-unit final LIKE. It will therefore be included in the model.</p>
@@ -1236,163 +1227,127 @@ anova(m7.glmer, m6.glmer, test = &quot;Chi&quot;)</code></pre>
 ## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m7.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
 ## m7.glmer:     Priming:ConversationType
-##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)   
-## m6.glmer  6 8514 8557  -4251     8502                           
-## m7.glmer  7 8509 8559  -4247     8495  7.09      1     0.0078 **
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>Anova(m7.glmer, test = &quot;Chi&quot;)</code></pre>
-<pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
-## 
-## Response: SUFlike
-##                           Chisq Df           Pr(&gt;Chisq)    
-## Priming                  538.66  1 &lt; 0.0000000000000002 ***
-## Gender                   102.19  1 &lt; 0.0000000000000002 ***
-## ConversationType          39.35  1        0.00000000035 ***
-## Priming:Gender            33.47  1        0.00000000724 ***
-## Priming:ConversationType   7.11  1               0.0077 ** 
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>The interaction between Priming and ConversationType significantly correlates with the use of speech-unit final LIKE but it does not explain much variance (AIC and BIC increase). It will be included in the model but it will very likely have a very small or spurious effect.</p>
+##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
+## m6.glmer  6 1663 1697   -826     1651                        
+## m7.glmer  7 1663 1702   -825     1649  2.03      1       0.15</code></pre>
+<p>The interaction between Priming and ConversationType does not significantly correlate with the use of speech-unit final LIKE and it does not explain much variance (AIC and BIC increase). It will be not be included in the model.</p>
 <pre class="r"><code># add Age*Gender
 ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
-<pre class="r"><code>m8.glm &lt;- update(m7.glm, .~.+Age*Gender)
+<pre class="r"><code>m8.glm &lt;- update(m6.glm, .~.+Age*Gender)
 ifelse(max(vif(m8.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;)</code></pre>
 <pre><code>## [1] &quot;VIFs okay&quot;</code></pre>
-<pre class="r"><code>m8.glmer &lt;- update(m7.glmer, .~.+Age*Gender)
-anova(m8.glmer, m7.glmer, test = &quot;Chi&quot;) </code></pre>
+<pre class="r"><code>m8.glmer &lt;- update(m6.glmer, .~.+Age*Gender)
+anova(m8.glmer, m6.glmer, test = &quot;Chi&quot;) </code></pre>
 <pre><code>## Data: mblrdata
 ## Models:
-## m7.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m7.glmer:     Priming:ConversationType
+## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m8.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Age + 
-## m8.glmer:     Priming:Gender + Priming:ConversationType + Gender:Age
+## m8.glmer:     Priming:Gender + Gender:Age
 ##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
-## m7.glmer  7 8509 8559  -4247     8495                        
-## m8.glmer  9 8512 8577  -4247     8494  0.45      2        0.8</code></pre>
+## m6.glmer  6 1663 1697   -826     1651                        
+## m8.glmer  8 1666 1710   -825     1650  1.53      2       0.47</code></pre>
 <p>The interaction between Age and Gender is not significant and will thus continue without it.</p>
 <pre class="r"><code># add Age*ConversationType
 ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
-<pre class="r"><code>m9.glm &lt;- update(m7.glm, .~.+Age*ConversationType)
+<pre class="r"><code>m9.glm &lt;- update(m6.glm, .~.+Age*ConversationType)
 ifelse(max(vif(m9.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;) </code></pre>
 <pre><code>## [1] &quot;VIFs okay&quot;</code></pre>
-<pre class="r"><code>m9.glmer &lt;- update(m7.glmer, .~.+Age*ConversationType)
-anova(m9.glmer, m7.glmer, test = &quot;Chi&quot;) </code></pre>
+<pre class="r"><code>m9.glmer &lt;- update(m6.glmer, .~.+Age*ConversationType)
+anova(m9.glmer, m6.glmer, test = &quot;Chi&quot;) </code></pre>
 <pre><code>## Data: mblrdata
 ## Models:
-## m7.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m7.glmer:     Priming:ConversationType
+## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m9.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Age + 
-## m9.glmer:     Priming:Gender + Priming:ConversationType + ConversationType:Age
+## m9.glmer:     Priming:Gender + ConversationType:Age
 ##          Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
-## m7.glmer  7 8509 8559  -4247     8495                        
-## m9.glmer  9 8511 8576  -4246     8493  2.38      2        0.3</code></pre>
+## m6.glmer  6 1663 1697   -826     1651                        
+## m9.glmer  8 1666 1711   -825     1650   0.9      2       0.64</code></pre>
 <p>The interaction between Age and ConversationType is not significant and will thus continue without it.</p>
 <pre class="r"><code># add Gender*ConversationType
 ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
-<pre class="r"><code>m10.glm &lt;- update(m7.glm, .~.+Gender*ConversationType)
+<pre class="r"><code>m10.glm &lt;- update(m6.glm, .~.+Gender*ConversationType)
 ifelse(max(vif(m10.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;)</code></pre>
 <pre><code>## [1] &quot;VIFs okay&quot;</code></pre>
-<pre class="r"><code>m10.glmer &lt;- update(m7.glmer, .~.+Gender*ConversationType)
-anova(m10.glmer, m7.glmer, test = &quot;Chi&quot;) </code></pre>
+<pre class="r"><code>m10.glmer &lt;- update(m6.glmer, .~.+Gender*ConversationType)
+anova(m10.glmer, m6.glmer, test = &quot;Chi&quot;) </code></pre>
 <pre><code>## Data: mblrdata
 ## Models:
-## m7.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m7.glmer:     Priming:ConversationType
+## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m10.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m10.glmer:     Priming:ConversationType + Gender:ConversationType
-##           Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)    
-## m7.glmer   7 8509 8559  -4247     8495                            
-## m10.glmer  8 8500 8557  -4242     8484  11.3      1    0.00079 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>Anova(m10.glmer, test = &quot;Chi&quot;)</code></pre>
-<pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
-## 
-## Response: SUFlike
-##                           Chisq Df           Pr(&gt;Chisq)    
-## Priming                  557.48  1 &lt; 0.0000000000000002 ***
-## Gender                   105.77  1 &lt; 0.0000000000000002 ***
-## ConversationType          38.20  1        0.00000000064 ***
-## Priming:Gender            21.28  1        0.00000397666 ***
-## Priming:ConversationType   8.99  1               0.0027 ** 
-## Gender:ConversationType   10.72  1               0.0011 ** 
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>The interaction between Gender and ConversationType improved model fit (AIC and BIC reduction) and significantly correlates with the use of speech-unit final LIKE. It will therefore be included in the model.</p>
+## m10.glmer:     Gender:ConversationType
+##           Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
+## m6.glmer   6 1663 1697   -826     1651                        
+## m10.glmer  7 1665 1704   -825     1651  0.34      1       0.56</code></pre>
+<p>The interaction between Gender and ConversationType is insignificant and does not improve model fit (AIC and BIC reduction). It will therefore not be included in the model.</p>
 <pre class="r"><code># add Priming*Age*Gender
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
-<pre class="r"><code>m11.glm &lt;- update(m10.glm, .~.+Priming*Age*Gender)
+<pre class="r"><code>m11.glm &lt;- update(m6.glm, .~.+Priming*Age*Gender)
 ifelse(max(vif(m11.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;)</code></pre>
 <pre><code>## [1] &quot;VIFs okay&quot;</code></pre>
-<pre class="r"><code>m11.glmer &lt;- update(m10.glmer, .~.+Priming*Age*Gender)
-anova(m11.glmer, m10.glmer, test = &quot;Chi&quot;) </code></pre>
+<pre class="r"><code>m11.glmer &lt;- update(m6.glmer, .~.+Priming*Age*Gender)
+anova(m11.glmer, m6.glmer, test = &quot;Chi&quot;) </code></pre>
 <pre><code>## Data: mblrdata
 ## Models:
-## m10.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m10.glmer:     Priming:ConversationType + Gender:ConversationType
+## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m11.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Age + 
-## m11.glmer:     Priming:Gender + Priming:ConversationType + Gender:ConversationType + 
-## m11.glmer:     Priming:Age + Gender:Age + Priming:Gender:Age
+## m11.glmer:     Priming:Gender + Priming:Age + Gender:Age + Priming:Gender:Age
 ##           Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
-## m10.glmer  8 8500 8557  -4242     8484                        
-## m11.glmer 12 8506 8593  -4241     8482  1.63      4        0.8</code></pre>
+## m6.glmer   6 1663 1697   -826     1651                        
+## m11.glmer 10 1668 1724   -824     1648  3.26      4       0.51</code></pre>
 <p>The interaction between Priming, Age and Gender is not significant and we will thus continue without it.</p>
 <pre class="r"><code># add Priming*Age*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
-<pre class="r"><code>m12.glm &lt;- update(m10.glm, .~.+Priming*Age*ConversationType)
+<pre class="r"><code>m12.glm &lt;- update(m6.glm, .~.+Priming*Age*ConversationType)
 ifelse(max(vif(m12.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;)</code></pre>
 <pre><code>## [1] &quot;VIFs okay&quot;</code></pre>
-<pre class="r"><code>m12.glmer &lt;- update(m10.glmer, .~.+Priming*Age*ConversationType)
-anova(m12.glmer, m10.glmer, test = &quot;Chi&quot;)</code></pre>
+<pre class="r"><code>m12.glmer &lt;- update(m6.glmer, .~.+Priming*Age*ConversationType)
+anova(m12.glmer, m6.glmer, test = &quot;Chi&quot;)</code></pre>
 <pre><code>## Data: mblrdata
 ## Models:
-## m10.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m10.glmer:     Priming:ConversationType + Gender:ConversationType
+## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m12.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Age + 
-## m12.glmer:     Priming:Gender + Priming:ConversationType + Gender:ConversationType + 
-## m12.glmer:     Priming:Age + ConversationType:Age + Priming:ConversationType:Age
+## m12.glmer:     Priming:Gender + Priming:Age + Priming:ConversationType + 
+## m12.glmer:     ConversationType:Age + Priming:ConversationType:Age
 ##           Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)
-## m10.glmer  8 8500 8557  -4242     8484                        
-## m12.glmer 12 8506 8593  -4241     8482  1.71      4       0.79</code></pre>
+## m6.glmer   6 1663 1697   -826     1651                        
+## m12.glmer 11 1666 1728   -822     1644  6.92      5       0.23</code></pre>
 <p>The interaction between Priming, Age and ConversationType is not significant and we will thus continue without it.</p>
 <pre class="r"><code># add Priming*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
-<pre class="r"><code>m13.glm &lt;- update(m10.glm, .~.+Priming*Gender*ConversationType)
+<pre class="r"><code>m13.glm &lt;- update(m6.glm, .~.+Priming*Gender*ConversationType)
 ifelse(max(vif(m13.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;)</code></pre>
 <pre><code>## [1] &quot;WARNING: high VIFs!&quot;</code></pre>
 <pre class="r"><code>vif(m13.glm)</code></pre>
 <pre><code>##                                        PrimingPrime 
-##                                               7.872 
+##                                               7.758 
 ##                                         GenderWomen 
-##                                               1.878 
+##                                               1.852 
 ##                          ConversationTypeSameGender 
-##                                              18.336 
+##                                              23.956 
 ##                            PrimingPrime:GenderWomen 
-##                                              10.311 
+##                                              10.064 
 ##             PrimingPrime:ConversationTypeSameGender 
-##                                              19.881 
+##                                              21.859 
 ##              GenderWomen:ConversationTypeSameGender 
-##                                              20.301 
+##                                              25.868 
 ## PrimingPrime:GenderWomen:ConversationTypeSameGender 
-##                                              21.643</code></pre>
-<pre class="r"><code>m13.glmer &lt;- update(m10.glmer, .~.+Priming*Gender*ConversationType)
-anova(m13.glmer, m10.glmer, test = &quot;Chi&quot;)</code></pre>
+##                                              22.779</code></pre>
+<pre class="r"><code>m13.glmer &lt;- update(m6.glmer, .~.+Priming*Gender*ConversationType)
+anova(m13.glmer, m6.glmer, test = &quot;Chi&quot;)</code></pre>
 <pre><code>## Data: mblrdata
 ## Models:
-## m10.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
-## m10.glmer:     Priming:ConversationType + Gender:ConversationType
+## m6.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender
 ## m13.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
 ## m13.glmer:     Priming:ConversationType + Gender:ConversationType + Priming:Gender:ConversationType
-##           Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)    
-## m10.glmer  8 8500 8557  -4242     8484                            
-## m13.glmer  9 8484 8549  -4233     8466  17.9      1   0.000024 ***
+##           Df  AIC  BIC logLik deviance Chisq Chi Df Pr(&gt;Chisq)  
+## m6.glmer   6 1663 1697   -826     1651                          
+## m13.glmer  9 1660 1710   -821     1642  9.66      3      0.022 *
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>Anova(m13.glmer, test = &quot;Chi&quot;)</code></pre>
@@ -1400,16 +1355,16 @@ anova(m13.glmer, m10.glmer, test = &quot;Chi&quot;)</code></pre>
 ## 
 ## Response: SUFlike
 ##                                  Chisq Df           Pr(&gt;Chisq)    
-## Priming                         555.33  1 &lt; 0.0000000000000002 ***
-## Gender                          105.98  1 &lt; 0.0000000000000002 ***
-## ConversationType                 32.67  1          0.000000011 ***
-## Priming:Gender                   21.06  1          0.000004451 ***
-## Priming:ConversationType          8.32  1               0.0039 ** 
-## Gender:ConversationType           7.26  1               0.0071 ** 
-## Priming:Gender:ConversationType  17.30  1          0.000031905 ***
+## Priming                         129.35  1 &lt; 0.0000000000000002 ***
+## Gender                           11.83  1              0.00058 ***
+## ConversationType                  8.53  1              0.00349 ** 
+## Priming:Gender                    3.49  1              0.06162 .  
+## Priming:ConversationType          1.81  1              0.17878    
+## Gender:ConversationType           0.15  1              0.69391    
+## Priming:Gender:ConversationType   6.27  1              0.01230 *  
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>Although the VIFs are slightly higher than 20, the maximum values is 21.643 and thus not excessive. And since the three-way interaction between Priming, Gender, and ConversationType is not only significantly correlated with the dependent variable but also decreases AIC and BIC, we will include it in the model.</p>
+<p>Although the VIFs are higher than 20, the maximum values is 25.868 and thus not excessive. And since the three-way interaction between Priming, Gender, and ConversationType is not only significantly correlated with the dependent variable but also decreases AIC, we will include it in the model. However, it should be noted that there is a BIC increase(!) - it could be argued that this argues against including this three-way interaction. This is a judgement call and depends on whether significance, AIC, or BIC is the main criterion for including predictors. Since we chose a p-value based approch here and have so far focused more on the AIC, we decise to disregard the BIC increase (it would be good practice to state that a BIC increase had taken place ina footnote though).</p>
 <pre class="r"><code># add Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
 <pre><code>## [1] &quot;okay&quot;</code></pre>
@@ -1418,66 +1373,66 @@ ifelse(max(vif(m14.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high V
 <pre><code>## [1] &quot;WARNING: high VIFs!&quot;</code></pre>
 <pre class="r"><code>vif(m14.glm)</code></pre>
 <pre><code>##                                        PrimingPrime 
-##                                               7.873 
+##                                               7.777 
 ##                                         GenderWomen 
-##                                               2.716 
+##                                               2.708 
 ##                          ConversationTypeSameGender 
-##                                              34.024 
+##                                              32.194 
 ##                                              AgeOld 
-##                                               3.514 
+##                                               3.529 
 ##                            PrimingPrime:GenderWomen 
-##                                              10.359 
+##                                              10.357 
 ##             PrimingPrime:ConversationTypeSameGender 
-##                                              22.239 
+##                                              23.690 
 ##              GenderWomen:ConversationTypeSameGender 
-##                                              36.440 
+##                                              34.419 
 ##                                  GenderWomen:AgeOld 
-##                                               5.590 
+##                                               5.487 
 ##                   ConversationTypeSameGender:AgeOld 
-##                                              18.324 
+##                                              20.116 
 ## PrimingPrime:GenderWomen:ConversationTypeSameGender 
-##                                              23.780 
+##                                              24.663 
 ##       GenderWomen:ConversationTypeSameGender:AgeOld 
-##                                              19.981</code></pre>
+##                                              22.178</code></pre>
 <p>In this case, the VIFs are excessive and have values higher than 30 which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.</p>
 <pre class="r"><code># add Priming*Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, &quot;incomplete information&quot;, &quot;okay&quot;)</code></pre>
-<pre><code>## [1] &quot;okay&quot;</code></pre>
+<pre><code>## [1] &quot;incomplete information&quot;</code></pre>
 <pre class="r"><code>m15.glm &lt;- update(m13.glm, .~.+Priming*Age*Gender*ConversationType)
 ifelse(max(vif(m15.glm)) &lt;= 20,  &quot;VIFs okay&quot;, &quot;WARNING: high VIFs!&quot;) </code></pre>
 <pre><code>## [1] &quot;WARNING: high VIFs!&quot;</code></pre>
 <pre class="r"><code>vif(m15.glm)</code></pre>
 <pre><code>##                                               PrimingPrime 
-##                                                     13.123 
+##                                                     15.812 
 ##                                                GenderWomen 
-##                                                      2.829 
+##                                                      2.797 
 ##                                 ConversationTypeSameGender 
-##                                                     39.295 
+##                                                     27.980 
 ##                                                     AgeOld 
-##                                                      3.833 
+##                                                      3.785 
 ##                                   PrimingPrime:GenderWomen 
-##                                                     16.322 
+##                                                     18.934 
 ##                    PrimingPrime:ConversationTypeSameGender 
-##                                                     34.213 
+##                                                     29.804 
 ##                     GenderWomen:ConversationTypeSameGender 
-##                                                     41.821 
+##                                                     30.239 
 ##                                        PrimingPrime:AgeOld 
-##                                                      9.257 
+##                                                      9.660 
 ##                                         GenderWomen:AgeOld 
-##                                                      6.742 
+##                                                      6.606 
 ##                          ConversationTypeSameGender:AgeOld 
-##                                                     29.734 
+##                                                1705972.444 
 ##        PrimingPrime:GenderWomen:ConversationTypeSameGender 
-##                                                     35.893 
+##                                                     31.477 
 ##                            PrimingPrime:GenderWomen:AgeOld 
-##                                                     11.411 
+##                                                     11.843 
 ##             PrimingPrime:ConversationTypeSameGender:AgeOld 
-##                                                     19.269 
+##                                                 471952.083 
 ##              GenderWomen:ConversationTypeSameGender:AgeOld 
-##                                                     31.457 
+##                                                1656905.801 
 ## PrimingPrime:GenderWomen:ConversationTypeSameGender:AgeOld 
-##                                                     20.607</code></pre>
-<p>Again, the VIFs are excessive and have values higher than 30. As this was the last possible model, we have found our final minimal adequate model in m13.glmer.</p>
+##                                                 415529.407</code></pre>
+<p>Again, the VIFs are excessive! As this was the last possible model, we have found our final minimal adequate model in m13.glmer.</p>
 <p>In a next step, we create an overview of model comparisons which serves as a summary for the model fitting process and provides AIC, BIC, and <span class="math inline">\(\chi\)</span><sup>2</sup> values.</p>
 <pre class="r"><code># comparisons of glmer objects
 m1.m0 &lt;- anova(m1.glmer, m0.glmer, test = &quot;Chi&quot;) 
@@ -1487,16 +1442,15 @@ m4.m3 &lt;- anova(m4.glmer, m3.glmer, test = &quot;Chi&quot;)
 m5.m4 &lt;- anova(m5.glmer, m4.glmer, test = &quot;Chi&quot;) 
 m6.m4 &lt;- anova(m6.glmer, m4.glmer, test = &quot;Chi&quot;) 
 m7.m6 &lt;- anova(m7.glmer, m6.glmer, test = &quot;Chi&quot;)
-m8.m7 &lt;- anova(m8.glmer, m7.glmer, test = &quot;Chi&quot;) 
-m9.m7 &lt;- anova(m9.glmer, m7.glmer, test = &quot;Chi&quot;) 
-m10.m7 &lt;- anova(m10.glmer, m7.glmer, test = &quot;Chi&quot;) 
-m11.m10 &lt;- anova(m11.glmer, m10.glmer, test = &quot;Chi&quot;) 
-m12.m10 &lt;- anova(m12.glmer, m10.glmer, test = &quot;Chi&quot;)
-m13.m10 &lt;- anova(m13.glmer, m10.glmer, test = &quot;Chi&quot;)
+m8.m6 &lt;- anova(m8.glmer, m6.glmer, test = &quot;Chi&quot;) 
+m9.m6 &lt;- anova(m9.glmer, m6.glmer, test = &quot;Chi&quot;) 
+m10.m6 &lt;- anova(m10.glmer, m6.glmer, test = &quot;Chi&quot;) 
+m11.m6 &lt;- anova(m11.glmer, m6.glmer, test = &quot;Chi&quot;) 
+m12.m6 &lt;- anova(m12.glmer, m6.glmer, test = &quot;Chi&quot;)
+m13.m6 &lt;- anova(m13.glmer, m6.glmer, test = &quot;Chi&quot;)
 # create a list of the model comparisons
-mdlcmp &lt;- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m6.m4, m7.m6, m8.m7, m9.m7, m10.m7, m11.m10, m12.m10, m13.m10)
-# load function for summary
-source(&quot;rscripts/ModelFittingSummarySWSU.R&quot;) # for GLMEM (step-wise step-up)
+mdlcmp &lt;- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m6.m4, m7.m6, m8.m6, m9.m6, m10.m6, m11.m6, m12.m6, m13.m6)
+# summary table for model fitting
 mdlft &lt;- mdl.fttng.swsu(mdlcmp)
 mdlft &lt;- mdlft[,-2]
 kable(mdlft, caption = &quot;Model fitting process summary.&quot;)</code></pre>
@@ -1524,11 +1478,11 @@ kable(mdlft, caption = &quot;Model fitting process summary.&quot;)</code></pre>
 <td align="left">1+Priming</td>
 <td align="left">m0.glmer</td>
 <td align="left">3</td>
-<td align="left">8688.39</td>
-<td align="left">8710.07</td>
-<td align="left">-4341.19</td>
-<td align="left">8682.39</td>
-<td align="left">506.84</td>
+<td align="left">1702.77</td>
+<td align="left">1719.58</td>
+<td align="left">-848.39</td>
+<td align="left">1696.77</td>
+<td align="left">127.72</td>
 <td align="left">1</td>
 <td align="left">0</td>
 <td align="left">p &lt; .001***</td>
@@ -1538,25 +1492,25 @@ kable(mdlft, caption = &quot;Model fitting process summary.&quot;)</code></pre>
 <td align="left">Age</td>
 <td align="left">m1.glmer</td>
 <td align="left">4</td>
-<td align="left">8686.95</td>
-<td align="left">8715.86</td>
-<td align="left">-4339.47</td>
-<td align="left">8678.95</td>
-<td align="left">3.44</td>
+<td align="left">1704.21</td>
+<td align="left">1726.61</td>
+<td align="left">-848.11</td>
+<td align="left">1696.21</td>
+<td align="left">0.56</td>
 <td align="left">1</td>
-<td align="left">0.06373</td>
-<td align="left">p &lt; .10(*)</td>
+<td align="left">0.45323</td>
+<td align="left">n.s.</td>
 </tr>
 <tr class="odd">
 <td align="left">m3.glmer</td>
 <td align="left">Gender</td>
 <td align="left">m1.glmer</td>
 <td align="left">4</td>
-<td align="left">8596.76</td>
-<td align="left">8625.67</td>
-<td align="left">-4294.38</td>
-<td align="left">8588.76</td>
-<td align="left">93.63</td>
+<td align="left">1679.4</td>
+<td align="left">1701.8</td>
+<td align="left">-835.7</td>
+<td align="left">1671.4</td>
+<td align="left">25.38</td>
 <td align="left">1</td>
 <td align="left">0</td>
 <td align="left">p &lt; .001***</td>
@@ -1566,13 +1520,13 @@ kable(mdlft, caption = &quot;Model fitting process summary.&quot;)</code></pre>
 <td align="left">ConversationType</td>
 <td align="left">m3.glmer</td>
 <td align="left">5</td>
-<td align="left">8559.57</td>
-<td align="left">8595.7</td>
-<td align="left">-4274.78</td>
-<td align="left">8549.57</td>
-<td align="left">39.19</td>
+<td align="left">1668.58</td>
+<td align="left">1696.59</td>
+<td align="left">-829.29</td>
+<td align="left">1658.58</td>
+<td align="left">12.81</td>
 <td align="left">1</td>
-<td align="left">0</td>
+<td align="left">0.00034</td>
 <td align="left">p &lt; .001***</td>
 </tr>
 <tr class="odd">
@@ -1580,13 +1534,13 @@ kable(mdlft, caption = &quot;Model fitting process summary.&quot;)</code></pre>
 <td align="left">Age+Priming:Age</td>
 <td align="left">m4.glmer</td>
 <td align="left">7</td>
-<td align="left">8562.54</td>
-<td align="left">8613.13</td>
-<td align="left">-4274.27</td>
-<td align="left">8548.54</td>
-<td align="left">1.03</td>
+<td align="left">1671.6</td>
+<td align="left">1710.81</td>
+<td align="left">-828.8</td>
+<td align="left">1657.6</td>
+<td align="left">0.98</td>
 <td align="left">2</td>
-<td align="left">0.59875</td>
+<td align="left">0.61134</td>
 <td align="left">n.s.</td>
 </tr>
 <tr class="even">
@@ -1594,112 +1548,112 @@ kable(mdlft, caption = &quot;Model fitting process summary.&quot;)</code></pre>
 <td align="left">Priming:Gender</td>
 <td align="left">m4.glmer</td>
 <td align="left">6</td>
-<td align="left">8514</td>
-<td align="left">8557.36</td>
-<td align="left">-4251</td>
-<td align="left">8502</td>
-<td align="left">47.57</td>
+<td align="left">1663.16</td>
+<td align="left">1696.77</td>
+<td align="left">-825.58</td>
+<td align="left">1651.16</td>
+<td align="left">7.42</td>
 <td align="left">1</td>
-<td align="left">0</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">0.00645</td>
+<td align="left">p &lt; .01 **</td>
 </tr>
 <tr class="odd">
 <td align="left">m7.glmer</td>
 <td align="left">Priming:ConversationType</td>
 <td align="left">m6.glmer</td>
 <td align="left">7</td>
-<td align="left">8508.91</td>
-<td align="left">8559.5</td>
-<td align="left">-4247.45</td>
-<td align="left">8494.91</td>
-<td align="left">7.09</td>
+<td align="left">1663.13</td>
+<td align="left">1702.34</td>
+<td align="left">-824.57</td>
+<td align="left">1649.13</td>
+<td align="left">2.03</td>
 <td align="left">1</td>
-<td align="left">0.00776</td>
-<td align="left">p &lt; .01 **</td>
+<td align="left">0.15427</td>
+<td align="left">n.s.</td>
 </tr>
 <tr class="even">
 <td align="left">m8.glmer</td>
 <td align="left">Age+Gender:Age</td>
-<td align="left">m7.glmer</td>
-<td align="left">9</td>
-<td align="left">8512.45</td>
-<td align="left">8577.5</td>
-<td align="left">-4247.23</td>
-<td align="left">8494.45</td>
-<td align="left">0.45</td>
+<td align="left">m6.glmer</td>
+<td align="left">8</td>
+<td align="left">1665.63</td>
+<td align="left">1710.44</td>
+<td align="left">-824.82</td>
+<td align="left">1649.63</td>
+<td align="left">1.53</td>
 <td align="left">2</td>
-<td align="left">0.79706</td>
+<td align="left">0.46535</td>
 <td align="left">n.s.</td>
 </tr>
 <tr class="odd">
 <td align="left">m9.glmer</td>
 <td align="left">Age+ConversationType:Age</td>
-<td align="left">m7.glmer</td>
-<td align="left">9</td>
-<td align="left">8510.53</td>
-<td align="left">8575.57</td>
-<td align="left">-4246.26</td>
-<td align="left">8492.53</td>
-<td align="left">2.38</td>
+<td align="left">m6.glmer</td>
+<td align="left">8</td>
+<td align="left">1666.26</td>
+<td align="left">1711.07</td>
+<td align="left">-825.13</td>
+<td align="left">1650.26</td>
+<td align="left">0.9</td>
 <td align="left">2</td>
-<td align="left">0.30422</td>
+<td align="left">0.63689</td>
 <td align="left">n.s.</td>
 </tr>
 <tr class="even">
 <td align="left">m10.glmer</td>
 <td align="left">Gender:ConversationType</td>
-<td align="left">m7.glmer</td>
-<td align="left">8</td>
-<td align="left">8499.65</td>
-<td align="left">8557.47</td>
-<td align="left">-4241.82</td>
-<td align="left">8483.65</td>
-<td align="left">11.26</td>
+<td align="left">m6.glmer</td>
+<td align="left">7</td>
+<td align="left">1664.82</td>
+<td align="left">1704.03</td>
+<td align="left">-825.41</td>
+<td align="left">1650.82</td>
+<td align="left">0.34</td>
 <td align="left">1</td>
-<td align="left">0.00079</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">0.55773</td>
+<td align="left">n.s.</td>
 </tr>
 <tr class="odd">
-<td align="left">NA</td>
-<td align="left"></td>
-<td align="left">m10.glmer</td>
-<td align="left">12</td>
-<td align="left">8506.02</td>
-<td align="left">8592.74</td>
-<td align="left">-4241.01</td>
-<td align="left">8482.02</td>
-<td align="left">1.63</td>
+<td align="left">m11.glmer</td>
+<td align="left">Age+Gender:Age+Priming:Age+Priming:Gender:Age</td>
+<td align="left">m6.glmer</td>
+<td align="left">10</td>
+<td align="left">1667.9</td>
+<td align="left">1723.91</td>
+<td align="left">-823.95</td>
+<td align="left">1647.9</td>
+<td align="left">3.26</td>
 <td align="left">4</td>
-<td align="left">0.80274</td>
+<td align="left">0.5148</td>
 <td align="left">n.s.</td>
 </tr>
 <tr class="even">
-<td align="left">NA</td>
-<td align="left"></td>
-<td align="left">m10.glmer</td>
-<td align="left">12</td>
-<td align="left">8505.94</td>
-<td align="left">8592.66</td>
-<td align="left">-4240.97</td>
-<td align="left">8481.94</td>
-<td align="left">1.71</td>
-<td align="left">4</td>
-<td align="left">0.78822</td>
+<td align="left">m12.glmer</td>
+<td align="left">Age+ConversationType:Age+Priming:Age+Priming:ConversationType+Priming:ConversationType:Age+Priming:Gender+Priming:GenderSUFlike+SUFlike</td>
+<td align="left">m6.glmer</td>
+<td align="left">11</td>
+<td align="left">1666.24</td>
+<td align="left">1727.85</td>
+<td align="left">-822.12</td>
+<td align="left">1644.24</td>
+<td align="left">6.92</td>
+<td align="left">5</td>
+<td align="left">0.22642</td>
 <td align="left">n.s.</td>
 </tr>
 <tr class="odd">
 <td align="left">m13.glmer</td>
-<td align="left">Priming:Gender:ConversationType</td>
-<td align="left">m10.glmer</td>
+<td align="left">Gender:ConversationType+Priming:ConversationType+Priming:Gender:ConversationType</td>
+<td align="left">m6.glmer</td>
 <td align="left">9</td>
-<td align="left">8483.78</td>
-<td align="left">8548.83</td>
-<td align="left">-4232.89</td>
-<td align="left">8465.78</td>
-<td align="left">17.86</td>
-<td align="left">1</td>
-<td align="left">0.00002</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">1659.51</td>
+<td align="left">1709.91</td>
+<td align="left">-820.75</td>
+<td align="left">1641.51</td>
+<td align="left">9.66</td>
+<td align="left">3</td>
+<td align="left">0.0217</td>
+<td align="left">p &lt; .05 *</td>
 </tr>
 </tbody>
 </table>
@@ -1713,8 +1667,8 @@ anova(mlr.glmer, m0.glmer, test = &quot;Chi&quot;) # final model better than bas
 ## mlr.glmer: SUFlike ~ (1 | ID) + Priming + Gender + ConversationType + Priming:Gender + 
 ## mlr.glmer:     Priming:ConversationType + Gender:ConversationType + Priming:Gender:ConversationType
 ##           Df  AIC  BIC logLik deviance Chisq Chi Df          Pr(&gt;Chisq)
-## m0.glmer   2 9193 9208  -4595     9189                                 
-## mlr.glmer  9 8484 8549  -4233     8466   723      7 &lt;0.0000000000000002
+## m0.glmer   2 1828 1840   -912     1824                                 
+## mlr.glmer  9 1660 1710   -821     1642   183      7 &lt;0.0000000000000002
 ##              
 ## m0.glmer     
 ## mlr.glmer ***
@@ -1729,29 +1683,28 @@ anova(mlr.glmer, m0.glmer, test = &quot;Chi&quot;) # final model better than bas
 ##     Priming:ConversationType + Gender:ConversationType + Priming:Gender:ConversationType
 ##    Data: mblrdata
 ##      AIC      BIC   logLik deviance df.resid 
-##     8484     8549    -4233     8466    10161 
+##   1659.5   1709.9   -820.8   1641.5     1991 
 ## Random effects:
 ##  Groups Name        Std.Dev.
-##  ID     (Intercept) 0       
-## Number of obs: 10170, groups:  ID, 225
+##  ID     (Intercept) 0.315   
+## Number of obs: 2000, groups:  ID, 208
 ## Fixed Effects:
 ##                                         (Intercept)  
-##                                              -0.707  
+##                                              -0.807  
 ##                                        PrimingPrime  
-##                                               0.272  
+##                                               0.371  
 ##                                         GenderWomen  
-##                                              -1.110  
+##                                              -1.003  
 ##                          ConversationTypeSameGender  
-##                                              -1.496  
+##                                              -1.809  
 ##                            PrimingPrime:GenderWomen  
-##                                               1.565  
+##                                               1.680  
 ##             PrimingPrime:ConversationTypeSameGender  
-##                                               1.905  
+##                                               2.486  
 ##              GenderWomen:ConversationTypeSameGender  
-##                                               1.153  
+##                                               1.342  
 ## PrimingPrime:GenderWomen:ConversationTypeSameGender  
-##                                              -1.755  
-## convergence code 0; 1 optimizer warnings; 0 lme4 warnings</code></pre>
+##                                              -2.421</code></pre>
 <p>To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that effect so that we can ascertain how much variance that effect explains. In our case, this is purely to show how to do this because main effects are superseded by interactions in which they are involved and should therefore not be interpreted <span class="citation">(A. Field, Miles, and Field <a href="#ref-field2012discovering">2012</a>, 622)</span>.</p>
 <pre class="r"><code>anova(m1.glmer, m0.glmer, test = &quot;Chi&quot;) </code></pre>
 <pre><code>## Data: mblrdata
@@ -1759,8 +1712,8 @@ anova(mlr.glmer, m0.glmer, test = &quot;Chi&quot;) # final model better than bas
 ## m0.glmer: SUFlike ~ 1 + (1 | ID)
 ## m1.glmer: SUFlike ~ (1 | ID) + Priming
 ##          Df  AIC  BIC logLik deviance Chisq Chi Df          Pr(&gt;Chisq)    
-## m0.glmer  2 9193 9208  -4595     9189                                     
-## m1.glmer  3 8688 8710  -4341     8682   507      1 &lt;0.0000000000000002 ***
+## m0.glmer  2 1828 1840   -912     1824                                     
+## m1.glmer  3 1703 1720   -848     1697   128      1 &lt;0.0000000000000002 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 </div>
@@ -1784,7 +1737,7 @@ ggplot(mblrdata, aes(Gender, Predicted, color = Priming)) +
 </div>
 <div id="extracting-model-fit-parameters" class="section level2">
 <h2><span class="header-section-number">4.7</span> Extracting Model Fit Parameters</h2>
-<p>We now create an “lrm” and “glme” object that are equivalent to the final minimal adequate model (but the former without the random effect).</p>
+<p>We now create an “lrm” and “glm” object that are equivalent to the final minimal adequate model (but the former without the random effect).</p>
 <pre class="r"><code>mlr.lrm &lt;- lrm(SUFlike ~ Priming + Gender + ConversationType, data = mblrdata, x = T, y = T)
 m1.glm = glm(SUFlike ~ Priming + Gender + ConversationType, family = binomial, data = mblrdata) # baseline model glm
 # we now create a lmer object equivalent to the final minimal adequate model
@@ -1795,19 +1748,19 @@ mlr.lmer &lt;- lmer(SUFlike ~ Age + Gender + ConversationType + (1|ID), data = m
 ##  Pearson&#39;s product-moment correlation
 ## 
 ## data:  coef(mlr.lrm) and fixef(mlr.lmer)
-## t = 2.7, df = 2, p-value = 0.1
+## t = 2.5, df = 2, p-value = 0.1
 ## alternative hypothesis: true correlation is not equal to 0
 ## 95 percent confidence interval:
-##  -0.5169  0.9975
+##  -0.5442  0.9973
 ## sample estimates:
-##    cor 
-## 0.8827</code></pre>
+##   cor 
+## 0.874</code></pre>
 <p>The fixed effects correlate strongly (.8827) which is a good indicator as it suggests that the coefficient estimates are sufficiently stable. We now activate the “Hmisc” package (if not already active) to extract model fit parameters <span class="citation">(Baayen <a href="#ref-baayen2008analyzing">2008</a>, 281)</span>.</p>
 <pre class="r"><code>probs = 1/(1+exp(-fitted(mlr.lmer)))
 probs = binomial()$linkinv(fitted(mlr.lmer))
 somers2(probs, as.numeric(mblrdata$SUFlike))</code></pre>
-<pre><code>##          C        Dxy          n    Missing 
-##     0.6323     0.2646 10170.0000     0.0000</code></pre>
+<pre><code>##         C       Dxy         n   Missing 
+##    0.7031    0.4062 2000.0000    0.0000</code></pre>
 <p>The model fit parameters indicate a suboptimal fit. Both the C-value and Somers’s D<sub>xy</sub> show poor fit between predicted and observed occurrences of SUFlike. If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity <span class="citation">(Baayen <a href="#ref-baayen2008analyzing">2008</a>, 204)</span>. Somers’ D<sub>xy</sub> is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D<sub>xy</sub> values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction <span class="citation">(Baayen <a href="#ref-baayen2008analyzing">2008</a>, 204)</span>. This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.</p>
 </div>
 <div id="model-diagnostics-2" class="section level2">
@@ -1816,9 +1769,6 @@ somers2(probs, as.numeric(mblrdata$SUFlike))</code></pre>
 <pre class="r"><code>plot(mlr.glmer, pch = 20, col = &quot;black&quot;, lty = &quot;dotted&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/blmm38-1.png" width="672" /></p>
 <p>As a final step, we summarize our findings in tabulated form.</p>
-<pre class="r"><code># summarize final model
-mblrmtb &lt;- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
-kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate binomial logistic mixed-effects regression model which was fitted to predictors of discourse like in New Zealand English.&quot;)</code></pre>
 <table>
 <caption>Summary of the final minimal adequate binomial logistic mixed-effects regression model which was fitted to predictors of discourse like in New Zealand English.</caption>
 <thead>
@@ -1837,11 +1787,11 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <tr class="odd">
 <td>Random Effect(s)</td>
 <td align="left">ID</td>
-<td align="left">0</td>
-<td align="left">0</td>
-<td align="left">118.61</td>
+<td align="left">0.1</td>
+<td align="left">0.32</td>
+<td align="left">11.68</td>
 <td align="left">1</td>
-<td align="left">0</td>
+<td align="left">0.0006</td>
 <td align="left">p &lt; .001***</td>
 </tr>
 <tr class="even">
@@ -1856,83 +1806,83 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 </tr>
 <tr class="odd">
 <td>(Intercept)</td>
-<td align="left">-0.71</td>
+<td align="left">-0.81</td>
 <td align="left"></td>
-<td align="left">0.49</td>
-<td align="left">0.06</td>
-<td align="left">-11.53</td>
+<td align="left">0.45</td>
+<td align="left">0.16</td>
+<td align="left">-4.94</td>
 <td align="left">0</td>
 <td align="left">p &lt; .001***</td>
 </tr>
 <tr class="even">
 <td>PrimingPrime</td>
-<td align="left">0.27</td>
-<td align="left">7.87</td>
-<td align="left">1.31</td>
-<td align="left">0.2</td>
-<td align="left">1.34</td>
-<td align="left">0.1807</td>
+<td align="left">0.37</td>
+<td align="left">7.7</td>
+<td align="left">1.45</td>
+<td align="left">0.45</td>
+<td align="left">0.83</td>
+<td align="left">0.4052</td>
 <td align="left">n.s.</td>
 </tr>
 <tr class="odd">
 <td>GenderWomen</td>
-<td align="left">-1.11</td>
-<td align="left">1.88</td>
-<td align="left">0.33</td>
-<td align="left">0.09</td>
-<td align="left">-12.74</td>
+<td align="left">-1</td>
+<td align="left">1.81</td>
+<td align="left">0.37</td>
+<td align="left">0.22</td>
+<td align="left">-4.52</td>
 <td align="left">0</td>
 <td align="left">p &lt; .001***</td>
 </tr>
 <tr class="even">
 <td>ConversationTypeSameGender</td>
-<td align="left">-1.5</td>
-<td align="left">18.25</td>
-<td align="left">0.22</td>
-<td align="left">0.24</td>
-<td align="left">-6.3</td>
-<td align="left">0</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">-1.81</td>
+<td align="left">21.93</td>
+<td align="left">0.16</td>
+<td align="left">0.65</td>
+<td align="left">-2.78</td>
+<td align="left">0.0055</td>
+<td align="left">p &lt; .01 **</td>
 </tr>
 <tr class="odd">
 <td>PrimingPrime:GenderWomen</td>
-<td align="left">1.57</td>
-<td align="left">10.3</td>
-<td align="left">4.78</td>
-<td align="left">0.25</td>
-<td align="left">6.17</td>
-<td align="left">0</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">1.68</td>
+<td align="left">10.01</td>
+<td align="left">5.37</td>
+<td align="left">0.56</td>
+<td align="left">2.99</td>
+<td align="left">0.0028</td>
+<td align="left">p &lt; .01 **</td>
 </tr>
 <tr class="even">
 <td>PrimingPrime:ConversationTypeSameGender</td>
-<td align="left">1.9</td>
-<td align="left">19.82</td>
-<td align="left">6.72</td>
-<td align="left">0.38</td>
-<td align="left">4.99</td>
-<td align="left">0</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">2.49</td>
+<td align="left">21.62</td>
+<td align="left">12.02</td>
+<td align="left">0.88</td>
+<td align="left">2.84</td>
+<td align="left">0.0046</td>
+<td align="left">p &lt; .01 **</td>
 </tr>
 <tr class="odd">
 <td>GenderWomen:ConversationTypeSameGender</td>
-<td align="left">1.15</td>
-<td align="left">20.2</td>
-<td align="left">3.17</td>
-<td align="left">0.25</td>
-<td align="left">4.63</td>
-<td align="left">0</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">1.34</td>
+<td align="left">23.87</td>
+<td align="left">3.83</td>
+<td align="left">0.68</td>
+<td align="left">1.99</td>
+<td align="left">0.0471</td>
+<td align="left">p &lt; .05 *</td>
 </tr>
 <tr class="even">
 <td>PrimingPrime:GenderWomen:ConversationTypeSameGender</td>
-<td align="left">-1.75</td>
-<td align="left">21.57</td>
-<td align="left">0.17</td>
-<td align="left">0.42</td>
-<td align="left">-4.16</td>
-<td align="left">0</td>
-<td align="left">p &lt; .001***</td>
+<td align="left">-2.42</td>
+<td align="left">22.67</td>
+<td align="left">0.09</td>
+<td align="left">0.97</td>
+<td align="left">-2.5</td>
+<td align="left">0.0123</td>
+<td align="left">p &lt; .05 *</td>
 </tr>
 <tr class="odd">
 <td>Model statistics</td>
@@ -1952,7 +1902,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">225</td>
+<td align="left">208</td>
 </tr>
 <tr class="odd">
 <td>Number of cases in model</td>
@@ -1962,7 +1912,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">10170</td>
+<td align="left">2000</td>
 </tr>
 <tr class="even">
 <td>Observed misses</td>
@@ -1972,7 +1922,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">8430</td>
+<td align="left">1656</td>
 </tr>
 <tr class="odd">
 <td>Observed successes</td>
@@ -1982,7 +1932,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">1740</td>
+<td align="left">344</td>
 </tr>
 <tr class="even">
 <td>Residual deviance</td>
@@ -1992,7 +1942,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">8465.78</td>
+<td align="left">1641.51</td>
 </tr>
 <tr class="odd">
 <td>R2 (Nagelkerke)</td>
@@ -2002,7 +1952,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">0.133</td>
+<td align="left">0.187</td>
 </tr>
 <tr class="even">
 <td>R2 (Hosmer &amp; Lemeshow)</td>
@@ -2012,7 +1962,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">0.09</td>
+<td align="left">0.13</td>
 </tr>
 <tr class="odd">
 <td>R2 (Cox &amp; Snell)</td>
@@ -2022,7 +1972,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">0.079</td>
+<td align="left">0.112</td>
 </tr>
 <tr class="even">
 <td>C</td>
@@ -2032,7 +1982,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">0.683</td>
+<td align="left">0.765</td>
 </tr>
 <tr class="odd">
 <td>Somers’ Dxy</td>
@@ -2042,7 +1992,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">0.366</td>
+<td align="left">0.529</td>
 </tr>
 <tr class="even">
 <td>AIC</td>
@@ -2052,7 +2002,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">8483.78</td>
+<td align="left">1659.51</td>
 </tr>
 <tr class="odd">
 <td>BIC</td>
@@ -2062,7 +2012,7 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">8548.83</td>
+<td align="left">1709.91</td>
 </tr>
 <tr class="even">
 <td>Prediction accuracy</td>
@@ -2072,21 +2022,221 @@ kable(mblrmtb[, -c(4:5)], caption = &quot;Summary of the final minimal adequate 
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">82.91%</td>
+<td align="left">83.7%</td>
 </tr>
 <tr class="odd">
 <td>Model Likelihood Ratio Test</td>
 <td align="left"></td>
 <td align="left"></td>
 <td align="left"></td>
-<td align="left">L.R. X2: 842.06</td>
+<td align="left">L.R. X2: 194.67</td>
 <td align="left">DF: 8</td>
 <td align="left">p-value: 0</td>
 <td align="left">sig: p &lt; .001***</td>
 </tr>
 </tbody>
 </table>
+<p>A mixed-effect binomial logistic regression model which contained speaker as random effect was fit to to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model (<span class="math inline">\(\chi\)</span><sup>2</sup>(8): 842.06, p &lt;.0001) but has a suboptimal fit (C: 0.765, Somers’ D<sub>xy</sub>: .529). The final minimal adequate model reported a significant interaction between the geneder of speakers, the type of conversation and priming (<span class="math inline">\(\chi\)</span><sup>2</sup>(3): 9.66, p = .022). The model showed that discourse <em>like</em> is more likely to surface in primed contexts but that in contrast to women and men in same-gender conversations as well as women in mixed-gender conversations, priming appears to affect the use of discourse <em>like</em> by men in mixed-gender conversations only to a marginal extent.</p>
 </div>
+</div>
+<div id="mixed-effects-quasi-poisson-regression-models" class="section level1">
+<h1><span class="header-section-number">5</span> Mixed-Effects (Quasi-)Poisson Regression Models</h1>
+<p>Like fixed-effects, mixed-effects Poisson models take counts as dependent variables. In this case, data was collected on three separate evenings (Trial) and the dependent variable represents instances of the filler “uhm” (UHM) occuring in two-minute conversations in which speakers of English, German, Russian, and Mandarin (Language). The number of shots that speakers had had before they talked was recorded (Shots).</p>
+<pre class="r"><code># load data
+countdata &lt;- read.table(&quot;https://slcladal.github.io/data/countdata.txt&quot;, 
+                       comment.char = &quot;&quot;,quote = &quot;&quot;, sep = &quot;\t&quot;, header = T) 
+# inspect data
+str(countdata)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    500 obs. of  6 variables:
+##  $ ID      : int  1 2 3 4 5 6 7 8 9 10 ...
+##  $ Trial   : int  3 3 3 1 1 3 1 3 3 2 ...
+##  $ Language: chr  &quot;Russian&quot; &quot;Russian&quot; &quot;German&quot; &quot;German&quot; ...
+##  $ Gender  : chr  &quot;Man&quot; &quot;Man&quot; &quot;Man&quot; &quot;Man&quot; ...
+##  $ UHM     : int  0 0 0 0 2 1 1 0 0 0 ...
+##  $ Shots   : int  0 0 5 3 6 5 1 4 0 2 ...</code></pre>
+<p>Since the data contains character variables, we need to factorize the data before we can analyze it further and remove the ID column.</p>
+<pre class="r"><code># factorize variables
+countdata &lt;- countdata %&gt;%
+  dplyr::select(-ID)
+clfct &lt;- c(&quot;Trial&quot;, &quot;Language&quot;, &quot;Gender&quot;)
+countdata[clfct] &lt;- lapply(countdata[clfct], factor)
+ # inspect data
+str(countdata); head(countdata)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    500 obs. of  5 variables:
+##  $ Trial   : Factor w/ 3 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;: 3 3 3 1 1 3 1 3 3 2 ...
+##  $ Language: Factor w/ 4 levels &quot;English&quot;,&quot;German&quot;,..: 4 4 2 2 2 2 3 2 4 2 ...
+##  $ Gender  : Factor w/ 2 levels &quot;Man&quot;,&quot;Woman&quot;: 1 1 1 1 2 1 1 2 2 1 ...
+##  $ UHM     : int  0 0 0 0 2 1 1 0 0 0 ...
+##  $ Shots   : int  0 0 5 3 6 5 1 4 0 2 ...</code></pre>
+<pre><code>##   Trial Language Gender UHM Shots
+## 1     3  Russian    Man   0     0
+## 2     3  Russian    Man   0     0
+## 3     3   German    Man   0     5
+## 4     1   German    Man   0     3
+## 5     1   German  Woman   2     6
+## 6     3   German    Man   1     5</code></pre>
+<p>After the data is factorized, we can visualize the data.</p>
+<pre class="r"><code>p1d &lt;- countdata %&gt;%
+  dplyr::select(Language, Shots) %&gt;%
+  dplyr::group_by(Language) %&gt;%
+  dplyr::mutate(Mean = round(mean(Shots), 1)) %&gt;%
+  dplyr::mutate(SD = round(sd(Shots), 1))
+# start plot
+ggplot(p1d, aes(Language, Shots, color = Language, fill = Language)) +
+  geom_violin(trim=FALSE, color = &quot;gray20&quot;)+ 
+  geom_boxplot(width=0.1, fill=&quot;white&quot;, color = &quot;gray20&quot;) +
+  geom_text(aes(y=-4,label=paste(&quot;mean: &quot;, Mean, sep = &quot;&quot;)), size = 3, color = &quot;black&quot;) +
+  geom_text(aes(y=-5,label=paste(&quot;SD: &quot;, SD, sep = &quot;&quot;)), size = 3, color = &quot;black&quot;) +
+  scale_fill_manual(values=rep(&quot;grey90&quot;,4)) + 
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position=&quot;none&quot;, legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-5, 15) +
+  labs(x = &quot;Language&quot;, y = &quot;Shots&quot;)</code></pre>
+<p><img src="mixedregressions_files/figure-html/qpmm3-1.png" width="672" /></p>
+<p>The violine plots show that the English speakers drank more shots than speakesr of other languages with Mandarin speakesr drinking the fewest shots.</p>
+<p>In the present case, we will a Boruta variable selection procedure to streamline the model fitting process. Thus, before fitting the model, we will test which variables have any kind of relationsship with the dependent variable and therefore deserve to be evaluated in the regression modelling. As this is just an example, we will only consider variables which are deemed important and disregard both unimportnat and tentative variables. We start the Boruta analysis by setting a seed and running an initial Boruta analysis.</p>
+<pre class="r"><code># perform variable selection
+set.seed(20191220)
+boruta &lt;- Boruta(UHM ~.,data=countdata)
+print(boruta)</code></pre>
+<pre><code>## Boruta performed 99 iterations in 7.57 secs.
+##  1 attributes confirmed important: Shots;
+##  No attributes deemed unimportant.
+##  3 tentative attributes left: Gender, Language, Trial;</code></pre>
+<p>As only Shots is confirmed as important, we will only check for the effect of Shots and include trial as a random effect in the regression modelling. Before we start with the modelling, however, we proceed by checking if the data does indeed approximate a Poisson distribution visually.</p>
+<pre class="r"><code># output the results
+gf = goodfit(countdata$UHM,type= &quot;poisson&quot;,method= &quot;ML&quot;)
+plot(gf,main=&quot;Count data vs Poisson distribution&quot;)</code></pre>
+<p><img src="mixedregressions_files/figure-html/qpmm5-1.png" width="672" /></p>
+<p>The data does not perfectly match a distributin that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then data is NOT Poisson distributed and, given the visualization is likely over-dispersed. In that case, we may have to use a quasi-Poisson model rather than a Poisson model as quasi-Poisson models are specifically designed to handle overdispersed data that does not fully approximate to a Poisson distribution.</p>
+<pre class="r"><code>summary(gf)</code></pre>
+<pre><code>## 
+##   Goodness-of-fit test for poisson distribution
+## 
+##                    X^2 df                             P(&gt; X^2)
+## Likelihood Ratio 153.4  5 0.0000000000000000000000000000002493</code></pre>
+<p>The p-values is indeed substantially smaller than .05 which means that we cannot use a simple Poisson model. We will now use a Levene’s test to check if the variance is distributed homogeniously (homoscedasticity) or whether the assumption of variance homogeneity is violated.</p>
+<pre class="r"><code># check homogeneity
+leveneTest(countdata$UHM, countdata$Shots, center = mean)</code></pre>
+<pre><code>## Levene&#39;s Test for Homogeneity of Variance (center = mean)
+##        Df F value              Pr(&gt;F)    
+## group  12    21.5 &lt;0.0000000000000002 ***
+##       487                                
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<p>The Levene test indicates that the data is heteroscedastic and in this case, we should actually transform the data into normalized frequencies rather than counts. As this is just an example, we will ignore this and proceed to fit a quasi-Poisson mixed-effects model which is better for over- and underdispersed data.</p>
+<p>We begin the model fitting process by creating a mixed- and a fixed-effects intercept-only base-line model. Unfortunately, there is not yet a procedure in place for quasi-Poisson models to test if the inclusion of random effects is justified. However, here the Boruta also provides valuable information: Language was only considered tentative but not improtnat which suggests that it will not explain variance which means that including Language as a random effect may not be justified. This would require futher inspection. Because we are only dealing with an example here, we ignore this fact (which you should not do in proper analyses) and continue right away with adding shots.</p>
+<pre class="r"><code># base-line mixed-model
+m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
+                   family = quasipoisson(link=&#39;log&#39;))
+# create glm base line model
+m0.glm = glm(UHM ~ 1, data = countdata, family = quasipoisson(link=&#39;log&#39;))
+# add Shots
+m1.glm &lt;- update(m0.glm, .~.+ Shots)
+m1.glmer &lt;- update(m0.glmer, .~.+ Shots)
+Anova(m1.glmer, test = &quot;Chi&quot;)           # SIG! (p&lt;0.0000000000000002 ***)</code></pre>
+<pre><code>## Analysis of Deviance Table (Type II tests)
+## 
+## Response: zz
+##       Chisq Df          Pr(&gt;Chisq)    
+## Shots   276  1 &lt;0.0000000000000002 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<p>The ANOVA confirms that Shots have a significant impact on the number of instances of <em>uhm</em>. We will now have a look at the model summary.</p>
+<pre class="r"><code>summary(m1.glmer)</code></pre>
+<pre><code>## Linear mixed-effects model fit by maximum likelihood
+##  Data: countdata 
+##   AIC BIC logLik
+##    NA  NA     NA
+## 
+## Random effects:
+##  Formula: ~1 | Language
+##         (Intercept) Residual
+## StdDev:  0.00004081    1.078
+## 
+## Variance function:
+##  Structure: fixed weights
+##  Formula: ~invwt 
+## Fixed effects: UHM ~ Shots 
+##               Value Std.Error  DF t-value p-value
+## (Intercept) -1.2789   0.09649 495  -13.26       0
+## Shots        0.2336   0.01408 495   16.59       0
+##  Correlation: 
+##       (Intr)
+## Shots -0.806
+## 
+## Standardized Within-Group Residuals:
+##     Min      Q1     Med      Q3     Max 
+## -1.4004 -0.6182 -0.5501  0.5437  4.0248 
+## 
+## Number of Observations: 500
+## Number of Groups: 4</code></pre>
+<p>The model summary does not provide AIC, BIC or logged likelihood values. The coefficient for “Shots” is highly significant (p &lt;.001) and the data is notably overdispersed (the Standardized Within-Group Residuals deviate substantailly from a normal distribution with higher values having a thick tail).</p>
+<p>In a next step, we will calculate the odds ratios of the coefficient (as we only have one). We will use the coefficients from the fixed-effecst model as the coefficients for mixed- and fixed-effecst models are identical (the random effect structure only affects the standard error and p-values but not the coefficients; you can check by uncommenting the summary command).</p>
+<pre class="r"><code>#summary(m1.glm)
+exp(coef(m1.glm))</code></pre>
+<pre><code>## (Intercept)       Shots 
+##      0.2783      1.2632</code></pre>
+<p>The standardized or <span class="math inline">\(\beta\)</span>-coefficient tells us that the likelihood of <em>uhm</em> increases by 1.26 (or 26.32 percent) with each additional shot.</p>
+<p>Before inspecting the relationship between Shots and <em>uhm</em>, we will diagnose the model by plotting the Pearson’s residuals against fitted values. This diagnostic plot should not show a funnel-like structure (but it will to a certain extent as the Levene’s test alsready indicated that the data is heteroscedastic).</p>
+<pre class="r"><code># diagnostic plot
+plot(m1.glmer, pch = 20, col = &quot;black&quot;, lty= &quot;dotted&quot;, ylab = &quot;Pearson&#39;s residuals&quot;)</code></pre>
+<p><img src="mixedregressions_files/figure-html/qpmm9-1.png" width="672" /></p>
+<p>Indeed, the plot exhibts a (slight) funnel shape (but not drastically so) and thus indicates heteroscedasticity. We continue by plotting the random effect adjustments.</p>
+<pre class="r"><code># generate diagnostic plots
+plot(m1.glmer, Language ~ resid(.), abline = 0, fill = &quot;gray70&quot;) </code></pre>
+<p><img src="mixedregressions_files/figure-html/qpmm10-1.png" width="672" /></p>
+<p>As expected (given that Language was only deemed tentative), there is very little variation between the languages. We will now plot the fixed-effect of “Shots” using the “predictorEffects” function from the “effects” package.</p>
+<pre class="r"><code># create effect plot for comparison purposes
+plot(predictorEffects(m1.glmer)) </code></pre>
+<p><img src="mixedregressions_files/figure-html/qpmm11-1.png" width="672" /></p>
+<p>The effects plot shows that the number of <em>uhms</em> increases near-linearly with the number of shots a speaker has had. We will now prettify this plot and, subsequently, summarize the analysis. To cerate a nicer effects plot, we have to extarct the means and standard errors of the observed and predicted values for <em>uhm</em> for each number of shots in the data and combine the obesreved and predicted means and standrad errors in a data frame.</p>
+<pre class="r"><code># create table with predicted values for uhms by shots
+eff_cf &lt;- predictorEffects(m1.glmer)
+eff_df &lt;- data.frame(eff_cf)
+# create data frame with effects
+ef &lt;- as.data.frame(effect(&quot;Shots&quot;, m1.glmer, xlevels=list(Shots=seq(0, 13, 1))))
+ef$Type &lt;- rep(&quot;Predicted&quot;, 14)
+ef$lower &lt;- NULL
+ef$upper &lt;- NULL
+ef &lt;- ef %&gt;%
+  dplyr::filter(Shots &lt; 10) # remove predictions for 10 shots or more
+# create table with observed values for uhms by shots
+UHM_mean &lt;- t(tapply(countdata$UHM, countdata$Shots, mean))
+UHM_se &lt;- t(tapply(countdata$UHM, countdata$Shots, se))
+Shots &lt;- c(seq(0,10,1), 12:13)  
+df &lt;- data.frame(Shots, UHM_mean[1,], UHM_se[1,])
+colnames(df) &lt;- c(&quot;Shots&quot;, &quot;fit&quot;, &quot;se&quot;)
+df$Type &lt;- rep(&quot;Observed&quot;, 13)
+df &lt;- df %&gt;%
+  dplyr::filter(Shots &lt; 10) # remove predictions for 10 shots or more
+# combine observed and predicted table
+tbd &lt;- rbind(ef, df)
+# inspect data
+head(tbd)</code></pre>
+<pre><code>##   Shots     fit      se      Type
+## 1     0 -1.2789 0.09630 Predicted
+## 2     1 -1.0453 0.08538 Predicted
+## 3     2 -0.8117 0.07551 Predicted
+## 4     3 -0.5780 0.06715 Predicted
+## 5     4 -0.3444 0.06092 Predicted
+## 6     5 -0.1108 0.05752 Predicted</code></pre>
+<pre class="r"><code># plot observed and expected
+ggplot(tbd, aes(Shots, fit, color = Type)) +
+  geom_point() + 
+  geom_errorbar(aes(ymin=fit-se, ymax=fit+se), width=0.5) +
+  theme_set(theme_bw(base_size = 20)) +
+  scale_color_manual(values = c(&quot;grey20&quot;, &quot;gray70&quot;)) +
+  theme(legend.position=&quot;none&quot;, legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-2.5, 5) +
+  labs(x = &quot;Shots&quot;, y = &quot;Number of uhm fillers&quot;)</code></pre>
+<p><img src="mixedregressions_files/figure-html/qpmm13-1.png" width="672" /></p>
+<p>The effect plot shows that the predicted number of shots incerases linearly with each shot, the observed number of shots plateus once a speaker had 5 shots (or more). We will now summarize the results as if the violations had NOT occurred(!) - again: thsi is onyl because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!</p>
+<p>A mixed-effect pseudo-Poisson regression model which contained the trial as random effect was fit to to the data. Prior to the model fitting process, a Boruta analysis was applied to determine whether any of the predictors had a meaningful relationship with the dependent variable (instances of <em>uhm</em>). Since the Boruta analysis indicated that only the number of shots that speakers have had was important, only “Shots” was tested during model fitting. The final minimal adequate model showed that the number of <em>uhm</em> as fillers increases significantly, and near-linearly with the number of shots speakers had (<span class="math inline">\(\chi\)</span><sup>2</sup>(1):276.0, p &lt;.0001, <span class="math inline">\(\beta\)</span>: 1.2632). An inspection of the random effect structure conveyed that there was almost no variability between languages.</p>
 </div>
 <div id="references" class="section level1 unnumbered">
 <h1>References</h1>
