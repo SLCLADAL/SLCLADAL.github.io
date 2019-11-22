@@ -1,7 +1,7 @@
 #' @title Summary Tables for Simple Linear Regressions
 #'
 #' @description This function produces summary tables for simple linear regressions by extracting the relevent information from a regression object created with the lm function.
-#' @param x A simple linear regressions by extracting the relevent information from a regression object created with the lm function.
+#' @param x A simple linear regression model with exactly one main effect created with the lm function.
 #' @export
 #' @keywords regression, linear regression, summary table, function
 #' @seealso
