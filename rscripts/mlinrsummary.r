@@ -1,29 +1,16 @@
-###########################################################################
-### --- Function for Customized Multiple Linear Regression Results
-###########################################################################
-##################################################################
-### --- R-Skript "Function for Customized Multiple Linear Regression Results"
-### --- Author: Martin Schweinberger (June 18th, 2014)
-### --- R-Version: R version 3.0.1 (2013-05-16) -- "Good Sport"
-### --- This R script retrieves relevant information from regression outputs of
-### --- Multiple Linear Regression.
-### --- NOTE
-### --- This script only works for Multiple Linear Regressions.
-### --- The function takes three arguments: x = a lrm object, a = a glm object, 
-### --- and dpvar = a vector representing the depentent variable with numeric values of either 0 or 1.
-### --- CONTACT
-### --- If you have questions,suggestions or you found errors
-### --- or in case you would to provide feedback, questions
-### --- write an email to
-### --- martin.schweinberger.hh@gmail.com
-### --- CITATION
-### --- If you use this script or results thereof, please cite it as:
-### --- Schweinberger, Martin. 2014. "Function for Customized
-### --- Multiple Linear Regression Results ", unpublished R-skript,
-### --- Hamburg University.
-###############################################################
-###                   START
-###############################################################
+#' @title Summary Tables for Multiple Linear Regressions
+#'
+#' @description This function produces summary tables for fixed-effects multiple linear regressions by extracting the relevent information from a glm and an lm object.
+#' @param x A glm object of family "binomial".
+#' @param a A lrm object.
+#' @param ia If ia = T (default) the table will show all columns of the summary table.
+#' @export
+#' @keywords multiple linear regression, linear regression, summary table, function
+#' @seealso
+#' @return NULL
+#' @examples \dontrun{
+#' Example code will come later!
+#' }
 
 mlinrsummary <- function(mlr, glm, ia = T) {
   options(warn=-1)
