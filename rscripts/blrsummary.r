@@ -1,36 +1,18 @@
-###########################################################################
-### --- Function for Customized Binomial Logistic Regression Results
-###########################################################################
-##################################################################
-### --- R script "Function for Customized Binomial Logistic Regression Results"
-### --- Author: Martin Schweinberger (June 18th, 2014)
-### --- R-Version: R version 3.0.1 (2013-05-16) -- "Good Sport"
-### --- This R script retrieves relevant information from regression outputs of
-### --- Binomial Logistic Regression.
-### --- NOTE
-### --- This script only works for Binomial Logistic Regressions.
-### --- The function takes two arguments: x = a glm object; a = a lrm object;
-### --- a percentage value representing the accuracy of the prediction achieved
-### --- by the model.
-### --- CONTACT
-### --- If you have questions,suggestions or you found errors
-### --- or in case you would to provide feedback, questions
-### --- write an email to
-### --- martin.schweinberger.hh@gmail.com
-### --- CITATION
-### --- If you use this script or results thereof, please cite it as:
-### --- Schweinberger, Martin. 2014. "Function for Customized
-### --- Binomial Logistic Regression Results ", unpublished R-skript,
-### --- Hamburg University.
-###############################################################
-###                   START
-###############################################################
-
-###############################################################
-### Function for a neat output table for Multiple Linear Regression Models
-###############################################################
-# x = glm model, a = lrm model, accuracy = predict.acc
-blrm.summary <- function(x, a, accuracy) {
+#' @title Summary Tables for Binomial Logistic Regressions
+#'
+#' @description This function produces summary tables for fixed-effects binomial logistic regressions by extracting the relevent information from a glm and an lrm object.
+#' @param x A glm object of family "binomial".
+#' @param a A lrm object.
+#' @param accuracy The accuracy of the model predictions.
+#' @export
+#' @keywords binomial logistic regression, logistic regression, summary table, function
+#' @seealso
+#' @return NULL
+#' @examples \dontrun{
+#' Example code will come later!
+#' }
+ 
+blrsummary <- function(x, a, accuracy) {
 p.nice <- function(z) {
   as.vector(unlist(sapply(z, function(w) {
     ifelse(w < .001, return("p < .001***"),

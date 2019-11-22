@@ -106,7 +106,7 @@ library(sjPlot)
 library(vcd)
 library(visreg)
 # load functions
-source("https://slcladal.github.io/rscripts/blr.summary.r")
+source("https://slcladal.github.io/rscripts/blrsummary.r")
 source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")
 source("https://slcladal.github.io/rscripts/mlinrsummary.r")
 source("https://slcladal.github.io/rscripts/SampleSizeMLR.r")
@@ -118,9 +118,7 @@ After preparing the session, we can now load the data and inspect its structure 
 ```{r mlr2, eval = T, echo = T, message=FALSE, warning=FALSE}
 # load data
 mlrdata <- read.delim("https://slcladal.github.io/data/mlrdata.txt", header = TRUE)
-head(mlrdata)    # inspect first 6 lines
-str(mlrdata)     # inspect structure
-summary(mlrdata) # summarize data
+head(mlrdata); str(mlrdata); summary(mlrdata) # inspect data
 ```
 
 The data set consist of three variables stored in three columns. The first column contains the relationship status of the women, the second whether the man is interested in the woman, and the third column represents the money spend on the present. The data set represents 100 cases and the mean amount of money spend on a present is 88.38 dollars. In a next step, we visualize the data to get a more detailed impression of the relationships between variables.
@@ -906,8 +904,7 @@ visreg(lr.glm, "Age", xlab = "Age",
        ylim = c(-3, 0))
 visreg(lr.glm, "Gender", xlab = "Gender",
        ylab = "Logged Odds (EH)",
-       ylim = c(-3, 0))
-par(mfrow = c(1, 1))
+       ylim = c(-3, 0)); par(mfrow = c(1, 1))
 ```
 
 A more intuitive way to visualze results id to plot the predicted values against the observed values.
@@ -982,10 +979,14 @@ According to rule of thumb provided in @green1991many, the sample size is suffic
 ## Summarizing Results
 
 As a final step, we summarize our findings in tabulated form.
+```{r blm38, eval = F, echo=T, message=FALSE, warning=FALSE}
+blrmsummary <- blrmsummary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
+blrmsummary
+```
 
-```{r blm38, eval = T, echo=T, message=FALSE, warning=FALSE}
-blrmsummary <- blrm.summary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
-kable(blrmsummary[, -c(4:5)], caption = "Summary of the final minimal adequate binomial logistic fixed-effects regression model which was fitted to predictors of eh in New Zealand English.")
+```{r blm38, eval = T, echo=F, message=FALSE, warning=FALSE}
+blrmsummary <- blrmsummary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
+kable(blrmsummary, caption = "Summary of the final minimal adequate binomial logistic fixed-effects regression model which was fitted to predictors of eh in New Zealand English.")
 ```
 
 **R2 (Hosmer & Lemeshow)**
@@ -1258,15 +1259,16 @@ Robust regressions are linear regressions with added weights [@rousseeuw2005robu
 
 ```{r rr1, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load data
-robustdata <- read.delim("https://slcladal.github.io/data/robustdata.txt", sep = "\t", header = T)
+robustdata <- read.delim("https://slcladal.github.io/data/mlrdata.txt", sep = "\t", header = T)
 # inspect data
 summary(robustdata)
 ```
 
+We now fit an ordinary linear model (and although we know from the section on multiple regression, that the interaction between status and attraction is significant, we will disregard this for now as this will help to explain the weighing procedure which is the focus of this section).
 
 ```{r rr2, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create model
-slm <- lm(crime ~ poverty + single, data = robustdata)
+slm <- lm(money ~ status+attraction, data = robustdata)
 # inspect model
 summary(slm)
 ```
@@ -1280,69 +1282,59 @@ plot(slm, las = 1)
 par(opar)
 ```
 
-The diagnostic plots indicate that there is an outlier in the data (data point 51). Therefore, we need to evaluate if the outlier severely affects the fit of the model.
+The diagnostic plots indicate that there are three outliers in the data (data points 52, 83 and possibly 64). Therefore, we need to evaluate if the outliers severely affects the fit of the model.
 
 ```{r rr4, eval = T, echo=T, message=FALSE, warning=FALSE}
-robustdata[c(9, 25, 51), 1:2]
+robustdata[c(52, 64, 83), 1:2]
 ```
 
+We can now calculate Cook's distance and standardized residuals check if the values of the potentially problematic points have unaccepatbly high values (-2 < ok < 2).
 
 ```{r rr5, eval = T, echo=T, message=FALSE, warning=FALSE}
-d1 <- cooks.distance(slm)
-r <- stdres(slm)
-a <- cbind(robustdata, d1, r)
-a[d1 > 4/51, ]
+CooksDistance <- cooks.distance(slm)
+StandardizedResiduals <- stdres(slm)
+a <- cbind(robustdata, CooksDistance, StandardizedResiduals)
+a[CooksDistance > 4/100, ]
 ```
 
+We will calculate the absolute value of oder the table so that it is easier to check the values.
 
 ```{r rr6, eval = T, echo=T, message=FALSE, warning=FALSE}
-rabs <- abs(r)
-a <- cbind(robustdata, d1, r, rabs)
-asorted <- a[order(-rabs), ]
+AbsoluteStandardizedResiduals <- abs(StandardizedResiduals)
+a <- cbind(robustdata, CooksDistance, StandardizedResiduals, AbsoluteStandardizedResiduals)
+asorted <- a[order(-AbsoluteStandardizedResiduals), ]
 asorted[1:10, ]
 ```
 
-
+As Cook's distance and the standardized residuals do have unaccepatble values, we re-calculate the linear model as a robust regression and inspect the results
 
 ```{r rr7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create robust regression model
-rmodel <- rlm(crime ~ poverty + single, data = robustdata)
+rmodel <- rlm(money ~ status + attraction, data = robustdata)
 # inspect model
 summary(rmodel)
 ```
 
+We will briefly check the weights to understand the process of weighing better. The idea of weighing is to downgrade data points that are too influential while not punishing data points that have a good fit and are thus less influential. This means that the problematic data points should have lower weights than other data points (the maximum is 1 - so points can only be made "lighter"). 
 
 ```{r rr8, eval = T, echo=T, message=FALSE, warning=FALSE}
-hweights <- data.frame(state = robustdata$state, resid = rmodel$resid, weight = rmodel$w)
+hweights <- data.frame(status = robustdata$status, resid = rmodel$resid, weight = rmodel$w)
 hweights2 <- hweights[order(rmodel$w), ]
 hweights2[1:15, ]
 ```
 
-
-```{r rr9, eval = T, echo=T, message=FALSE, warning=FALSE}
-rr.bisquare <- rlm(crime ~ poverty + single, data=robustdata, psi = psi.bisquare)
-summary(rr.bisquare)
-```
-
-
-```{r rr10, eval = T, echo=T, message=FALSE, warning=FALSE}
-biweights <- data.frame(state = robustdata$state, 
-                        resid = rr.bisquare$resid,
-                        weight = rr.bisquare$w)
-biweights2 <- biweights[order(rr.bisquare$w), ]
-biweights2[1:15, ]
-```
+The values of the weights support our assumption that those data points that were deemed too influential are made "lighter" as they now only have weights of .486 and .494 respectively. 
 
 After inspecting the weights, we also want to extract the p-values for the predictors. The p-values have to be calculated separately using the "f.robftest" fucntion from the "sfsmisc" library.
 
 ```{r rr11, eval = T, echo=T, message=FALSE, warning=FALSE}
-p_poverty <- f.robftest(rmodel, var = "poverty")
-p_single <- f.robftest(rmodel, var = "single")
+p_status <- f.robftest(rmodel, var = 2)
+p_attraction <- f.robftest(rmodel, var = 3)
 # inspect results
-p_poverty; p_single
+p_status; p_attraction
 ```
 
-The output shows that poverty is not a significant predictor while single correlates highly significanty with crime.
+The output shows that both status and attraction are significant but, as we have seen above, the effect that really matters is the interaction between status and attraction. This was, however, not the focus of this sections as this section meerly served to introduce the concept of weights and how they can be used in the context of a robust linear regression.
 
 # References
 
