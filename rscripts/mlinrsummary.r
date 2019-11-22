@@ -63,7 +63,7 @@ ciupr <- confint(glm)[, 2]
   f = summary(mlr)$fstatistic
   p <- pf(f[1],f[2],f[3],lower.tail=F)
 
-Fstat <- c("", "", "", "","", paste("F-statistic:", round(summary(mlr)[[10]][[1]], 2)), 
+Fstat <- c(rep("", 4), paste("F-statistic:", round(summary(mlr)[[10]][[1]], 2)), 
     paste("DF:", round(summary(mlr)[[10]][[2]], 0), "and", round(summary(mlr)[[10]][[3]], 0)), paste("p-value:", round(p[[1]], 5)),
     p.nice(p[[1]]))
   gblstz.tb <- rbind(mdl.statz, nbcases, rste, mR, aR, AIC, BIC, Fstat)
