@@ -53,13 +53,13 @@ ciupr <- confint(glm)[, 2]
     colnames(coefs)[4],
     "Significance")
   
-  mdl.statz <- c("", "", "", "","", "", "", "", "Value")
-  nbcases <- c("", "", "", "","", "", "", "", length(fitted(glm)))
-  rste <- c("", "", "", "", "","", "", "", round(summary(mlr)[[6]], 2))
-  mR <- c("", "", "", "", "","", "", "", round(summary(mlr)[[8]], 3))
-  aR <- c("", "","", "", "", "", "", "", round(summary(mlr)[[9]], 3))    
-  AIC <- c("", "", "", "", "","", "", "", round(summary(glm)[[5]], 2))
-  BIC <- c("", "", "", "", "","", "", "", round(BIC(mlr), 2))
+  mdl.statz <- c(rep("", 7), "Value")
+  nbcases <- c(rep("", 7), length(fitted(glm)))
+  rste <- c(rep("", 7), round(summary(mlr)[[6]], 2))
+  mR <- c(rep("", 7), round(summary(mlr)[[8]], 3))
+  aR <- c(rep("", 7), round(summary(mlr)[[9]], 3))    
+  AIC <- c(rep("", 7), round(summary(glm)[[5]], 2))
+  BIC <- c(rep("", 7), round(BIC(mlr), 2))
   f = summary(mlr)$fstatistic
   p <- pf(f[1],f[2],f[3],lower.tail=F)
 
