@@ -1,5 +1,5 @@
 
-# "Fixed-Effects Regression Models"
+# "Fixed-Effects Regression"
 # "UQ SLC Digital Team"
 #
 # clean current workspace
@@ -10,7 +10,8 @@ options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
 install.packages(c("boot", "car", "caret", "effects", "foreign", "ggplot2", 
                    "Hmisc", "knitr", "MASS", "mlogit", "msm", "QuantPsyc", 
-                   "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", "vcd", "visreg"))
+                   "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", 
+                   "vcd", "visreg"))
 # load libraries
 library(boot)
 library(car)
@@ -33,16 +34,14 @@ library(sjPlot)
 library(vcd)
 library(visreg)
 # load functions
-source("https://slcladal.github.io/rscripts/blr.summary.r")
-source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")
-source("https://slcladal.github.io/rscripts/mlinr.summary.r")
+source("https://slcladal.github.io/rscripts/blrsummary.r")
+source("https://slcladal.github.io/rscripts/multiplot.r")
+source("https://slcladal.github.io/rscripts/mlinrsummary.r")
 source("https://slcladal.github.io/rscripts/SampleSizeMLR.r")
 source("https://slcladal.github.io/rscripts/ExpR.r")
 # load data
 mlrdata <- read.delim("https://slcladal.github.io/data/mlrdata.txt", header = TRUE)
-head(mlrdata)    # inspect first 6 lines
-str(mlrdata)     # inspect structure
-summary(mlrdata) # summarize data
+head(mlrdata); str(mlrdata); summary(mlrdata) # inspect data
 # create plots
 p1 <- ggplot(mlrdata, aes(status, money)) +   # data + x/y-axes
   geom_boxplot(fill=c("grey30", "grey70")) + # def. col.
@@ -118,16 +117,14 @@ anova(m0.mlr, m2.mlr)
 # compare baseline- and minimal adequate model
 Anova(m0.mlr, m2.mlr, type = "III")
 # start plotting
-par(mfrow = c(1, 4)) # display plots in 3 rows/2 columns
-plot(m2.mlr)         # plot fitted values
-par(mfrow = c(1, 1)) # restore original settings
+par(mfrow = c(2, 2)) # display plots in 3 rows/2 columns
+plot(m2.mlr); par(mfrow = c(1, 1)) # cerate plots and restore original settings
 # determine a cutoff for data points that have D-values higher than 4/(n-k-1)
 cutoff <- 4/((nrow(mlrdata)-length(m2.mlr$coefficients)-2))
 # start plotting
 par(mfrow = c(1, 2))           # display plots in 3 rows/2 columns
 qqPlot(m2.mlr, main="QQ Plot") # create qq-plot
-plot(m2.mlr, which=4, cook.levels = cutoff) # plot cook*s distance
-par(mfrow = c(1, 1))           # restore original settings
+plot(m2.mlr, which=4, cook.levels = cutoff); par(mfrow = c(1, 1))
 # extract influence statistics
 infl <- influence.measures(m2.mlr)
 # add infl. statistics to data
@@ -244,9 +241,12 @@ smplesz(m2.mlr)
 # check beta-error likelihood
 expR(m2.mlr)
 # tabulate regression results
-mlrsummary <- mlr.summary(m2.mlr, m2.glm, ia = T)
+mlrsummary <- mlinrsummary(m2.mlr, m2.glm, ia = T)
 # remove columns with confidence intervals
-mlrsummary[,-c(4:5)]
+mlrsummary[,-c(3:4)]
+# tabulate regression results
+mlrsummary <- mlinrsummary(m2.mlr, m2.glm, ia = T)
+kable(mlrsummary, caption = "Overview of the final minimal adequate linear fixed-effects regression model.")
 bodyheight=rnorm(20,180,10) # generates 20 values, with mean of 30 & s.d.=2
 bodyheight=sort(bodyheight) # sorts these values in ascending order.
 relationship=c(0,0,0,0,0,1,0,1,0,0,1,1,0,1,1,1,0,1,1,1) # assign 'survival' to these 20 individuals non-randomly... most mortality occurs at smaller body size
@@ -418,8 +418,7 @@ visreg(lr.glm, "Age", xlab = "Age",
        ylim = c(-3, 0))
 visreg(lr.glm, "Gender", xlab = "Gender",
        ylab = "Logged Odds (EH)",
-       ylim = c(-3, 0))
-par(mfrow = c(1, 1))
+       ylim = c(-3, 0)); par(mfrow = c(1, 1))
 # extract predicted probabilities
 blrdata$Predicted <- predict(lr.glm, blrdata, type = "response")
 # plot
@@ -445,8 +444,10 @@ smplesz <- function(x) {
     return("Sample size sufficient")) }
 # apply unction to model
 smplesz(lr.glm)
-blrmsummary <- blrm.summary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
-kable(blrmsummary[, -c(4:5)], caption = "Summary of the final minimal adequate binomial logistic fixed-effects regression model which was fitted to predictors of eh in New Zealand English.")
+blrsummary <- blrsummary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
+blrsummary
+blrsummary <- blrsummary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
+kable(blrsummary, caption = "Summary of the final minimal adequate binomial logistic fixed-effects regression model which was fitted to predictors of eh in New Zealand English.")
 # load data
 ordata <- read.delim("https://slcladal.github.io/data/ordinaldata.txt", sep = "\t", header = T)
 colnames(ordata) <- c("Recommend", "Internal", "Exchange", "FinalScore")
@@ -553,43 +554,36 @@ ggplot(poissondata, aes(x = Alcohol, y = Predicted, colour = Language)) +
   labs(x = "Alcohol (ml)", y = "Expected number of pauses") +
   scale_color_manual(values=c("gray30", "gray50", "gray70"))
 # load data
-robustdata <- read.delim("https://slcladal.github.io/data/robustdata.txt", sep = "\t", header = T)
+robustdata <- read.delim("https://slcladal.github.io/data/mlrdata.txt", sep = "\t", header = T)
 # inspect data
 summary(robustdata)
 # create model
-slm <- lm(crime ~ poverty + single, data = robustdata)
+slm <- lm(money ~ status+attraction, data = robustdata)
 # inspect model
 summary(slm)
 # create model diagnost plots
 opar <- par(mfrow = c(2,2), oma = c(0, 0, 1.1, 0))
 plot(slm, las = 1)
 par(opar)
-robustdata[c(9, 25, 51), 1:2]
-d1 <- cooks.distance(slm)
-r <- stdres(slm)
-a <- cbind(robustdata, d1, r)
-a[d1 > 4/51, ]
-rabs <- abs(r)
-a <- cbind(robustdata, d1, r, rabs)
-asorted <- a[order(-rabs), ]
+robustdata[c(52, 64, 83), 1:2]
+CooksDistance <- cooks.distance(slm)
+StandardizedResiduals <- stdres(slm)
+a <- cbind(robustdata, CooksDistance, StandardizedResiduals)
+a[CooksDistance > 4/100, ]
+AbsoluteStandardizedResiduals <- abs(StandardizedResiduals)
+a <- cbind(robustdata, CooksDistance, StandardizedResiduals, AbsoluteStandardizedResiduals)
+asorted <- a[order(-AbsoluteStandardizedResiduals), ]
 asorted[1:10, ]
 # create robust regression model
-rmodel <- rlm(crime ~ poverty + single, data = robustdata)
+rmodel <- rlm(money ~ status + attraction, data = robustdata)
 # inspect model
 summary(rmodel)
-hweights <- data.frame(state = robustdata$state, resid = rmodel$resid, weight = rmodel$w)
+hweights <- data.frame(status = robustdata$status, resid = rmodel$resid, weight = rmodel$w)
 hweights2 <- hweights[order(rmodel$w), ]
 hweights2[1:15, ]
-rr.bisquare <- rlm(crime ~ poverty + single, data=robustdata, psi = psi.bisquare)
-summary(rr.bisquare)
-biweights <- data.frame(state = robustdata$state, 
-                        resid = rr.bisquare$resid,
-                        weight = rr.bisquare$w)
-biweights2 <- biweights[order(rr.bisquare$w), ]
-biweights2[1:15, ]
-p_poverty <- f.robftest(rmodel, var = "poverty")
-p_single <- f.robftest(rmodel, var = "single")
+p_status <- f.robftest(rmodel, var = 2)
+p_attraction <- f.robftest(rmodel, var = 3)
 # inspect results
-p_poverty; p_single
-The output shows that poverty is not a significant predictor while single correlates highly significanty with crime.
+p_status; p_attraction
+The output shows that both status and attraction are significant but, as we have seen above, the effect that really matters is the interaction between status and attraction. This was, however, not the focus of this sections as this section meerly served to introduce the concept of weights and how they can be used in the context of a robust linear regression.
 # References

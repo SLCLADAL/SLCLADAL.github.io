@@ -1,5 +1,5 @@
 
-# "Mixed-Effects Regression Models"
+# "Mixed-Effects Regression"
 # "UQ SLC Digital Team"
 #
 # clean current workspace
@@ -113,9 +113,9 @@ library(tidyr)
 library(vcd)
 library(visreg)
 # load functions
-source("https://slcladal.github.io/rscripts/multiplot_ggplot2.r")   
+source("https://slcladal.github.io/rscripts/multiplot.r")   
 source("https://slcladal.github.io/rscripts/PseudoR2lmerBinomial.r") 
-source("https://slcladal.github.io/rscripts/meblr.summary.r")  
+source("https://slcladal.github.io/rscripts/meblrsummary.r")  
 source("https://slcladal.github.io/rscripts/eflme.r")
 source("https://slcladal.github.io/rscripts/ModelFittingSummarySWSU.r") 
 # supress scientific notation

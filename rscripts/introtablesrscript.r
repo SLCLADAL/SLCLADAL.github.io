@@ -21,19 +21,64 @@ head(myothertable)
 library(xlsx)
 # load table into R
 # WARNING! set your own path!
-mytable <- read.xlsx("D:\\Uni\\UQ\\LADAL\\SLCLADAL.github.io\\data/testdata1.xlsx", 1)
+exceldata <- read.xlsx("data/testdata1.xlsx", 1)
 # show first 6 lines of table
-head(mytable)
+head(exceldata)
 # load libraries
 library(dplyr)
 library(tidyr)
+# load new data
+newdata <- read.delim("data/mlrdata.txt", sep = "\t", header = T)
 # inspect data before processing
-nrow(myothertable); str(myothertable); table(myothertable$attraction)
+nrow(newdata); str(newdata); table(newdata$attraction)
+# example of a data processing pipeline
+pipeddata <- read.delim("data/mlrdata.txt", sep = "\t", header = T) %>%
+  dplyr::rename(Status = status, Attraction = attraction, Money = money) %>%
+  dplyr::group_by(Status, Attraction) %>%
+  dplyr::summarise(Mean = mean(Money))
+# inspect summarized data
+pipeddata
 # select and filter
-mytable <- myothertable %>%
+reduceddata <- newdata %>%
   # select the columns attraction and money
   dplyr::select(attraction, money) %>%
   # extract rows which represent cases where the person was intersted in someone
   dplyr::filter(attraction == "Interested")
-# inspect data before processing
-nrow(mytable); table(mytable$attraction)
+# inspect new table
+nrow(reduceddata); table(reduceddata$attraction)
+# select and filter
+datawithoutmoney <- newdata %>%
+  # remove money
+  dplyr::select(-money) 
+# inspect data
+head(datawithoutmoney)
+# creating a new column
+newdata <- newdata %>%
+  dplyr::mutate(Spendalot = ifelse(money >= 100, "Alot", "Alittle")) 
+# inspect data
+head(newdata)
+# renaming columns
+newdata <- newdata  %>%
+  dplyr::rename(Status = status, Attraction = attraction, Money = money)
+# inspect data
+head(newdata)
+#grouping and summarizing data 
+datasummary <- newdata %>%
+  dplyr::group_by(Status, Attraction) %>%
+  dplyr::summarise(Mean = round(mean(Money), 2), SD = round(sd(Money), 1))
+# inspect summarized data
+datasummary
+# converting data to wide format 
+widedata <- datasummary %>%
+  # remove SD column
+  dplyr::select(-SD) %>% 
+  # convert into wide format
+  tidyr::spread(Attraction, Mean)
+# inspect wide data
+widedata
+# converting data to long format 
+longdata <- widedata %>%
+  # convert into long format
+  tidyr::gather(Attraction, Money, Interested:NotInterested)
+# inspect wide data
+longdata

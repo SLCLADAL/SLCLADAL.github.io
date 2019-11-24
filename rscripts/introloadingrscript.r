@@ -12,7 +12,7 @@ install.packages(c("cluster", "factoextra", "cluster",
                    "seriation", "pvclust", "ape", "vcd", 
                    "exact2x2", "factoextra", "seriation", 
                    "NbClust", "pvclust"))
-# Setting workspace
+# Set workspace
 #setwd("D:\\StatisticsForLinguists")
 # show workspace
 getwd ()
