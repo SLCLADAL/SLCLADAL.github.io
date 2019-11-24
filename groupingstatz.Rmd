@@ -180,12 +180,16 @@ Based on this distance matrix, we can now implement a cluster analysis in `R`.
 To create a simple cluster object in R, we use the "hclust" function from the "cluster" package. The resulting object is then plotted to create a dendrogram which shows how students have been amalgamated (combined) by the clustering algorithm (which, in the present case, is called "ward.D").
 
 ```{r cl8, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
-library("cluster")    # activate library
-clusterstudents <- hclust( # hierarchical cluster object
-  diststudents,       # use data diststudents
-  method="ward.D")    # ward.D as linkage method
-plot(clusterstudents, # plot result as dendrogram
-     hang = 0)        # labels at split
+# activate library
+library("cluster")    
+library("factoextra")
+library("seriation")
+library("NbClust")
+library("pvclust")
+# create hierarchical cluster object with ward.D as linkage method
+clusterstudents <- hclust(diststudents, method="ward.D")
+# plot result as dendrogram
+plot(clusterstudents, hang = 0)
 ```
 
 Let us have a look at how the clustering algorithm has amalgamated the students. The amalgamation process takes the distance matrix from above as a starting point and, in a first step, has merged Student A and Student B (because they were the most similar students in the data based on the distance matrix). After collapsing Student A and Student B, the resulting distance matrix looks like the distance matrix below (notice that Student A and Student B now form a cluster that is represented by the means of the grades of the two students).
@@ -559,172 +563,9 @@ pfish[[1]]
 assocstats(table(cluster, clsts.df$youse))
 
 assocstats(table(cluster, clsts.df$like))
-
 ```
 
-
-```{r cl37, eval = T, echo=T, message=FALSE, warning=FALSE}
-library("factoextra")
-library("seriation")
-library("NbClust")
-library("pvclust")
-```
-
-# Correspondence Analysis
-
-```{r ca1, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load libraries
-library("FactoMineR")
-library("factoextra")
-# load preinstalled data
-data(housetasks)
-# inspect data
-head(housetasks)
-# load library
-library("gplots")
-# 1. convert the data as a table
-dt <- as.table(as.matrix(housetasks))
-# 2. Graph
-balloonplot(t(dt), main ="housetasks", xlab ="", ylab="",
-            label = FALSE, show.margins = FALSE)
-
-chisq <- chisq.test(housetasks)
-chisq
-
-library("FactoMineR")
-res.ca <- CA(housetasks, graph = FALSE)
-print(res.ca)
-# Chi-square statistics
-chi2 <- 1944.456
-# Degree of freedom
-df <- (nrow(housetasks) - 1) * (ncol(housetasks) - 1)
-# P-value
-pval <- pchisq(chi2, df = df, lower.tail = FALSE)
-pval
-library("factoextra")
-eig.val <- get_eigenvalue(res.ca)
-eig.val
-fviz_screeplot(res.ca) +
- geom_hline(yintercept=33.33, linetype=2, color="red", addlabels = TRUE, ylim = c(0, 50))
-# repel= TRUE to avoid text overlapping (slow if many point)
-fviz_ca_biplot(res.ca, repel = TRUE)
-
-```
-
-
-# Principal Component Analysis
-
-```{r pca1, eval = T, echo=T, message=FALSE, warning=FALSE}
-# inspect data
-data(iris)
-head(iris, 3)
-```
-
-```{r pca2, eval = T, echo=T, message=FALSE, warning=FALSE}
-# log transform 
-log.ir <- log(iris[, 1:4])
-ir.species <- iris[, 5]
- 
-# apply PCA - scale. = TRUE is highly 
-# advisable, but default is FALSE. 
-ir.pca <- prcomp(log.ir, center = TRUE, scale. = TRUE) 
-```
-
-
-```{r pca3, eval = T, echo=T, message=FALSE, warning=FALSE}
-# print method
-print(ir.pca)
-```
-
-
-```{r pca4, eval = T, echo=T, message=FALSE, warning=FALSE}
-# plot method
-plot(ir.pca, type = "l")
-```
-
-```{r pca5, eval = T, echo=T, message=FALSE, warning=FALSE}
-# summary method
-summary(ir.pca)
-```
-
-```{r pca6, eval = T, echo=T, message=FALSE, warning=FALSE}
-# predict PCs
-predict(ir.pca, newdata=tail(log.ir, 2))
-```
-
-
-```{r pca7, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load library
-#library(devtools)
-# install library from github
-#install_github("vqv/ggbiplot")
-# load installed library
-library(ggbiplot)
-# create plot
-g <- ggbiplot(ir.pca, obs.scale = 1, var.scale = 1, 
-              groups = ir.species, ellipse = TRUE, 
-              circle = TRUE)
-g <- g + scale_color_discrete(name = '')
-g <- g + theme(legend.direction = 'horizontal', 
-               legend.position = 'top')
-print(g)
-```
-
-```{r pca8, eval = T, echo=T, message=FALSE, warning=FALSE}
-require(caret)
-trans = preProcess(iris[,1:4], 
-                   method=c("BoxCox", "center", 
-                            "scale", "pca"))
-PC = predict(trans, iris[,1:4])
-```
-
-
-```{r pca9, eval = T, echo=T, message=FALSE, warning=FALSE}
-# inspect retained PCs
-head(PC, 3)
-
-# inspect loadings
-trans$rotation
-```
-
-
-# Multidimensional Scaling 
-
-```{r mds1, eval = T, echo=T, message=FALSE, warning=FALSE}
-# Classical MDS
-# N rows (objects) x p columns (variables)
-# each row identified by a unique row name
-
-d <- dist(clus) # Euclidean distances between the rows
-fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
-fit # view results
-
-# plot solution
-x <- fit$points[,1]
-y <- fit$points[,2]
-plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
-  main="Metric MDS", type="n")
-text(x, y, labels = row.names(clus), cex=.7) 
-```
-
-
-```{r mds2, eval = F, echo=F, message=FALSE, warning=FALSE}
-# Nonmetric MDS
-# N rows (objects) x p columns (variables)
-# each row identified by a unique row name
-
-library(MASS)
-d <- dist(clus) # Euclidean distances between the rows
-fit <- isoMDS(d, k=2) # k is the number of dim
-fit # view results
-
-# plot solution
-x <- fit$points[,1]
-y <- fit$points[,2]
-plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
-  main="Nonmetric MDS", type="n")
-text(x, y, labels = row.names(clus), cex=.7) 
-```
+Clustering is a highly complex topic and there many more complexities to it. However, this should have helped to get you started.
 
 
 # Vector Space Models
@@ -749,7 +590,7 @@ We start by loading and then displaying the data which is called "vsmdata" and c
 
 ```{r vsm1, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load data
-vsmdata <- read.delim("data/vsmdata.txt", sep = "\t", header = T)
+vsmdata <- read.delim("https://slcladal.github.io/data/vsmdata.txt", sep = "\t", header = T)
 # inspect data
 str(vsmdata)
 ```
@@ -784,7 +625,7 @@ tdm <- t(tdm)
 tdm[1:5, 1:5]
 ```
 
-In a next step, we extract the expected values of the co-occurrences if the amplifiers were distributed homogeneously and calculate the Pointwise Mutual Information (PMI) score and use that to then calculate the Positive Pointwise Mutual Information (PPMI) scores. According to [@levshina2015linguistics 327] (referring to @bullinaria2007extracting) PPMI perform better than PMI as negative values are replaced with zeros. In a next step, we calculate the cosine similarity which will for the bases for the subsequent clustering.
+In a next step, we extract the expected values of the co-occurrences if the amplifiers were distributed homogeneously and calculate the *Pointwise Mutual Information* (PMI) score and use that to then calculate the *Positive Pointwise Mutual Information* (PPMI) scores. According to @levshina2015linguistics 327 - referring to @bullinaria2007extracting - PPMI perform better than PMI as negative values are replaced with zeros. In a next step, we calculate the cosine similarity which will for the bases for the subsequent clustering.
 
 ```{r vsm4, eval = T, echo=T, message=FALSE, warning=FALSE}
 # compute expected values
@@ -831,12 +672,13 @@ amplifier.clusters$clustering
 In a next step, we visualize the results of the semantic vector space model as a dendrogram.
 
 ```{r vsm7, eval = T, echo=T, message=FALSE, warning=FALSE}
-# create cluster object (ward.D linkage)
+# create cluster object
 cd <- hclust(clustd, method="ward.D")    
 # plot cluster object
-plot(cd)
+plot(cd, main = "", sub = "", yaxt = "n", ylab = "", xlab = "", cex = .8)
 # add colored ractangles around clusters
-rect.hclust(cd, k = 6, col = "gray30", lty = "dotted", main = "", xaxis = "n")
+rect.hclust(cd, k = 6, border = "gray60")
+
 ```
 
 The clustering solution shows that, as expected, *completely* and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *very* and *really* form a cluster together with the zero variant. This is likely so because *really*, *very*, and the zero variant are the most frequent "variants" but also co-occur with the most variety of adjectives. The results can be interpreted to suggest that *really* and *very* are "default" amplifiers that lack distinct semantic profiles.
@@ -847,6 +689,170 @@ In a last step (which here purely to show alternatives to rooted dendrograms, we
 
 plot(as.phylo(cd), type = "unrooted", cex = 0.6,
      label.offset = .1, no.margin = TRUE)
+```
+
+There are many more useful methods for classifying and grouping data but this should suffice to get you started.
+
+# Correspondence Analysis
+
+in preparation
+
+```{r ca1, eval = F, echo=F, message=FALSE, warning=FALSE}
+# load libraries
+library("FactoMineR")
+library("factoextra")
+# load preinstalled data
+data(housetasks)
+# inspect data
+head(housetasks)
+# load library
+library("gplots")
+# 1. convert the data as a table
+dt <- as.table(as.matrix(housetasks))
+# 2. Graph
+balloonplot(t(dt), main ="housetasks", xlab ="", ylab="",
+            label = FALSE, show.margins = FALSE)
+
+chisq <- chisq.test(housetasks)
+chisq
+
+library("FactoMineR")
+res.ca <- CA(housetasks, graph = FALSE)
+print(res.ca)
+# Chi-square statistics
+chi2 <- 1944.456
+# Degree of freedom
+df <- (nrow(housetasks) - 1) * (ncol(housetasks) - 1)
+# P-value
+pval <- pchisq(chi2, df = df, lower.tail = FALSE)
+pval
+library("factoextra")
+eig.val <- get_eigenvalue(res.ca)
+eig.val
+fviz_screeplot(res.ca) +
+ geom_hline(yintercept=33.33, linetype=2, color="red", addlabels = TRUE, ylim = c(0, 50))
+# repel= TRUE to avoid text overlapping (slow if many point)
+fviz_ca_biplot(res.ca, repel = TRUE)
+
+```
+
+
+# Principal Component Analysis
+
+in preparation
+
+```{r pca1, eval = F, echo=F, message=FALSE, warning=FALSE}
+# inspect data
+data(iris)
+head(iris, 3)
+```
+
+```{r pca2, eval = F, echo=F, message=FALSE, warning=FALSE}
+# log transform 
+log.ir <- log(iris[, 1:4])
+ir.species <- iris[, 5]
+ 
+# apply PCA - scale. = TRUE is highly 
+# advisable, but default is FALSE. 
+ir.pca <- prcomp(log.ir, center = TRUE, scale. = TRUE) 
+```
+
+
+```{r pca3, eval = F, echo=F, message=FALSE, warning=FALSE}
+# print method
+print(ir.pca)
+```
+
+
+```{r pca4, eval = F, echo=F, message=FALSE, warning=FALSE}
+# plot method
+plot(ir.pca, type = "l")
+```
+
+```{r pca5, eval = F, echo=F, message=FALSE, warning=FALSE}
+# summary method
+summary(ir.pca)
+```
+
+```{r pca6, eval = F, echo=F, message=FALSE, warning=FALSE}
+# predict PCs
+predict(ir.pca, newdata=tail(log.ir, 2))
+```
+
+
+```{r pca7, eval = F, echo=F, message=FALSE, warning=FALSE}
+# load library
+#library(devtools)
+# install library from github
+#install_github("vqv/ggbiplot")
+# load installed library
+library(ggbiplot)
+# create plot
+g <- ggbiplot(ir.pca, obs.scale = 1, var.scale = 1, 
+              groups = ir.species, ellipse = TRUE, 
+              circle = TRUE)
+g <- g + scale_color_discrete(name = '')
+g <- g + theme(legend.direction = 'horizontal', 
+               legend.position = 'top')
+print(g)
+```
+
+```{r pca8, eval = F, echo=F, message=FALSE, warning=FALSE}
+require(caret)
+trans = preProcess(iris[,1:4], 
+                   method=c("BoxCox", "center", 
+                            "scale", "pca"))
+PC = predict(trans, iris[,1:4])
+```
+
+
+```{r pca9, eval = F, echo=F, message=FALSE, warning=FALSE}
+# inspect retained PCs
+head(PC, 3)
+
+# inspect loadings
+trans$rotation
+```
+
+
+# Multidimensional Scaling 
+
+in preparation
+
+```{r mds1, eval = F, echo=F, message=FALSE, warning=FALSE}
+# Classical MDS
+# N rows (objects) x p columns (variables)
+# each row identified by a unique row name
+
+d <- dist(clus) # Euclidean distances between the rows
+fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
+fit # view results
+
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Metric MDS", type="n")
+text(x, y, labels = row.names(clus), cex=.7) 
+```
+
+
+```{r mds2, eval = F, echo=F, message=FALSE, warning=FALSE}
+# Nonmetric MDS
+# N rows (objects) x p columns (variables)
+# each row identified by a unique row name
+
+library(MASS)
+d <- dist(clus) # Euclidean distances between the rows
+fit <- isoMDS(d, k=2) # k is the number of dim
+fit # view results
+
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+  main="Nonmetric MDS", type="n")
+text(x, y, labels = row.names(clus), cex=.7) 
 ```
 
 # References
