@@ -1,48 +1,6 @@
 ###########################################################################
 ### --- Function for Customized Mixed-Effects Binomial Logistic Regression Results
 ###########################################################################
-##################################################################
-### --- R script "Function for Mixed-Effects Customized Binomial Logistic Regression Results"
-### --- Author: Martin Schweinberger (August 18th, 2014)
-### --- R-Version: R version 3.0.1 (2013-05-16) -- "Good Sport"
-### --- This R script retrieves relevant information from regression outputs of
-### --- Binomial Logistic Regression.
-### --- NOTE
-### --- This script only works for Mixed-Effects Binomial Logistic Regressions.
-### --- The function takes two arguments: x = a glm object; a = a lrm object;
-### --- a percentage value representing the accuracy of the prediction achieved
-### --- by the model.
-### --- CONTACT
-### --- If you have questions,suggestions or you found errors
-### --- or in case you would to provide feedback, questions
-### --- write an email to
-### --- martin.schweinberger.hh@gmail.com
-### --- CITATION
-### --- If you use this script or results thereof, please cite it as:
-### --- Schweinberger, Martin. 2014. "Function for Customized
-### --- Binomial Logistic Regression Results ", unpublished R-skript,
-### --- Hamburg University.
-###############################################################
-###                   START
-###############################################################
-
-###############################################################
-### Function for a neat output table for Multiple Linear Regression Models
-###############################################################
-# glm0 = glm object with only an intercept, glm1 = glm object with same fixed effects as final glmer object,
-# glmer0 = glmer object with only a random effect, glmer1 = final glmer model, 
-# dpvar =  vector with 0 (no success/no hit) or 1 (success/hit), i.e the dependent
-# variable of the final data set without any missing values
-###############################################################
-### --- Example
-#glm0 <-  glm(suf.LIKE ~ 1, family = binomial, data = newdata) # baseline model glm
-#glm1 <-  glm(suf.LIKE ~ age * ed.level, family = binomial, data = newdata) # final glm model
-#glmer0 <- glmer(suf.LIKE ~ (1|file.subfile.spk), family = binomial, data = newdata, control = glmerControl(optimizer = "Nelder_Mead", calc.derivs = F))
-#glmer1 <- glmer(suf.LIKE ~ (1|file.subfile.spk) + log.len.like + age * ed.level, family = binomial, data = newdata, control = glmerControl(optimizer = "Nelder_Mead", calc.derivs = F))
-#dpvar <- mydata$suf.LIKE
-
-###############################################################
-
 meblrmsummary <- function(glm0, glm1, glmer0, glmer1, dpvar) {
   p.nice <- function(z) {
     as.vector(unlist(sapply(z, function(w) {
