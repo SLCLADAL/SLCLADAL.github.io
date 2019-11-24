@@ -515,7 +515,7 @@ probs = binomial()$linkinv(fitted(mlr.lmer))
 somers2(probs, as.numeric(mblrdata$SUFlike))
 plot(mlr.glmer, pch = 20, col = "black", lty = "dotted")
 # summarize final model
-mblrmtb <- meblrm.summary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
+mblrmtb <- meblrmsummary(m0.glm, m1.glm, m0.glmer, mlr.glmer, dpvar=mblrdata$SUFlike)
 kable(mblrmtb[, -c(4:5)], caption = "Summary of the final minimal adequate binomial logistic mixed-effects regression model which was fitted to predictors of discourse like in New Zealand English.")
 # load data
 countdata <- read.table("https://slcladal.github.io/data/countdata.txt", 
