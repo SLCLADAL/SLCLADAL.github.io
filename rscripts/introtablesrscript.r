@@ -82,3 +82,4 @@ longdata <- widedata %>%
   tidyr::gather(Attraction, Money, Interested:NotInterested)
 # inspect wide data
 longdata
+There are many more useful functions for processing, handling, and summarizing tables but this should suffice to get you started.

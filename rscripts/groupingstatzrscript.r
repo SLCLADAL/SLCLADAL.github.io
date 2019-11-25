@@ -102,12 +102,16 @@ diststudentstb <- matrix(c("1", "3", "3","3", "", "2", "4", "4","", "", "6", "6"
 colnames(diststudentstb) <- c("StudentA", "StudentB", "StudentC", "StudentD")
 rownames(diststudentstb) <- c("StudentB", "StudentC", "StudentD", "StudentE")
 kable(diststudentstb, caption = "Distance matrix based of students based on grades in math, music, and biology.")
-library("cluster")    # activate library
-clusterstudents <- hclust( # hierarchical cluster object
-  diststudents,       # use data diststudents
-  method="ward.D")    # ward.D as linkage method
-plot(clusterstudents, # plot result as dendrogram
-     hang = 0)        # labels at split
+# activate library
+library("cluster")    
+library("factoextra")
+library("seriation")
+library("NbClust")
+library("pvclust")
+# create hierarchical cluster object with ward.D as linkage method
+clusterstudents <- hclust(diststudents, method="ward.D")
+# plot result as dendrogram
+plot(clusterstudents, hang = 0)
 students2 <- matrix(c(1.5, 3, 2, 1,  2,  1, 2,  4,  4, 3,  4,  3),
   nrow = 4, byrow = T)
 students2 <- as.data.frame(students2)
@@ -202,11 +206,14 @@ clustd_minkowski <- round(dist(clusts, method = "minkowski"), 2)
 library(cluster)
 clustd_daisy <- round(daisy(clusts, metric = "euclidean"), 2) 
 clustd_maximum 
+# load library
 library(seriation)
-dissplot(clustd)  # create distance plot
-cd <- hclust(clustd,             # create cluster object
-             method="ward.D2")   # ward.D2 linkage (minimum variance)
-plot(cd, hang = -1)              # display dendogram
+# create distance plot
+dissplot(clustd) 
+# create cluster object
+cd <- hclust(clustd, method="ward.D2") 
+# display dendogram              
+plot(cd, hang = -1)              
 # single linkage: cluster with nearest data point
 cd_single <- hclust(clustd, method="single") 
 # create cluster object (ward.D linkage)
@@ -240,8 +247,7 @@ others.cm <- colMeans(others)
 # calcualte difference between celtic and other englishes
 diff <- celtic.cm - others.cm
 sort(diff, decreasing = F)
-plot(                   # start plot
-  sort(diff),           # y-values
+plot(sort(diff),           # y-values
   1:length(diff),       # x-values 
   type= "n",            # plot type (empty)
   cex.axis = .75,       # axis font size
@@ -325,10 +331,64 @@ pfish[[1]]
 # determine effect size
 assocstats(table(cluster, clsts.df$youse))
 assocstats(table(cluster, clsts.df$like))
-library("factoextra")
-library("seriation")
-library("NbClust")
-library("pvclust")
+# load data
+vsmdata <- read.delim("https://slcladal.github.io/data/vsmdata.txt", sep = "\t", header = T)
+# inspect data
+str(vsmdata)
+# load library
+library(tm)
+# tabulate data (create term-document matrix)
+tdm <- ftable(vsmdata$Adjective, vsmdata$Amplifier)
+# extract amplifiers and adjectives 
+amplifiers <- as.vector(unlist(attr(tdm, "col.vars")[1]))
+adjectives <- as.vector(unlist(attr(tdm, "row.vars")[1]))
+# attach row and column names to tdm
+rownames(tdm) <- adjectives
+colnames(tdm) <- amplifiers
+# inspect data
+tdm[1:5, 1:5]
+# convert frequencies greater than 1 into 1
+tdm <- t(apply(tdm, 1, function(x){ifelse(x > 1, 1, x)}))
+# remove adjectives that we never amplified
+tdm <- tdm[which(rowSums(tdm) > 1),]
+# transpose tdm because we are interested in amplifiers not adjectives
+tdm <- t(tdm)
+# inspect data
+tdm[1:5, 1:5]
+# compute expected values
+tdm.exp <- chisq.test(tdm)$expected
+# calculate PMI and PPMI
+PMI <- log2(tdm/tdm.exp)
+PPMI <- ifelse(PMI < 0, 0, PMI)
+# load library
+library(Rling)
+# calculate cosine similarity
+cosinesimilarity <- cossim(PPMI)
+# inspect cosine values
+cosinesimilarity[1:5, 1:5]
+# find max value that is not 1
+cosinesimilarity.test <- apply(cosinesimilarity, 1, function(x){
+  x <- ifelse(x == 1, 0, x) } )
+maxval <- max(cosinesimilarity.test)
+# create distance matrix
+amplifier.dist <- 1 - (cosinesimilarity/maxval)
+clustd <- as.dist(amplifier.dist)
+# load library
+library(cluster)
+# find optimal number of clusters
+asw <- as.vector(unlist(sapply(2:nrow(tdm)-1, function(x) pam(clustd, k = x)$silinfo$avg.width)))
+# determine the optimal number of clusters (max width is optimal)
+optclust <- which(asw == max(asw))+1 # optimal number of clusters
+# inspect clustering with optimal number of clusters
+amplifier.clusters <- pam(clustd, optclust)
+# inspect cluster solution
+amplifier.clusters$clustering
+# create cluster object
+cd <- hclust(clustd, method="ward.D")    
+# plot cluster object
+plot(cd, main = "", sub = "", yaxt = "n", ylab = "", xlab = "", cex = .8)
+# add colored ractangles around clusters
+rect.hclust(cd, k = 6, border = "gray60")
 # load libraries
 library("FactoMineR")
 library("factoextra")
@@ -405,7 +465,7 @@ trans$rotation
 # Classical MDS
 # N rows (objects) x p columns (variables)
 # each row identified by a unique row name
-d <- dist(clus) # euclidean distances between the rows
+d <- dist(clus) # Euclidean distances between the rows
 fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
 fit # view results
 # plot solution
@@ -418,7 +478,7 @@ text(x, y, labels = row.names(clus), cex=.7)
 # N rows (objects) x p columns (variables)
 # each row identified by a unique row name
 library(MASS)
-d <- dist(clus) # euclidean distances between the rows
+d <- dist(clus) # Euclidean distances between the rows
 fit <- isoMDS(d, k=2) # k is the number of dim
 fit # view results
 # plot solution
@@ -427,3 +487,4 @@ y <- fit$points[,2]
 plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
   main="Nonmetric MDS", type="n")
 text(x, y, labels = row.names(clus), cex=.7) 
+# References
