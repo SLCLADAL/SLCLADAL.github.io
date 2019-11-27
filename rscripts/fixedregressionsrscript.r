@@ -7,11 +7,16 @@ rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
 install.packages(c("boot", "car", "caret", "effects", "foreign", "ggplot2", 
                    "Hmisc", "knitr", "MASS", "mlogit", "msm", "QuantPsyc", 
                    "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", 
-                   "vcd", "visreg"))
+                  "stringr",  "vcd", "visreg"))
 # load libraries
 library(boot)
 library(car)
@@ -31,6 +36,7 @@ library(rms)
 library(sandwich)
 library(sfsmisc)
 library(sjPlot)
+library(stringr)
 library(vcd)
 library(visreg)
 # load functions
@@ -247,35 +253,34 @@ mlrsummary[,-c(3:4)]
 # tabulate regression results
 mlrsummary <- mlinrsummary(m2.mlr, m2.glm, ia = T)
 kable(mlrsummary, caption = "Overview of the final minimal adequate linear fixed-effects regression model.")
-bodyheight=rnorm(20,180,10) # generates 20 values, with mean of 30 & s.d.=2
+bodyheight=rnorm(20,175,20) # generates 20 values, with mean of 30 & s.d.=2
 bodyheight=sort(bodyheight) # sorts these values in ascending order.
 relationship=c(0,0,0,0,0,1,0,1,0,0,1,1,0,1,1,1,0,1,1,1) # assign 'survival' to these 20 individuals non-randomly... most mortality occurs at smaller body size
 blrex=as.data.frame(cbind(bodyheight,relationship)) # saves data frame with two columns: body size & survival
-kable(blrex, caption = "Example data set representing the height and relationship status of a sample of men.")
+kable(head(blrex), caption = "First six observations of an example data set representing the height and relationship status of a sample of men.")
 # plot 1
 p1 <- ggplot(blrex, aes(bodyheight, relationship)) +
   geom_point() +
-  geom_smooth(method = "lm", se = F) +
+  geom_smooth(method = "lm", se = F, color = "red", size = .5) +
   labs(x = "Height") +
   labs(y = "Relationship", cex = .75) +
   theme_set(theme_bw(base_size = 8))+
-  coord_cartesian(ylim = c(-0.2, 1.2), xlim = c(160, 200)) +
+  coord_cartesian(ylim = c(-0.2, 1.2), xlim = c(140, 220)) +
   scale_y_continuous(breaks=seq(0, 1, 1), labels = c("Not in Relationship", "In Relationship")) +
   guides(fill = FALSE)
 # plot 2
 p2 <- ggplot(blrex, aes(x=bodyheight, y=relationship)) +
   geom_point() +
-  geom_smooth(method = "glm",
-    method.args = list(family = "binomial"),
-    se = FALSE) +
-  coord_cartesian(ylim = c(-0.2, 1.2), xlim = c(160, 200)) +
-  labs(x = "Height") +                        # x-axis label
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), 
+              se = FALSE, color = "red", size = .5) +
+  coord_cartesian(ylim = c(-0.2, 1.2), xlim = c(140, 220)) +
+  labs(x = "Height") +
   scale_y_continuous(breaks=seq(0, 1, 1), labels = c("Not in Relationship", "In Relationship")) +
-  labs(y = "Relationship", cex = .75)
+  labs(y = "Relationship status", cex = .75)
 # draw two plots in one window
 multiplot(p1, p2, cols = 2)
 # load data
-blrdata <- read.table("data/blrdata.txt",
+blrdata <- read.table("https://slcladal.github.io/data/blrdata.txt",
                       comment.char = "",  # data does not contain comments
                       quote = "",         # data does not contain quotes
                       sep = "\t",         # data is tab separetd
@@ -347,8 +352,8 @@ anova(m2.lrm)
 m7.lrm <- lrm(EH ~ (Age+Gender+Ethnicity)^3, data = blrdata, x = T, y = T, linear.predictors = T)
 #validate(m7.lrm, bw = T, B = 200)
 pentrace(m2.lrm, seq(0, 0.8, by = 0.05)) # determine penalty
-lr.glm <- m2.glm  # rename final minimal adeqaute glm model
-lr.lrm <- m2.lrm  # rename final minimal adeqaute lrm model
+lr.glm <- m2.glm  # rename final minimal adequate glm model
+lr.lrm <- m2.lrm  # rename final minimal adequate lrm model
 modelChi <- lr.glm$null.deviance - lr.glm$deviance
 chidf <- lr.glm$df.null - lr.glm$df.residual
 chisq.prob <- 1 - pchisq(modelChi, chidf)
@@ -452,17 +457,14 @@ kable(blrsummary, caption = "Summary of the final minimal adequate binomial logi
 ordata <- read.delim("https://slcladal.github.io/data/ordinaldata.txt", sep = "\t", header = T)
 colnames(ordata) <- c("Recommend", "Internal", "Exchange", "FinalScore")
 # inspect data
-head(ordata); nrow(ordata)
-#
-ordata$Recommend <- factor(ordata$Recommend, 
-                           levels=c("unlikely", 
-                                    "somewhat likely", 
-                                    "very likely"),
-                           labels=c("unlikely", 
-                                    "somewhat likely", 
-                                    "very likely"))
-# one at a time, table apply, pared, and public
-lapply(ordata[, c("Recommend", "Internal", "Exchange")], table)
+str(ordata)
+# relevel data
+ordata <- ordata %>%
+dplyr::mutate(Recommend = factor(Recommend, 
+                           levels=c("unlikely", "somewhat likely", "very likely"),
+                           labels=c("unlikely",  "somewhat likely",  "very likely"))) %>%
+  dplyr::mutate(Exchange = ifelse(Exchange == 1, "Exchange", "NoExchange")) %>%
+  dplyr::mutate(Internal = ifelse(Internal == 1, "Internal", "External"))
 ## three way cross tabs (xtabs) and flatten the table
 ftable(xtabs(~ Exchange + Recommend + Internal, data = ordata))
 summary(ordata$FinalScore); sd(ordata$FinalScore)
@@ -482,16 +484,36 @@ summary(m)
 p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
 ## combined table
 (ctable <- cbind(ctable, "p value" = p))
-# default method gives profiled CIs
-(ci <- confint(m)) 
-# CIs assuming normality
-confint.default(m) 
-## odds ratios
-exp(coef(m))
-## OR and CI
+# extract profiled confidence intervals
+ci <- confint(m)
+# calculate odds ratios and combine them with profiled CIs
 exp(cbind(OR = coef(m), ci))
+# plot poisson
+Count <- 1:10
+Lambda1 <- dpois(Count, 1)
+Lambda2 <- dpois(Count, 2)
+Lambda3 <- dpois(Count, 3)
+Lambda4 <- dpois(Count, 4)
+Lambda5 <- dpois(Count, 5)
+pdata <- data.frame(Count, Lambda1, Lambda2, Lambda3, Lambda4, Lambda5)
+pdata <- pdata %>%
+  dplyr::group_by(Count) %>%
+  tidyr::gather(Lambda, Value, Lambda1:Lambda5) %>%
+  dplyr::mutate(Lambda = str_replace_all(Lambda, "Lambda", ""))   %>%
+  dplyr::mutate(Lambda = factor(Lambda))
+# plot poisson with different lambdas
+ggplot(pdata, aes(x = Count, y = Value, color = Lambda)) +
+  geom_smooth(alpha=.5, se = F) +
+  guides(color=guide_legend(override.aes=list(fill=NA))) + 
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="top") +
+  scale_colour_manual(values=c("goldenrod2", "gray40", "blue",
+                               "indianred4", "gray80"), name="Lambda") +
+  labs(x = "Number of Instances")  + 
+  scale_x_continuous(breaks=1:10, labels=1:10) +
+  scale_y_continuous(name="Probability", limits=c(0, .4))
 # load data
-poissondata <- read.delim("data/posdata.txt", sep = "\t", header = T, skipNul = T, quote = "")
+poissondata <- read.delim("https://slcladal.github.io/data/posdata.txt", sep = "\t", header = T, skipNul = T, quote = "")
 # inspect data
 summary(poissondata)
 # process data
