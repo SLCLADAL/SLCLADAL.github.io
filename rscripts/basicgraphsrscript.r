@@ -10,6 +10,18 @@ options(stringsAsFactors = F)
 install.packages(c("lattice", "ggplot2", "dplyr", "likert", 
                    "scales", "vcd", "tm", "wordcloud", 
                    "stringr", "SnowballC"))
+# activate packages
+library(knitr)
+library(lattice)             
+library(ggplot2)               
+library(dplyr)
+library(likert)                         
+library(scales)
+library(vcd)    
+library(tm)
+library(wordcloud)
+library(stringr)
+library(SnowballC)
 # load data
 plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE)
 # inspect data
@@ -58,8 +70,6 @@ plot(Variable2 ~ Variable1,
      pch = 20,        
      col = "darkgrey" 
      )
-# activate lattice package
-library(lattice)             
 # create simple scatter plot
 xyplot(Prepositions ~ Date,                 # plot Prepositions by Date
        ylab = "Prepositions (Frequency)",   # add y-axis label 
@@ -79,8 +89,6 @@ xyplot(Prepositions ~ Date | Genre,           # plot Prepositions by Date by Gen
        pch = 20,                              # symbol type (20 = filled dots)
        col = "black"                          # color of symbols
        )                                      # end drawing plot
-# activate ggplot2 package
-library(ggplot2)               
 # create simple scatter plot
 ggplot(plotdata,                # plot data from data set plodata  
        aes(x= Date,             # define x-axis
@@ -143,8 +151,6 @@ ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  gro
   scale_color_manual(values = c(rep("grey20", 16)), 
                      # suppress legend 
                      guide = FALSE)          
-# load package
-library(dplyr)
 # modify data
 lineplotdata <- plotdata %>%
   dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
@@ -157,7 +163,7 @@ lineplotdata <- plotdata %>%
   dplyr::ungroup() %>%
   dplyr::mutate(Date =as.numeric(Date))
 # inspect data
-lineplotdata
+str(lineplotdata)
 # define aesthetics
 ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre)) +
   # add geom layer with lines
@@ -304,8 +310,6 @@ ggplot(newlikertdata, aes(Satisfaction, Frequency,  fill = Course)) +
         labels=c("very dissatisfied", "dissatisfied",  "neutral", "satisfied", 
                  "very satisfied")) + 
   theme_bw()
-# activate package
-library(likert)                         
 # load data
 data(pisaitems)           # use a provided dataset called pisaitems
 # extract subset from data for visualization
@@ -316,8 +320,6 @@ questionl28 <- likert(items28)
 summary(questionl28) 
 # plot likert data
 plot(questionl28)
-# activate scales library
-library(scales)
 # create a vector with values called Test1
 Test1 <- c(11.2, 13.5, 200, 185, 1.3, 3.5) 
 # create a vector with values called Test2
@@ -417,12 +419,6 @@ ggplot(plotdata, aes(Date, fill=Region)) +
   geom_density(alpha=.5) +  
   scale_fill_manual(values = c("indianred4",  "gray50")) + 
   theme(legend.position=c(0,1), legend.justification=c(0,1)) 
-# activate packages
-library(dplyr)
-library(tm)
-library(wordcloud)
-library(stringr)
-library(SnowballC)
 # load and process speeches by clinton
 clinton <- readLines("https://slcladal.github.io/data/Clinton.txt") %>%
   paste(sep = " ", collapse = " ")

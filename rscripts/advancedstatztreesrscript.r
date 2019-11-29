@@ -230,7 +230,7 @@ AgeSplit <- c(((15+22)/2), ((22+27)/2), ((27+37)/2), ((37+42)/2), ((42+63)/2))
 Gini <- c(0.4, 0.5,0.444, 0.41, 0.267)
 citdata3 <- data.frame(AgeSplit, Gini)
 kable(citdata3, caption = "Possible age splits and their associated Gini values.")
-citdata <- read.delim("data/treedata.txt", header = T, sep = "\t")
+citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
 citdata <- head(citdata)
 citdata$ID <- 1:nrow(citdata)
 citdata <- citdata %>%
