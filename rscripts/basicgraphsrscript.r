@@ -10,38 +10,36 @@ options(stringsAsFactors = F)
 install.packages(c("lattice", "ggplot2", "dplyr", "likert", 
                    "scales", "vcd", "tm", "wordcloud", 
                    "stringr", "SnowballC"))
-# attach iris
-attach(iris) 
-# inspect  iris data
-str(iris)                  
-# attach iris
-attach(mtcars) 
-# inspect  iris data
-str(mtcars)                  
+# load data
+plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE)
+# inspect data
+str(plotdata); summary(plotdata)
+# attach plotdata
+attach(plotdata)
 # create simple scatter plot
-plot(Sepal.Length ~ Sepal.Width,         # plot Sepal.Length by Sepal.Width
-     type = "p",                         # plot type p (points) 
-     data = iris,                        # data from data set iris  
-     ylab = "Sepal Length",              # add y-axis label 
-     xlab = "Sepal Width",               # add x-axis label 
-     main = "plot type 'p' (points)"     # add title 
-     )                                   # end drawing plot
-# create simple scatter plot with ablines
-plot(Sepal.Length ~ Sepal.Width,          # plot Sepal.Length by Sepal.Width
+plot(Prepositions ~ Date,                 # plot Prepositions by Date
      type = "p",                          # plot type p (points) 
-     data = iris,                         # data from data set iris  
-     ylab = "Sepal Length",               # add y-axis label 
-     xlab = "Sepal Width",                # add x-axis label 
+     data = plotdata,                     # data from data set plotdata  
+     ylab = "Prepositions (Frequency)",   # add y-axis label 
+     xlab = "Date (year of composition)", # add x-axis label 
+     main = "plot type 'p' (points)"      # add title 
+     )                                    # end drawing plot
+# create simple scatter plot with ablines
+plot(Prepositions ~ Date,                 # plot Prepositions by Date
+     type = "p",                          # plot type p (points) 
+     data = plotdata,                     # data from data set iris  
+     ylab = "Prepositions (Frequency)",   # add y-axis label 
+     xlab = "Date (year of composition)", # add x-axis label 
      main = "Scatterplot",                # add title 
      pch = 20,                            # use point symbol 20 (filled circles)
      col = "lightgrey"                    # define symbol color as lightgrey
      )                                    # end drawing plot
 abline(                                   # add regression line (y~x) 
-  lm(Sepal.Length ~ Sepal.Width),         # draw rgeression line of linear model (lm)   
+  lm(Prepositions ~ Date),                # draw rgeression line of linear model (lm) 
   col="red"                               # define line colour as red
   )                                       # end drawing line             
 lines(                                    # add line (x,y)
-  lowess(Sepal.Width, Sepal.Length),      # draw smoothed lowess line (x,y) 
+  lowess(Prepositions ~ Date),            # draw smoothed lowess line (x,y) 
   col="blue"                              # define line colour as blue
   )                                       # end drawing line
 # load data03
@@ -63,106 +61,104 @@ plot(Variable2 ~ Variable1,
 # activate lattice package
 library(lattice)             
 # create simple scatter plot
-xyplot(Sepal.Length ~ Sepal.Width,  # plot Sepal.Length by Sepal.Width
-       ylab = "Sepal Length",       # add y-axis label 
-       xlab = "Sepal Width"         # add x-axis label 
-       )                            # end drawing plot
+xyplot(Prepositions ~ Date,                 # plot Prepositions by Date
+       ylab = "Prepositions (Frequency)",   # add y-axis label 
+       xlab = "Date (year of composition)", # add x-axis label
+       )                                    # end drawing plot
 # create scatter plots by species
-xyplot(Sepal.Length ~ Sepal.Width | Species, # plot Sepal.Length by Sepal.Width by Species
-       ylab = "Sepal Length",                # add y-axis label
-       xlab = "Sepal Width",                 # add y-axis label
-       grid = TRUE                           # add grids to panels
-       )                                     # end drawing plot
+xyplot(Prepositions ~ Date | Genre,         # plot Prepositions by Date by Genre
+       ylab = "Prepositions (Frequency)",   # add y-axis label
+       xlab = "Date (year of composition)", # add y-axis label
+       grid = TRUE                          # add grids to panels
+       )                                    # end drawing plot
+# create scatter plots by species
+xyplot(Prepositions ~ Date | Genre,           # plot Prepositions by Date by Genre
+       ylab = "Prepositions (Frequency)",     # add y-axis label
+       xlab = "Date (year of composition)",   # add y-axis label
+       grid = TRUE,                           # cerate a grid
+       pch = 20,                              # symbol type (20 = filled dots)
+       col = "black"                          # color of symbols
+       )                                      # end drawing plot
 # activate ggplot2 package
 library(ggplot2)               
 # create simple scatter plot
-ggplot(iris,                    # plot data from data set iris  
-       aes(x=Sepal.Length,      # define x-axis
-           y= Sepal.Width)) +   # define y-axis
+ggplot(plotdata,                # plot data from data set plodata  
+       aes(x= Date,             # define x-axis
+           y= Prepositions)) +  # define y-axis
   geom_point()                  # define plot type
-# create scatter plot colored by species
-ggplot(iris,                   # plot data from data set iris
-       aes(x=Sepal.Length,     # define x-axis
-           y= Sepal.Width,     # define y-axis
-           color = Species)) + # define to color by Species
+# create scatter plot colored by genre
+ggplot(plotdata,               # plot data from data set plotdata
+       aes(x=Date,             # define x-axis
+           y= Prepositions,    # define y-axis
+           color = Genre)) +   # define to color by Species
   geom_point() +               # define plot type
   theme_bw()                   # define theme  as black and white (bw)
-# create scatter plot colored by species
-scatterplot <- ggplot(          # create plot object called scatterplot
-  iris,                         # plot data from data set iris 
-       aes(x=Sepal.Length,      # define x--axis
-           y= Sepal.Width,      # define y-axis and color by Species
-           color = Species)) +  # color by Species
-  geom_point() +                # define plot type (what should be drawn)
-  scale_color_manual(           # color manually
-    values = c('indianred4',    # define colours to be used
-               'darkgrey', 
-               'gold')) + 
-  theme_bw()                    # define theme as black and white
-# add ablines (regression lines)
-scatterplot + geom_smooth(method = "lm")
+# create scatter plot colored by genre
+ggplot(plotdata, aes(x=Date, y= Prepositions, color = Genre)) +
+  geom_point() +
+  theme_bw() +
+  scale_color_manual(         # define colours to be used
+    values = c("indianred4", "darkblue", "orange", "lightgreen", "darkgreen",
+               "darkgrey", "grey50", "gray80", "brown", "red",
+               "goldenrod", "chartreuse", "black", "lightblue", 
+               "blueviolet", "burlywood"))
+# create scatter plot colored by genre in different panels
+ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
+  facet_wrap(Genre, ncol = 4) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = F) +
+  theme_bw()
+# create scatter plot colored by genre in different panels
+ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
+  facet_wrap(Genre, ncol = 4) +
+  geom_smooth(method = "lm", se = F) +
+  theme_bw()
 # create scatter density plot
-ggplot(          # create plot object called scatterplot
-  iris,                         # plot data from data set iris 
-       aes(x=Sepal.Length,      # define x--axis
-           y= Sepal.Width,      # define y-axis and color by Species
-           color = Species)) +  # color by Species
-    scale_color_manual(         # color manually
-    values = c('indianred4',    # define colors to be used
-               'darkgrey', 
-               'gold')) + 
-  theme_bw() +                  # define theme (black and white theme)
+ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
+    facet_wrap(Genre, ncol = 4) +
+  theme_bw() +                  
   geom_density_2d()             # add 2-dm. density
 # scatter plot with error bars
-ggplot(iris,      
-        # def. x/y-axes
-       aes(Species, Sepal.Length,              
-           # col. by Species
-           colour = Species)) +                  
+ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  group = Genre)) +                 
   # add title
-  ggtitle("Sepal Length by Species") +          
+  ggtitle("Prepositions by Genre") +          
   # create a dot at means
   stat_summary(fun.y = mean, geom = "point",     
                # means by Species
-               aes(group= Species)) +          
+               aes(group= Genre)) +          
   # bootstrap data
   stat_summary(fun.data = mean_cl_boot,       
                # add error bars
                geom = "errorbar", width = 0.2) + 
   # def. y-axis range
-  coord_cartesian(ylim = c(4, 8)) +              
+  coord_cartesian(ylim = c(100, 200)) +              
   # def. font size
-  theme_set(theme_bw(base_size = 20)) +         
-  # def. size of x-axis
-  theme(axis.text.x = element_text(size=24,     
-                                   # def. style
-                                   face="plain"),  
-        # def. size of y-axis
-        axis.text.y = element_text(size=24,        
-                                   # def. style
-                                   face="plain"),  
-        # def. col. of x-axis title
-        axis.title.x = element_text(colour="grey20", 
-                                     # def. font size of x-axis title
-                                    size=24,  
-                                    # def. style
-                                    face="plain"), 
-        # def. col. of y-axis title
-        axis.title.y = element_text(colour="grey20",
-                                    # def. font size of x-axis title
-                                    size=24, 
-                                    # def. angle of x-axis title
-                                    angle=90, 
-                                    # def. style
-                                    face="plain")) + 
+  theme_set(theme_bw(base_size = 15)) +         
+  # def. x- and y-axis
+  theme(axis.text.x = element_text(size=10, angle = 90),  
+        axis.text.y = element_text(size=10, face="plain")) + 
   # def. axes labels
-  labs(x = "Species", y = "Sepal Length (cm)") +     
+  labs(x = "Genre", y = "Prepositions (Frequency)") +     
   # def. to col.
-  scale_color_manual(values = c("grey20", "grey20", "grey20"), 
+  scale_color_manual(values = c(rep("grey20", 16)), 
                      # suppress legend 
-                     guide = FALSE) + 
-  # define theme as black and white
-  theme_bw()                    
+                     guide = FALSE)          
+# load package
+library(dplyr)
+newplotdata <- plotdata %>%
+  dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  group_by(Date, Genre) %>%
+  dplyr::summarise(Mean = mean(Prepositions)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(Date =as.numeric(Date))
+# inspect data
+head(newplotdata)
+ggplot(newplotdata, aes(x=Date, y= Mean,  color = Genre)) +
+  geom_line()
 # clean workspace
 rm(list=ls(all=T))
 # unload package Rmsic
