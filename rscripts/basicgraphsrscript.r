@@ -32,10 +32,10 @@ plot(Prepositions ~ Date,                 # plot Prepositions by Date
      xlab = "Date (year of composition)", # add x-axis label 
      main = "Scatterplot",                # add title 
      pch = 20,                            # use point symbol 20 (filled circles)
-     col = "lightgrey"                    # define symbol color as lightgrey
+     col = "lightgrey"                    # define symbol colour as light grey
      )                                    # end drawing plot
 abline(                                   # add regression line (y~x) 
-  lm(Prepositions ~ Date),                # draw rgeression line of linear model (lm) 
+  lm(Prepositions ~ Date),                # draw regression line of linear model (lm) 
   col="red"                               # define line colour as red
   )                                       # end drawing line             
 lines(                                    # add line (x,y)
@@ -145,7 +145,8 @@ ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  gro
                      guide = FALSE)          
 # load package
 library(dplyr)
-newplotdata <- plotdata %>%
+# modify data
+lineplotdata <- plotdata %>%
   dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
   dplyr::mutate(Date = ifelse(Date < 1600, "1600",
                               ifelse(Date < 1700, "1700",
@@ -156,147 +157,58 @@ newplotdata <- plotdata %>%
   dplyr::ungroup() %>%
   dplyr::mutate(Date =as.numeric(Date))
 # inspect data
-head(newplotdata)
-ggplot(newplotdata, aes(x=Date, y= Mean,  color = Genre)) +
+lineplotdata
+# define aesthetics
+ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre)) +
+  # add geom layer with lines
   geom_line()
-# clean workspace
-rm(list=ls(all=T))
-# unload package Rmsic
-unloadNamespace("Rmisc")
-# activate dplyr package
-library(dplyr)
-# process data
-linedata <- mtcars %>%       # create object linedata with mtcars data
-  group_by(cyl) %>%          # group mtcars data by cyl
-  summarise(                 # summarise grouped data
-    MilesPerGallon_mean = mean(mpg), # create var. MilesPerGallon_mean
-    Weigth_mean  = mean(wt), # create variable Weigth_mean
-    HorsePower_mean  = mean(hp),     # create var. HorsePower_mean
-    Speed_mean = mean(qsec)  # create variable Speed_mean
-  )                          # end summary
-# attach data
-attach(linedata)
-# inspect data
-linedata                     
-# cerate simple line graph
-plot(MilesPerGallon_mean, # plot MilesPerGallon_mean 
-     type = "b")          # type of graph (both symbols and lines)
-lines(Speed_mean,         # draw line for Speed_mean
-      type = "b")         # type of graph (both symbols and lines)
-# create customizes line graph
-plot(MilesPerGallon_mean,     # plot MilesPerGallon_mean
-     type = "b",              # type of graph (symbols plus lines)
-     ylim = c(10, 30),        # y-axis range
-     ylab = "Value",          # y-axis title 
-     xlab = "Number of Cylinders",    # x-axis title  
-     axes = F)                # suppress drawing of axes 
-lines(Speed_mean,             # draw line for Speed_mean
-      type = "b",             # draw both symbols and lines 
-      lty = 2,                # draw line type 2 (dashed) 
-      pch = 2)                # draw symbols type 2 (empty triangles)
-axis(1,                       # x-axis
-     at = 1:3,                # tick marks at pos. 1 to 3
-     lab = c("4","6","8")     # define tick marks
-     )                        # end x-axis definition
-axis(2,                       # y-axis 
-     at = seq(10, 30, 5),     # tick marks at pos. 10 to 30, int. 5 
-     las = 1,                 # draw tick marks perpendicular to axis
-     lab = seq(10, 30, 5)     # define tick marks labels
-     )                        # end y-axis definition
-box()                         # draw box around plotting area
-legend("topright",            # add legend at position top right 
-       c("Miles per Gallon",  # add description of legend elements
-         "Speed (1/4 Mile in sec.)"), 
-       lty = c(1, 2)          # define line types
-       )                      # end legend definition
-# load data
-data03 <- read.delim("https://slcladal.github.io/data/data03.txt", 
-                     sep = "\t", header = T)
-# load data
-data03 <- read.delim("https://slcladal.github.io/data/data03.txt", 
-                     sep = "\t", header = T)
-# create line graph
-plot(data03$Variable1,   
-     type = "b", 
-     col = "blue",
-     ylab = "Value")
-# draw lines
-lines(data03$Variable2, 
-      type = "b",
-      col = "red") 
-# create line graph
-ggplot(linedata,   
-       # def. x- and y-axis, col. by cyl
-       aes(cyl, MilesPerGallon_mean)) +  
-  # draw line and def. line col.
-  geom_line(color = 'lightgray') +       
-  # draw line for Speed_mean
-  geom_line(y = Speed_mean, color = 'gold') +  
-  # add x-axis label
-  labs(x = "Number of Cylinders") +      
-  # customize y-axis label
-  scale_y_continuous(name="Value",       
-                     # customize tick positions 
-                     limits=c(10, 30)) + 
-  # customize x-axis tick positions
-  scale_x_continuous(breaks=c(4, 6, 8),  
-                     # add labels to x-axis
-        labels=c("4", "6", "8")) +       
-  # define theme as black and white
-  theme_bw()                             
-# create customized line graph
-ggplot(linedata,                         
-       # define x/y-axis, col. by cyl
-       aes(cyl, MilesPerGallon_mean)) +  
-  # draw smoothed line for MilesPerGallon_mean
-  geom_smooth(aes(y = MilesPerGallon_mean,       
-                  # def. color
-                  color = "MilesPerGallon_mean", 
-                  # def. line type
-                  linetype = "MilesPerGallon_mean")) + 
-  # draw smoothed line for Speed_mean
-  geom_smooth(aes(y = Speed_mean,       
-                  # def. col.
-                  color = "Speed_mean",        
-                  # def. line type
-                  linetype = "Speed_mean"))  +    
+# define aesthetics
+ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre, linetype = Genre)) +
+  # add geom layer with lines
+  geom_smooth()
+# define aesthetics
+ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre, linetype = Genre)) +
+  # add geom layer with lines
+  geom_smooth() +  
   # legend without background color
   guides(color=guide_legend(override.aes=list(fill=NA))) +  
   # def. legend position
   theme(legend.position="top") +  
   # def. linetype
-  scale_linetype_manual(values=c("longdash", "dotted"), 
+  scale_linetype_manual(values=c("longdash", "dashed", "dotdash", "dotted", "solid"), 
                         # def. legend header
-                        name=c("Variables"),
+                        name=c("Genre"),
                         # def. linetypes
-                        breaks = c("MilesPerGallon_mean", 
-                                   "Speed_mean"),
+                        breaks = c("History", "PrivateLetter", "PublicLetter",
+                                   "Science", "Sermon"),
                         # def. labels
-                        labels = c("MilesPerGallon_mean", 
-                                   "Speed_mean")) + 
+                        labels = c("History", "Private letter", "Public letter",
+                                   "Science", "Sermon")) + 
   # def. col.
-  scale_colour_manual(values=c("goldenrod2",        
+  scale_colour_manual(values=c("goldenrod2", "gray30", "blue", "burlywood",        
                                "indianred4"),
                       # define legend header
-                      name=c("Variables"),
+                      name=c("Genre"),
                       # define elements
-                      breaks=c("MilesPerGallon_mean", "Speed_mean"),  
+                      breaks=c("History", "PrivateLetter", "PublicLetter",
+                                   "Science", "Sermon"),  
                       # define labels
-                      labels = c("MilesPerGallon_mean", "Speed_mean")) +
+                      labels = c("History", "Private letter", "Public letter",
+                                   "Science", "Sermon")) +
   # add x-axis label
-  labs(x = "Number of Cylinders") +      
+  labs(x = "Year") +      
   # customize x-axis tick positions
-  scale_x_continuous(breaks=c(4, 6, 8), 
+  scale_x_continuous(breaks=seq(1600, 1900, 100), 
                      # add labels to x-axis tick pos.
-                     labels=c("4", "6", "8")) +
+                     labels=seq(1600, 1900, 100)) +
   # add y-axis label
-  scale_y_continuous(name="Value",  
+  scale_y_continuous(name="Relative frequency \n(per 1,000 words)",  
                      # customize tick y-axis
-                     limits=c(10, 30)) + 
+                     limits=c(100, 200)) + 
   # define theme  as black and white
   theme_set(theme_bw(base_size = 10))    
 # create lickert data
-LikertData <- data.frame(Course=
+likertdata <- data.frame(Course=
                            c(rep(c("Chinese",
                                    "German",
                                    "Japanese"),
@@ -318,226 +230,80 @@ LikertData <- data.frame(Course=
                                rep(4, 25),
                                rep(5, 30))))
 # inspect data
-head(LikertData)
+head(likertdata)
 # create cumulative density plot
-ggplot(LikertData,aes(x=Satisfaction,color=Course)) + 
-  geom_step(aes(y=..y..),stat="ecdf") +
+ggplot(likertdata,aes(x = Satisfaction, color = Course)) + 
+  geom_step(aes(y = ..y..), stat = "ecdf") +
   labs(y = "Cumulative Density") + 
-  scale_x_discrete(limits=c("1","2","3","4","5"), breaks=c(1,2,3,4,5),
-        labels=c("very dissatisfied", "dissatisfied", "neutral",
-                              "satisfied", "very satisfied")) + 
-  scale_colour_manual(values=c("goldenrod2", # def. col.
-                               "indianred4", 
-                               "blue"))  
-# create tabulated data 
-counts <- table(mtcars$gear)     # create table of gears in mtcars 
-# create simple bar plot
-barplot(counts,                  # start barplot and use counts table
-        main="Frequency of cars by their number of gears",   # title
-        xlab="Number of Gears",  # x-axis label
-        ylim = c(0,20)           # y-axis range
-        )                        # end plot
-# create customized bar plot
-barplot(counts,
-        main="Frequency of cars by their number of gears", # title
-        horiz = T,                # horizontal bars
-        xlab="Number of Gears",   # x-axis label
-        col = c("grey30", # def. col.
-                "grey50", 
-                "grey70"),
-        xlim = c(0,20),  # y-axis range
-        las = 1          # def. labels as perpendicular to axis
-        )                # end plot
-box()                    # create box around panel
-# create a vector of values
-Values <- c(10, 12, 7, 14, 9) 
-# create a vector of labels
-Labels <- c("US", "UK", "Australia", "Germany", "France")
-# calculate the percentages for each element in values
-Percentages <- round(Values/sum(Values)*100)
-# add percentage values to labels
-Labels <- paste(Labels, Percentages) 
-# add % symbol to labels
-Labels <- paste(Labels,"%",sep="")            
-# combine in a data frame
-piedata <- data.frame(Values, Percentages, Labels)  
-# attach piedata to avoid having to specify the data
-attach(piedata) 
-# inspect data
-piedata 
-# create pie chart
-pie(Values,
-    labels = Labels, 
-    col=rainbow(length(Values)),
-    main="Pie Chart of Countries")
-# create bar plot
-barplot(
-# plot Values in decreasing order data
-        Values[order(Values, decreasing = T)],   
-        ylim = c(0,20),                # def. y-axis range
-        col=rainbow(length(Values)),   # def. col.
-        main="Pie Chart of Countries"  # title
-        )                              # end plot
-# add text (labels)
-text( 
-# def. x-axis pos. of labels
-  seq(0.7, 5.5, 1.2),                  
-# def. the y-axis positions of the labels (2 higher than bar)
-  Values[order(Values, decreasing = T)] + 2,  
-# define text to be plotted
-  Labels[order(Values, decreasing = T)]         
-  )
+  scale_x_discrete(limits = c("1","2","3","4","5"), breaks = c(1,2,3,4,5),
+        labels=c("very dissatisfied", "dissatisfied", "neutral", "satisfied", "very satisfied")) + 
+  scale_colour_manual(values = c("goldenrod2", "indianred4", "blue"))  
 # create bar plot data
-barplotdata=matrix(sample(1:50,15) , nrow=3) 
-# add column names
-colnames(barplotdata)=c("1900","1920","1940","1960","1980") 
-# add rownames
-rownames(barplotdata)=c("A","B","C") 
-# calculate percentages
-barplotdatapercent=apply(barplotdata, 2, function(x) {
-  round(x*100/sum(x),1) }) 
-# inspect data
-barplotdatapercent                                                              
-# create bar plot
-barplot(                      # create a barplot
-  barplotdatapercent,         # use barplotdatapercent
-  main="Stacked Barplot",     # add title
-  xlab="Decade",              # add x-axis label
-  ylab="Percent",             # add y-axis label
-  col=c("darkblue","red", "gold"),       # def. col.
-  legend = rownames(barplotdatapercent), # add legend
-  beside=F                    # stack bars
-)                             # end barplot
-box()                         # draw box around plot
-# create grouped bar plot
-barplot(                     # create a barplot
-  barplotdata,               # use barplotdata
-  main="Grouped Barplot",    # add title
-  xlab="Decade",             # add x-axis label
-  ylab="Percent",            # add y-axis label
-  ylim=c(0,50),              # def. y-axis range
-  col=c("darkblue",          # def. col.
-        "red", 
-        "gold"),       
-  beside=T,                  # place bars beside each other
-  legend = rownames(barplotdata),        # add legend
-  args.legend=list(          # place legend beside plotting area
-    x=22,                    # define x-axis position
-    y=max(barplotdata),      # define y-axis position
-    bty = "n"                # separate legend elements
-    )                        # end legend definition
-)                            # end barplot
-# load data
-data02 <- read.delim("https://slcladal.github.io/data/data02.txt", sep = "\t", header = F)
-# transform data into a matrix
-data02 <- as.matrix(data02)
-# load data
-data02 <- read.delim("https://slcladal.github.io/data/data02.txt", sep = "\t", header = F)
-# transform data into a matrix
-data02 <- as.matrix(data02)
-# create a barplot
-barplot(                                 
-  data02,                   # use barplotdata
-  main="Barplot Exercise",  # add title
-  xlab="",                  # add x-axis label
-  ylab="Frequency",         # add y-axis label
-  ylim=c(0,700),            # define y-axis range
-  col=c("darkblue","red"),  # define colours
-  beside=T                  # bars next to each other
-)
-# create a data set called barplotdatagg1
-barplotdatagg1 <- data.frame(             
-  # create a vector with Variable values
-  rep(rownames(barplotdata), ncol(barplotdata)),  
-  # create a vector with Decade values
-  rep(colnames(barplotdata), each = nrow(barplotdata)), 
-  # create a vector with Frequency values
-  as.vector(barplotdata)                          
-  )       
-# define column names
-colnames(barplotdatagg1) <- c("Variable", "Decade", "Frequency") 
-# attach barplotdatagg1 data set
-attach(barplotdatagg1)                             
-# inspect barplotdatagg1
-head(barplotdatagg1)                              
-# create a data set called barplotdatagg2
-barplotdatagg2 <- barplotdatagg1 %>% 
-  group_by(Decade) %>%        # group by Decade
-  summarise(                  # start summary 
-    CumFreq = sum(Frequency)  # create var. of cum. freqs.
-  )    
-# attach barplotdatagg2 data set
-attach(barplotdatagg2)               
-# inspect barplotdatagg2
-head(barplotdatagg2)                 
-# plot barplotdatagg
-ggplot(barplotdatagg2,             
-       aes(Decade, CumFreq)) + # define x- and y-axis
-  geom_bar(stat="identity") +  # determine type of plot
-  theme_bw()                   # define theme as black and white
-# plot barplotdatagg1
-ggplot(barplotdatagg1,                   
-       aes(Decade, Frequency,            # def. x/y-axis
-           fill = Variable)) +           # def. grouping variable
-  geom_bar(stat="identity",              # def. type of plot
-           position=position_dodge()) +  # def. grouping
-  # define colours
-  scale_fill_manual(values=c("goldenrod2", 
-                             "gray70", 
-                             "indianred4")) + 
-  # add text and define colour
-  geom_text(aes(label=Frequency), vjust=1.6, color="white", 
-            # define text position and size
-            position = position_dodge(0.9), size=3.5) +   
-  # define theme as black and white
-  theme_bw()                                                
+bardata <- plotdata %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  dplyr::mutate(Date = factor(Date)) %>%
+  group_by(Date) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  dplyr::mutate(Percent = round(Frequency/sum(Frequency)*100, 1))
+# inpsect data
+head(bardata)
+# create pie chart
+ggplot(bardata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void()
+# bar plot
+ggplot(bardata, aes(Date, Percent)) +  # define x- and y-axis
+  geom_bar(stat="identity") +          # determine type of plot
+  theme_bw()                          # use black & white theme
+# create bar plot data
+newbardata <- plotdata %>%
+    dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  dplyr::mutate(Date = factor(Date)) %>%
+  group_by(Date, Genre) %>%
+  dplyr::summarise(Frequency = n())
+# inpsect data
+head(newbardata)
+# bar plot
+ggplot(newbardata, aes(Date, Frequency, fill = Genre)) + 
+  geom_bar(stat="identity", position = position_dodge()) +  
+  theme_bw()                         
+# bar plot
+ggplot(newbardata, aes(Date, Frequency, fill = Genre)) + 
+  geom_bar(stat="identity") +  
+  theme_bw()                         
+# bar plot
+ggplot(newbardata, aes(Date, Frequency, fill = Genre)) + 
+  geom_bar(stat="identity", position="fill") +  
+  theme_bw()                         
 # create likert data
-LikertData <- data.frame(Course=c(rep(c("Chinese", "German","Japanese"),each = 100)),
-                         Satisfaction=
-                           c(c(rep(1, 20), 
-                               rep(2, 30), 
-                               rep(3, 25), 
-                               rep(4, 10), 
-                               rep(5, 15)),
-                         c(rep(1, 40), 
-                           rep(2, 25), 
-                           rep(3, 15), 
-                           rep(4, 15), 
-                           rep(5, 5)),
-                         c(rep(1, 10), 
-                           rep(2, 15), 
-                           rep(3, 20), 
-                           rep(4, 25), 
-                           rep(5, 30))))
-Likert <- LikertData %>%
+newlikertdata <- likertdata %>%
   group_by(Course, Satisfaction) %>%
   mutate(Frequency = n())
-Likert <- unique(Likert)
+newlikertdata <- unique(newlikertdata)
 # inspect data
-head(Likert)
+head(newlikertdata)
 # create grouped bar plot
-ggplot(Likert,           
-       aes(Satisfaction, Frequency,     # def. x/y-axis
-           fill = Course)) +            # def. grouping var.
-  geom_bar(stat="identity",             # def. type of plot
-           position=position_dodge()) + # def. grouping
-  # define colours
-  scale_fill_manual(values=c("goldenrod2", 
-                             "gray70", 
-                             "indianred4")) + 
+ggplot(newlikertdata, aes(Satisfaction, Frequency,  fill = Course)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  # define colors
+  scale_fill_manual(values=c("goldenrod2", "gray70",  "indianred4")) + 
   # add text and define colour
   geom_text(aes(label=Frequency), vjust=1.6, color="white", 
             # define text position and size
-            position = position_dodge(0.9), 
-            size=3.5) +     
-    scale_x_discrete(limits=c("1","2","3","4","5"), 
-                     breaks=c(1,2,3,4,5),
-        labels=c("very dissatisfied", 
-                 "dissatisfied", 
-                 "neutral",
-                 "satisfied", 
+            position = position_dodge(0.9),  size=3.5) +     
+    scale_x_discrete(limits=c("1","2","3","4","5"), breaks=c(1,2,3,4,5),
+        labels=c("very dissatisfied", "dissatisfied",  "neutral", "satisfied", 
                  "very satisfied")) + 
-  theme_bw()    # def. theme as black and white
+  theme_bw()
 # activate package
 library(likert)                         
 # load data
@@ -616,121 +382,41 @@ mosaic(HairEyeColor, # use HairEyeColor data set
        shade=T,  
        # add a legend to explain the colour coding
        legend=TRUE)  
-# create a boxplot of Sepal.Length by Species
-boxplot(Sepal.Length~Species, 
-        # use data set iris
-        data=iris,       
-        # def. title
-        main="Boxplot",     
-        # def. y-axis label
-        ylab="Sepal Length (cm)",                          
-        # add x-axis label
-        xlab="Species",                              
-        # def. col. of boxes
-        col = c("lightgrey", "lightblue", "lightgreen")    
-        ) 
-# create a boxplot of Sepal.Length by Species
-boxplot(Sepal.Length~Species,                              
-        # use data set iris
-        data=iris,                                         
-        # def. title
-        main="Boxplot",                                   
-        # def. y-axis label
-        ylab="Sepal Length (cm)",                          
-        # def. x-axis label
-        xlab="Species",                                   
-        # def. col. of boxes
-        col = c("lightgrey", "lightblue", "lightgreen"),  
-        # add notches
-        notch = T                                          
-        ) 
-# create data set
-Language <- c(rep("German", 10), rep("English", 10))
-Score <- c(6, 65, 12, 56, 45, 84, 38, 46, 64, 24, 67, 16, 56, 34, 54, 42, 36, 47, 54, 29)
-# create data frame
-databp <- data.frame(Language, Score)
+# create data
+boxdata <- plotdata %>%
+  dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900")))))%>%
+  dplyr::mutate(Date = factor(Date))
 # inspect data
-databp
-# create a boxplot of Sepal.Length by Species
-boxplot(Score~Language,                              
-        # use data set iris
-        data=databp,                                       
-        # def. title
-        main="Boxplot",                       
-        # def. y-axis label
-        ylab="Score",   
-        # def. x-axis label
-        xlab="Language",                  
-        # def. col. of boxes
-        col = c("lightgrey", "darkgrey"),   
-        # add notches
-        notch = F)
-# create a boxplot with iris data
-ggplot(iris,                   
-       # def. x/y-axis
-       aes(Species, Sepal.Length,              
-           # define coloring factor
-           color = Species)) +                 
-  # define outlier color
-  geom_boxplot(outlier.colour="black",  
-                # define outlier shape
-               outlier.shape=16,       
-                # define outlier size
-               outlier.size=2,         
-               # do not draw notches
-               notch=FALSE,             
-               # def. col. of boxes
-               fill=c("gold", "gray70", "indianred4"), 
-               # define color edges
+head(boxdata)
+# create boxplot
+ggplot(boxdata, aes(Date, Prepositions, color = Genre)) +                 
+  geom_boxplot(fill=c("gold", "gray70", "indianred4", "blue"), color="black") 
+# create boxplot
+ggplot(boxdata, aes(Date, Prepositions, color = Genre)) +                 
+  geom_boxplot(outlier.colour="red", outlier.shape=2, outlier.size=5, 
+               notch=T, fill=c("gold", "gray70", "indianred4", "blue"), 
                color="black") 
 # create violin plot
-ggplot(iris,   # use iris data          
-       # def. x/y-axes
-       aes(x=Species, y=Sepal.Length,       
-           # col. by Species
-           fill=Species)) +                 
-  # def. plot type (violin)
-  geom_violin(trim=FALSE)+             
-  # create (additional) boxplots
-  geom_boxplot(width=0.1, fill="white")+   
-  # def. title
-  labs(title="Sepal Length  by Species",    
-       # def. axes labels
-       x="Species", y = "Length (cm)") +    
-  # def. col.
-  scale_fill_manual(values=c("#999999", 
-                             "#E69F00", 
-                             "#56B4E9")) + 
-  # use black and white theme
-  theme_bw() +                              
-  # surpress legend
-  theme(legend.position="none")             
+ggplot(boxdata, aes(Date, Prepositions, fill = Date)) +  
+  geom_violin(trim = FALSE) +  
+  geom_boxplot(width=0.1, fill="white") +
+  scale_fill_manual(values = c("gold", "gray70", "indianred4", "blue")) +
+  theme_bw() +
+  theme(legend.position = "none")         
 # create dot plot
-ggplot(iris,  # use iris data                              
-       # def. x/y-axes
-       aes(x=Sepal.Length, y=Sepal.Width,       
-           # col. by Species
-           color=Species)) +                    
-  # create dot plot
-  geom_point() +                                
-  # def. col. 
-  scale_color_manual(values = c('indianred4', 
-                                'darkgrey', 
-                                'gold')) + 
-  # add legend
+ggplot(plotdata, aes(x = Date, y = Prepositions, color=Region)) +  
+  geom_point() +  
+  scale_color_manual(values = c("indianred4",  "gray50")) + 
   theme(legend.position=c(0,1), legend.justification=c(0,1)) 
-# create density plot
-ggplot(iris,     # use iris data    
-       # define axes and coloring
-       aes(Sepal.Length, fill=Species)) +  
-  # create density plot and define smoothing factor
-  geom_density(alpha=.5) +                 
-  # def. col.
-  scale_fill_manual(values = c('indianred4', 
-                               'darkgrey', 
-                               'gold')) + 
-  # surpress legend
-  theme(legend.position = "none")          
+# create dot plot
+ggplot(plotdata, aes(Date, fill=Region)) +  
+  geom_density(alpha=.5) +  
+  scale_fill_manual(values = c("indianred4",  "gray50")) + 
+  theme(legend.position=c(0,1), legend.justification=c(0,1)) 
 # activate packages
 library(dplyr)
 library(tm)
