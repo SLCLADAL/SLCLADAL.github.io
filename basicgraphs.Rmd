@@ -63,7 +63,7 @@ options(stringsAsFactors = F)
 # install libraries
 install.packages(c("lattice", "ggplot2", "dplyr", "likert", 
                    "scales", "vcd", "tm", "wordcloud", 
-                   "stringr", "SnowballC"))
+                   "stringr", "SnowballC", "tidyr"))
 ```
 
 Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
@@ -85,6 +85,7 @@ library(tm)
 library(wordcloud)
 library(stringr)
 library(SnowballC)
+library(tidyr)
 ```
 
 
@@ -264,40 +265,78 @@ ggplot(plotdata, aes(x=Date, y= Prepositions, color = Genre)) +
 
 The white background is created by specifying the theme as a black and white theme ("theme_bw()") while the colour of the dots is changed by specifying that the colour should be applied by Species ("color = Species"). Then, the colours to be used are defined in the function "scale_color_manual". 
 
-In addition, we can add regression lines with error bars by Species and, if we want to show separate windows for the plots, we can use the "facet_grid" or "facet_wrap" function and define by which variable we want to create different panels.
+## Using symbols in scatter plots
+
+Instead of using simple dots to represent data points, it can be useful to use symbols instead to make it easier for readers to understand what individual dots refer to. This is so because the reader does not have to take the eyes away from the graph to the legend to understand what a dot represents. 
+
+As the data is too rich for such a visualization, we will create a reduced data set so that the graph is more readily interpretable.
+
+```{r data3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# modify data
+plotdataredux <- plotdata %>%
+  dplyr::filter(Genre == "Bible" | Genre == "Fiction" | Genre == "PrivateLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+  dplyr::mutate(Date =as.numeric(Date)) %>% 
+  droplevels() %>%
+  dplyr::select(-Text)
+# inspect data
+str(plotdataredux)
+```
+
+We can now specify the symbols in the scatterplot.
 
 ```{r scatter12, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create scatter plot colored by genre
+ggplot(plotdataredux, aes(Date, Prepositions, group = Genre, color = Genre)) +
+  geom_point(aes(y = Prepositions, shape = Genre)) +
+  guides(shape=guide_legend(override.aes=list(fill=NA))) +
+  scale_shape_manual(name = "Genre", values = c("B", "F", "H","L","S","R")) +
+  theme_bw() +
+  theme(legend.position="top")
+```
+
+
+## Dot plots with error bars
+
+In addition, we can add regression lines with error bars by Species and, if we want to show separate windows for the plots, we can use the "facet_grid" or "facet_wrap" function and define by which variable we want to create different panels.
+
+```{r scatter13, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create scatter plot colored by genre in different panels
-ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
+ggplot(plotdata, aes(Date, Prepositions,  color = Genre)) +
   facet_wrap(Genre, ncol = 4) +
   geom_point() + 
   geom_smooth(method = "lm", se = F) +
-  theme_bw()
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        axis.text.x = element_text(size=8, angle=90))
 ```
 
 If we only want to show the lines, we simply drop the "geom_point" function.
 
-```{r scatter12b, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter14, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create scatter plot colored by genre in different panels
 ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
   facet_wrap(Genre, ncol = 4) +
   geom_smooth(method = "lm", se = F) +
-  theme_bw()
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        axis.text.x = element_text(size=8, angle=90))
 ```
 
 Another option is to plot density layers instead of plotting the data points.
 
-```{r scatter13, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter15, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create scatter density plot
 ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
     facet_wrap(Genre, ncol = 4) +
   theme_bw() +                  
-  geom_density_2d()             # add 2-dm. density
+  geom_density_2d() +
+  theme(legend.title = element_blank(), 
+        axis.text.x = element_text(size=8, angle=90))
 ```
 
 Although these are not scatterplots, plots with dot-symbols are very flexible and can be extended to show properties of the distribution of values. One way to create such a plot is to plot means as dot-symbols and add error bars to provide information about the underlying distribution. The plot below illustrates such a plot and additionally shows how plots can be further customized.
 
-```{r scatter14, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter16, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # scatter plot with error bars
 ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  group = Genre)) +                 
   # add title
@@ -313,16 +352,14 @@ ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  gro
   # def. y-axis range
   coord_cartesian(ylim = c(100, 200)) +              
   # def. font size
-  theme_set(theme_bw(base_size = 15)) +         
+  theme_bw(base_size = 15) +         
   # def. x- and y-axis
   theme(axis.text.x = element_text(size=10, angle = 90),  
         axis.text.y = element_text(size=10, face="plain")) + 
   # def. axes labels
   labs(x = "Genre", y = "Prepositions (Frequency)") +     
   # def. to col.
-  scale_color_manual(values = c(rep("grey20", 16)), 
-                     # suppress legend 
-                     guide = FALSE)          
+  scale_color_manual(guide = FALSE)          
 ```
 
 In the following, we will simply go over the most common types of graphs and use examples to show what they look like and how they can be created. The main graph types we will have a look at are:
@@ -332,12 +369,11 @@ In the following, we will simply go over the most common types of graphs and use
 * boxplots ("geom_box" and "geom_violin")
 * density plots ("geom_density")
 
-In order to be able to use these visualizations, we will have to change the data.
+In order to be able to use these visualizations, we will modify the data to better bring the point across.
 
 ```{r ld1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # modify data
-lineplotdata <- plotdata %>%
-  dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+lineplotdata <- plotdataredux %>%
   dplyr::mutate(Date = ifelse(Date < 1600, "1600",
                               ifelse(Date < 1700, "1700",
                               ifelse(Date < 1800, "1800",
@@ -363,6 +399,9 @@ ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre)) +
   geom_line()
 ```
 
+
+## Smoothed line graphs
+
 Another very useful function when creating line graphs with "ggplot" is "geom_smooth" which *smoothes* the lines to be drawn. 
 
 ```{r line2, echo = T, results='hide', message=FALSE, warning=FALSE}
@@ -371,8 +410,6 @@ ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre, linetype = Genre)) +
   # add geom layer with lines
   geom_smooth()
 ```
-
-## Smoothed line graphs
 
 As this smoothed line graph is extremely useful, we will customize it to show how to modify your graph.
 
@@ -386,26 +423,27 @@ ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre, linetype = Genre)) +
   # def. legend position
   theme(legend.position="top") +  
   # def. linetype
-  scale_linetype_manual(values=c("longdash", "dashed", "dotdash", "dotted", "solid"), 
+  scale_linetype_manual(values=c("longdash", "twodash", "dashed", 
+                                 "dotdash", "dotted", "solid"), 
                         # def. legend header
                         name=c("Genre"),
                         # def. linetypes
-                        breaks = c("History", "PrivateLetter", "PublicLetter",
-                                   "Science", "Sermon"),
+                        breaks = c("Bible", "Fiction", "History",
+                                   "PrivateLetter", "Science", "Sermon"),
                         # def. labels
-                        labels = c("History", "Private letter", "Public letter",
-                                   "Science", "Sermon")) + 
+                        labels = c("Bible", "Fiction", "History",
+                                   "Private letter", "Science", "Sermon")) + 
   # def. col.
-  scale_colour_manual(values=c("goldenrod2", "gray30", "blue", "burlywood",        
-                               "indianred4"),
+  scale_colour_manual(values=c("goldenrod2", "gray30", "blue", 
+                               "burlywood", "gray80", "indianred4"),
                       # define legend header
                       name=c("Genre"),
                       # define elements
-                      breaks=c("History", "PrivateLetter", "PublicLetter",
-                                   "Science", "Sermon"),  
+                      breaks=c("Bible", "Fiction", "History",
+                               "PrivateLetter", "Science", "Sermon"),  
                       # define labels
-                      labels = c("History", "Private letter", "Public letter",
-                                   "Science", "Sermon")) +
+                      labels = c("Bible", "Fiction", "History",
+                                 "Private letter", "Science", "Sermon")) +
   # add x-axis label
   labs(x = "Year") +      
   # customize x-axis tick positions
@@ -493,7 +531,7 @@ head(bardata)
 
 Before creating bar plots, we will briefly turn to pie charts because pie charts are very common despite suffering from certain shortcomings. Consider the following example which highlights some of the issues that arise when using pie charts.
 
-```{r bar2, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create pie chart
 ggplot(bardata,  aes("", Percent, fill = Date)) + 
   geom_bar(stat="identity", width=1, color = "white") +
@@ -505,15 +543,55 @@ ggplot(bardata,  aes("", Percent, fill = Date)) +
 
 If the slices of the pie chart are not labelled, it is difficult to see which slices are smaller or bigger compared to other slices. This problem can easily be avoided when using a bar plot instead.
 
+The labeling of pie charts is, however, somewhat tidious as the positioning is tricky. Below is an example for adding lables without specification.
+
+```{r pie3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create pie chart
+ggplot(bardata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void() +
+  geom_text(aes(y = Percent, label = Percent), color = "white", size=6)
+```
+
+To place the labels where they make sense, we will add another variable to the data called "Poisition".
+
+```{r pie4, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+piedata <- bardata %>%
+  dplyr::arrange(desc(Date)) %>%
+  dplyr::mutate(Position = cumsum(Percent)- 0.5*Percent)
+# inspect piedata
+piedata
+```
+
+Now that we have specified the position, we can include it into the pie chart.
+
+```{r pie5, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create pie chart
+ggplot(piedata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void() +
+  geom_text(aes(y = Position, label = Percent), color = "white", size=6)
+```
+
 # Bar plots
 
 Like pie charts, bar plot display frequency information across categorical variable levels.
 
 ```{r bar3, echo = T, results='hide', message=FALSE, warning=FALSE}
 # bar plot
-ggplot(bardata, aes(Date, Percent)) +  # define x- and y-axis
+ggplot(bardata, aes(Date, Percent, fill = Date)) +
   geom_bar(stat="identity") +          # determine type of plot
-  theme_bw()                          # use black & white theme
+  theme_bw() +                         # use black & white theme
+  # add and define text
+  geom_text(aes(y = Percent-5, label = Percent), color = "white", size=3) + 
+  # add colors
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  # supress legend
+  theme(legend.position="none")
 ```
 
 Compared with the pie chart, it is much easier to grasp the relative size and order of the percentage values which shows that pie charts are unfit to show relationships between elements in a graph and, as a general rule of thumb, should be avoided.
@@ -692,37 +770,84 @@ ggplot(plottable,
   labs(x = "", y = "Score")                                               
 ```  
 
-# Association and mosaic plots
+# Association plots
 
-A plot type that is related to bar plots is the association plot. Association plots are similar to the bar plot which shows deviations from a reference as above but association plots show the difference between the observed and expected frequencies in bin. Therefore, they are often used when graphically representing tables with absolute frequencies. We use the already loaded *vcd* package to create association plots. For the example here, we are also changing the labels in the table from "Male" and "Female" to "M" and "F" because otherwise, the labels would overlap.
+Another plot type that is related to bar plots is the association plot. Association plots are similar to bar plots in that they display difference as bars above or below a line (as shown above). However, association plots show the difference between the observed and expected frequencies rather than differences as deviations from a reference. Therefore, they are often used when graphically representing tables with absolute frequencies. We use the already loaded *vcd* package to create association plots. 
 
-```{r ass1, results='hide', message=FALSE, warning=FALSE}
-# activate vcd package
-library(vcd)    
-# recode Sex var. to avoid overlay in plot
-attr(HairEyeColor, "dimnames")$Sex=c("M", "F")   
+We also modify the reduced plotdata as association plots work on matrices rather than dat frames or tibbles. In addition, we will drop more genres as to avoid overlap in the yaxis lables later on.
+
+```{r ass2, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# reduce data
+assocdata <- plotdataredux %>%
+  dplyr::filter(Genre != "PrivateLetter", Genre != "History") %>%
+  droplevels() %>%
+  group_by(Genre, Region) %>%
+  dplyr::summarise(Prepositions = round(mean(Prepositions), 0)) %>%
+  tidyr::spread(Region, Prepositions) 
+# create matrix 
+assocmx <- as.matrix(assocdata[,2:3])
+attr(assocmx, "dimnames")[1] <- as.vector(assocdata[,1])
+# inspect data
+assocmx
 ```
+
 
 Association plots are created by using the "assoc" function which takes a table (or a similar format such as a matrix or a data frame) as their argument. In addition, we specify "shade" as "T" in order to colour code the bars in the association plot and to add a legend.
 
-```{r ass2, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r ass3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create association plot
-assoc(HairEyeColor, 
-      shade=TRUE)
+assoc(assocmx, shade=TRUE)
 ```
+
+The bars above the line indicate that the observed frequency is higher than expected, bars under the line indicate frequencies that are lower than expected. However, the lack of coloring strongly suggests that there are noe significant differences between the observed and the expected frequencies which means that Genre is unlikly to have a significant effect of the frequency of prepositions.
+
+# Mosaic plots
 
 Another plot which is useful to graphically depict the relationship of categorical variables is the mosaic plot. The size of the boxes in a mosaic plot indicate how frequent that subcategory is and the colours show whether or not the category differs from the value that is expected if given the overall distribution in the table. In addition, the hue of the colour shows how great the difference between observed and expected is and thus indicates whether the respective subcategory deviates significantly from the expected frequency. 
 
 ```{r mos1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create a mosaic plot
-mosaic(HairEyeColor, # use HairEyeColor data set
-       # color code difference between observed and expected values
-       shade=T,  
-       # add a legend to explain the colour coding
-       legend=TRUE)  
+mosaic(assocmx, shade=T, legend=TRUE)  
 ```
  
-According to the mosaic plot above, people who have blond hair and brown eyes occur less frequently than expected if there were no correlation between eye and hair colour (as indicated by the red rectangles in the lower left corner). The combination of blond hair and blue eyes is, however, substantially more frequent than would be expected by chance. 
+According to the mosaic plot above, there are neither significant differences in the number of observations (the boxes are similiar in size and shape) and that genre does not have a significant effect on the frequency of prepositions as the boxes are grey and not colored. 
+
+# Heat maps
+
+Heat maps are similar to mosaic plots in that they display frequency information and use color-coding to indicate high and low values. Heat maps also work on matrices but they are much more powerful and versatile that mosaic plots. 
+
+Heat maps are a very popular way to display frequency information and various packages have been written to create or customize heatmaps (for example the packages "ComplexHeatmap", "dendextend", "d3heatmap", "pheatmap") which means that many aspects of heatmaps can be modified. In this example, we will only use the most basic function to create a heat map.
+
+We again modify the data and create a matrix from the original plotdata. In addition, we scale the frequencies. This is not neccessary in the present case but when dealing with variables which differ in their mean and variance because they reflect different variables, scaling will normalize t´such variables and render their values comparable. 
+
+```{r ht1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create data
+heatdata <- plotdata %>%
+  dplyr::select(Genre, Date, Prepositions) %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  group_by(Date, Genre) %>%
+  dplyr::summarise(Prepositions = round(mean(Prepositions), 0)) %>%
+  tidyr::spread(Date, Prepositions) %>%
+  dplyr::filter(Genre != "Religion")
+# create matrix 
+heatmx <- as.matrix(heatdata[,2:5])
+attr(heatmx, "dimnames")[1] <- as.vector(heatdata[,1])
+heatmx <- scale(heatmx)
+# inspect data
+heatmx
+```
+
+Now that we have created a data matrix, we can cerate a simple heat map.
+
+```{r ht2, echo = T, eval = T, message=FALSE, warning=FALSE}
+# create heat map
+heatmap(heatmx, scale = "none")
+```
+
+The dendogram on the top shows that documents from 1600 and 1700 as well as documents from 1800 and 1900 are grouped together and thus are more similar with respect to their preposition frequencies. The dendogram on the left indicates that we have two categories of documents: the genres to towards the bottom tend to have fewer prepositions (indicated by the light colors) while the documents to the top tend to have more prepositions (thus the darker hues). Legal texts (genre = Law) have notably higher rates of prepositions as is deriveable from the dark red color of such texts.  
 
 # Boxplots
 

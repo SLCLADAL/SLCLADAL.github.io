@@ -9,7 +9,7 @@ options(stringsAsFactors = F)
 # install libraries
 install.packages(c("lattice", "ggplot2", "dplyr", "likert", 
                    "scales", "vcd", "tm", "wordcloud", 
-                   "stringr", "SnowballC"))
+                   "stringr", "SnowballC", "tidyr"))
 # activate packages
 library(knitr)
 library(lattice)             
@@ -22,6 +22,7 @@ library(tm)
 library(wordcloud)
 library(stringr)
 library(SnowballC)
+library(tidyr)
 # load data
 plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE)
 # inspect data
@@ -110,22 +111,43 @@ ggplot(plotdata, aes(x=Date, y= Prepositions, color = Genre)) +
                "darkgrey", "grey50", "gray80", "brown", "red",
                "goldenrod", "chartreuse", "black", "lightblue", 
                "blueviolet", "burlywood"))
+# modify data
+plotdataredux <- plotdata %>%
+  dplyr::filter(Genre == "Bible" | Genre == "Fiction" | Genre == "PrivateLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+  dplyr::mutate(Date =as.numeric(Date)) %>% 
+  droplevels() %>%
+  dplyr::select(-Text)
+# inspect data
+str(plotdataredux)
+# create scatter plot colored by genre
+ggplot(plotdataredux, aes(Date, Prepositions, group = Genre, color = Genre)) +
+  geom_point(aes(y = Prepositions, shape = Genre)) +
+  guides(shape=guide_legend(override.aes=list(fill=NA))) +
+  scale_shape_manual(name = "Genre", values = c("B", "F", "H","L","S","R")) +
+  theme_bw() +
+  theme(legend.position="top")
 # create scatter plot colored by genre in different panels
-ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
+ggplot(plotdata, aes(Date, Prepositions,  color = Genre)) +
   facet_wrap(Genre, ncol = 4) +
   geom_point() + 
   geom_smooth(method = "lm", se = F) +
-  theme_bw()
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        axis.text.x = element_text(size=8, angle=90))
 # create scatter plot colored by genre in different panels
 ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
   facet_wrap(Genre, ncol = 4) +
   geom_smooth(method = "lm", se = F) +
-  theme_bw()
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        axis.text.x = element_text(size=8, angle=90))
 # create scatter density plot
 ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
     facet_wrap(Genre, ncol = 4) +
   theme_bw() +                  
-  geom_density_2d()             # add 2-dm. density
+  geom_density_2d() +
+  theme(legend.title = element_blank(), 
+        axis.text.x = element_text(size=8, angle=90))
 # scatter plot with error bars
 ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  group = Genre)) +                 
   # add title
@@ -141,19 +163,16 @@ ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  gro
   # def. y-axis range
   coord_cartesian(ylim = c(100, 200)) +              
   # def. font size
-  theme_set(theme_bw(base_size = 15)) +         
+  theme_bw(base_size = 15) +         
   # def. x- and y-axis
   theme(axis.text.x = element_text(size=10, angle = 90),  
         axis.text.y = element_text(size=10, face="plain")) + 
   # def. axes labels
   labs(x = "Genre", y = "Prepositions (Frequency)") +     
   # def. to col.
-  scale_color_manual(values = c(rep("grey20", 16)), 
-                     # suppress legend 
-                     guide = FALSE)          
+  scale_color_manual(guide = FALSE)          
 # modify data
-lineplotdata <- plotdata %>%
-  dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+lineplotdata <- plotdataredux %>%
   dplyr::mutate(Date = ifelse(Date < 1600, "1600",
                               ifelse(Date < 1700, "1700",
                               ifelse(Date < 1800, "1800",
@@ -181,26 +200,27 @@ ggplot(lineplotdata, aes(x=Date, y= Mean,  color = Genre, linetype = Genre)) +
   # def. legend position
   theme(legend.position="top") +  
   # def. linetype
-  scale_linetype_manual(values=c("longdash", "dashed", "dotdash", "dotted", "solid"), 
+  scale_linetype_manual(values=c("longdash", "twodash", "dashed", 
+                                 "dotdash", "dotted", "solid"), 
                         # def. legend header
                         name=c("Genre"),
                         # def. linetypes
-                        breaks = c("History", "PrivateLetter", "PublicLetter",
-                                   "Science", "Sermon"),
+                        breaks = c("Bible", "Fiction", "History",
+                                   "PrivateLetter", "Science", "Sermon"),
                         # def. labels
-                        labels = c("History", "Private letter", "Public letter",
-                                   "Science", "Sermon")) + 
+                        labels = c("Bible", "Fiction", "History",
+                                   "Private letter", "Science", "Sermon")) + 
   # def. col.
-  scale_colour_manual(values=c("goldenrod2", "gray30", "blue", "burlywood",        
-                               "indianred4"),
+  scale_colour_manual(values=c("goldenrod2", "gray30", "blue", 
+                               "burlywood", "gray80", "indianred4"),
                       # define legend header
                       name=c("Genre"),
                       # define elements
-                      breaks=c("History", "PrivateLetter", "PublicLetter",
-                                   "Science", "Sermon"),  
+                      breaks=c("Bible", "Fiction", "History",
+                               "PrivateLetter", "Science", "Sermon"),  
                       # define labels
-                      labels = c("History", "Private letter", "Public letter",
-                                   "Science", "Sermon")) +
+                      labels = c("Bible", "Fiction", "History",
+                                 "Private letter", "Science", "Sermon")) +
   # add x-axis label
   labs(x = "Year") +      
   # customize x-axis tick positions
@@ -262,10 +282,35 @@ ggplot(bardata,  aes("", Percent, fill = Date)) +
   coord_polar("y", start=0) +
   scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
   theme_void()
+# create pie chart
+ggplot(bardata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void() +
+  geom_text(aes(y = Percent, label = Percent), color = "white", size=6)
+piedata <- bardata %>%
+  dplyr::arrange(desc(Date)) %>%
+  dplyr::mutate(Position = cumsum(Percent)- 0.5*Percent)
+# inspect piedata
+piedata
+# create pie chart
+ggplot(piedata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void() +
+  geom_text(aes(y = Position, label = Percent), color = "white", size=6)
 # bar plot
-ggplot(bardata, aes(Date, Percent)) +  # define x- and y-axis
+ggplot(bardata, aes(Date, Percent, fill = Date)) +
   geom_bar(stat="identity") +          # determine type of plot
-  theme_bw()                          # use black & white theme
+  theme_bw() +                         # use black & white theme
+  # add and define text
+  geom_text(aes(y = Percent-5, label = Percent), color = "white", size=3) + 
+  # add colors
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  # supress legend
+  theme(legend.position="none")
 # create bar plot data
 newbardata <- plotdata %>%
     dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
@@ -371,19 +416,41 @@ ggplot(plottable,
                                        "indianred4"), 3)) + 
   # axes titles
   labs(x = "", y = "Score")                                               
-# activate vcd package
-library(vcd)    
-# recode Sex var. to avoid overlay in plot
-attr(HairEyeColor, "dimnames")$Sex=c("M", "F")   
+# reduce data
+assocdata <- plotdataredux %>%
+  dplyr::filter(Genre != "PrivateLetter", Genre != "History") %>%
+  droplevels() %>%
+  group_by(Genre, Region) %>%
+  dplyr::summarise(Prepositions = round(mean(Prepositions), 0)) %>%
+  tidyr::spread(Region, Prepositions) 
+# create matrix 
+assocmx <- as.matrix(assocdata[,2:3])
+attr(assocmx, "dimnames")[1] <- as.vector(assocdata[,1])
+# inspect data
+assocmx
 # create association plot
-assoc(HairEyeColor, 
-      shade=TRUE)
+assoc(assocmx, shade=TRUE)
 # create a mosaic plot
-mosaic(HairEyeColor, # use HairEyeColor data set
-       # color code difference between observed and expected values
-       shade=T,  
-       # add a legend to explain the colour coding
-       legend=TRUE)  
+mosaic(assocmx, shade=T, legend=TRUE)  
+# create data
+heatdata <- plotdata %>%
+  dplyr::select(Genre, Date, Prepositions) %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  group_by(Date, Genre) %>%
+  dplyr::summarise(Prepositions = round(mean(Prepositions), 0)) %>%
+  tidyr::spread(Date, Prepositions) %>%
+  dplyr::filter(Genre != "Religion")
+# create matrix 
+heatmx <- as.matrix(heatdata[,2:5])
+attr(heatmx, "dimnames")[1] <- as.vector(heatdata[,1])
+heatmx <- scale(heatmx)
+# inspect data
+heatmx
+# create heat map
+heatmap(heatmx, scale = "none")
 # create data
 boxdata <- plotdata %>%
   dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
