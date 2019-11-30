@@ -12,7 +12,7 @@
 
 <meta name="author" content="UQ SLC Digital Team" />
 
-<meta name="date" content="2019-11-29" />
+<meta name="date" content="2019-11-30" />
 
 <title>Mixed-Effects Regression</title>
 
@@ -509,7 +509,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Mixed-Effects Regression</h1>
 <h4 class="author">UQ SLC Digital Team</h4>
-<h4 class="date">2019-11-29</h4>
+<h4 class="date">2019-11-30</h4>
 
 </div>
 
@@ -2166,7 +2166,7 @@ ggplot(p1d, aes(Language, Shots, color = Language, fill = Language)) +
 set.seed(20191220)
 boruta &lt;- Boruta(UHM ~.,data=countdata)
 print(boruta)</code></pre>
-<pre><code>## Boruta performed 99 iterations in 5.768 secs.
+<pre><code>## Boruta performed 99 iterations in 5.863 secs.
 ##  1 attributes confirmed important: Shots;
 ##  1 attributes confirmed unimportant: Gender;
 ##  2 tentative attributes left: Language, Trial;</code></pre>
@@ -2175,14 +2175,14 @@ print(boruta)</code></pre>
 gf = goodfit(countdata$UHM,type= &quot;poisson&quot;,method= &quot;ML&quot;)
 plot(gf,main=&quot;Count data vs Poisson distribution&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/qpmm5-1.png" width="672" /></p>
-<p>The data does not perfectly match a distributin that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then data is NOT Poisson distributed and, given the visualization is likely over-dispersed. In that case, we may have to use a quasi-Poisson model rather than a Poisson model as quasi-Poisson models are specifically designed to handle overdispersed data that does not fully approximate to a Poisson distribution.</p>
+<p>The data does not perfectly match a distributin that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then the distribution of the data differs significantly from a Poisson distribution and, given the visualization is likely over-dispersed. In that case, we may have to use a quasi-Poisson model. One effect of overdispersion is that the standrad errors of a model are biased and quasi-Poisson models scale the standard errors to compensate bias. However, <span class="citation">Zuur, Hilbe, and Ieno (<a href="#ref-zuur2013beginner" role="doc-biblioref">2013</a>)</span> suggest to use negative-binomial model instead. This is so because the scaling of the standard errors performed by quasi-Poisson mdoels only affects the significance of coefficients (the p-values) but it does not affect the coefficients which, however, may be affected themsleves by overdispersion. Thus, the coefficients of Poisson as well as quasi-Poisson models (which are identical) may be unreliable when dealing with overdipersion. Negative binomial models, in contrast, include an additional dispersion or heterogeneity parameter which accommodates overdispersion better than merely scaling the standard errors <span class="citation">(see Zuur, Hilbe, and Ieno <a href="#ref-zuur2013beginner" role="doc-biblioref">2013</a>, 21)</span>.</p>
 <pre class="r"><code>summary(gf)</code></pre>
 <pre><code>## 
 ##   Goodness-of-fit test for poisson distribution
 ## 
 ##                    X^2 df                             P(&gt; X^2)
 ## Likelihood Ratio 153.4  5 0.0000000000000000000000000000002493</code></pre>
-<p>The p-values is indeed substantially smaller than .05 which means that we cannot use a simple Poisson model. We will now use a Levene’s test to check if the variance is distributed homogeniously (homoscedasticity) or whether the assumption of variance homogeneity is violated.</p>
+<p>The p-value is indeed smaller than .05 which means that we cannot use a simple Poisson model. We will now use a Levene’s test to check if the variance is distributed homogeniously (homoscedasticity) or whether the assumption of variance homogeneity is violated.</p>
 <pre class="r"><code># check homogeneity
 leveneTest(countdata$UHM, countdata$Shots, center = mean)</code></pre>
 <pre><code>## Levene&#39;s Test for Homogeneity of Variance (center = mean)
@@ -2191,7 +2191,7 @@ leveneTest(countdata$UHM, countdata$Shots, center = mean)</code></pre>
 ##       487                                
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>The Levene test indicates that the data is heteroscedastic and in this case, we should actually transform the data into normalized frequencies rather than counts. As this is just an example, we will ignore this and proceed to fit a quasi-Poisson mixed-effects model which is better for over- and underdispersed data.</p>
+<p>The Levene test indicates that the data is heteroscedastic and in this case, we should inspect the data very carefully to check what to do. One option would be to use a negative-binomail model or we could transform the data. As this is just an example, we will ignore this and proceed to fit a quasi-Poisson mixed-effects model which is handels over-dispersed data better than normal Poisson-models.</p>
 <p>We begin the model fitting process by creating a mixed- and a fixed-effects intercept-only base-line model. Unfortunately, there is not yet a procedure in place for quasi-Poisson models to test if the inclusion of random effects is justified. However, here the Boruta also provides valuable information: Language was only considered tentative but not improtnat which suggests that it will not explain variance which means that including Language as a random effect may not be justified. This would require futher inspection. Because we are only dealing with an example here, we ignore this fact (which you should not do in proper analyses) and continue right away with adding shots.</p>
 <pre class="r"><code># base-line mixed-model
 m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
@@ -2239,6 +2239,7 @@ Anova(m1.glmer, test = &quot;Chi&quot;)           # SIG! (p&lt;0.000000000000000
 ## Number of Observations: 500
 ## Number of Groups: 4</code></pre>
 <p>The model summary does not provide AIC, BIC or logged likelihood values. The coefficient for “Shots” is highly significant (p &lt;.001) and the data is notably overdispersed (the Standardized Within-Group Residuals deviate substantailly from a normal distribution with higher values having a thick tail).</p>
+<p>If we were serious, we would check if we find data points that are too influential by plotting the Cook’s distance (which should not show data points with values &gt; 1). If there are data points with high Cook’s D values, we could exclude them which would, very likel,y reduce the overdispersion <span class="citation">(see Zuur, Hilbe, and Ieno <a href="#ref-zuur2013beginner" role="doc-biblioref">2013</a>, 22)</span>. If the model would then still show substantial overdispersion, we would switch to a negative binomial model. As we are only intersted in the implementation of a (quasi-)Poisson model here, we will ignore this and pretend everything is okay.</p>
 <p>In a next step, we will calculate the odds ratios of the coefficient (as we only have one). We will use the coefficients from the fixed-effecst model as the coefficients for mixed- and fixed-effecst models are identical (the random effect structure only affects the standard error and p-values but not the coefficients; you can check by uncommenting the summary command).</p>
 <pre class="r"><code>#summary(m1.glm)
 exp(coef(m1.glm))</code></pre>
@@ -2341,6 +2342,9 @@ ggplot(tbd, aes(Shots, fit, color = Type)) +
 </div>
 <div id="ref-twisk2006multilevel">
 <p>Twisk, J. W. R. 2006. <em>Applied Multilevel Analysis: A Practical Guide</em>. Cambridge: Cambridge University Press.</p>
+</div>
+<div id="ref-zuur2013beginner">
+<p>Zuur, AF, JM Hilbe, and EN Ieno. 2013. <em>A Beginner S Guide to Glm and Glmm with R</em>. Newburgh: Highland Statistics Ltd.</p>
 </div>
 <div id="ref-zuur2010protocol">
 <p>Zuur, Alain F., Elena N. Ieno, and Chris S. Elphick. 2010. “A Protocol for Data Exploration to Avoid Common Statistical Problems.” <em>Methods in Ecology and Evolution</em> 1 (1): 3–14.</p>
