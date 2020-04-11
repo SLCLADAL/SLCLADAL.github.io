@@ -1,0 +1,245 @@
+---
+title: "Untitled"
+author: "Martin Schweinberger"
+date: "11 4 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Install packages.
+
+```{r net1, echo=T, eval = T, message=FALSE, warning=FALSE}
+#install.packages("GGally")
+library(GGally)
+library(network)
+library(sna)
+library(ggplot2)
+```
+
+ Create network.
+ 
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# random graph
+# load libraries
+library(gutenbergr)
+library(dplyr)
+# load data
+romeo <- gutenberg_works(title == "Romeo and Juliet") %>%
+  gutenberg_download(meta_fields = "title")
+# inspect data
+romeo
+```
+
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(stringr)
+# load split
+romeoscenes <- romeo %>%
+  select(text) %>%
+  as.vector() %>%
+  str_replace_all(fixed("\""), "") %>%
+  str_replace_all(fixed("\n"), "") %>%
+  paste(collapse = " ") %>%
+  str_replace_all("(Scene )", "qwertz\\1") %>%
+  strsplit("qwertz") %>%
+  unlist()
+# inspect data
+str(romeoscenes[2])
+```
+
+Now we extract the persons that are present in each scene.
+
+```{r na3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(stringr)
+# extract persons
+romeopersonas <- romeoscenes %>%
+  str_match_all(" , [A-Z][a-z]{2,} {0,1}[A-Z]{0,1}[a-z]{0,}\\.")
+# inspect data
+str(romeopersonas[1:5])
+```
+
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# extract personas per scene
+personas <- sapply(romeopersonas, function(x){
+  x <- unlist(x)
+  x <- gsub(",", "", x)
+  x <- gsub("\\.", "", x)
+  x <- gsub(" ", "", x)
+  x <- unique(x)
+  x <- as.vector(x)
+  x <- paste(x, collapse = " ")
+  x <- gsub(" ActV", "", x)
+})
+# inspect data
+personas
+```
+
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# remove first elements
+personas <- personas[-c(1, 24)]
+personas
+```
+
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(tm)
+# create corpus
+corpus <- Corpus(VectorSource(personas))
+# create document term matrix
+scenepersonas <- DocumentTermMatrix(corpus)
+# clean terms
+scenepersonas$dimnames$Terms <- ifelse(scenepersonas$dimnames$Terms == "abraham",
+                                       "Abraham",
+                                 ifelse(scenepersonas$dimnames$Terms == "benvolio",
+                                       "Benvolio",
+                                ifelse(scenepersonas$dimnames$Terms == "capulet",
+                                       "LordCapulet",
+                                ifelse(scenepersonas$dimnames$Terms == "gregory",
+                                       "Gregory",
+                                ifelse(scenepersonas$dimnames$Terms == "ladycapulet",
+                                       "LadyCapulet",
+                                ifelse(scenepersonas$dimnames$Terms == "ladymontague",
+                                       "LadyMontague",
+                                ifelse(scenepersonas$dimnames$Terms == "montague",
+                                       "LordMontague",
+                                ifelse(scenepersonas$dimnames$Terms == "prince",
+                                       "PrinceEscalus",
+                                ifelse(scenepersonas$dimnames$Terms == "romeo",
+                                       "Romeo",
+                                ifelse(scenepersonas$dimnames$Terms == "sampson",
+                                       "Sampson",
+                                ifelse(scenepersonas$dimnames$Terms == "tybalt",
+                                       "Tybalt",
+                                ifelse(scenepersonas$dimnames$Terms == "paris",
+                                       "CountParis", scenepersonas$dimnames$Terms))))))))))))
+# clean terms
+scenepersonas$dimnames$Terms <- ifelse(scenepersonas$dimnames$Terms == "servant",
+                                       "CapuletServant",
+                                 ifelse(scenepersonas$dimnames$Terms == "juliet",
+                                       "Juliet",
+                                ifelse(scenepersonas$dimnames$Terms == "nurse",
+                                       "Nurse",
+                                ifelse(scenepersonas$dimnames$Terms == "mercutio",
+                                       "Mercutio",
+                                ifelse(scenepersonas$dimnames$Terms == "chorus",
+                                       "Chorus",
+                                ifelse(scenepersonas$dimnames$Terms == "friar",
+                                       "Friar",
+                                ifelse(scenepersonas$dimnames$Terms == "peter",
+                                       "Peter",
+                                ifelse(scenepersonas$dimnames$Terms == "apothecary",
+                                       "Apothecary",
+                                ifelse(scenepersonas$dimnames$Terms == "balthasar",
+                                       "Balthasar",
+                                ifelse(scenepersonas$dimnames$Terms == "friarjohn",
+                                       "FriarJohn",
+                                ifelse(scenepersonas$dimnames$Terms == "friarlawrence",
+                                       "FriarLawrence",
+                                ifelse(scenepersonas$dimnames$Terms == "boy",
+                                       "Boy",
+                                       ifelse(scenepersonas$dimnames$Terms == "page",
+                                       "PageToParis", scenepersonas$dimnames$Terms)))))))))))))
+
+str(scenepersonas)
+```
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load library
+library(Matrix)
+# convert dtm into sparse matrix
+rnjdtm <- sparseMatrix(i = scenepersonas$i, j = scenepersonas$j, 
+                           x = scenepersonas$v, 
+                           dims = c(scenepersonas$nrow,
+                                    scenepersonas$ncol),
+                           dimnames = dimnames(scenepersonas))
+# calculate cooccurrence counts
+coocurrence <- t(rnjdtm) %*% rnjdtm
+# convert into matrix
+romeom <- as.matrix(coocurrence)
+colnames(romeom) <- scenepersonas$dimnames$Terms
+# inspect data
+write.table(romeom, "data/romeo.txt", sep = "\t", row.names = T)
+head(romeom)
+```
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+romeo <- read.table("data/romeo.txt", sep = "\t", header = T, )
+romeo
+```
+
+
+```{r net3, echo=T, eval = T, message=FALSE, warning=FALSE}
+net = network(test,
+              directed = FALSE,
+#              matrix.type = "bipartite",
+              ignore.eval = FALSE,
+              names.eval = "weights"
+)
+# vertex names
+network.vertex.names(net) = rownames(romeom)
+net
+```
+
+Plot network.
+
+```{r net5, echo=T, eval = T, message=FALSE, warning=FALSE}
+ggnet2(net, 
+       size = 6, 
+       color = "goldenrod", 
+       edge.size = .5,
+       edge.color = "lightgrey", 
+       label = TRUE, 
+       label.size = 3)
+```
+
+Now, we add to which family each of the characters belong.
+
+```{r net5, echo=T, eval = T, message=FALSE, warning=FALSE}
+# create vectors with names of characters
+escalus <- c("PrinceEscalus", "CountParis", "Mercutio", "PageToParis")
+capulet <- c("LordCapulet", "LadyCapulet", "Juliet", "Tybalt", "Nurse",
+             "Peter", "Gregory", "Sampson", "Anthony", "Potpan", "Servant",
+             "CapuletServant", "OldCapulet")
+montague <- c("LordMontague", "LadyMontague", "Romeo", "Benvolio",
+              "Balthasar", "Abraham")
+# add color by group
+net %v% "Family" = ifelse(network.vertex.names(net) %in% capulet, "Capulet", 
+                   ifelse(network.vertex.names(net) %in% montague, "Montague", 
+                   ifelse(network.vertex.names(net) %in% escalus, "Escalus", "other")))
+# modify color
+net %v% "color" = ifelse(net %v% "Family" == "Capulet", "goldenrod", 
+                  ifelse(net %v% "Family" == "Montague", "indianred4", 
+                  ifelse(net %v% "Family" == "Escalus", "burlywood", "gray60")))
+# rescale edge size
+set.edge.attribute(net, "weights", ifelse(net %e% "weights" <= 1, 0.25, 
+                                   ifelse(net %e% "weights" <= 3, .5, 1)))
+# define line type
+set.edge.attribute(net, "lty", ifelse(net %e% "weights" == 0.25, 3, 
+                                      ifelse(net %e% "weights" == .5, 2, 1)))
+```
+
+
+```{r net5, echo=T, eval = T, message=FALSE, warning=FALSE}
+ggnet2(net, 
+       color = "color", 
+       label = TRUE, 
+       label.size = 3,
+       alpha = 0.2,
+       size = "degree",
+       size.cut = 3,
+       edge.size = "weights",
+       edge.lty = "lty",
+       edge.alpha = 0.5) +
+  guides(color = FALSE, size = FALSE)
+```
+
+
+
