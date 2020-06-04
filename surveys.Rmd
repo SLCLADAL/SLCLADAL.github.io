@@ -1,0 +1,321 @@
+---
+title: "An introduction to analyzing questionnaire and survey data"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Introduction
+
+This tutorial deals with questionnaire and survey data and also offers some advice on what to consider when creating questionnaires and surveys. Issues relating to what software to use when creating a survey (e.g. SurveyMonkey, Qualtrics, GoogleForms, etc.) or how to program a questionnaire or online experiment in Java or R are not discussed here.
+
+A survey is a research method for gathering information based on a sample of people. Questionnaires are a research instrument and typically represent a part of a survey, i.e. that part where participants are asked to answer a set of questions.
+
+"Questionnaires are any written instruments that present respondents with a series of  questions or statements to which they are to react either by writing out their answers or selecting among existing answers."  (Brown 2001: 6)
+
+Questionaires elicit three types of data:
+
+* Factual 
+* Behavioral
+* Attitudinal
+
+While factual and behavioural data about what the respondent is and does, attitudinal data aim to tap into what the respondent thinks or feels.
+
+The advantages of surveys are that they (a) offer a relative cheap, quick, and effective way to collect (targeted) data from a comparatively large set of people and (b) that they can be distributed or carried out in various formats (face-to-face, by telephone, by computer or via social media, or by postal service).
+
+Disadvantages of questionnaires are that they prone to providing unreliable or unnatural data. Data gathered via surveys can be unreliable due to the social desirability bias which is the tendency of respondents to answer questions in a manner that will be viewed favorably by others. Thus, the data that surveys provide may not necessarily be representative of actual natural behavior. 
+
+Questionnaires and surveys are widely used in language research and thus one of the most common research designs. In this section, we will discuss what needs to kept in mind when designing questionaires and surveys, what pieces of software or plattforms one can use, options for visualizing questionnaire and survey data, statistical methods that are used to evaluate questionnaire and survey data (reliability), and which statistical methods are used in analyzing the data.
+
+# Visualizing survey data
+
+Just as the data that is provided by surveys and questionnaires can take various forms, theer are numerous ways to display survey data. In the follwoing, we will have a look at some of the most common or useful ways in which survey and questionnaier data can be visualized.
+
+
+## Line graphs for Likert-scaled data
+
+A special case of line graphs is used when dealing with Likert-scaled variables. In such cases, the line graph displays the density of cumulative frequencies of responses. The difference between the cumulative frequencies of responses displays differences in preferences. We will only focus on how to create such graphs using the "ggplot" environment here as it has an inbuild function ("ecdf") which is designed to handle such data.
+
+In a first step, we create a data set which consists of a Likert-scaled variable. The fictitious data created here consists of rating of students from three courses about how satisfied they were with their language-learning course. The response to the Likert item is numeric so that "strongly disagree/very dissatisfied" would get the lowest and "strongly agree/very satisfied" the highest numeric value. 
+
+```{r line9, echo=T, message=FALSE, warning=FALSE}
+# activate packages
+library(knitr)
+library(lattice)             
+library(ggplot2)               
+library(dplyr)
+library(likert) 
+# load data
+plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE)
+# create lickert data
+likertdata <- data.frame(Course=
+                           c(rep(c("Chinese",
+                                   "German",
+                                   "Japanese"),
+                                 each = 100)),
+                         Satisfaction=
+                           c(c(rep(1, 20),
+                               rep(2, 30),
+                               rep(3, 25),
+                               rep(4, 10),
+                               rep(5, 15)),
+                             c(rep(1, 40),
+                               rep(2, 25),
+                               rep(3, 15),
+                               rep(4, 15),
+                               rep(5, 5)),
+                             c(rep(1, 10),
+                               rep(2, 15),
+                               rep(3, 20),
+                               rep(4, 25),
+                               rep(5, 30))))
+# inspect data
+head(likertdata)
+```
+
+
+Now that we have data resembling a Likert-scaled item from a questionnaire, we will display the data in a cumulative line graph.
+
+```{r line10, echo=T, message=FALSE, warning=FALSE}
+# activate package
+library(ggplot2)
+# create cumulative density plot
+ggplot(likertdata,aes(x = Satisfaction, color = Course)) + 
+  geom_step(aes(y = ..y..), stat = "ecdf") +
+  labs(y = "Cumulative Density") + 
+  scale_x_discrete(limits = c("1","2","3","4","5"), breaks = c(1,2,3,4,5),
+        labels=c("very dissatisfied", "dissatisfied", "neutral", "satisfied", "very satisfied")) + 
+  scale_colour_manual(values = c("goldenrod2", "indianred4", "blue"))  
+```
+
+
+The satisfaction of the German course was the lowest as the red line shows the highest density (frequency of responses) of "very dissatisfied" and "dissatisfied" ratings. The students in our fictitious data set were most satisfied with the Chinese course as the blue line is the lowest for "very dissatisfied" and "dissatisfied" ratings while the difference between the courses shrinks for "satisfied" and "very satisfied". The Japanese language course is in-between the German and the Chinese course.  
+
+
+# Pie charts
+
+Most commonly, the data for visualization comes from tables of absolute frequencies associated with a categorical or nominal variable. The default way to visualize such frequency tables are pie charts and bar plots. 
+
+In a first step, we modify the original data to get counts and percentages. The data represents the number of documents per time period and the percentage of those documents across all time periods.
+
+```{r bar1, echo = T, results='hide', message=FALSE, warning=FALSE}
+# activate package
+library(dplyr)
+# create bar plot data
+bardata <- plotdata %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  dplyr::mutate(Date = factor(Date)) %>%
+  group_by(Date) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  dplyr::mutate(Percent = round(Frequency/sum(Frequency)*100, 1))
+# inpsect data
+head(bardata)
+```
+
+
+Before creating bar plots, we will briefly turn to pie charts because pie charts are very common despite suffering from certain shortcomings. Consider the following example which highlights some of the issues that arise when using pie charts.
+
+```{r pie1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create pie chart
+ggplot(bardata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void()
+```
+
+
+If the slices of the pie chart are not labelled, it is difficult to see which slices are smaller or bigger compared to other slices. This problem can easily be avoided when using a bar plot instead.
+
+The labelling of pie charts is, however, somewhat tedious as the positioning is tricky. Below is an example for adding labels without specification.
+
+```{r pie3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create pie chart
+ggplot(bardata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void() +
+  geom_text(aes(y = Percent, label = Percent), color = "white", size=6)
+```
+
+
+To place the labels where they make sense, we will add another variable to the data called "Position".
+
+```{r pie4, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+piedata <- bardata %>%
+  dplyr::arrange(desc(Date)) %>%
+  dplyr::mutate(Position = cumsum(Percent)- 0.5*Percent)
+```
+
+Now that we have specified the position, we can include it into the pie chart.
+
+```{r pie5, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create pie chart
+ggplot(piedata,  aes("", Percent, fill = Date)) + 
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  theme_void() +
+  geom_text(aes(y = Position, label = Percent), color = "white", size=6)
+```
+
+
+# Bar plots
+
+Like pie charts, bar plot display frequency information across categorical variable levels.
+
+```{r bar3, echo = T, results='hide', message=FALSE, warning=FALSE}
+# bar plot
+ggplot(bardata, aes(Date, Percent, fill = Date)) +
+  geom_bar(stat="identity") +          # determine type of plot
+  theme_bw() +                         # use black & white theme
+  # add and define text
+  geom_text(aes(y = Percent-5, label = Percent), color = "white", size=3) + 
+  # add colors
+  scale_fill_manual(values = c("red", "blue", "gray70", "goldenrod")) +
+  # supress legend
+  theme(legend.position="none")
+```
+
+
+Compared with the pie chart, it is much easier to grasp the relative size and order of the percentage values which shows that pie charts are unfit to show relationships between elements in a graph and, as a general rule of thumb, should be avoided.
+
+
+## Grouped Bar plots
+
+Bar plot can be grouped to add another layer of information which is particularly useful when dealing with frequency counts across multiple categorical variables. But before we can create grouped bar plots, we need to create an appropriate data set. 
+
+```{r bar4, echo = T, results='hide', message=FALSE, warning=FALSE}
+# create bar plot data
+newbardata <- plotdata %>%
+    dplyr::filter(Genre == "PrivateLetter" | Genre == "PublicLetter" | Genre == "Science" | Genre == "History" | Genre == "Sermon") %>%
+  dplyr::mutate(Date = ifelse(Date < 1600, "1600",
+                              ifelse(Date < 1700, "1700",
+                              ifelse(Date < 1800, "1800",
+                              ifelse(Date < 1900, "1900", "1900"))))) %>%
+  dplyr::mutate(Date = factor(Date)) %>%
+  group_by(Date, Genre) %>%
+  dplyr::summarise(Frequency = n())
+# inpsect data
+head(newbardata)
+```
+
+
+We have now added Genre as an additional categorical variable and will include Genre as the "fill" argument in our bar plot. To group the bars, we use the command "position=position_dodge()".
+
+```{r bar5, echo = T, results='hide', message=FALSE, warning=FALSE}
+# bar plot
+ggplot(newbardata, aes(Date, Frequency, fill = Genre)) + 
+  geom_bar(stat="identity", position = position_dodge()) +  
+  theme_bw()                         
+```
+
+
+If we leave out the "position=position_dodge()" argument, we get a stacked bar plot as shown below.
+
+```{r bar6, echo = T, results='hide', message=FALSE, warning=FALSE}
+# bar plot
+ggplot(newbardata, aes(Date, Frequency, fill = Genre)) + 
+  geom_bar(stat="identity") +  
+  theme_bw()                         
+```
+
+
+One issue to consider when using stacked bar plots is the number of variable levels: when dealing with many variable levels, stacked bar plots tend to become rather confusing. This can be solved by either collapsing infrequent variable levels or choose a colour palette that reflects some other inherent piece of information such as *formality* (e.g. blue) versus *informality* (e.g. red).
+
+Stacked bar plots can also be normalized so that changes in percentages become visible. This is done by exchanging "position=position_dodge()" with "position=""fill"". 
+
+```{r bar7, echo = T, results='hide', message=FALSE, warning=FALSE}
+# bar plot
+ggplot(newbardata, aes(Date, Frequency, fill = Genre)) + 
+  geom_bar(stat="identity", position="fill") +  
+  theme_bw()                         
+```
+
+## Bar plots for Likert data
+
+Bar plots are particularly useful when visualizing data obtained through Likert items. As this is a very common issue that empirical researchers face. There are two basic ways to display Likert items using bar plots: grouped bar plots and more elaborate scaled bar plots.
+
+Although we have seen above how to create grouped bar plots, we will repeat it here with the language course example used above when we used cumulative density line graphs to visualise how to display Likert data.  
+
+In a first step, we recreate the data set which we have used above. The data set consists of a Likert-scaled variable (Satisfaction) which represents rating of students from three courses about how satisfied they were with their language-learning course. The response to the Likert item is numeric so that "strongly disagree/very dissatisfied" would get the lowest and "strongly agree/very satisfied" the highest numeric value. 
+
+```{r bar8, echo=T, message=FALSE, warning=FALSE}
+# create likert data
+newlikertdata <- likertdata %>%
+  group_by(Course, Satisfaction) %>%
+  mutate(Frequency = n())
+newlikertdata <- unique(newlikertdata)
+# inspect data
+head(newlikertdata)
+```
+
+
+Now that we have data resembling a Likert-scaled item from a questionnaire, we will display the data in a cumulative line graph.
+
+```{r bar9, echo=T, message=FALSE, warning=FALSE}
+# create grouped bar plot
+ggplot(newlikertdata, aes(Satisfaction, Frequency,  
+                          fill = Course, color = Course)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_line(size = 1) +
+  # define colors
+  scale_fill_manual(values=c("goldenrod2", "gray70",  "indianred4")) +
+  scale_color_manual(values=c("goldenrod", "gray60",  "indianred")) +
+  # add text and define colour
+  geom_text(aes(label=Frequency), vjust=1.6, color="white", 
+            # define text position and size
+            position = position_dodge(0.9),  size=3.5) +     
+    scale_x_discrete(limits=c("1","2","3","4","5"), breaks=c(1,2,3,4,5),
+        labels=c("very dissatisfied", "dissatisfied",  "neutral", "satisfied", 
+                 "very satisfied")) + 
+  theme_bw()
+```
+
+
+Another and very interesting way to display such data is by using the Likert package. In a first step, we need to activate the package, clean the data, and extract a subset for the data visualization example.
+
+```{r bar10, echo=T, message=FALSE, warning=FALSE}
+# load data
+data(pisaitems)           # use a provided dataset called pisaitems
+# extract subset from data for visualization
+items28 <- pisaitems[, substr(names(pisaitems), 1, 5) == "ST24Q"]
+# transform into a likert object
+questionl28 <- likert(items28)
+# inspect data
+kable(head(questionl28), caption = "First 6 rows of the data") 
+```
+
+
+After extracting a sample of the data, we plot it to show how the Likert data can be displayed.
+
+```{r bar11, echo = T, results='hide', message=FALSE, warning=FALSE}
+# plot likert data
+plot(questionl28)
+```
+
+
+# Evaluating the reliability of questions: Cronbach's $\alpha$
+
+Oftentimes several questions in one questionnaire aim to tap into the same cognitive concept or attitude or whatever we are interested in. The answers to these related questions should be internally consistent, i.e. the responses should correlate strongly and positively. 
+
+Cronbach's $\alpha$ is measure of internal consistency or reliability that provides information on how strongly the responses to a set of questions correlate. The formula for Cronbach's $\alpha$ is shown below (N: number of items, $\bar c$: average inter-item co-variance among items, $\bar v$: average variance).
+
+$\alpha = \frac{N*\bar c}{\bar v + (N-1)\bar c}$
+
+If the values for Cronbach's $\alpha$ are low (below .7), then this indicates that the questions are not internally consistent (and do not tap into the same concept) or that the questions are not uni-dimensional (as they should be). 
+
+In R, Cronbach's $\alpha$ is calculated as follows.
+
+# Factor analysis
+
