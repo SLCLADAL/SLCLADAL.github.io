@@ -79,19 +79,20 @@ A special case of line graphs is used when dealing with Likert-scaled variables.
 
 In a first step, we create a data set which consists of a Likert-scaled variable. The fictitious data created here consists of rating of students from three courses about how satisfied they were with their language-learning course. The response to the Likert item is numeric so that "strongly disagree/very dissatisfied" would get the lowest and "strongly agree/very satisfied" the highest numeric value. 
 
-```{r line9, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r line_01, echo=T, eval = T, message=FALSE, warning=FALSE}
 # activate packages
 library(knitr)
 library(lattice)             
 library(ggplot2)               
 library(dplyr)
 library(likert) 
+library(MASS)
 # load data
 plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", 
                        sep = "\t", header = TRUE)
 likertdata1 <- read.delim("data/likertdata1.txt", 
                        sep = "\t", header = TRUE)
-likertdata2 <- read.delim("data/likertdata2.txt", 
+likertdata2 <- read.delim("https://slcladal.github.io/data/likertdata2.txt", 
                        sep = "\t", header = TRUE)
 # inspect data
 kable(head(likertdata1), caption = "First 6 rows of likertdata1")
@@ -99,7 +100,7 @@ kable(head(likertdata1), caption = "First 6 rows of likertdata1")
 
 Now that we have data resembling a Likert-scaled item from a questionnaire, we will display the data in a cumulative line graph.
 
-```{r line10, echo=T, message=FALSE, warning=FALSE}
+```{r line_03, echo=T, message=FALSE, warning=FALSE}
 # activate package
 library(ggplot2)
 # create cumulative density plot
@@ -124,9 +125,7 @@ Most commonly, the data for visualization comes from tables of absolute frequenc
 
 In a first step, we modify the original data to get counts and percentages. The data represents the number of documents per time period and the percentage of those documents across all time periods.
 
-```{r bar1, echo = T, results='hide', message=FALSE, warning=FALSE}
-# activate package
-library(dplyr)
+```{r pie_01, echo = T, results='hide', message=FALSE, warning=FALSE}
 # create bar plot data
 bardata <- likertdata1 %>%
   group_by(Satisfaction) %>%
@@ -152,7 +151,7 @@ kable(head(bardata), caption = "First 6 rows of bardata")
 
 Before creating bar plots, we will briefly turn to pie charts because pie charts are very common despite suffering from certain shortcomings. Consider the following example which highlights some of the issues that arise when using pie charts.
 
-```{r pie1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie_03, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create pie chart
 ggplot(bardata,  aes("", Percent, fill = Satisfaction)) + 
   geom_bar(stat="identity", width=1, color = "white") +
@@ -168,7 +167,7 @@ If the slices of the pie chart are not labelled, it is difficult to see which sl
 
 The labelling of pie charts is, however, somewhat tedious as the positioning is tricky. Below is an example for adding labels without specification.
 
-```{r pie3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie_05, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create pie chart
 ggplot(bardata,  aes("", Percent, fill = Satisfaction)) + 
   geom_bar(stat="identity", width=1, color = "white") +
@@ -183,7 +182,7 @@ ggplot(bardata,  aes("", Percent, fill = Satisfaction)) +
 
 To place the labels where they make sense, we will add another variable to the data called "Position".
 
-```{r pie4, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie_07, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 piedata <- bardata %>%
   dplyr::arrange(desc(Satisfaction)) %>%
   dplyr::mutate(Position = cumsum(Percent)- 0.5*Percent)
@@ -194,7 +193,7 @@ kable(head(piedata), caption = "First 6 rows of piedata")
 
 Now that we have specified the position, we can include it into the pie chart.
 
-```{r pie5, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie_09, echo = T, results = 'asis', message=FALSE, warning=FALSE}
 # create pie chart
 ggplot(piedata,  aes("", Percent, fill = Satisfaction)) + 
   geom_bar(stat="identity", width=1, color = "white") +
@@ -207,11 +206,52 @@ ggplot(piedata,  aes("", Percent, fill = Satisfaction)) +
 ```
 
 
+We will now create separate pie charts for each course. In a first step, we cerate a data set that does not only contain the Satisfaction levels and their frequency but also the course.
+
+```{r pie_11, echo = T, eval = T, message=FALSE, warning=FALSE}
+# create grouped pie data
+groupedpiedata <- likertdata1 %>%
+  group_by(Course, Satisfaction) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  dplyr::mutate(Percent = round(Frequency/sum(Frequency)*100, 1)) %>%
+  dplyr::mutate(Satisfaction = ifelse(Satisfaction == 1, "very dissatisfied",
+                               ifelse(Satisfaction == 2, "dissatisfied",
+                               ifelse(Satisfaction == 3, "neutral", 
+                               ifelse(Satisfaction == 4, "satisfied", 
+                               ifelse(Satisfaction == 5, "very satisfied", Satisfaction)))))) %>%
+  dplyr::mutate(Satisfaction = factor(Satisfaction, 
+                                      levels = c("very dissatisfied",
+                                                 "dissatisfied", 
+                                                 "neutral", 
+                                                 "satisfied", 
+                                                 "very satisfied"))) %>%
+  dplyr::arrange(desc(Satisfaction)) %>%
+  dplyr::mutate(Position = cumsum(Percent)- 0.5*Percent)
+# inspect data
+kable(head(groupedpiedata), caption = "First 6 rows of groupedpiedata")
+
+```
+
+Now that we have created the data, we can plot separate pie charts for each course.
+
+```{r pie_15, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+# create pie chart
+ggplot(groupedpiedata,  aes("", Percent, fill = Satisfaction)) + 
+  facet_wrap(~Course) +
+  geom_bar(stat="identity", width=1, color = "white") +
+  coord_polar("y", start=0) +
+  scale_fill_manual(values = c("firebrick4", "firebrick1", 
+                               "gray70", 
+                               "blue", "darkblue")) +
+  theme_void() +
+  geom_text(aes(y = Position, label = Percent), color = "white", size=4)
+```
+
 **Bar plots**
 
 Like pie charts, bar plot display frequency information across categorical variable levels.
 
-```{r bar3, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar_01, echo = T, results='hide', message=FALSE, warning=FALSE}
 # bar plot
 ggplot(bardata, aes(Satisfaction, Percent, fill = Satisfaction)) +
   # determine type of plot
@@ -233,7 +273,7 @@ Compared with the pie chart, it is much easier to grasp the relative size and or
 
 Bar plot can be grouped to add another layer of information which is particularly useful when dealing with frequency counts across multiple categorical variables. But before we can create grouped bar plots, we need to create an appropriate data set. 
 
-```{r bar4, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar_03, echo = T, results='hide', message=FALSE, warning=FALSE}
 # create bar plot data
 groupedbardata <- likertdata1 %>%
   group_by(Course, Satisfaction) %>%
@@ -257,7 +297,7 @@ kable(head(groupedbardata), caption = "First 6 rows of groupedbardata")
 
 We have now added Genre as an additional categorical variable and will include Genre as the "fill" argument in our bar plot. To group the bars, we use the command "position=position_dodge()".
 
-```{r bar5, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar_05, echo = T, results='hide', message=FALSE, warning=FALSE}
 # bar plot
 ggplot(groupedbardata, 
        aes(Satisfaction, Frequency, fill = Course)) + 
@@ -268,11 +308,11 @@ ggplot(groupedbardata,
 
 If we leave out the "position=position_dodge()" argument, we get a stacked bar plot as shown below.
 
-```{r bar6, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar_07, echo = T, results='hide', message=FALSE, warning=FALSE}
 # bar plot
 ggplot(groupedbardata, 
        aes(Satisfaction, Frequency, fill = Course)) + 
-  geom_bar(stat="identity") +  
+  geom_bar(stat="identity") + 
   theme_bw()                         
 ```
 
@@ -281,11 +321,19 @@ One issue to consider when using stacked bar plots is the number of variable lev
 
 Stacked bar plots can also be normalized so that changes in percentages become visible. This is done by exchanging "position=position_dodge()" with "position=""fill"". 
 
-```{r bar7, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar_09, echo = T, results='hide', message=FALSE, warning=FALSE}
 # bar plot
 ggplot(groupedbardata, 
-       aes(Satisfaction, Frequency, fill = Course)) + 
+       aes(Course, Frequency, fill = Satisfaction)) + 
   geom_bar(stat="identity", position="fill") +  
+  # define colors
+  scale_fill_manual(values=c("firebrick4", "firebrick1", "gray70", 
+                               "blue", "darkblue")) +
+  scale_color_manual(values=c("firebrick4", "firebrick1", "gray70", 
+                               "blue", "darkblue")) +
+  labs(y = "Percent") +
+  scale_y_continuous(breaks=seq(0,1,.2),
+                     labels=seq(0,100,20)) +
   theme_bw()                         
 ```
 
@@ -299,7 +347,7 @@ In a first step, we recreate the data set which we have used above. The data set
 
 Now that we have data resembling a Likert-scaled item from a questionnaire, we will display the data in a cumulative line graph.
 
-```{r bar9, echo=T, message=FALSE, warning=FALSE}
+```{r bar_11, echo=T, message=FALSE, warning=FALSE}
 # create grouped bar plot
 ggplot(groupedbardata, aes(Satisfaction, Frequency,  
                           fill = Course, color = Course)) +
@@ -315,11 +363,32 @@ ggplot(groupedbardata, aes(Satisfaction, Frequency,
   theme_bw()
 ```
 
+Again, we can also plot separate bar graphs for each class by specifying "facets".
+
+```{r bar_13, echo=T, message=FALSE, warning=FALSE}
+# create grouped bar plot
+ggplot(groupedbardata, aes(Satisfaction, Frequency,  
+                          fill = Satisfaction, color = Satisfaction)) +
+  facet_grid(rows = groupedbardata$Course) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_line() +
+  # define colors
+  scale_fill_manual(values=c("firebrick4", "firebrick1", "gray70", 
+                               "blue", "darkblue")) +
+  scale_color_manual(values=c("firebrick4", "firebrick1", "gray70", 
+                               "blue", "darkblue")) +
+  # add text and define colour
+  geom_text(aes(label=Frequency), vjust=1.6, color="white", 
+            # define text position and size
+            position = position_dodge(0.9),  size=3.5) +     
+  theme_bw()
+```
+
 Another and very interesting way to display such data is by using the Likert package. In a first step, we need to activate the package, clean the data, and extract a subset for the data visualization example.
 
 One aspect that is different to previous visualizations is that, when using the Likert package, we need to transform the data into a "likert" object (which is, however, very eays and is done by using the "likert()" function as shown below).
 
-```{r bar10a, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r bar_21, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load data
 likertdata2 <- read.delim("https://slcladal.github.io/data/likertdata2.txt", header = TRUE)
 # transform into a likert object
@@ -328,7 +397,7 @@ likertdata2 <- likert(likertdata2)
 kable(likertdata2$results, caption = "Summary of the data") 
 ```
 
-```{r bar10b, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r bar_23, eval = T, echo=T, message=FALSE, warning=FALSE}
 # inspect data
 kable(head(likertdata2$items), caption = "First 6 rows of the data") 
 ```
@@ -336,7 +405,7 @@ kable(head(likertdata2$items), caption = "First 6 rows of the data")
 
 After extracting a sample of the data, we plot it to show how the Likert data can be displayed.
 
-```{r bar11, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar_25, echo = T, results='hide', message=FALSE, warning=FALSE}
 # plot likert data
 plot(likertdata2)
 ```
@@ -344,7 +413,9 @@ plot(likertdata2)
 
 # Useful statistics for survey data
 
-This section introduces some statistical measures or tests that sueful when dealing with survey data. We will begin with measures of realiability (Cronbach's $\alpha$).
+This section introduces some statistical measures or tests that sueful when dealing with survey data. We will begin with measures of realiability (Cronbach's $\alpha$), then move on to methods for merging variables (Factor analysis and principle component naalysis), and finally to ordinal regression which tests which variables correlate with a certain outcome.
+
+## Cronbach's Alpha
 
 **Evaluating the reliability of questions: Cronbach's Alpha**
 
@@ -366,7 +437,7 @@ Probably the best measures of reliability are $\omega$ (*omega*) measures. Hiera
 
 We will now calculate Cronbach's $\alpha$ in R. In a first step, we activate the "psych" package and load as well as inspect the data. 
 
-```{r cron01, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r cron_01, echo = T, eval = T, message=FALSE, warning=FALSE}
 # activate package
 library(psych)
 # load data
@@ -380,7 +451,7 @@ The inspection of the data shows that the responses of participants represent th
 
 Thus, we use the "alpha()" function and provide the questions that tap into the concept we want to assess. In addition to Cronbach's $\alpha$, the "alpha()" function also reports Guttman's lambda_6 which is an alternative measure for realiability. This is an advantage becuse Cronbach's $\alpha$ underestimates the reliability of a test and overestimates the first factor saturation.
 
-```{r cron02, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r cron_02, echo = T, eval = T, message=FALSE, warning=FALSE}
 # calculate cronbach's alpha
 Cronbach <- alpha(surveydata[c("Q01_Outgoing",	
                    "Q02_Outgoing",	
@@ -395,7 +466,7 @@ The output of the "alpha()" function  is rather extensive and we will only inter
 
 The value under alpha is Cronbach's $\alpha$ and it should be above 0.7. The values to its left and right are the lower and upper bound of its confidence interval. The values in the column with the header "G6" show how well each question represents the concept it aims to reflect. Low values indicate that the question does not reflect the underyling concept while high values (.7 and higher) indicate that the question acptures that concept well (or to an acceptable degree).
 
-**Factor analysis**
+## Factor analysis
 
 When dealing with many variables it is often the case that several variables are related and represent a common, underlying factor. To find such underlying factors, we can use a factor analysis.
 
@@ -403,7 +474,7 @@ Factor analysis is a method that allows to find commonalities or structure in da
 
 This becomes particularly apparent when considering sociodemographic variables as behaviors are not only dependent on single variables, e.g., economic status, but on the interaction of several additonal variables such as education level, marital status, number of children, etc. All of these variables can be combined into a single factor (or hidden latent variable).
 
-```{r fa01, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r fa_01, echo = T, eval = T, message=FALSE, warning=FALSE}
 # remove respondent
 surveydata <- surveydata %>% 
   dplyr::select(-Respondent)
@@ -413,7 +484,7 @@ print(factoranalysis, digits=2, cutoff=.2, sort=TRUE)
 
 The results of a factor analysis can be visualized so that questions which reflect the same underlying factor are grouped together.
 
-```{r fa04, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r fa_04, echo = T, eval = T, message=FALSE, warning=FALSE}
 # plot factor 1 by factor 2
 load <- factoranalysis$loadings[,1:2]
 plot(load,type="n") # set up plot
@@ -422,40 +493,132 @@ text(load,
      cex=.7) # add variable names 
 ```
 
-The plot shows that the questions form groups which indicates that the questions do a rather good job at reflecting the concepts that they aim to tap into.
+The plot shows that the questions form groups which indicates that the questions do a rather good job at reflecting the concepts that they aim to tap into. The only problematic question is question 10 (Q10) which aimed to tap into the intelligence of respondents but appears not to correlate strongly with the other questions that aim to extract information about the respondents intelligance. In such cases, it makes sense, to remove a question (in this case Q10) from the survey as it does not appear to reflect waht we wanted it to.
 
-**Principle component analysis**
+## Principle component analysis
 
 Principal component analysis is used when several questions or variables reflect a common factor and they should be combined into a single variable, e.g. during  the statistical analysis of the data. Thus, principal component analysis can be used to collapse different variables (or questions) into one. 
 
 Imagine you have measured leghts of sentences in different ways (in words, syllables, characters, time it takes to pronounce, etc.). You could combine all these different measures of length by applying a PCA to those measures and using the first principal component as a single proxy for all these different measures. 
 
-```{r pca03, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r pca_03, echo = T, eval = T, message=FALSE, warning=FALSE}
 # entering raw data and extracting PCs  from the correlation matrix
-PrincipalComponents <- princomp(surveydata, cor=TRUE)
+PrincipalComponents <- princomp(surveydata[c("Q01_Outgoing",	
+                   "Q02_Outgoing",	
+                   "Q03_Outgoing",	
+                   "Q04_Outgoing",	
+                   "Q05_Outgoing")], cor=TRUE)
 summary(PrincipalComponents) # print variance accounted for
 ```
 
-```{r pca05, echo = T, eval = T, message=FALSE, warning=FALSE}
+The output shows that the first component (Comp.1) explains 91.58 percent of the variance. This shows that we only lose 8.42 percent of the variance if we use this component as a proxy for "outgoingness" if we use th collapsed componnet rather than the five individual items.
+
+```{r pca_05, echo = T, eval = T, message=FALSE, warning=FALSE}
 loadings(PrincipalComponents) # pc loadings
 ```
 
-```{r pca07, echo = T, eval = T, message=FALSE, warning=FALSE}
+We now check if the five questions that are intended to tap into "outgoingness" represent one (and not more) underlying factors. Do check this, we create a scree plot. 
+
+```{r pca_07, echo = T, eval = T, message=FALSE, warning=FALSE}
 plot(PrincipalComponents,type="lines") # scree plot
 ```
 
-```{r pca09, echo = T, eval = T, message=FALSE, warning=FALSE}
+The scree plot shown above indicates that we only need a single component to explain the variance as there is a steep decline from the first to the second component. This confims that the questions that tap into "outgoingness" represent one (and not more) underlying factors.
+
+```{r pca_09, echo = T, eval = T, message=FALSE, warning=FALSE}
 PrincipalComponents$scores # the principal components
 ```
 
-```{r pca11, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r pca_11, echo = T, eval = T, message=FALSE, warning=FALSE}
 biplot(PrincipalComponents) 
 ```
 
-```{r pca13, echo = T, eval = T, message=FALSE, warning=FALSE}
-# Varimax Rotated Principal Components (retaining 3 components)
-pcomp <- principal(surveydata, nfactors=3, rotate="varimax")
-pcomp # print results 
+
+## Ordinal Regression
+
+Ordinal regression is very similar to multiple linear regression but takes an ordinal dependent variable [@agresti2010analysis]. For this reason, ordinal regression is one of the key methods in analysing Likert data. 
+
+To see how an ordinal regression is implemented in R, we load and inspect the "ordinaldata" data set. The data set consists of 400 observations of students that were either educated at this school (Internal = 1) or not (Internal = 0). Some of the students have been abroad (Exchange = 1) while other have not (Exchange = 0). In addition, the data set contains the students' final score of a language test (FinalScore) and the dependent variable which the recommendation of a committee for an additional, very prestigious program. The recommendation has three levels ("very likely", "somewhat likely", and "unlikely") and reflects the committees’ assessment of whether the student is likely to succeed in the program.
+
+```{r orr1, eval = T, echo=T, message=FALSE, warning=FALSE}
+# load data
+ordata <- read.delim("https://slcladal.github.io/data/ordinaldata.txt", sep = "\t", header = T)
+colnames(ordata) <- c("Recommend", "Internal", "Exchange", "FinalScore")
+# inspect data
+str(ordata)
 ```
 
+In a first step, we need to relevel the ordinal variable to represent an ordinal factor (or a progression from "unlikely" over "somewhat likely" to "very likely". And we will also factorize Internal and Exchange to make it easier to interpret the output later on.
 
+
+```{r orr2, eval = T, echo=T, message=FALSE, warning=FALSE}
+# relevel data
+ordata <- ordata %>%
+dplyr::mutate(Recommend = factor(Recommend, 
+                           levels=c("unlikely", "somewhat likely", "very likely"),
+                           labels=c("unlikely",  "somewhat likely",  "very likely"))) %>%
+  dplyr::mutate(Exchange = ifelse(Exchange == 1, "Exchange", "NoExchange")) %>%
+  dplyr::mutate(Internal = ifelse(Internal == 1, "Internal", "External"))
+```
+
+Now that the dependent variable is releveled, we check the distribution of the variable levels by tabulating the data. To get a better understanding of the data we create frequency tables across variables rather than viewing the variables in isolation.
+
+```{r orr3, eval = T, echo=T, message=FALSE, warning=FALSE}
+## three way cross tabs (xtabs) and flatten the table
+ftable(xtabs(~ Exchange + Recommend + Internal, data = ordata))
+```
+
+We also check the mean and standard deviation of the final score as final score is a numeric variable and cannot be tabulated (unless we convert it to a factor).
+
+```{r orr4, eval = T, echo=T, message=FALSE, warning=FALSE}
+
+summary(ordata$FinalScore); sd(ordata$FinalScore)
+```
+
+The lowest score is 1.9 and the highest score is a 4.0 with a mean of approximately 3. Finally, we inspect the distributions graphically.
+
+```{r orr5, eval = T, echo=T, message=FALSE, warning=FALSE}
+# visualize data
+ggplot(ordata, aes(x = Recommend, y = FinalScore)) +
+  geom_boxplot(size = .75) +
+  geom_jitter(alpha = .5) +
+  facet_grid(Exchange ~ Internal, margins = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+```
+
+We see that we have only few students that have taken part in an exchange program and there are also only few internal students overall. With respect to recommendations, only few students are considered to very likely succeed in the program. We can now start with the modelling by using the "polr" function. To make things easier for us, we will only consider the main effects here as this tutorial only aims to how to implement an ordinal regression but not how it should be done in a proper study - then, the model fitting and diagnostic procedures would have to be performed accurately, of course. 
+
+```{r orr6, eval = T, echo=T, message=FALSE, warning=FALSE}
+## fit ordered logit model and store results 'm'
+m <- polr(Recommend ~ Internal + Exchange + FinalScore, data = ordata, Hess=TRUE)
+## view a summary of the model
+summary(m)
+```
+
+The results show that having studied here at this school increases the chances of receiving a positive recommendation but that having been on an exchange has a negative but insignificant effect on the recommendation. The final score also correlates positively with a positive recommendation but not as much as having studied here.
+
+```{r orr7, eval = T, echo=T, message=FALSE, warning=FALSE}
+## store table
+(ctable <- coef(summary(m)))
+```
+
+As the regression report does not provide p-values, we have to calculate them separately (after having calculated them, we add them to the coefficient table).
+
+```{r orr8, eval = T, echo=T, message=FALSE, warning=FALSE}
+## calculate and store p values
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+## combined table
+(ctable <- cbind(ctable, "p value" = p))
+```
+As predicted, Exchange does not have a significant effect but FinalScore and Internal both correlate significantly with the likelihood of receiving a positive recommendation.
+
+```{r orr9, eval = T, echo=T, message=FALSE, warning=FALSE}
+# extract profiled confidence intervals
+ci <- confint(m)
+# calculate odds ratios and combine them with profiled CIs
+exp(cbind(OR = coef(m), ci))
+```
+
+The odds ratios show that internal students are 2.85 or 285 percent more likely compraed to non-internal students to receive positive evaluations and that a 1-point increase in the test score lead to a 1.85 or 185 percent increase in the chances of receiving a positive recommendation. The effect of an exchange is slightly negative but, as we have seen above, not significant.
+
+**References**
