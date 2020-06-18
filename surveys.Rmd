@@ -102,12 +102,13 @@ options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
 install.packages(c("knitr", "lattice", "tidyverse", "likert", 
-                   "MASS", "psych", "viridis"))
+                   "MASS", "psych", "viridis", "ggplot2", 
+                   "userfriendlyscience"))
 ```
 
 Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
 
-**Line graphs for Likert-scaled data**
+## Line graphs for Likert-scaled data
 
 A special case of line graphs is used when dealing with Likert-scaled variables (we will talk about Likert scales in more detail below). In such cases, the line graph displays the density of cumulative frequencies of responses. The difference between the cumulative frequencies of responses displays differences in preferences. We will only focus on how to create such graphs using the "ggplot" environment here as it has an in-build function ("ecdf") which is designed to handle such data.
 
@@ -152,11 +153,11 @@ ggplot(likertdata1,
 
 The satisfaction of the German course was the lowest as the red line shows the highest density (frequency of responses) of "very dissatisfied" and "dissatisfied" ratings. The students in our fictitious data set were most satisfied with the Chinese course as the blue line is the lowest for "very dissatisfied" and "dissatisfied" ratings while the difference between the courses shrinks for "satisfied" and "very satisfied". The Japanese language course is in-between the German and the Chinese course.  
 
-**Pie charts**
+## Pie charts
 
 Most commonly, the data for visualization comes from tables of absolute frequencies associated with a categorical or nominal variable. The default way to visualize such frequency tables are pie charts and bar plots. In a first step, we modify the data to get counts and percentages. 
 
-```{r pie_01, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r pie_01, echo = T, eval=T, message=FALSE, warning=FALSE}
 # create bar plot data
 bardata <- likertdata1 %>%
   group_by(Satisfaction) %>%
@@ -177,7 +178,6 @@ bardata <- likertdata1 %>%
                                                  "very satisfied")))
 # inspect data
 kable(head(bardata), caption = "First 6 rows of bardata")
-
 ```
 
 
@@ -276,7 +276,7 @@ ggplot(groupedpiedata,  aes("", Percent, fill = Satisfaction)) +
   geom_text(aes(y = Position, label = Percent), color = "white", size=4)
 ```
 
-**Bar plots**
+## Bar plots
 
 Like pie charts, bar plot display frequency information across categorical variable levels.
 
@@ -500,13 +500,66 @@ plot(likertdata2)
 ```
 
 
+## Boxplots and violin plots
+
+So far, we have plotted values but we have not plotted the underlying distributions. For instance, we have plotted mean values but not the variance within the distribution. One handy way to combine plotting general trends and their underlying distributions are boxplots.
+
+Boxplots, or Box-and-Whisker Plots, are exploratory graphics first created by John W. Tukey and they show the relationships between categorical and numeric variables. They are very useful because they not only provide measures of central tendency (the median which is the line in the middle of the box) but they also offer information about the distribution of the data. To elaborate, fifty percent of data points fall within the box while seventy-five percent of data points fall within the whiskers (the lines which look like extended error bars): the box thus encompasses the interquartile range between the first and third quartile. The whiskers show the minimum and maximum values in the data and only outliers (data points that lie 1.5 times the interquartile range or more above the third quartile or 1.5 times the interquartile range or more below the first quartile. If the whiskers differ in length, then this means that the data is asymmetrically distributed.
+
+We will now create simple boxplots that show the distribution of prepositions per time period.
+
+```{r box2, echo = T, eval = T, message=FALSE, warning=FALSE}
+# load data
+likertdata1 <- read.delim("https://slcladal.github.io/data/likertdata1.txt", 
+                       sep = "\t", header = TRUE)
+# create boxplot
+ggplot(likertdata1, aes(Course, Satisfaction, fill = Course)) +
+  geom_boxplot(fill=c("goldenrod2", "indianred4", "blue"), color="black") +
+    scale_y_discrete(limits = c("1","2","3","4","5"), 
+                   breaks = c(1,2,3,4,5),
+                   labels=c("very dissatisfied", "dissatisfied", 
+                            "neutral", "satisfied", "very satisfied")) + 
+  theme_bw()
+```
+
+Another interesting feature of boxplots is that they allow us to visually get an idea whether categories differ significantly. Because if add "notch = T" and the notches of the boxplots do not overlap, then this is a very strong indication that the categories actually differ significantly (see below). 
+
+```{r box3, echo = T, eval = T, message=FALSE, warning=FALSE}
+# create boxplot
+ggplot(likertdata1, aes(Course, Satisfaction, fill = Course)) +
+  geom_boxplot(notch=T, fill=c("goldenrod2", "indianred4", "blue"), 
+               color="black") +
+    scale_y_discrete(limits = c("1","2","3","4","5"), 
+                   breaks = c(1,2,3,4,5),
+                   labels=c("very dissatisfied", "dissatisfied", 
+                            "neutral", "satisfied", "very satisfied")) + 
+  theme_bw()
+```
+
+An alternative to boxplots which display the distribution within the data even more accurately are violin plots. 
+
+```{r vio1, echo = T, eval = T, message=FALSE, warning=FALSE}
+# create violin plot
+ggplot(likertdata1, aes(Course, Satisfaction, fill = Course)) +  
+  geom_violin(trim = FALSE) +  
+  geom_boxplot(width=0.1, fill="white") +
+  scale_fill_manual(values = c("goldenrod2", "indianred4", "blue")) +
+  theme_bw() +
+      scale_y_discrete(limits = c("1","2","3","4","5"), 
+                   breaks = c(1,2,3,4,5),
+                   labels=c("very dissatisfied", "dissatisfied", 
+                            "neutral", "satisfied", "very satisfied")) + 
+  theme(legend.position = "none")         
+```
+
+
 # Useful statistics for survey data
 
 This section introduces some statistical measures or tests that useful when dealing with survey data. We will begin with measures of reliability (Cronbach's $\alpha$), then move on to methods for merging variables (Factor analysis and principle component analysis), and finally to ordinal regression which tests which variables correlate with a certain outcome.
 
-## Cronbach's Alpha
+## Evaluating the reliability of questions
 
-**Evaluating the reliability of questions: Cronbach's Alpha**
+**Cronbach's Alpha**
 
 Oftentimes several questions in one questionnaire aim to tap into the same cognitive concept or attitude or whatever we are interested in. The answers to these related questions should be internally consistent, i.e. the responses should correlate strongly and positively. 
 
@@ -516,7 +569,7 @@ $\alpha = \frac{N*\bar c}{\bar v + (N-1)\bar c}$
 
 If the values for Cronbach's $\alpha$ are low (below .7), then this indicates that the questions are not internally consistent (and do not tap into the same concept) or that the questions are not uni-dimensional (as they should be). 
 
-While Cronbach's $\alpha$ is the most frequently used measures of reliability (probably because it is conceptually simple and can be computed very easily), it underestimates the reliability of a test and overestimates the first factor saturation. This can be a problem is the data is *lumpy*. Thus, various other measures of reliability have been proposed. 
+While Cronbach's $\alpha$ is the most frequently used measures of reliability (probably because it is conceptually simple and can be computed very easily), it underestimates the reliability of a test and overestimates the first factor saturation. This can be a problem is the data is *lumpy*. Thus, various other measures of reliability have been proposed. Also,Cronbach's $\alpha$ assumes that scale items are repeated measurements, an assumption that is often violated.
 
 An alternative reliability measure that takes the amount of variance per item into account and thus performs better when dealing with *lumpy* data (although it is still affected by *lumpiness*) is Guttman's Lambda 6 (G6) [@guttman1945lambda]. In contrast to Cronbach's $\alpha$, G6 is mostly used to evaluate the reliability of individual test items though. This means that it provides information about how well individual questions reflect the concept that they aim to tap into. 
 
@@ -553,6 +606,25 @@ Cronbach
 The output of the "alpha()" function  is rather extensive and we will only interpret selected output here. 
 
 The value under alpha is Cronbach's $\alpha$ and it should be above 0.7. The values to its left and right are the lower and upper bound of its confidence interval. The values in the column with the header "G6" show how well each question represents the concept it aims to reflect. Low values indicate that the question does not reflect the underlying concept while high values (.7 and higher) indicate that the question captures that concept well (or to an acceptable degree).
+
+**Omega**
+
+The omega ($\omega$) coefficient is also a reliability measure of internal consistency. $\omega$ represents an estimate of the general factor saturation of a test that was proposed by McDonald. Zinbarg, Revelle, Yovel and Li (2005) compare McDonald's Omega to Cronbach's $\alpha$ and Revelle's $\beta$. They conclude that omega is the best estimate (see also Zinbarg et al., 2006).
+
+A very handy way to calculate McDonald's $\omega$ is to use the "scaleReliability()" function from the "userfriendlyscience" package (which also provides Cronbach's $\alpha$ and the Greatest Lower Bound (GLB) estimate which is also a very good and innovative measure of reliability). 
+
+```{r omeg_02, echo = T, eval = T, message=FALSE, warning=FALSE}
+# activate package
+library(userfriendlyscience)
+# extract reliability measures
+reliability <- userfriendlyscience::scaleReliability(surveydata[c("Q01_Outgoing",	
+                   "Q02_Outgoing",	
+                   "Q03_Outgoing",	
+                   "Q04_Outgoing",	
+                   "Q05_Outgoing")])
+# inspect results
+reliability
+```
 
 ## Factor analysis
 
