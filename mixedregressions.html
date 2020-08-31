@@ -11,7 +11,7 @@
 
 <meta name="author" content="UQ SLC Digital Team" />
 
-<meta name="date" content="2020-08-27" />
+<meta name="date" content="2020-08-31" />
 
 <title>Mixed-Effects Regression</title>
 
@@ -513,7 +513,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Mixed-Effects Regression</h1>
 <h4 class="author">UQ SLC Digital Team</h4>
-<h4 class="date">2020-08-27</h4>
+<h4 class="date">2020-08-31</h4>
 
 </div>
 
@@ -2141,14 +2141,14 @@ str(countdata); head(countdata)</code></pre>
 set.seed(20191220)
 boruta &lt;- Boruta(UHM ~.,data=countdata)
 print(boruta)</code></pre>
-<pre><code>## Boruta performed 99 iterations in 5.379 secs.
+<pre><code>## Boruta performed 99 iterations in 5.183 secs.
 ##  1 attributes confirmed important: Shots;
 ##  1 attributes confirmed unimportant: Gender;
 ##  2 tentative attributes left: Language, Trial;</code></pre>
 <p>As only Shots is confirmed as important, we will only check for the effect of Shots and include Language as a random effect in the regression modeling. Including Language as a random effect is probably not justified statistically (given that the Boruta analysis showed that it only has a tentative effect) but for theoretical reasons as the speakers are nested into Languages. Before we start with the modeling, however, we proceed by checking if the data does indeed approximate a Poisson distribution.</p>
 <pre class="r"><code>library(vcd)
 # output the results
-gf = goodfit(countdata$UHM,type= &quot;poisson&quot;,method= &quot;ML&quot;)
+gf = goodfit(countdata$UHM,type= &quot;poisson&quot;, method= &quot;ML&quot;)
 plot(gf,main=&quot;Count data vs Poisson distribution&quot;)</code></pre>
 <p><img src="mixedregressions_files/figure-html/pmm5-1.png" width="672" /></p>
 <p>The data does not perfectly match a distribution that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then the distribution of the data differs significantly from a Poisson distribution and, given the visualization is likely over-dispersed.</p>
@@ -2162,12 +2162,14 @@ plot(gf,main=&quot;Count data vs Poisson distribution&quot;)</code></pre>
 <p>The p-value is indeed smaller than .05 which means that we should indeed use a negative-binomial model rather than a Poisson model. We will ignore this, for now, and proceed to fit a Poisson mixed-effects model and check what happens if a Poisson model is fit to over-dispersed data.</p>
 <div id="mixed-effects-poisson-regression" class="section level2">
 <h2><span class="header-section-number">4.1</span> Mixed-Effects Poisson Regression</h2>
-<p>In a first step, we create fixed- and mixed-effects intercept-only baseline models and then test if including “Shots” significantly improves model fit and, thus, has a significant impact on the number of <em>uhms</em>.</p>
+<p>In a first step, we create mixed-effect intercept-only baseline models and then test if including “Shots” significantly improves model fit and, thus, has a significant impact on the number of <em>uhms</em>.</p>
 <pre class="r"><code># base-line mixed-model
-m0.glmer = glmer(UHM ~ 1 + (1 | Language), data = countdata, family = poisson)
+m0.glmer = glmer(UHM ~ 1 + (1 | Language), data = countdata, family = poisson,
+                 control=glmerControl(optimizer=&quot;bobyqa&quot;))
 # add Shots
-m1.glmer &lt;- update(m0.glmer, .~.+ Shots)
-Anova(m1.glmer, test = &quot;Chi&quot;)           </code></pre>
+m1.glmer &lt;- update(m0.glmer, .~.+ Shots)</code></pre>
+<pre><code>## boundary (singular) fit: see ?isSingular</code></pre>
+<pre class="r"><code>Anova(m1.glmer, test = &quot;Chi&quot;)           </code></pre>
 <pre><code>## Analysis of Deviance Table (Type II Wald chisquare tests)
 ## 
 ## Response: UHM
@@ -2175,13 +2177,14 @@ Anova(m1.glmer, test = &quot;Chi&quot;)           </code></pre>
 ## Shots   321  1 &lt;0.0000000000000002 ***
 ## ---
 ## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<p>The ANOVA confirms that Shots have a significant impact on the number of instances of <em>uhm</em>. We will now have a look at the model summary.</p>
+<p>The ANOVA confirms that Shots have a significant impact on the number of instances of <em>uhm</em>. However, we get the warning that the fitted mixed model is (almost / near) singular. In such cases, the model should not be reported. As this is only an example, we will continue by having a look at the model summary.</p>
 <pre class="r"><code>summary(m1.glmer)</code></pre>
 <pre><code>## Generalized linear mixed model fit by maximum likelihood (Laplace
 ##   Approximation) [glmerMod]
 ##  Family: poisson  ( log )
 ## Formula: UHM ~ (1 | Language) + Shots
 ##    Data: countdata
+## Control: glmerControl(optimizer = &quot;bobyqa&quot;)
 ## 
 ##      AIC      BIC   logLik deviance df.resid 
 ##   1041.8   1054.5   -517.9   1035.8      497 
@@ -2336,18 +2339,29 @@ Marginal R<sup>2</sup> / Conditional R<sup>2</sup>
 </td>
 </tr>
 </table>
+<p>The summary table shows that our model is indeed highly problematic (the conditional R<sup>2</sup> could not be computed): this shows that our model suffers from a serious problem (near singular fit). If this were not just an example, you should not(!) report this model!</p>
 </div>
 <div id="quasi-possion-mixed-effects-regression" class="section level2">
 <h2><span class="header-section-number">4.2</span> Quasi-Possion Mixed-Effects Regression</h2>
 <p>We will now turn to a quasi-Poisson model to see if scaling the standard errors has a positive effect. This can make sense as quasi-Poisson mixed-effects models handle over-dispersed data better than normal Poisson-models.</p>
 <p>We begin the model fitting process by creating a mixed- and a fixed-effects intercept-only base-line model. Unfortunately, there is not yet a procedure in place for quasi-Poisson models to test if the inclusion of random effects is justified. However, here the Boruta also provides valuable information: Language was only considered tentative but not important which suggests that it will not explain variance which means that including Language as a random effect may not be justified. This would require further inspection. Because we are only dealing with an example here, we ignore this fact (which you should not do in proper analyses) and continue right away with adding shots.</p>
-<pre class="r"><code>library(MASS)
-# base-line mixed-model
+<pre class="r"><code>library(MASS)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;MASS&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:dplyr&#39;:
+## 
+##     select</code></pre>
+<pre class="r"><code># base-line mixed-model
 m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
-                   family = quasipoisson(link=&#39;log&#39;))
-# add Shots
-m1.glmer &lt;- update(m0.glmer, .~.+ Shots)
-Anova(m1.glmer, test = &quot;Chi&quot;)           # SIG! (p&lt;0.0000000000000002 ***)</code></pre>
+                   family = quasipoisson(link=&#39;log&#39;))</code></pre>
+<pre><code>## iteration 1</code></pre>
+<pre><code>## iteration 2</code></pre>
+<pre><code>## iteration 3</code></pre>
+<pre><code>## iteration 4</code></pre>
+<pre class="r"><code># add Shots
+m1.glmer &lt;- update(m0.glmer, .~.+ Shots)</code></pre>
+<pre><code>## iteration 1</code></pre>
+<pre class="r"><code>Anova(m1.glmer, test = &quot;Chi&quot;)           # SIG! (p&lt;0.0000000000000002 ***)</code></pre>
 <pre><code>## Analysis of Deviance Table (Type II tests)
 ## 
 ## Response: zz
