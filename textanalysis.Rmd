@@ -584,8 +584,9 @@ source("https://slcladal.github.io/rscripts/POStagObject.r") # for pos-tagging o
 # load libraries
 library(NLP)
 library(openNLP)
-library(openNLPmodels.en)
-# detach ggplot2 library becuase function "annotate" 
+#library(openNLPmodels.en)
+library(openNLPdata)
+# detach ggplot2 library because function "annotate" 
 # would be taken from ggplot2 rather than NLP
 #detach("package:ggraph", unload=TRUE)
 detach("package:factoextra", unload=TRUE)
@@ -654,15 +655,13 @@ In the following, we will use the frequency of phonemes to classify a text. In a
 
 ```{r tc1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # read in German text
-German <- readLines("https://slcladal.github.io/data/phonemictext1.txt")
-# clean text
-German <- gsub(" ", "", German)
-# split text into phonemes
-German <- strsplit(German, "")
-# unlist and convert into vector
-German <- as.vector(unlist(German))
+German <- readLines("https://slcladal.github.io/data/phonemictext1.txt") %>%
+  str_replace_all(" ", "") %>%
+  str_split("") %>%
+  unlist() %>%
+  as.vector()
 # inspect data
-head(German)
+head(German, 20)
 ```
 
 We now do the same for three other texts - an English and a Spanish text as well as one text in a language that we will determine using classification.
@@ -677,7 +676,7 @@ English <- as.vector(unlist(strsplit(gsub(" ", "", English), "")))
 Spanish <- as.vector(unlist(strsplit(gsub(" ", "", Spanish), "")))
 Unknown <- as.vector(unlist(strsplit(gsub(" ", "", Unknown), "")))
 # inspect data
-head(English, 10)
+head(English, 20)
 ```
 
 We will now create a table that represents the phonemes and their frequencies in each of the 4 texts. In addition, we will add the language and simply the column names.
@@ -707,27 +706,22 @@ head(classdata)
 Now, we group the data so that we see, how often each phoneme is used in each language.
 
 ```{r tc4, echo=T, eval = T, message=FALSE, warning=FALSE}
-# set options
-options(stringsAsFactors = F)
-# create wide format
-classdatanew <- reshape(classdata, idvar = "Language", timevar = "Phoneme",direction = "wide")
-classdw <- t(apply(classdatanew, 1, function(x){ 
-  x <- ifelse(is.na(x) == T, 0, x)}))
-# simplify column names
-colnames(classdw) <- gsub("Frequency.", "", colnames(classdw))
-# convert into data frame
-classdw <- as.data.frame(classdw)
+# activate package
+library(tidyr)
+# convert into wide format
+classdw <- classdata %>%
+  spread(Phoneme, Frequency) %>%
+  replace(is.na(.), 0)
 # inspect data
-classdw[, 1:6]
+head(classdw)
 ```
-
 Now, we need to transform the data again, so that we have the frequency of each phoneme by language as the classifier will use "Language" as the dependent variable and the phoneme frequencies as predictors.
 
 ```{r tc5, echo=T, eval = T, message=FALSE, warning=FALSE}
 numvar <- colnames(classdw)[2:length(colnames(classdw))]
 classdw[numvar] <- lapply(classdw[numvar], as.numeric)
 # function for normalizing numeric variables
-normalize <- function(x) { (x -min(x))/(max(x)-min(x))   }
+normalize <- function(x) { (x-min(x))/(max(x)-min(x))   }
 # apply normalization
  classdw[numvar] <- as.data.frame(lapply(classdw[numvar], normalize))
  # inspect data
@@ -764,15 +758,15 @@ library(dplyr)
 train <- classdw %>%
   filter(Language != "Unknown")
 # increase training set size
-train <- rbind(train, train, train, train, train, train, train, train)
+#train <- rbind(train, train, train, train, train, train, train, train)
 # create test set
 test <- classdw %>%
   filter(Language == "Unknown")
 # convert variables
-train$Language <- as.factor(train$Language)
-train$Language <- as.factor(train$Language)
+#train$Language <- as.factor(train$Language)
+#train$Language <- as.factor(train$Language)
 # inspect data
-train[1:10, 1:3]; test[, 1:3]
+train
 ```
 
 Finally, we can apply our classifier to our data. The classifier we use is a k-nearest neighbour classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
@@ -786,7 +780,7 @@ prediction <- class::knn(train[,2:ncol(train)], test[,2:ncol(test)], cl = train[
 prediction
 ```
 
-Based on the frequencies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley's "Brave New World". The training texts were German, English, and Spanish translations of a subsection of Wikipedia's article for Hermann Hesse's "Steppenwolf". 
+Based on the frequencies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley's *Brave New World*. The training texts were German, English, and Spanish translations of a subsection of Wikipedia's article for Hermann Hesse's *Steppenwolf*. 
 
 # Sentiment Analysis
 
@@ -904,7 +898,8 @@ Entity Extraction is a process during which textual elements which have characte
 # load libraries
 library(NLP)
 library(openNLP)
-library(openNLPmodels.en)
+#library(openNLPmodels.en)
+library(openNLPdata)
 # load text
 orwell <- readLines("https://slcladal.github.io/data/orwell.txt")
 orwell <- orwell  %>%
