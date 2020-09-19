@@ -1,0 +1,372 @@
+---
+title: "Introduction to Data Visualization"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces data visualization using R and shows how to modify different types of visualizations in the ggplot framework in R. The entire R-markdown document can be downloaded [here](https://slcladal.github.io/rscripts/introviz.Rmd). 
+
+When it comes to data visualization, R offers a myriad of options and ways to show and summarize data which makes R an incredibly flexible tool that offers full control over the distinct layers of plots. Rather than showing how to produce different types of plots (e.g. scatter plots, box plots, and line graphs), this introduction will focus on the three main frameworks for data visualization in R (base, lattice, and ggplot) and show how you can modify your visualizations (e.g. changing axes and tick labels, change colors, and showing different plots in one window). How to create different types of plots is shown in [this tutorial](https://slcladal.github.io/basicgraphs.html). We separate between this introduction and showing how to produce different types of visualizations because rather general questions relating to what needs to be kept in mind when visualizing data are discussed. The practical part presents the code used to set up graphs so that they can be recreated and also discusses potential problems that you may encounter when setting up a graph. 
+
+As there exists a multitude of different ways to visualize data, this section only highlights the different philosophies that underlie the different frameworks for data visualization in R (base, lattice, and ggplot) and how to modify visualizations to match one's individual needs. The major advantage of using R consists in the fact that the code can be store, distributed, and run very easily. This means that R represents a flexible framework for creating graphs that enables sustainable, reproducible, and transparent procedures. 
+
+## Basics of data visualization{-}
+
+Before turning to the practical issues relating to creating graphs, a few words on what one has to keep in mind when visualizing data are in order. On a very general level, graphs should be used to inform the reader about properties and relationships between variables. This implies that...
+
+* graphs, including axes, must be labeled properly to allow the reader to understand the visualization with ease. 
+
+* visualizations should not use more dimensions than the data has that is visualized.
+
+* all elements within a graph should be unambiguous.
+
+* variable scales should be portrayed accurately (for instance, lines - which imply continuity - should not be used for categorically scaled variables).
+
+* graphs should be as intuitive as possible and should not mislead the reader.
+
+## Different philosophies: base R, lattice, and ggplot{-}
+
+A few words on different frameworks for creating graphics in R are in order. There are three main frameworks in which to create graphics in R. The *basic* framework, the *lattice* framework, and the *ggplot* or *tidyverse* framework. 
+
+### The base R framework{-}
+
+The *base R* framework is the oldest of the three and is included in what is called the `base R` - a collection of about 30 packages that are automatically activated/loaded when you start `R`.  The idea behind the "base" environment is that the creation of graphics is seen in analogy to a painter who paints on an empty canvass. Each line or element is added to the graph consecutively which oftentimes leads to code that is very comprehensible but also very long.
+
+### The lattice framework{-}
+
+The *lattice* environment was a follow-up to the *base* framework and it complements it insofar as it made it much easier to display various variables and variable levels simultaneously. The philosophy of the lattice-package is quite different from the philosophy of *base*: whereas everything had to be specified in *base*, the graphs created in the *lattice* environment require only very little code but are therefore very easily created when one is satisfied with the design but vey labor intensive when it comes to customizing graphs. However, *lattice* is very handy when summarizing relationships between multiple variable and variable levels.
+
+### The ggplot framework{-}
+
+The *ggplot* environment was written by Hadley Wickham and it combines the positive aspects of both the *base* and the *lattice* package. It was first publicized in the *gplot* and *ggplot1* packages but the latter was soon repackaged and improved in the now most widely used package for data visualization: the *ggplot2* package. The *ggplot* environment implements a philosophy of graphic design described in builds on *The Grammar of Graphics* by Leland Wilkinson [@wilkinson2012grammar].
+
+The philosophy of *ggplot2* is to consider graphics as consisting out of basic elements (called *aesthetics* and they include, for instance, the data set to be plotted and the axes) and layers that overlaid onto the aesthetics. The idea of the *ggplot2* package can be summarized as taking "care of many of the fiddly details that make plotting a hassle (like drawing legends) as well as providing a powerful model of graphics that makes it easy to produce complex multi-layered graphics."
+
+Thus, ggplots typically start with the function call (ggplot) followed by the specification of the data, then the aesthetics (aes), and then a specification of the type of plot that is created (geom_line for line graphs, geom_box for box plots, geom_bar for bar graphs, geom_text for text, etc.). In addition, ggplot allows to specify all elements that the graph consists of (e.g. the theme and axes)
+
+As the ggplot framework has become the dominant way to create visualizations in R, we will only focus on this framework in the following practical examples.
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F}
+# install libraries
+install.packages(c("dplyr", "ggplot", "gridExtra", "knitr", "kableExtra", "stringr"))
+```
+
+Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
+
+# Getting started{-}
+
+Before turning to the graphs, we will load the packages for this tutorial and then briefly look at the structures of the data set we are working with. The data set is called "lmmdata" but we will change the name to "plotdata". The data set contains the date when the text was written (Date), the genre of the text (Genre), the name of the text (Text), the relative frequency of prepositions in the text (Prepositions), and the region in which the text was written (Region). We also inspect the structure of the data using the "str()" and the "summary()" command. 
+
+```{r prep2, echo=T, eval = T, message=FALSE, warning=FALSE}
+# activate packages
+library(dplyr)
+library(ggplot2) 
+library(gridExtra)
+library(knitr) 
+library(kableExtra)
+library(stringr)
+# load data
+plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE) %>%
+  mutate(GenreRedux = case_when(str_detect(.$Genre, "Letter") ~ "Conversational",
+                                Genre == "Diary" ~ "Conversational",
+                                Genre == "Bible"|Genre == "Sermon" ~ "Religious",
+                                Genre == "Law"|Genre == "TrialProceeding" ~ "Legal",
+                                Genre == "Fiction" ~ "Fiction",
+                                TRUE ~ "NonFiction")) %>%
+  mutate(DateRedux = case_when(Date < 1500 ~ "1150-1499",
+                               Date < 1600 ~ "1500-1599",
+                               Date < 1700 ~ "1600-1699",
+                               Date < 1800 ~ "1700-1799",
+                               TRUE ~ "1800-1913")) %>%
+  mutate(Genre = factor(Genre),
+         Text = factor(Text),
+         Region = factor(Region),
+         GenreRedux = factor(GenreRedux),
+         DateRedux = factor(DateRedux))
+# inspect data
+head(plotdata)
+```
+
+In a table, the first rows of the data look like this:
+
+```{r prep3, echo = F, eval=T, message=FALSE, warning=FALSE}
+kable(head(plotdata), caption = "First 6 rows of the plotdata") %>%
+  kable_styling(bootstrap_options = "striped", full_width = T, position = "left")
+```
+
+We will now turn to creating the graphs.
+
+# Creating a simple graph
+
+When creating a visualization with ggplot, we first use the function `ggplot` and define the data that the visualization will use, then, we define the aesthetics which define the layout, i.e. the x and y axes. 
+
+```{r plot1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions))
+```
+
+In a next step, we add the geom-layer which defines the type of visualization that we want to display. In this case, we use `geom_point` as we want to show points that stand for the frequencies of prepositions in each text. Note that we add the geom-layer by adding a `+` at the end of the line!
+
+```{r plot2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point()
+```
+
+We can change the theme by specifying the theme we want to use. Here, we will use `theme_bw` which stands for the black-and-white theme (we will get into the different types of themes later).
+
+```{r plot3, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point() + 
+  theme_bw()
+```
+
+
+```{r plot4, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point() + 
+  geom_smooth(se = F) + 
+  theme_bw()
+```
+
+# Modifying axes and titles{-}
+
+There are different way to modify axes, the easiest id´s to specify the axes labels using `labs`. To add a custom title, we can use `ggtitle`.
+
+```{r axes1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point() + 
+  labs(x = "Year", y = "Frequency") +
+  ggtitle("Preposition use over time", subtitle="based on the PPC corpus")
+```
+
+```{r axes2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point() + 
+  labs(x = "Year", y = "Frequency") +
+  coord_cartesian(xlim = c(1000, 2000), ylim = c(-100, 300))
+```
+
+```{r axes3, echo = T, eval=T}
+p <- ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point() + 
+  labs(x = "Year", y = "Frequency")
+p + theme(axis.text.x = element_text(face="italic", color="red", size=8, angle=45),
+          axis.text.y = element_text(face="bold", color="blue", size=15, angle=90))
+```
+
+
+```{r axes4, echo = T, eval=T}
+p + theme(
+  axis.text.x = element_blank(),
+  axis.text.y = element_blank(),
+  axis.ticks = element_blank())
+```
+
+
+```{r axes5, echo = T, eval=T}
+p + scale_x_discrete(name ="Year of composition", limits=seq(1150, 1900, 50)) +
+  scale_y_discrete(name ="Relative Frequency", limits=seq(70, 190, 20))
+```
+
+
+
+# Modifying colors{-}
+
+```{r colors1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
+  geom_point() 
+```
+
+
+```{r colors2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point(aes(color = GenreRedux))
+```
+
+```{r colors4, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
+  geom_point() + 
+  scale_color_manual(values = c("red", "gray30", "blue", "orange", "gray80"),
+                     breaks = names(table(plotdata$GenreRedux)))
+```
+
+# Changing shapes{-}
+
+```{r shape1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, shape = GenreRedux)) +
+  geom_point() 
+```
+
+```{r shape2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, shape = GenreRedux)) +
+  geom_point() + 
+  scale_shape_manual(values = 1:5)
+```
+
+
+# Adapting sizes{-}
+
+```{r size1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, size = Region, color = GenreRedux)) +
+  geom_point() 
+```
+
+```{r size2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux, size = Prepositions)) +
+  geom_point() 
+```
+
+
+# Adding text{-}
+
+```{r text1, echo = T, eval=T}
+plotdata %>%
+  filter(Genre == "Fiction") %>%
+  ggplot(aes(x = Date, y = Prepositions, label = Prepositions, color = Region)) +
+  geom_text(size = 3) +
+  theme_bw()
+```
+
+```{r text2, echo = T, eval=T}
+plotdata %>%
+  filter(Genre == "Fiction") %>%
+  ggplot(aes(x = Date, y = Prepositions, label = Prepositions)) +
+  geom_text(size = 3, hjust=1.2) +
+  geom_point() +
+  theme_bw()
+```
+```{r text3, echo = T, eval=T}
+plotdata %>%
+  filter(Genre == "Fiction") %>%
+  ggplot(aes(x = Date, y = Prepositions, label = Prepositions)) +
+  geom_text(size = 3, nudge_x = -15, check_overlap = T) +
+  geom_point() +
+  theme_bw()
+```
+
+
+```{r text4, echo = T, eval=T}
+plotdata %>%
+  filter(Genre == "Fiction") %>%
+  ggplot(aes(x = Date, y = Prepositions, label = Prepositions)) +
+  geom_text(size = 3, nudge_x = -15, check_overlap = T) +
+  geom_point() +
+  theme_bw()
+```
+
+
+```{r text5, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point() +
+  annotate(geom = "text", label = "Some text", x = 1200, y = 175, color = "orange") +
+  annotate(geom = "text", label = "More text", x = 1850, y = 75, color = "lightblue", size = 8) +
+    theme_bw()
+```
+
+
+```{r text6, echo = T, eval=T}
+plotdata %>%
+  group_by(GenreRedux) %>%
+  summarise(Frequency = round(mean(Prepositions), 1)) %>%
+  ggplot(aes(x = GenreRedux, y = Frequency, label = Frequency)) +
+  geom_bar(stat="identity") +
+  geom_text(vjust=-1.6, color = "black") +
+  coord_cartesian(ylim = c(0, 180)) +
+  theme_bw()
+```
+
+
+
+```{r text7, echo = T, eval=T}
+plotdata %>%
+  group_by(Region, GenreRedux) %>%
+  summarise(Frequency = round(mean(Prepositions), 1)) %>%
+  ggplot(aes(x = GenreRedux, y = Frequency, group = Region, fill = Region, label = Frequency)) +
+  geom_bar(stat="identity", position = "dodge") +
+  geom_text(vjust=1.6, position = position_dodge(0.9)) + 
+  theme_bw()
+```
+
+
+```{r text8, echo = T, eval=T}
+plotdata %>%
+  filter(Genre == "Fiction") %>%
+  ggplot(aes(x = Date, y = Prepositions, label = Prepositions)) +
+  geom_label(size = 3, vjust=1.2) +
+  geom_point() +
+  theme_bw()
+```
+
+
+# Combining multiple plots{-}
+
+```{r combine1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  facet_grid(~GenreRedux) +
+  geom_point() + 
+  theme_bw()
+```
+
+```{r combine2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  facet_wrap(vars(Region, GenreRedux), ncol = 5) +
+  geom_point() + 
+  theme_bw()
+```
+
+```{r combine3, echo = T, eval=T}
+p1 <- ggplot(plotdata, aes(x = Date, y = Prepositions)) + geom_point() + theme_bw()
+p2 <- ggplot(plotdata, aes(x = GenreRedux, y = Prepositions)) + geom_boxplot() + theme_bw()
+p3 <- ggplot(plotdata, aes(x = DateRedux, group = GenreRedux)) + geom_bar() + theme_bw()
+p4 <- ggplot(plotdata, aes(x = Date, y = Prepositions)) + geom_point() + geom_smooth(se = F) + theme_bw()
+grid.arrange(p1, p2, nrow = 1)
+```
+
+```{r combine4, echo = T, eval=T}
+grid.arrange(grobs = list(p4, p2, p3), 
+             widths = c(2, 1), 
+             layout_matrix = rbind(c(1, 1), c(2, 3)))
+```
+
+# Available themes{-}
+
+```{r theme1, echo = T, eval=T}
+p <- ggplot(plotdata, aes(x = Date, y = Prepositions)) + geom_point() + labs(x = "", y= "") +
+  ggtitle("Default") + theme(axis.text.x = element_text(size=6, angle=90))
+p1 <- p + theme_bw() + ggtitle("theme_bw") + theme(axis.text.x = element_text(size=6, angle=90))
+p2 <- p + theme_classic() + ggtitle("theme_classic") + theme(axis.text.x = element_text(size=6, angle=90))
+p3 <- p + theme_minimal() + ggtitle("theme_minimal") + theme(axis.text.x = element_text(size=6, angle=90))
+p4 <- p + theme_light() + ggtitle("theme_light") + theme(axis.text.x = element_text(size=6, angle=90))
+p5 <- p + theme_dark() + ggtitle("theme_dark") + theme(axis.text.x = element_text(size=6, angle=90))
+p6 <- p + theme_void() + ggtitle("theme_void") + theme(axis.text.x = element_text(size=6, angle=90))
+p7 <- p + theme_gray() + ggtitle("theme_gray") + theme(axis.text.x = element_text(size=6, angle=90))
+grid.arrange(p, p1, p2, p3, p4, p5, p6, p7, ncol = 4)
+```
+
+
+```{r theme2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
+  geom_point() + 
+  theme(panel.background = element_rect(fill = "white", colour = "red"))
+```
+
+Extensive information about how to modify themes can be found  [here](https://ggplot2.tidyverse.org/reference/theme.html).
+
+
+# How to cite this tutorial {-}
+
+Schweinberger, Martin. 2020. *Visualizing data using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/basicgraphs.html.
+
+# References
