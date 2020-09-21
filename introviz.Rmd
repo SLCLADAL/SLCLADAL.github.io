@@ -51,7 +51,7 @@ The *ggplot* environment was written by Hadley Wickham and it combines the posit
 
 The philosophy of *ggplot2* is to consider graphics as consisting out of basic elements (called *aesthetics* and they include, for instance, the data set to be plotted and the axes) and layers that overlaid onto the aesthetics. The idea of the *ggplot2* package can be summarized as taking "care of many of the fiddly details that make plotting a hassle (like drawing legends) as well as providing a powerful model of graphics that makes it easy to produce complex multi-layered graphics."
 
-Thus, ggplots typically start with the function call (ggplot) followed by the specification of the data, then the aesthetics (aes), and then a specification of the type of plot that is created (geom_line for line graphs, geom_box for box plots, geom_bar for bar graphs, geom_text for text, etc.). In addition, ggplot allows to specify all elements that the graph consists of (e.g. the theme and axes)
+Thus, ggplots typically start with the function call (ggplot) followed by the specification of the data, then the aesthetics (aes), and then a specification of the type of plot that is created (geom_line for line graphs, geom_box for box plots, geom_bar for bar graphs, geom_text for text, etc.). In addition, ggplot allows to specify all elements that the graph consists of (e.g. the theme and axes).
 
 As the ggplot framework has become the dominant way to create visualizations in R, we will only focus on this framework in the following practical examples.
 
@@ -68,7 +68,7 @@ Once you have installed R, R-Studio, and have also initiated the session by exec
 
 # Getting started{-}
 
-Before turning to the graphs, we will load the packages for this tutorial and then briefly look at the structures of the data set we are working with. The data set is called "lmmdata" but we will change the name to "plotdata". The data set contains the date when the text was written (Date), the genre of the text (Genre), the name of the text (Text), the relative frequency of prepositions in the text (Prepositions), and the region in which the text was written (Region). We also inspect the structure of the data using the "str()" and the "summary()" command. 
+Before turning to the graphs, we will load the packages for this tutorial. The data set is called `lmmdata` but we will change the name to `plotdata` for this tutorial. The data set is based on the [*Penn Parsed Corpora of Historical English*](https://www.ling.upenn.edu/hist-corpora/) (PPC) and it contains the date when a text was written (`Date`), the genre of the text (`Genre`), the name of the text (`Text`), the relative frequency of prepositions in the text (`Prepositions`), and the region in which the text was written (`Region`). We also add two more variables to the data called `GenreRedux` and `DateRedux`. `GenreRedux` collapses the existing genres into five main categories (*Conversational*, *Religious*, *Legal*, *Fiction*, and *NonFiction*) while `DateRedux` collapses the dates when the texts were composed into five main periods (1150-1499, 1500-1599, 1600-1699, 1700-1799, and 1800-1913). We also factorize non-numeric variables. 
 
 ```{r prep2, echo=T, eval = T, message=FALSE, warning=FALSE}
 # activate packages
@@ -96,11 +96,9 @@ plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = T
          Region = factor(Region),
          GenreRedux = factor(GenreRedux),
          DateRedux = factor(DateRedux))
-# inspect data
-head(plotdata)
 ```
 
-In a table, the first rows of the data look like this:
+The first six rows of the data look like this:
 
 ```{r prep3, echo = F, eval=T, message=FALSE, warning=FALSE}
 kable(head(plotdata), caption = "First 6 rows of the plotdata") %>%
@@ -109,9 +107,9 @@ kable(head(plotdata), caption = "First 6 rows of the plotdata") %>%
 
 We will now turn to creating the graphs.
 
-# Creating a simple graph
+# Creating a simple graph{-}
 
-When creating a visualization with ggplot, we first use the function `ggplot` and define the data that the visualization will use, then, we define the aesthetics which define the layout, i.e. the x and y axes. 
+When creating a visualization with ggplot, we first use the function `ggplot` and define the data that the visualization will use, then, we define the aesthetics which define the layout, i.e. the x- and y-axes. 
 
 ```{r plot1, echo = T, eval=T}
 ggplot(plotdata, aes(x = Date, y = Prepositions))
@@ -124,38 +122,47 @@ ggplot(plotdata, aes(x = Date, y = Prepositions)) +
   geom_point()
 ```
 
-We can change the theme by specifying the theme we want to use. Here, we will use `theme_bw` which stands for the black-and-white theme (we will get into the different types of themes later).
+We can also add another layer, e.g. a layer which shows a smoothed loess line, and we can change the theme by specifying the theme we want to use. Here, we will use `theme_bw` which stands for the black-and-white theme (we will get into the different types of themes later).
 
 ```{r plot3, echo = T, eval=T}
 ggplot(plotdata, aes(x = Date, y = Prepositions)) +
-  geom_point() + 
+  geom_point() +
+  geom_smooth(se = F) +
   theme_bw()
 ```
 
+We can also store our plot in an object and then add different layers to it or modify the plot. Here we store the basic graph in an object that we call `p` and then change the axes names.  
 
 ```{r plot4, echo = T, eval=T}
-ggplot(plotdata, aes(x = Date, y = Prepositions)) +
-  geom_point() + 
-  geom_smooth(se = F) + 
-  theme_bw()
+p <- ggplot(plotdata, aes(x = Date, y = Prepositions)) +
+  geom_point()
+p + labs(x = "Year", y = "Frequency")
+```
+
+We can also integrate plots into data processing pipelines as shown below. When you integrate visualizations into pipelines, you should not specify the data as it is clear from the pipe which data the plot is using.
+
+```{r plot5, echo = T, eval=T}
+plotdata %>%
+  select(DateRedux, GenreRedux, Prepositions) %>%
+  group_by(DateRedux, GenreRedux) %>%
+  summarise(Frequency = mean(Prepositions)) %>%
+    ggplot(aes(x = DateRedux, y = Frequency, group = GenreRedux, color = GenreRedux)) +
+    geom_line()
 ```
 
 # Modifying axes and titles{-}
 
-There are different way to modify axes, the easiest id´s to specify the axes labels using `labs`. To add a custom title, we can use `ggtitle`.
+There are different way to modify axes, the easiest way is to specify the axes labels using `labs` (as already shown above). To add a custom title, we can use `ggtitle`.
 
 ```{r axes1, echo = T, eval=T}
-ggplot(plotdata, aes(x = Date, y = Prepositions)) +
-  geom_point() + 
-  labs(x = "Year", y = "Frequency") +
+p + labs(x = "Year", y = "Frequency") +
   ggtitle("Preposition use over time", subtitle="based on the PPC corpus")
 ```
 
+To change the range of the axes, we can specify their limits in the `coord_cartesian` layer.
+
 ```{r axes2, echo = T, eval=T}
-ggplot(plotdata, aes(x = Date, y = Prepositions)) +
-  geom_point() + 
-  labs(x = "Year", y = "Frequency") +
-  coord_cartesian(xlim = c(1000, 2000), ylim = c(-100, 300))
+p + coord_cartesian(xlim = c(1000, 2000), ylim = c(-100, 300))
 ```
 
 ```{r axes3, echo = T, eval=T}
@@ -184,25 +191,76 @@ p + scale_x_discrete(name ="Year of composition", limits=seq(1150, 1900, 50)) +
 
 # Modifying colors{-}
 
+To modify colors, you can include a color specification in the main aesthetics.
+
 ```{r colors1, echo = T, eval=T}
 ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
   geom_point() 
 ```
 
+Or you can specify the color in the aesthetics of the geom-layer.
 
 ```{r colors2, echo = T, eval=T}
-ggplot(plotdata, aes(x = Date, y = Prepositions)) +
-  geom_point(aes(color = GenreRedux))
+p + geom_point(aes(color = GenreRedux))
 ```
+To change the default colors manually, you can use `scale_color_manual` and define the colors you want to use in the `values` argument and specify the variable levels that want to distinguish by colors in the `breaks` argument. You can find an overview of the colors that you can define in R [here](http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf).
+
+
+```{r colors3, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
+  geom_point()  + 
+  scale_color_manual(values = c("red", "gray30", "blue", "orange", "gray80"),
+                       breaks = c("Conversational", "Fiction", "Legal", "NonFiction", "Religious"))
+```
+
+When the variable that you want to colorize does not have discrete levels, you use `scale_color_continuous` instead of `scale_color_manual`.
 
 ```{r colors4, echo = T, eval=T}
-ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
-  geom_point() + 
-  scale_color_manual(values = c("red", "gray30", "blue", "orange", "gray80"),
-                     breaks = names(table(plotdata$GenreRedux)))
+p + geom_point(aes(color = Prepositions)) + 
+  scale_color_continuous()
 ```
 
-# Changing shapes{-}
+You can also change colors by specifying color `palettes`. Color `palettes` are predefined vectors of colors and there are many different color `palettes` available. Below are some examples using the `Brewer` color palette.
+
+```{r colors5, echo = T, eval=T}
+p + geom_point(aes(color = GenreRedux)) + 
+  scale_color_brewer()
+```
+
+```{r colors6, echo = T, eval=T}
+p + geom_point(aes(color = GenreRedux)) + 
+  scale_color_brewer(palette = 2)
+```
+
+```{r colors7, echo = T, eval=T}
+p + geom_point(aes(color = GenreRedux)) + 
+  scale_color_brewer(palette = 3)
+```
+
+
+We now use the `viridis` color palette to show how you can use another palette. The example below uses the viridis palette for a discrete variable (GenreRedux).
+
+```{r colors8, echo = T, eval=T}
+p + geom_point(aes(color = GenreRedux)) + 
+  scale_color_viridis_d()
+```
+
+To use the viridis palette for continuous variables you need to use `scale_color_viridis_c` instead of `scale_color_viridis_d`.
+
+```{r colors9, echo = T, eval=T}
+p + geom_point(aes(color = Prepositions)) + 
+  scale_color_viridis_c()
+```
+
+The `Brewer` color palette (see below) is the most commonly used color palette but there are many more. You can find an overview of the color palettes that are available [here](https://www.datanovia.com/en/blog/top-r-color-palettes-to-know-for-great-data-visualization/).
+
+```{r colors10, echo = T, eval=T}
+library(RColorBrewer)
+display.brewer.all()
+```
+
+
+# Changing lines and shapes and adding tranparency{-}
 
 ```{r shape1, echo = T, eval=T}
 ggplot(plotdata, aes(x = Date, y = Prepositions, shape = GenreRedux)) +
@@ -210,11 +268,70 @@ ggplot(plotdata, aes(x = Date, y = Prepositions, shape = GenreRedux)) +
 ```
 
 ```{r shape2, echo = T, eval=T}
-ggplot(plotdata, aes(x = Date, y = Prepositions, shape = GenreRedux)) +
-  geom_point() + 
+ggplot(plotdata, aes(x = Date, y = Prepositions)) + 
+  geom_point(aes(shape = GenreRedux)) + 
   scale_shape_manual(values = 1:5)
 ```
 
+Similarly, if you want to change the lines in a line plot, you define the `linetype` in the aesthetics.
+
+```{r shape3, echo = T, eval=T}
+plotdata %>%
+  select(GenreRedux, DateRedux, Prepositions) %>%
+  group_by(GenreRedux, DateRedux) %>%
+  summarize(Frequency = mean(Prepositions)) %>%
+  ggplot(aes(x = DateRedux, y = Frequency, group = GenreRedux, linetype = GenreRedux)) +
+  geom_line()
+```
+
+You can of course also manually specify the line types.
+
+```{r shape4, echo = T, eval=T}
+plotdata %>%
+  select(GenreRedux, DateRedux, Prepositions) %>%
+  group_by(GenreRedux, DateRedux) %>%
+  summarize(Frequency = mean(Prepositions)) %>%
+  ggplot(aes(x = DateRedux, y = Frequency, group = GenreRedux, linetype = GenreRedux)) +
+  geom_line() +
+  scale_linetype_manual(values = c("twodash", "longdash", "solid", "dotted", "dashed"))
+```
+
+Here is an overview of the most commonly used linetypes in R.
+
+```{r shape5, echo = T, eval=T}
+d=data.frame(lt=c("blank", "solid", "dashed", "dotted", "dotdash", "longdash", "twodash", "1F", "F1", "4C88C488", "12345678"))
+ggplot() +
+scale_x_continuous(name="", limits=c(0,1)) +
+scale_y_discrete(name="linetype") +
+scale_linetype_identity() +
+geom_segment(data=d, mapping=aes(x=0, xend=1, y=lt, yend=lt, linetype=lt))
+```
+To make your layers transparent, you need to specify `alpha` values.
+
+```{r shape6, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) + 
+  geom_point(alpha = .2)
+```
+
+Transparency can be particularly useful when using different layers that add different types of visualizations.
+
+
+```{r shape7, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions)) + 
+  geom_point(alpha = .1) + 
+  geom_smooth(se = F)
+```
+
+Transparency can also be linked to other variables.
+
+```{r shape8, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, alpha = Region)) + 
+  geom_point()
+```
+```{r shape9, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, alpha = Prepositions)) + 
+  geom_point()
+```
 
 # Adapting sizes{-}
 
@@ -363,6 +480,43 @@ ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
 ```
 
 Extensive information about how to modify themes can be found  [here](https://ggplot2.tidyverse.org/reference/theme.html).
+
+# Modifying legends{-}
+
+```{r legend1, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
+  geom_point() + 
+  theme(legend.position = "top")
+```
+
+```{r legend2, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, color = GenreRedux)) +
+  geom_point() + 
+  theme(legend.position = "none")
+```
+
+```{r legend3, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, linetype = GenreRedux, color = GenreRedux)) +
+  geom_smooth(se = F) +  
+  theme(legend.position = c(0.2, 0.7)) 
+```
+
+
+```{r legend4, echo = T, eval=T}
+ggplot(plotdata, aes(x = Date, y = Prepositions, linetype = GenreRedux, color = GenreRedux)) +
+  geom_smooth(se = F) + 
+  guides(color=guide_legend(override.aes=list(fill=NA))) +  
+  theme(legend.position = "top", 
+        legend.text = element_text(color = "green")) +
+  scale_linetype_manual(values=1:5, 
+                        name=c("Genre"),
+                        breaks = names(table(plotdata$GenreRedux)),
+                        labels = names(table(plotdata$GenreRedux))) + 
+  scale_colour_manual(values=c("red", "gray30", "blue", "orange", "gray80"),
+                      name=c("Genre"),
+                      breaks=names(table(plotdata$GenreRedux)),  
+                      labels = names(table(plotdata$GenreRedux)))
+```
 
 
 # How to cite this tutorial {-}
