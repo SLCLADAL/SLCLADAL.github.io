@@ -49,14 +49,14 @@ options("scipen" = 100, "digits" = 4) # suppress math annotation
 install.packages(c("boot", "car", "caret", "dplyr",  "effects", "foreign", "ggplot2", 
                    "Hmisc", "DT", "knitr", "lme4", "MASS", "mlogit", "msm", 
                    "QuantPsyc", "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", 
-                   "stringr", "vcd", "visreg"))
+                   "stringr", "vcd", "visreg", "MuMIn"))
 ```
 
 Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
 
 # Fixed Effects Regression
 
-Before turning to mixed-effects models which are able to represent hierarchical data structures, we will focus on traditional fixed effects regression models and begin with multiple linear regression. The underlying concepts of regression modeling are introduced in the tutorial on [simple linear regression](https://slcladal.github.io/basicstatzchi.html).
+Before turning to mixed-effects models which are able to represent hierarchical data structures, we will focus on traditional fixed effects regression models and begin with multiple linear regression. The underlying concepts of regression modeling are introduced in the tutorial on [simple linear regression](https://slcladal.github.io/basicstatz.html).
 
 ## Multiple Linear Regression
 
@@ -106,6 +106,7 @@ library(lme4)
 library(MASS)
 library(mlogit)
 library(msm)
+library(MuMIn)
 library(nlme)
 library(plyr)
 library(QuantPsyc)
@@ -514,11 +515,17 @@ expR(m2.mlr)
 
 The function "smplesz" reports that the sample size is insufficient by 9 data points according to @green1991many. The likelihood of $\beta$-errors, however, is very small (0.0309). As a last step, we summarize the results of the regression analysis.
 
-```{r mlr25, eval = T, echo=T}
+```{r mlr25}
 tab_model(m0.glm, m2.glm)
 ```
 
 ***
+
+<span style="color: red;">Note</span>: The R^2^ values in this report is incorrect! As we have seen above the correct R^2^ values are: multiple RR^2^ 0.8574, Adjusted R^2^ 0.8528:
+
+```{r mlr25b}
+summary(m2.mlr)
+```
 
 Although @field2012discovering suggest that the main effects of the predictors involved in the interaction should not be interpreted, they are interpreted here to illustrate how the results of a multiple linear regression can be reported. Accordingly, the results of the regression analysis performed above can be summarized as follows:
 
@@ -918,7 +925,7 @@ We are now in a position to perform model diagnostics and test if the model viol
 
 ### Multicollinearity{-}
 
-To check whether the final minimal model contains predictors that correlate with each other, we extract variance inflation factors (VIF). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is completely unreliable and cannot claim the multicollinearity is absent [@myers1990classical]. Predictors causing such VIFs should be removed. Indeed, predictors with VIF values greater than 4 are usually already problematic but, for large data sets, even VIFs greater than 2 can lead inflated standard errors (Jaeger 2013:http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&do=view&target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf). Also, VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215] and [@zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed.
+To check whether the final minimal model contains predictors that correlate with each other, we extract variance inflation factors (VIF). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is completely unreliable and cannot claim the multicollinearity is absent [@myers1990classical]. Predictors causing such VIFs should be removed. Indeed, predictors with VIF values greater than 4 are usually already problematic but, for large data sets, even VIFs greater than 2 can lead inflated standard errors ([Jaeger 2013](http://wiki.bcs.rochester.edu/HlpLab/LSA2013Regression?action=AttachFile&do=view&target=LSA13-Lecture6-CommonIssuesAndSolutions.pdf)). Also, VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215] and [@zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed.
 
 ```{r blm33}
 vif(lr.glm)
@@ -968,10 +975,18 @@ According to rule of thumb provided in @green1991many, the sample size is suffic
 
 As a final step, we summarize our findings in tabulated form.
 
-```{r blm38}
+```{r blm38a}
+tab_model(lr.glm, lr.lrm)
+```
+
+***
+
+A more detailed summary table can be retrieved as follows:
+
+```{r blm38, warning=F, message=F}
 blrsummary <- blrsummary(lr.glm, lr.lrm, predict.acc) # summarize regression analysis
 # inspect data
-datatable(blrsummary, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
+datatable(blrsummary, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 **R^2^ (Hosmer & Lemeshow)**
@@ -1779,6 +1794,14 @@ summary(m5.lme)
 tab_model(m5.lme)
 ```
 
+***
+
+<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+
+```{r lmm28b}
+library(MuMIn)
+r.squaredGLMM(m5.lme)
+```
 
 ***
 
@@ -2362,7 +2385,7 @@ summary(gf)
 
 The p-value is indeed smaller than .05 which means that we should indeed use a negative-binomial model rather than a Poisson model. We will ignore this, for now, and proceed to fit a Poisson mixed-effects model and check what happens if a Poisson model is fit to over-dispersed data.
 
-## Mixed-Effects Poisson Regression
+### Mixed-Effects Poisson Regression{-}
 
 In a first step, we create mixed-effect intercept-only baseline models and then test if including "Shots" significantly improves model fit and, thus, has a significant impact on the number of *uhms*.
 
@@ -2424,7 +2447,24 @@ The diagnostic plots show problems as the dots in the first two plots are not ra
 plot_model(m1.glmer, type = "pred", terms = c("Shots"))
 ```
 
-The model predicts that the instances of *uhm* increase with the number of shots. Note that the increase is not homogenous as the y-axis labels indicate!
+The model predicts that the instances of *uhm* increase with the number of shots. Note that the increase is not homogenous as the y-axis labels indicate! We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+
+```{r pmm11f, warning=F, message=F}
+library(tidyr)
+countdata %>%
+  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  dplyr::rename(Observed = UHM) %>%
+  tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
+  dplyr::mutate(Shots = factor(Shots),
+                Type = factor(Type)) %>%
+  dplyr::group_by(Shots, Type) %>%
+  dplyr::summarize(Frequency = mean(Frequency)) %>%
+  ggplot(aes(Shots, Frequency, group = Type, color = Type, linetype = Type)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = c("orange", "lightblue")) 
+```
+
+The comparison between the observed and the predicted uses of *uhm* becomes somewhat volatile and shows fluctuations after eight shots. We will now summarize the results as if the violations (overdispersion measure > 1 and excessive multicollinearity (singular fit)) had NOT occurred(!) - again: this is only because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
 
 The summary of the model can be extracted using the tab_model function from the sjPlot package.
 
@@ -2434,11 +2474,22 @@ tab_model(m1.glmer)
 
 ***
 
-The summary table shows that our model is indeed highly problematic (the conditional R^2^ could not be computed): this shows that our model suffers from a serious problem (near singular fit). If this were not just an example, you should not(!) report this model!
+<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
 
-## Mixed-Effects Quasi-Possion Regression
+```{r pmm11cd, message=F, warning=F}
+library(MuMIn)
+r.squaredGLMM(m1.glmer)
+```
 
-We will now turn to a quasi-Poisson model to see if scaling the standard errors has a positive effect. This can make sense as quasi-Poisson mixed-effects models handle over-dispersed data better than normal Poisson-models.
+***
+
+Also note that our model suffers from a serious problem (near singular fit). If this were not just an example, you should not(!) report this model!
+
+### Mixed-Effects Quasi-Possion Regression{-}
+
+The Quasi-Poisson Regression is a generalization of the Poisson regression and is used when modeling an overdispersed count variable. Poisson models are based on the Poisson distribution which is defined as a distribution where the variance is equal to the mean (which is very restrictive and not often the case). Quasi-Poisson models scale the standard errors which has a positive effect when dealing with overdispersed data. 
+
+Therefore, when the variance is greater than the mean, a Quasi-Poisson model, which assumes that the variance is a linear function of the mean, is more appropriate as it handles over-dispersed data better than normal Poisson-models. 
 
 We begin the model fitting process by creating a mixed- and a fixed-effects intercept-only base-line model. Unfortunately, there is not yet a procedure in place for quasi-Poisson models to test if the inclusion of random effects is justified. However, here the Boruta also provides valuable information: Language was only considered tentative but not important which suggests that it will not explain variance which means that including Language as a random effect may not be justified. This would require further inspection. Because we are only dealing with an example here, we ignore this fact (which you should not do in proper analyses) and continue right away with adding shots. 
 
@@ -2508,7 +2559,24 @@ In a final step, we plot the fixed-effect of "Shots" using the "predictorEffects
 plot_model(m1.glmer, type = "pred", terms = c("Shots"))
 ```
 
-The effects plot shows that the number of *uhms* increases near-linearly with the number of shots a speaker has had. However, the predictions do not make sense: note that the model predicts *negative* values for up to 5 shots. this does not make sense and we have to abandon the quasi-Poisson model despite it showing improvements compared to the Poisson model (some adjustments by Language and less patterning in the diagnostic plots).
+The effects plot shows that the number of *uhms* increases exponentially with the number of shots a speaker has had. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+
+```{r qpmm11f, warning=F, message=F}
+library(tidyr)
+countdata %>%
+  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  dplyr::rename(Observed = UHM) %>%
+  tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
+  dplyr::mutate(Shots = factor(Shots),
+                Type = factor(Type)) %>%
+  dplyr::group_by(Shots, Type) %>%
+  dplyr::summarize(Frequency = mean(Frequency)) %>%
+  ggplot(aes(Shots, Frequency, group = Type, color = Type, linetype = Type)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = c("orange", "lightblue")) 
+```
+
+Given that the overdispersion measure of this Quasi-Poisson model is close to 1, that the model did not suffer from excessive multicollinearity (singular fit), and because this model shows improvements compared to the Poisson model with respect to the model diagnostics (some adjustments by Language and less patterning in the diagnostic plots), we would choose this quasi-Poisson model over the Poisson model. 
 
 Finally, we extract the summary table of this model.
 
@@ -2516,11 +2584,20 @@ Finally, we extract the summary table of this model.
 tab_model(m1.glmer)
 ```
 
-*** 
+***
 
-## Mixed-Effects Negative Binomial Regression
+<span style="color: red;">Note</span>: The summary tables does not provide R^2^ values. The R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
 
-In a first step, we create fixed- and mixed-effects intercept-only baseline models and then test if including "Shots" significantly improves model fit and, thus, has a significant impact on the number of *uhms*.
+```{r qpmm11d, message=F, warning=F}
+library(MuMIn)
+r.squaredGLMM(m1.glmer)
+```
+
+### Mixed-Effects Negative Binomial Regression{-}
+
+Negative binomial regression models are a generalization of Poisson regression which loosens the restrictive assumption that the variance is equal to the mean made by the Poisson model. This is a major advantage as the most common issue that one faces with Poisson regressions is that the data deviate too substantially from the assumed Poisson distribution. 
+
+To implement a Negative-Binomial Mixed-Effects Regression, we first create a mixed-effects intercept-only baseline model and then test if including `Shots` significantly improves model fit and, thus, has a significant impact on the number of *uhms*.
 
 ```{r nbmm1}
 # base-line mixed-model
@@ -2536,7 +2613,6 @@ The negative-binomial model also reports a significant impact of shots on the nu
 # inspect model
 summary(m1.glmer)           
 ```
-
 In a next step, we calculate the overdispersion.
 
 ```{r nbmm3}
@@ -2551,7 +2627,7 @@ Overdispersion <- sum(PearsonResiduals^2) / (Cases / NumberOfPredictors)# show o
 Overdispersion
 ```
 
-The overdispersion has increased in this case. We will use diagnostic plots to check for problems.
+The overdispersion has increased which is rather suboptimal. In this case, we would report the  Quasi-Poisson Regression rather than the Negative Binomial Model (which is rather rare as Negative Binomial Models typically perform better than (Quasi-)Poisson models. However, this tutorial focuses merely on how to implement a Negative Binomial Mixed-Effects Regression and we thus continue with generating diagnostic plots to check for problems.
 
 ```{r nbmm4}
 diag_data <- data.frame(PearsonResiduals, fitted(m1.glmer))
@@ -2576,6 +2652,26 @@ The diagnostics show patterning similar to the one we saw with the Poisson model
 plot_model(m1.glmer, type = "pred", terms = c("Shots"))
 ```
 
+The effect plot shows that the predicted number of shots increases exponentially with each shot. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+
+```{r nbmm6f, warning=F, message=F}
+library(tidyr)
+countdata %>%
+  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  dplyr::rename(Observed = UHM) %>%
+  tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
+  dplyr::mutate(Shots = factor(Shots),
+                Type = factor(Type)) %>%
+  dplyr::group_by(Shots, Type) %>%
+  dplyr::summarize(Frequency = mean(Frequency)) %>%
+  ggplot(aes(Shots, Frequency, group = Type, color = Type, linetype = Type)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = c("orange", "lightblue")) 
+```
+
+
+The comparison between the observed and the predicted uses of *uhm* becomes somewhat volatile and shows fluctuations after eight shots. We will now summarize the results as if the violations had NOT occurred(!) - again: this is only because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
+
 And, we extract the summary table of this model.
 
 ```{r nbmm6c}
@@ -2584,7 +2680,14 @@ tab_model(m1.glmer)
 
 ***
 
-The effect plot shows that the predicted number of shots increases linearly with each shot. For nine and more shots, the model substantially overestimates the number of *uhms* which shows a bad model fit. It should be noted though that the observed number of *uhms* also becomes somewhat volatile and shows fluctuations after eight shots. We will now summarize the results as if the violations had NOT occurred(!) - again: this is only because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
+<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+
+```{r nbmm6d}
+library(MuMIn)
+r.squaredGLMM(m1.glmer)
+```
+
+***
 
 A mixed-effect negative binomial regression model which contained the language in which the conversation took place as random effect was fit to the data. Prior to the regression modeling, a Boruta analysis was applied to determine whether any of the predictors had a meaningful relationship with the dependent variable (instances of *uhm*). Since the Boruta analysis indicated that only the number of shots a speaker had was important, only "Shots" was tested during model fitting. The final minimal adequate model showed that the number of *uhm* as fillers increases significantly, and near-linearly with the number of shots speakers had ($\chi$^2^(1):83.0, p <.0001, $\beta$: 0.2782). An inspection of the random effect structure conveyed that there was almost no variability between languages and language did not contribute meaningfully to the model fit.
 
