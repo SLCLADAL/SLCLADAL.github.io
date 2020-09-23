@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Martin Schweinberger" />
+
+<meta name="date" content="2020-09-23" />
+
+<title>Sentiment Analysis in R</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #ffffff;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">LADAL</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="people.html">OUR PEOPLE</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    NEWS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="news.html">News &amp; Announcements</a>
+    </li>
+    <li>
+      <a href="conferences.html">Events &amp; Presentations</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    DATA SCIENCE BASICS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Introduction to Data Science</li>
+    <li>
+      <a href="introcomputer.html">Working with Computers: Tips and Tricks</a>
+    </li>
+    <li>
+      <a href="reproducibility.html">Data Management, Version Control, and Reproducibility</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Quantitative Research</li>
+    <li>
+      <a href="introquant.html">Introduction to Quantitative Reasoning</a>
+    </li>
+    <li>
+      <a href="basicquant.html">Basic Concepts in Quantitative Research</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Introduction to R</li>
+    <li>
+      <a href="IntroR_workshop.html">Getting started</a>
+    </li>
+    <li>
+      <a href="stringprocessing.html">String Processing</a>
+    </li>
+    <li>
+      <a href="regularexpressions.html">Regular Expressions</a>
+    </li>
+    <li>
+      <a href="introtables.html">Working with Tables</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    TUTORIALS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Data Visualization</li>
+    <li>
+      <a href="introviz.html">Introduction to Data Viz</a>
+    </li>
+    <li>
+      <a href="basicgraphs.html">Common Visualization Types</a>
+    </li>
+    <li>
+      <a href="basicgraphs.html">Advanced Visualization Methods</a>
+    </li>
+    <li>
+      <a href="maps.html">Displaying Geo-Spatial Data</a>
+    </li>
+    <li>
+      <a href="motion.html">Interactive Charts</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Statistics</li>
+    <li>
+      <a href="descriptivestatz.html">Descriptive Statistics</a>
+    </li>
+    <li>
+      <a href="basicstatz.html">Basic Inferential Statistics</a>
+    </li>
+    <li>
+      <a href="regression.html">Regression Analysis</a>
+    </li>
+    <li>
+      <a href="advancedstatztrees.html">Tree-Based Models</a>
+    </li>
+    <li>
+      <a href="groupingstatz.html">Classification</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Text Analytics</li>
+    <li>
+      <a href="textanalysis.html">Text Analysis and Distant Reading</a>
+    </li>
+    <li>
+      <a href="kwics.html">Concordancing (keywords-in-context)</a>
+    </li>
+    <li>
+      <a href="basicnetwork.html">Network Analysis</a>
+    </li>
+    <li>
+      <a href="collocations.html">Co-occurrence and Collocation Analysis</a>
+    </li>
+    <li>
+      <a href="topicmodels.html">Topic Modeling</a>
+    </li>
+    <li>
+      <a href="sentiment.html">Sentiment Analysis</a>
+    </li>
+    <li>
+      <a href="tagging.html">Tagging and Parsing</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    FOCUS &amp; CASE STUDIES
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="surveys.html">R for analyzing questionnaire and surveys</a>
+    </li>
+    <li>
+      <a href="corplingr.html">Swear words in Irish English</a>
+    </li>
+    <li>
+      <a href="convertpdf2txt.html">Converting PDFs to txt</a>
+    </li>
+    <li>
+      <a href="webcrawling.html">Web Crawling using R</a>
+    </li>
+  </ul>
+</li>
+<li>
+  <a href="services.html">SERVICES &amp; CONTACT</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Sentiment Analysis in R</h1>
+<h4 class="author">Martin Schweinberger</h4>
+<h4 class="date">2020-09-23</h4>
+
+</div>
+
+
+<p><img src="images/uq1.jpg" width="100%" /></p>
+<div id="introduction" class="section level1 unnumbered">
+<h1>Introduction</h1>
+<p>This tutorial introduces sentiment analysis (SA) and show how to petrform a SA in R. The entire R-markdown document for the tutorial can be downloaded <a href="https://slcladal.github.io/rscripts/sentiment.Rmd">here</a>.</p>
+<div id="preparation-and-session-set-up" class="section level2 unnumbered">
+<h2>Preparation and session set up</h2>
+<p>This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R <a href="https://slcladal.github.io/IntroR_workshop.html">here</a>. For this tutorials, we need to install certain <em>packages</em> from an R <em>library</em> so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).</p>
+<pre class="r"><code># install libraries
+install.packages(c(&quot;knitr&quot;, &quot;lattice&quot;, &quot;ggplot2&quot;, &quot;dplyr&quot;, &quot;likert&quot;, &quot;scales&quot;, 
+                   &quot;vcd&quot;, &quot;tm&quot;, &quot;wordcloud&quot;, &quot;stringr&quot;, &quot;SnowballC&quot;, &quot;tidyr&quot;, 
+                   &quot;gridExtra&quot;, &quot;knitr&quot;, &quot;kableExtra&quot;, &quot;stringr&quot;))</code></pre>
+<p>Once you have installed R-Studio and initiated the session by executing the code shown above, you are good to go.</p>
+</div>
+</div>
+<div id="sentiment-analysis" class="section level1">
+<h1><span class="header-section-number">1</span> Sentiment Analysis</h1>
+<p>Sentiment Analysis is a cover term for approaches which extract information on emotion or opinion from natural language [@]. Sentiment analyses have been successfully applied to analysis of language data in a wide range of disciplines such as psychology, economics, education, as well as political and social sciences. Commonly sentiment analyses are used to determine the stance of a larger group of speakers towards a given phenomenon such as political candidates or parties, product lines or situations. Crucially, sentiment analyses are employed in these domains because they have advantages compared to alternative methods investigating the verbal expression of emotion. One advantage of sentiment analyses is that the emotion coding of sentiment analysis is fully replicable.</p>
+<p>Typically, Sentiment Analysis represents a type of classifier only provide information about positive or negative polarity, e.g. whether a tweet is “positive” or “negative”. Therefore, Sentiment Analysis is often regarded as rather coarse-grained and, thus, rather irrelevant for the types of research questions in linguistics.</p>
+<p>In the language sciences, Sentiment Analysis can also be a very helpful tool if the type of Sentiment Analysis provides more fine-grained information. In the following, we will perform such a information-rich Sentiment Analysis. The Sentiment Analysis used here does not only provide information about polarity but it will also provide association values for eight core emotions.</p>
+<p>The more fine-grained output is made possible by relying on the Word-Emotion Association Lexicon (Mohammad &amp; Turney 2013), which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (see <span class="citation">Mohammad and Turney (<a href="#ref-mohammad2013crowdsourcing" role="doc-biblioref">2013</a>)</span>). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word <em>cry</em> or <em>tragedy</em> are more readily associated with SADNESS while words such as <em>happy</em> or <em>beautiful</em> are indicative of JOY and words like <em>fit</em> or <em>burst</em> may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction.</p>
+<div id="getting-started" class="section level2 unnumbered">
+<h2>Getting started</h2>
+<p>Before turning to the SA, we will load the packages for this tutorial.</p>
+<pre class="r"><code># activate packages
+lapply(c(&quot;knitr&quot;, &quot;lattice&quot;, &quot;ggplot2&quot;, &quot;dplyr&quot;, &quot;likert&quot;, &quot;scales&quot;, 
+         &quot;vcd&quot;, &quot;tm&quot;, &quot;wordcloud&quot;, &quot;stringr&quot;, &quot;SnowballC&quot;, &quot;tidyr&quot;, 
+         &quot;gridExtra&quot;, &quot;knitr&quot;, &quot;kableExtra&quot;, &quot;stringr&quot;), 
+       library, 
+       character.only = TRUE)</code></pre>
+<pre><code>## [[1]]
+## [1] &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot; 
+## [7] &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[2]]
+## [1] &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;    
+## [7] &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[3]]
+##  [1] &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot;
+##  [7] &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[4]]
+##  [1] &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot; 
+##  [7] &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[5]]
+##  [1] &quot;likert&quot;    &quot;xtable&quot;    &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;    
+##  [7] &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;  
+## [13] &quot;base&quot;     
+## 
+## [[6]]
+##  [1] &quot;scales&quot;    &quot;likert&quot;    &quot;xtable&quot;    &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;  
+##  [7] &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot; 
+## [13] &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[7]]
+##  [1] &quot;vcd&quot;       &quot;grid&quot;      &quot;scales&quot;    &quot;likert&quot;    &quot;xtable&quot;    &quot;dplyr&quot;    
+##  [7] &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot;
+## [13] &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[8]]
+##  [1] &quot;tm&quot;        &quot;NLP&quot;       &quot;vcd&quot;       &quot;grid&quot;      &quot;scales&quot;    &quot;likert&quot;   
+##  [7] &quot;xtable&quot;    &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;    
+## [13] &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
+## 
+## [[9]]
+##  [1] &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;         
+##  [6] &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;       
+## [11] &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;    
+## [16] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## 
+## [[10]]
+##  [1] &quot;stringr&quot;      &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;         
+##  [6] &quot;vcd&quot;          &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;      
+## [11] &quot;dplyr&quot;        &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;       
+## [16] &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;     
+## [21] &quot;base&quot;        
+## 
+## [[11]]
+##  [1] &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;          
+##  [6] &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;      
+## [11] &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;       
+## [16] &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;    
+## [21] &quot;methods&quot;      &quot;base&quot;        
+## 
+## [[12]]
+##  [1] &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;    &quot;RColorBrewer&quot;
+##  [6] &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;         &quot;scales&quot;      
+## [11] &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;      &quot;lattice&quot;     
+## [16] &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;       
+## [21] &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## 
+## [[13]]
+##  [1] &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;   
+##  [6] &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;        
+## [11] &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;     
+## [16] &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;   
+## [21] &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## 
+## [[14]]
+##  [1] &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;   
+##  [6] &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;        
+## [11] &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;     
+## [16] &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;   
+## [21] &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## 
+## [[15]]
+##  [1] &quot;kableExtra&quot;   &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;     
+##  [6] &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;         
+## [11] &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;       
+## [16] &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;    
+## [21] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
+## 
+## [[16]]
+##  [1] &quot;kableExtra&quot;   &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;     
+##  [6] &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;         
+## [11] &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;       
+## [16] &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;    
+## [21] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;</code></pre>
+<p>In the following, we will perform a sentiment analysis to investigate the emotionality of five different novels. We will start with the first example and load five pieces of literature.</p>
+<pre class="r"><code># read in texts
+darwin &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;)
+twain &lt;- readLines(&quot;https://slcladal.github.io/data/twainhuckfinn.txt&quot;)
+orwell &lt;- readLines(&quot;https://slcladal.github.io/data/orwell.txt&quot;)
+lovecraft &lt;- readLines(&quot;https://slcladal.github.io/data/lovecraftcolor.txt&quot;)
+husband &lt;- readLines(&quot;https://slcladal.github.io/data/husbandsregret.txt&quot;)</code></pre>
+<p>In a next step, we clean the data, convert it to lower case, and split it into individual words.</p>
+<pre class="r"><code># clean and split files into words 
+darwin &lt;- tolower(as.vector(unlist(strsplit(paste(gsub(&quot; {2,}&quot;, &quot; &quot;, darwin), sep = &quot; &quot;), &quot; &quot;))))
+twain &lt;- tolower(as.vector(unlist(strsplit(paste(gsub(&quot; {2,}&quot;, &quot; &quot;, twain), sep = &quot; &quot;), &quot; &quot;))))
+orwell &lt;- tolower(as.vector(unlist(strsplit(paste(gsub(&quot; {2,}&quot;, &quot; &quot;, orwell), sep = &quot; &quot;), &quot; &quot;))))
+lovecraft &lt;- tolower(as.vector(unlist(strsplit(paste(gsub(&quot; {2,}&quot;, &quot; &quot;, lovecraft), sep = &quot; &quot;), &quot; &quot;))))
+husband &lt;- tolower(as.vector(unlist(strsplit(paste(gsub(&quot; {2,}&quot;, &quot; &quot;, husband), sep = &quot; &quot;), &quot; &quot;))))</code></pre>
+<p>Now, we extract samples from each data set.</p>
+<pre class="r"><code>darwin &lt;- sample(darwin, 5000, replace = F)
+twain &lt;- sample(twain, 5000, replace = F)
+orwell &lt;- sample(orwell, 5000, replace = F)
+lovecraft &lt;- sample(lovecraft, 5000, replace = F)
+husband &lt;- sample(husband, 5000, replace = F)</code></pre>
+<p>We now load the “syuzhet” package and apply the “get_nrc_sentiment” function to the data which performs the Sentiment Analysis.</p>
+<pre class="r"><code># load library
+library(syuzhet)
+# perform sentiment analysis
+darwinemo &lt;- get_nrc_sentiment(darwin)
+twainemo &lt;- get_nrc_sentiment(twain)
+orwellemo &lt;- get_nrc_sentiment(orwell)
+lovecraftemo &lt;- get_nrc_sentiment(lovecraft)
+husbandemo &lt;- get_nrc_sentiment(husband)
+# inspect data
+head(darwinemo)</code></pre>
+<pre><code>##   anger anticipation disgust fear joy sadness surprise trust negative positive
+## 1     0            0       0    0   0       0        0     0        0        0
+## 2     0            0       0    0   0       0        0     0        0        0
+## 3     0            0       0    0   0       0        0     0        0        0
+## 4     0            0       0    0   0       0        0     0        0        0
+## 5     0            0       0    0   0       0        0     0        0        0
+## 6     0            0       0    0   0       0        0     0        0        0</code></pre>
+<p>After performing the Sentiment Analysis, we prepare the data for visualizations</p>
+<pre class="r"><code># extract percentages of emotional words
+darwinemos &lt;- colSums(darwinemo)/50
+twainemos &lt;- colSums(twainemo)/50
+orwellemos &lt;- colSums(orwellemo)/50
+lovecraftemos &lt;- colSums(lovecraftemo)/50
+husbandemos &lt;- colSums(husbandemo)/50
+# collapse into a single table
+emolit &lt;- data.frame(darwinemos, twainemos, orwellemos, lovecraftemos, husbandemos)
+# transpose data
+emo &lt;- t(emolit)
+# clean row names
+rownames(emo) &lt;- gsub(&quot;emos&quot;, &quot;&quot;, rownames(emo))
+# inspect data
+head(emo)</code></pre>
+<pre><code>##           anger anticipation disgust fear  joy sadness surprise trust negative
+## darwin     0.62         1.48    0.40 1.36 0.94    1.56     0.88  2.50     2.74
+## twain      0.88         2.06    0.70 1.20 1.62    1.22     1.04  2.04     2.26
+## orwell     1.60         2.12    1.44 2.36 1.44    1.90     1.04  2.22     4.06
+## lovecraft  1.66         1.82    1.40 2.36 1.16    2.36     0.96  1.62     4.30
+## husband    2.08         2.36    1.18 2.32 2.20    2.30     1.22  2.36     4.42
+##           positive
+## darwin        3.28
+## twain         3.32
+## orwell        3.62
+## lovecraft     3.04
+## husband       4.46</code></pre>
+<pre class="r"><code>#convert into data frame
+emo &lt;- as.data.frame(emo)
+# add author column
+emo$Author &lt;- c(&quot;Darwin&quot;, &quot;Twain&quot;, &quot;Orwell&quot;, &quot;Lovecraft&quot;, &quot;Husband&quot;)
+# load library
+library(tidyr)
+# convert data from wide to long
+emol &lt;- gather(emo, Emotion, Score, anger:positive, factor_key=TRUE)
+# inspect data
+head(emol)</code></pre>
+<pre><code>##      Author      Emotion Score
+## 1    Darwin        anger  0.62
+## 2     Twain        anger  0.88
+## 3    Orwell        anger  1.60
+## 4 Lovecraft        anger  1.66
+## 5   Husband        anger  2.08
+## 6    Darwin anticipation  1.48</code></pre>
+<p>Based on this table, we can now visualise the relative emotion scores for each book.</p>
+<pre class="r"><code># load library
+library(ggplot2)
+# extract subset
+emol2 &lt;- emol %&gt;%
+  filter(Emotion != &quot;positive&quot;) %&gt;%
+  filter(Emotion != &quot;negative&quot;)
+# start plot
+ggplot(emol2,                   # plot barplotdatagg1
+       aes(Emotion, Score,      # define x- and y-axis
+           fill = Author)) +    # define grouping variable
+  geom_bar(stat=&quot;identity&quot;,     # determine type of plot
+           position=position_dodge()) +  # determine grouping
+  scale_fill_manual(values=c(&quot;goldenrod2&quot;, &quot;gray70&quot;, &quot;indianred4&quot;, &quot;grey30&quot;, &quot;lightblue&quot;)) +                 # define colours
+  theme_bw()                    # define theme (black and white)</code></pre>
+<p><img src="sentiment_files/figure-html/sa7-1.png" width="672" /></p>
+</div>
+</div>
+<div id="citation-session-info" class="section level1 unnumbered">
+<h1>Citation &amp; Session Info</h1>
+<p>Schweinberger, Martin. 2020. <em>Sentiment Analysis in R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/sentiment.html" class="uri">https://slcladal.github.io/sentiment.html</a>.</p>
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>## R version 4.0.2 (2020-06-22)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 18362)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=German_Germany.1252  LC_CTYPE=German_Germany.1252   
+## [3] LC_MONETARY=German_Germany.1252 LC_NUMERIC=C                   
+## [5] LC_TIME=German_Germany.1252    
+## 
+## attached base packages:
+## [1] grid      stats     graphics  grDevices utils     datasets  methods  
+## [8] base     
+## 
+## other attached packages:
+##  [1] syuzhet_1.0.4      kableExtra_1.2.1   gridExtra_2.3      tidyr_1.1.1       
+##  [5] SnowballC_0.7.0    stringr_1.4.0      wordcloud_2.6      RColorBrewer_1.1-2
+##  [9] tm_0.7-7           NLP_0.2-0          vcd_1.4-7          scales_1.1.1      
+## [13] likert_1.3.5       xtable_1.8-4       dplyr_1.0.1        ggplot2_3.3.2     
+## [17] lattice_0.20-41    knitr_1.29        
+## 
+## loaded via a namespace (and not attached):
+##  [1] zoo_1.8-8         tidyselect_1.1.0  xfun_0.16         slam_0.1-47      
+##  [5] reshape2_1.4.4    purrr_0.3.4       colorspace_1.4-1  vctrs_0.3.2      
+##  [9] generics_0.0.2    viridisLite_0.3.0 htmltools_0.5.0   yaml_2.2.1       
+## [13] rlang_0.4.7       pillar_1.4.6      glue_1.4.1        withr_2.2.0      
+## [17] lifecycle_0.2.0   plyr_1.8.6        munsell_0.5.0     gtable_0.3.0     
+## [21] rvest_0.3.6       psych_2.0.8       evaluate_0.14     labeling_0.3     
+## [25] lmtest_0.9-37     parallel_4.0.2    Rcpp_1.0.5        webshot_0.5.2    
+## [29] tmvnsim_1.0-2     farver_2.0.3      mnormt_2.0.2      digest_0.6.25    
+## [33] stringi_1.4.6     tools_4.0.2       magrittr_1.5      tibble_3.0.3     
+## [37] crayon_1.3.4      pkgconfig_2.0.3   ellipsis_0.3.1    MASS_7.3-51.6    
+## [41] xml2_1.3.2        httr_1.4.2        rmarkdown_2.3     rstudioapi_0.11  
+## [45] R6_2.4.1          nlme_3.1-148      compiler_4.0.2</code></pre>
+<hr />
+<p><a href="https://slcladal.github.io/index.html">Go back to the main page</a></p>
+<hr />
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references">
+<div id="ref-mohammad2013crowdsourcing">
+<p>Mohammad, Saif M, and Peter D Turney. 2013. “Crowdsourcing a Word-Emotion Association Lexicon.” <em>Computational Intelligence</em> 29 (3): 436–65.</p>
+</div>
+</div>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
