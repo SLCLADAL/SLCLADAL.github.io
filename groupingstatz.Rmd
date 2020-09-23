@@ -1,6 +1,6 @@
 ---
 title: "Classification and Clustering with R"
-author: "UQ SLC Digital Team"
+author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   bookdown::html_document2: default
@@ -26,7 +26,7 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # supress math annotation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
 # install libraries
 install.packages(c("cluster", "factoextra", "cluster", 
                    "seriation", "pvclust", "ape", "vcd", 
@@ -34,7 +34,7 @@ install.packages(c("cluster", "factoextra", "cluster",
                    "NbClust", "pvclust"))
 ```
 
-Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
+Once you have installed R-Studio and initiated the session by executing the code shown above, you are good to go.
 
 # Cluster Analysis
 
@@ -238,7 +238,7 @@ How and which elements are merged depends on the what is understood as distance.
 
 To understand how a cluster analysis determines to which cluster a given data point belongs, we need to understand what different distance measures represent. Have a look at the Figure below which visually represents three different ways to conceptualize distance.
 
-```{r cl13, eval = T, echo =  T, message=FALSE, warning=FALSE}
+```{r cl13}
 par(mar=c(1,1,1,1))  # define margine width of the plot
 x <- c(1,5)          # define an x value
 y <- c(1,5)          # define a y value
@@ -266,7 +266,7 @@ The Figure above depicts three ways to measure distance: the "eucledian distance
 
 We will now turn to another example in order to delve a little deeper into how clustering algorithms work. In this example, we will find cluster of varieties of English based on the relative frequency of selected non-standard features (such as the relative frequencies of cleft constructions and tag questions). As a first step, we generate some fictional data set for this analysis. 
 
-```{r cl14, eval = T, echo =  T, message=FALSE, warning=FALSE}
+```{r cl14}
 # generate data
 IrishEnglish <- round(sqrt((rnorm(10, 9.5, .5))^2), 3)
 ScottishEnglish <- round(sqrt((rnorm(10, 9.3, .4))^2), 3)
@@ -283,12 +283,13 @@ clus <- data.frame(IrishEnglish, ScottishEnglish, BritishEnglish,
                    CanadianEnglish, JamaicanEnglish, PhillipineEnglish, IndianEnglish)
 # add row names
 rownames(clus) <- c("nae_neg", "like", "clefts", "tags", "youse", "soitwas", "dt", "nsr", "invartag", "wh_cleft")
-summary(clus) # inspect results
+# inspect results
+summary(clus) 
 ```
 
 As a next step, we create a cluster object based on the data we have just generated.
 
-```{r cl15, eval = T, echo =  T, message=FALSE, warning=FALSE}
+```{r cl15}
 # clean data
 clust <- t(clus)            # transpose data
 clust <- na.omit(clust)     # remove missing values
@@ -299,7 +300,7 @@ clust
 
 We now assess if data is clusterable by testing whether or not the data includes nonrandom structures. To means to determine whether the data contains nonrandomness, we calculate the Hopkins statistic which informs how similar the data is to a random distribution. If the values of the Hopkins statistic are higher than 0.5 then this indicates that the data is random and that there are no inherent clusters. However, if the Hopkins statistic is close to 0, then the data is clusterable. The "n" in the "get_clust_tendency" functions represents the maximum number of clusters to be tested which should be  number of predictors in the data. 
 
-```{r cl16, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r cl16}
 library("factoextra")         # load library to extract cluster tendency
 clusttendency <- get_clust_tendency(clusts,    # apply get_clust_tendency to cluster object
                    n = 9,     # define number of points from sampe speace 
@@ -568,9 +569,9 @@ Clustering is a highly complex topic and there many more complexities to it. How
 
 # Vector Space Models
 
-Vector Space Models are particularly useful when dealing with language data as they provide very accurate estimates of "semantic" similarity based on *word embeddings* (or co-occurrence profiles). Word embeddings refer to the vectors which hold the frequency information about how frequently a given word has cooccurred with other words. If the ordering of co-occurring words remains constant, then the vectors can be used to determine which words have similar profiles. 
+Vector Space Models are particularly useful when dealing with language data as they provide very accurate estimates of "semantic" similarity based on *word embeddings* (or co-occurrence profiles). Word embeddings refer to the vectors which hold the frequency information about how frequently a given word has co-occurred with other words. If the ordering of co-occurring words remains constant, then the vectors can be used to determine which words have similar profiles. 
 
-To show how vector space models work, we will follow the procedure described in @levshina2015linguistics to investigate similarities among amplifiers based on their co-occurrences (word embeddings) with adjectives. Adjective amplifiers are elements such as those in 1. to 5.
+To show how vector space models work, we will follow the procedure described in @levshina2015linguistics. However, we will not use her `Rling` package, which is not supported my R version 4.0.2, to calculate cosine similarities but rather the `coop` package [see @coop]. In this tutorial, we investigate similarities among amplifiers based on their co-occurrences (word embeddings) with adjectives. Adjective amplifiers are elements such as those in 1. to 5.
 
 1. The *very*~amplifier~ *nice*~adjective~ man.
 2. A *truely*~amplifier~ *remarkable*~adjective~ woman. 
@@ -584,22 +585,57 @@ The similarity among adjective amplifiers can then be used to find clusters or g
 7. The *really*~amplifier~ *nice*~adjective~ man.
 8. ^?^The *completely*~amplifier~ *nice*~adjective~ man.
 
-We start by loading and then displaying the data which is called "vsmdata" and consist of 5,000 observations of adjectives and contains two columns: one column with the adjectives (Adjectives) and another column which has the amplifiers ("0" means that the adjective occurred without an amplifier).
+We start by loading the required packages, the data, and then displaying the data which is called "vsmdata" and consist of 5,000 observations of adjectives and contains two columns: one column with the adjectives (Adjectives) and another column which has the amplifiers ("0" means that the adjective occurred without an amplifier). 
 
-```{r vsm1, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r vsm1}
+# load packages
+library(coop)
+library(dplyr)
+library(tm)
+library(cluster)
+library(DT)
 # load data
 vsmdata <- read.delim("https://slcladal.github.io/data/vsmdata.txt", sep = "\t", header = T)
 # inspect data
-str(vsmdata)
+datatable(vsmdata, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
-In a next step, we create a matrix from this data frame which maps how often a given amplifier co-occurred with a given adjective.
+For this tutorial, we will reduce the number of amplifiers and adjectives and thus simplify the data to render it easier to understand what is going on. To simplify the data, we remove 
 
-```{r vsm2, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load library
-library(tm)
++ all non-amplified adjectives
++ the adjectives many and much
++ adjectives that are amplified less than 10 times
+
+In addition, we collapse all amplifiers that occur less than 20 times into a bin category (*other*).
+
+```{r vsm2}
+# simplify data
+vsmdata_simp <- vsmdata %>%
+  # remove non-amplifier adjectives
+  dplyr::filter(Amplifier != 0,
+         Adjective != "many",
+         Adjective != "much") %>%
+  # collapse infrequent amplifiers
+  dplyr::group_by(Amplifier) %>%
+  dplyr::mutate(AmpFreq = dplyr::n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(Amplifier = ifelse(AmpFreq > 20, Amplifier, "other")) %>%
+  # collapse infrequent adjectives
+  dplyr::group_by(Adjective) %>%
+  dplyr::mutate(AdjFreq = dplyr::n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(Adjective = ifelse(AdjFreq > 10, Adjective, "other")) %>%
+  dplyr::filter(Adjective != "other") %>%
+  dplyr::select(-AmpFreq, -AdjFreq)
+# inspect data
+datatable(vsmdata_simp, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+```
+
+In a next step, we create a matrix from this data frame which maps how often a given amplifier co-occurred with a given adjective. In text mining, this format is called a text-document matrix or tdm (which is a transposed [document-term matrix](https://en.wikipedia.org/wiki/Document-term_matrix) of dtm).
+
+```{r vsm3}
 # tabulate data (create term-document matrix)
-tdm <- ftable(vsmdata$Adjective, vsmdata$Amplifier)
+tdm <- ftable(vsmdata_simp$Adjective, vsmdata_simp$Amplifier)
 # extract amplifiers and adjectives 
 amplifiers <- as.vector(unlist(attr(tdm, "col.vars")[1]))
 adjectives <- as.vector(unlist(attr(tdm, "row.vars")[1]))
@@ -612,7 +648,7 @@ tdm[1:5, 1:5]
 
 Now that we have a term document matrix, we want to remove adjectives that were never amplified. Note however that if we were interested in classifying adjectives (rather than amplifiers) according to their co-occurrence with amplifiers, we would, of course, not do this, as not being amplified would be a relevant feature for adjectives. But since we are interested in classifying amplifiers, not amplified adjectives do not have any information value.
 
-```{r vsm3, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r vsm4}
 # convert frequencies greater than 1 into 1
 tdm <- t(apply(tdm, 1, function(x){ifelse(x > 1, 1, x)}))
 # remove adjectives that we never amplified
@@ -625,23 +661,21 @@ tdm[1:5, 1:5]
 
 In a next step, we extract the expected values of the co-occurrences if the amplifiers were distributed homogeneously and calculate the *Pointwise Mutual Information* (PMI) score and use that to then calculate the *Positive Pointwise Mutual Information* (PPMI) scores. According to @levshina2015linguistics 327 - referring to @bullinaria2007extracting - PPMI perform better than PMI as negative values are replaced with zeros. In a next step, we calculate the cosine similarity which will for the bases for the subsequent clustering.
 
-```{r vsm4, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r vsm5}
 # compute expected values
 tdm.exp <- chisq.test(tdm)$expected
 # calculate PMI and PPMI
 PMI <- log2(tdm/tdm.exp)
 PPMI <- ifelse(PMI < 0, 0, PMI)
-# load library
-library(Rling)
 # calculate cosine similarity
-cosinesimilarity <- cossim(PPMI)
+cosinesimilarity <- cosine(PPMI)
 # inspect cosine values
 cosinesimilarity[1:5, 1:5]
 ```
 
 As we have now obtained a similarity measure, we can go ahead and perform a cluster analysis on these similarity values. However, as we have to extract the maximum values in the similarity matrix that is not 1 as we will use this to create a distance matrix. While we could also have simply subtracted the cosine similarity values from 1 to convert the similarity matrix into a distance matrix, we follow the procedure proposed by @levshina2015linguistics.
 
-```{r vsm5, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r vsm6, eval = T, echo=T, message=FALSE, warning=FALSE}
 # find max value that is not 1
 cosinesimilarity.test <- apply(cosinesimilarity, 1, function(x){
   x <- ifelse(x == 1, 0, x) } )
@@ -654,9 +688,7 @@ clustd <- as.dist(amplifier.dist)
 In a next step, we want to determine the optimal number of clusters. This has two reasons: firstly, we need to establish that we have reason to assume that the data is not homogeneous (this would occur if the optimal number of clusters were 1), and, secondly, we want check how many meaningful clusters there are in our data.
 
 
-```{r vsm6, eval = T, echo=T, message=FALSE, warning=FALSE}
-# load library
-library(cluster)
+```{r vsm7, eval = T, echo=T, message=FALSE, warning=FALSE}
 # find optimal number of clusters
 asw <- as.vector(unlist(sapply(2:nrow(tdm)-1, function(x) pam(clustd, k = x)$silinfo$avg.width)))
 # determine the optimal number of clusters (max width is optimal)
@@ -669,7 +701,7 @@ amplifier.clusters$clustering
 
 In a next step, we visualize the results of the semantic vector space model as a dendrogram.
 
-```{r vsm7, eval = T, echo=T, message=FALSE, warning=FALSE}
+```{r vsm8, eval = T, echo=T, message=FALSE, warning=FALSE}
 # create cluster object
 cd <- hclust(clustd, method="ward.D")    
 # plot cluster object
@@ -681,57 +713,82 @@ rect.hclust(cd, k = 6, border = "gray60")
 
 The clustering solution shows that, as expected, *completely* and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *very* and *really* form a cluster together with the zero variant. This is likely so because *really*, *very*, and the zero variant are the most frequent "variants" but also co-occur with the most variety of adjectives. The results can be interpreted to suggest that *really* and *very* are "default" amplifiers that lack distinct semantic profiles.
 
-There are many more useful methods for classifying and grouping data but this should suffice to get you started.
+There are many more useful methods for classifying and grouping data and the [tutorial by Gede Primahadi Wijaya Rajeg, Karlina Denistia, and Simon Musgrave](https://gederajeg.github.io/vector_space_model_indonesian/) [@rajeg2020semvec] highly recommended to get a better understanding of SVM but this should suffice to get you started.
 
 # Correspondence Analysis
 
-in preparation
+Correspondence analysis (CA) represents a multivariate statistical technique that provides a graphic method of exploring the relationship between variables in a contingency table. CA is conceptually similar to principal component analysis (PCA), but applies to categorical rather than continuous data.
 
-```{r ca1, eval = F, echo=F, message=FALSE, warning=FALSE}
+CA consists out of the following four steps:
+
+1. Computing row and column averages
+2. Computing expected values
+3. Computing the residuals
+4. Plotting residuals
+
+As is the tutorial on Semantic Vector Space Models, we will we investigate similarities among amplifiers based on their co-occurrences (word embeddings) with adjectives. To this end, we continue with the simplified `vsmdata` (`vsmdata_simp`).
+
+## Preparation{-}
+
+We start by loading the required packages and by inspecting the simplified `vsmdata` (`vsmdata_simp`)
+
+
+```{r ca1}
 # load libraries
-library("FactoMineR")
-library("factoextra")
-# load preinstalled data
-data(housetasks)
+library(dplyr)
+library(FactoMineR)
+library(factoextra)
+library(gplots)
+library(DT)
 # inspect data
-head(housetasks)
-# load library
-library("gplots")
+datatable(vsmdata_simp, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+```
+We now use a balloon plot to see if tehre are any potential correlations between amplifiers and adjectives.
+
+
+```{r ca3}
 # 1. convert the data as a table
-dt <- as.table(as.matrix(housetasks))
+dt <- as.matrix(table(vsmdata_simp))
 # 2. Graph
-balloonplot(t(dt), main ="housetasks", xlab ="", ylab="",
+balloonplot(t(dt), main ="vsmdata_simp", xlab ="", ylab="",
             label = FALSE, show.margins = FALSE)
-
-chisq <- chisq.test(housetasks)
-chisq
-
-library("FactoMineR")
-res.ca <- CA(housetasks, graph = FALSE)
-print(res.ca)
-# Chi-square statistics
-chi2 <- 1944.456
-# Degree of freedom
-df <- (nrow(housetasks) - 1) * (ncol(housetasks) - 1)
-# P-value
-pval <- pchisq(chi2, df = df, lower.tail = FALSE)
-pval
-library("factoextra")
-eig.val <- get_eigenvalue(res.ca)
-eig.val
-fviz_screeplot(res.ca) +
- geom_hline(yintercept=33.33, linetype=2, color="red", addlabels = TRUE, ylim = c(0, 50))
-# repel= TRUE to avoid text overlapping (slow if many point)
-fviz_ca_biplot(res.ca, repel = TRUE)
-
 ```
 
+The balloon plot suggests that there are potential correlations as the dots (balloons) are not distributed evenly according to frequency. To validate if there is significant correlation between the amplifier types and the adjectives using a $\chi$^2^- test. 
 
-# Principal Component Analysis
 
-in preparation
+```{r ca4}
+chisq <- chisq.test(dt)
+chisq
+```
+
+The $\chi$^2^- test confirms that there is a significant correlations between amplifier types and the adjectives.
+
+
+```{r ca5}
+res.ca <- CA(dt, graph = FALSE)
+# inpsect results of the CA
+#print(res.ca)
+eig.val <- get_eigenvalue(res.ca)
+eig.val
+```
+The display of the *eigenvalues* provides information on the amount of variance that is explained by each dimension. The first dimension explains 49.87 percent of the variance, the second dimension explains another 30.34 percent of the variance, leaving all other variables with relative moderate explanatory power as they only account for 20 percent variance. We now plot and interpret the results of the CA.
+
+```{r ca6}
+# repel= TRUE to avoid text overlapping (slow if many point)
+fviz_ca_biplot(res.ca, 
+               repel = TRUE,
+               col.row = "orange",
+               col.col = "darkgray")
+```
+
+The results of the CA show that the adjective *different* is collocating with *other* amplifiers while *very* is collocating with *difficult* and *important*, *pretty* is collocating with *big*, *really* is collocating with *nice*, and *so* is collocating with *bad*.
+
+
 
 ```{r pca1, eval = F, echo=F, message=FALSE, warning=FALSE}
+# Principal Component Analysis
+
 # inspect data
 data(iris)
 head(iris, 3)
@@ -772,9 +829,9 @@ predict(ir.pca, newdata=tail(log.ir, 2))
 
 ```{r pca7, eval = F, echo=F, message=FALSE, warning=FALSE}
 # load library
-#library(devtools)
+library(devtools)
 # install library from github
-#install_github("vqv/ggbiplot")
+install_github("vqv/ggbiplot")
 # load installed library
 library(ggbiplot)
 # create plot
@@ -805,11 +862,12 @@ trans$rotation
 ```
 
 
-# Multidimensional Scaling 
 
-in preparation
 
 ```{r mds1, eval = F, echo=F, message=FALSE, warning=FALSE}
+# Multidimensional Scaling 
+
+
 # Classical MDS
 # N rows (objects) x p columns (variables)
 # each row identified by a unique row name
@@ -856,7 +914,7 @@ sessionInfo()
 
 ***
 
-[Go back to the main page](https://slcladal.github.io/index.html)
+[Main page](https://slcladal.github.io/index.html)
 
 ***
 
