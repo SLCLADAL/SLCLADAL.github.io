@@ -1,0 +1,150 @@
+---
+title: "POS-Tagging and Syntactic Parsing with R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces part-of-speech tagging and syntactic parsing using R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/tagging.Rmd). This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_8_NER_POS.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and overs many more very useful text mining methods. 
+
+Part-of-speech tagging (commonly referred to as pos-, POS-, or PoS-tagging) is a common procedure when working with natural language data. Despite being used quite frequently, it is a rather complex issue that requires the application of statistical methods that are quite advanced. In the following, we will explore different options for pos-tagging and syntactic parsing. 
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # supress math annotation
+# install libraries
+install.packages(c("tm", "NLP", "openNLP", "openNLPdata"))
+```
+
+Once you have installed R Studio and initiated the session by executing the code shown above, you maybe good to go.
+
+***
+
+<span style="color: red;">Note</span>: A word of warning is in order here. The `openNLP` library is written is Java and may require a re-installation of Java as well as re-setting the path variable to Java. A short video on how to set the path variable can be found (here)[https://www.youtube.com/watch?v=yrRmLOcB9fg]. 
+
+***
+
+
+# POS-tagging English texts
+
+We extract proper nouns (tag NNP for singular and tag NNPS for plural proper nouns) from paragraphs of president's speeches.
+
+```{r initalisierung, results='hide', message=FALSE, warning=FALSE}
+options(stringsAsFactors = FALSE)
+library(tm)
+library(NLP)
+# read suto paragraphs
+textdata <- read.csv("https://slcladal.github.io/data/sotu_paragraphs.csv", sep = ";", encoding = "UTF-8")
+english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
+# Create corpus object
+corpus <- Corpus(DataframeSource(textdata))
+require(openNLP)
+require(openNLPdata)
+# openNLP annotator objects
+sent_token_annotator <- Maxent_Sent_Token_Annotator()
+word_token_annotator <- Maxent_Word_Token_Annotator()
+pos_tag_annotator <- Maxent_POS_Tag_Annotator()
+annotator_pipeline <- Annotator_Pipeline(
+    sent_token_annotator,
+    word_token_annotator,
+    pos_tag_annotator
+)
+# function for annotation
+annotateDocuments <- function(doc, pos_filter = NULL) {
+  doc <- as.String(doc)
+  doc_with_annotations <- annotate(doc, annotator_pipeline)
+  tags <- sapply(subset(doc_with_annotations, type=="word")$features, `[[`, "POS")
+  tokens <- doc[subset(doc_with_annotations, type=="word")]
+  if (!is.null(pos_filter)) {
+    res <- tokens[tags %in% pos_filter]
+  } else {
+    res <- paste0(tokens, "_", tags)
+  }
+  res <- paste(res, collapse = " ")
+  return(res)
+}
+# run annotation on a sample of the corpus
+annotated_corpus <- lapply(corpus[1:10], annotateDocuments)
+# Have a look into the first annotated documents
+annotated_corpus[[1]]
+annotated_corpus[[2]]
+```
+
+# Filter NEs for further applications
+
+We annotate the first paragraphs of the corpus, extract proper nouns, also referred to as Named Entities (NEs) such as person names, locations etc., and compute significance of co-occurrence of them.
+
+```{r cooc, message=FALSE, warning=FALSE, cache=T}
+sample_corpus <- sapply(corpus[1:1000], annotateDocuments, pos_filter = c("NNP", "NNPS"))
+# Binary term matrix
+require(Matrix)
+minimumFrequency <- 2
+filtered_corpus <- Corpus(VectorSource(sample_corpus))
+binDTM <- DocumentTermMatrix(filtered_corpus, control=list(bounds = list(global=c(minimumFrequency, Inf)), weighting = weightBin))
+# colnames(binDTM)
+binDTM <- sparseMatrix(i = binDTM$i, j = binDTM$j, x = binDTM$v, dims = c(binDTM$nrow, binDTM$ncol), dimnames = dimnames(binDTM))
+# Matrix multiplication for cooccurrence counts
+coocCounts <- t(binDTM) %*% binDTM
+source("rscripts/calculateCoocStatistics.R")
+# Definition of a parameter for the representation of the co-occurrences of a concept
+# Determination of the term of which co-competitors are to be measured.
+coocTerm <- "indians"
+coocs <- calculateCoocStatistics(coocTerm, binDTM, measure="LOGLIK")
+print(coocs[1:20])
+```
+
+
+# POS-Tagging for Languages other than English
+
+For German language support run
+
+```{r German, eval = F}
+# install.packages("openNLPmodels.de", repos = "http://datacube.wu.ac.at")
+# require("openNLPmodels.de")
+```
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. 2020. *POS-Tagging and Syntactic Parsing with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/tagging.html
+
+```
+@manual{schweinberger2020pos,
+  author = {Schweinberger, Martin},
+  title = {POS-Tagging and Syntactic Parsing with R},
+  note = {https://slcladal.github.io/tagging.html},
+  year = {2020},
+  organization = "The University of Queensland, School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/09/24}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+# References {-}
+
+***
+
+[Main page](https://slcladal.github.io/index.html)
+
+***
+
