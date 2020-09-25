@@ -1,6 +1,6 @@
 ---
-title: "Tree-Based Models with R"
-author: "UQ SLC Digital Team"
+title: "Tree-Based Models in R"
+author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   bookdown::html_document2: default
@@ -11,7 +11,7 @@ link-citations: yes
 knitr::include_graphics("images/uq1.jpg")
 ```
 
-# Introduction
+# Introduction{-}
 
 This tutorial focuses on tree-based models and their implementation in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/advancedstatztrees.Rmd).
 
@@ -22,23 +22,25 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # supress math annotation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
 # install libraries
 install.packages(c("Boruta", "caret", "cowplot", "dplyr", 
                    "ggplot2", "Gmisc", "grid", "Hmisc", 
                    "knitr", "party", "partykit", "randomForest", 
-                   "Rling"))
+                   "tidyr", "stringr", "Rling", "DT"))
 ```
 
 Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
 
-# Conditional Inference Trees{-}
+# Conditional Inference Trees
 
 This section deals with tree-structure models, the most basic type is a conditional inference tree. Like random forests, conditional inference trees are non-parametric and thus do not rely on distributional requirements (or at least on fewer). The tree structure represents recursive partitioning of the data to minimize residual deviance. There are several advantages to using tree-based models:
 
 * Tree-structure models are very useful because they can deal with different types of variables and provide a very good understanding of the structure in the data. 
+
 * Tree-structure models are particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models. 
-* Tree-based models can be used as variable-selection procedure which informs about which variables have any sort of significant relationship with the dependent variable and can thereby inform model fitting.
+
+* Tree-structure models can be used as variable-selection procedure which informs about which variables have any sort of significant relationship with the dependent variable and can thereby inform model fitting.
 
 Before we implement a conditional inference tree in R, we will have a look at how it works. We will do this in more detail here as random forests and Boruta analyses are extensions of conditional inference trees and are therefore based on the same concepts.
 
@@ -63,21 +65,20 @@ Before going through how this conditional decision tree is generated, let us fir
 Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. The first six lines of this fictitious data set are displayed in the table below:
 
 ```{r cit2, echo=F, message=FALSE, warning=FALSE}
-library(knitr)                 # activate library for tabulating
+library(DT)                 # activate library for tabulating
 citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
-attach(citdata)
-kable(head(citdata), caption = "Example data set to illustrate conditional inference trees.")
+# inspect data
+datatable(citdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
-In a first step, we initialize our R session by activating relevant libraries, setting options and setting a seed. Then, we load the data into R.
+In a first step, we initialize our R session by setting options and activating the neccessary packages.
 
-```{r cit3}
+```{r cit3, message=F, warning=F}
 # activate libraries
 library(partykit)              
 library(dplyr)  
 library(grid)
 library(Gmisc) 
-#library(Rling) 
 library(ggplot2)       
 library(cowplot)       
 library(randomForest)
@@ -85,35 +86,52 @@ library(party)
 library(Hmisc)
 library(Boruta) 
 library(RCurl)
-# to install the caret library, it was necessary to go through the installation 
-# process below - once caret is installed once, you do not need to go through 
-# these steps again
-# install caret library
-#source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
-#install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
-#                                      "http://cran.rstudio.com/", dependencies=TRUE))
-#install.packages("dimRed", dependencies = TRUE)
-#install.packages('caret', dependencies = TRUE)
-# activate caret library
-library(caret) 
 # set options
 options(stringsAsFactors = F)
 options(scipen = 999)
 options(max.print=10000)
+```
+
+*** 
+
+NOTE
+
+In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.
+
+```{r cit4a, eval = F, message=F, warning=F}
+# install caret library
+source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
+install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
+                                      "http://cran.rstudio.com/", dependencies=TRUE))
+install.packages("dimRed", dependencies = TRUE)
+install.packages('caret', dependencies = TRUE)
+# activate caret library
+library(caret)
+```
+
+```{r cit4b, echo = F}
+library(caret)
+```
+
+***
+
+We can now load and inspect the data that we will use in this tutorial.
+
+```{r cit4c, echo=T, message=FALSE, warning=FALSE}
 # load data
 citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
 # inspect data
-head(citdata); str(citdata)
+datatable(citdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
-The "str" functions output tells us that the data is not factorized yet. As tree-based models require either numeric or factorized data, we factorize the "character" variables in our data.
+The output tells us that the data is not factorized yet. As tree-based models require either numeric or factorized data, we factorize the "character" variables in our data.
 
-```{r cit4, echo=T, message=FALSE, warning=FALSE}
+```{r cit4d, echo=T, message=FALSE, warning=FALSE}
 # factorize variables (cit require factors instead of character vectors)
 fcts <- c("Age", "Gender", "Status", "LikeUser")
 citdata[fcts] <- lapply(citdata[fcts], factor)
 # inspect data
-str(citdata)
+datatable(citdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 The data now consists of factors which two levels each. After initializing the R session, it needs to be determined, what the root of the decision tree should be. This means that we have to determine which of the variables represents the root node. In order to do so, we tabulate for each variable level, how many speakers of that level have used discourse *like* (LikeUsers) and how many have not used discourse *like* (NonLikeUsers).
@@ -166,7 +184,6 @@ G_{Gender} = \frac{159} {303} \times 0.4602235 +  \frac{144} {303} \times 0.4358
 Before we do these calculations in R, we will just briefly revisit the gender distribution and perform a $\chi$^2^-test to see whether testing gender makes sense in the first place.
 
 ```{r cit6, echo=T, message=FALSE, warning=FALSE}
-
 # GENDER
 # re-inspect gender distribution
 tblikegender <- table(citdata$LikeUser, citdata$Gender)
@@ -406,16 +423,18 @@ citprediction <- predict(citd.ctree)
 confusionMatrix(citprediction, citdata$LikeUser)
 ```
 
-The conditional inference tree has an accuracy of 72.91 percent which is significantly better than the base-line accuracy of 52.99 percent. To understand what the other statistics refer to and how they are calculated, run the command "?confusionMatrix". 
+The conditional inference tree has an accuracy of 72.91 percent which is significantly better than the base-line accuracy of 52.99 percent. To understand what the other statistics refer to and how they are calculated, run the command `?confusionMatrix`. 
 
 ## Splitting numeric, ordinal, and true categorical variables{-}
 
 While it is rather straight forward to calculate the Gini values for categorical variables, it may not seem quite as apparent how to calculate splits for numeric or ordinal variables. To illustrate how the algorithm works on such variables, consider the example data set shown below.
 
 ```{r citn1, echo=F, message=FALSE, warning=FALSE}
-library(knitr)                 # activate library for tabulating
-citdata2 <- read.delim("https://slcladal.github.io/data/numerictreedata.txt", header = T, sep = "\t")
-kable(citdata2, caption = "Example data set to illustrate numeric splits in conditional inference trees.")
+Age <- c(15, 37, 63, 42, 22, 27)
+LikeUser <- c("yes", "no", "no", "yes", "yes", "yes")
+citdata2 <- data.frame(Age, LikeUser)
+# inspect data
+datatable(citdata2, rownames = FALSE, options = list(pageLength = 6, scrollX=T), filter = "none")
 ```
 
 In a first step, we order the numeric variable so that we arrive at the following table.
@@ -423,7 +442,8 @@ In a first step, we order the numeric variable so that we arrive at the followin
 ```{r citn2, echo=F, message=FALSE, warning=FALSE}
 citdata2 <- citdata2 %>%
   arrange(Age)
-kable(citdata2, caption = "Example data set to illustrate numeric splits in conditional inference trees.")
+# inspect data
+datatable(citdata2, rownames = FALSE, options = list(pageLength = 6, scrollX=T), filter = "none")
 ```
 
 Next, we calculate the means for each level of "Age".
@@ -432,7 +452,8 @@ Next, we calculate the means for each level of "Age".
 Age <- c(15, ((15+22)/2), 22, ((22+27)/2), 27, ((27+37)/2), 37, ((37+42)/2), 42, ((42+63)/2), 63)
 LikeUser <- c("yes", "", "yes", "", "yes", "", "no", "", "yes", "", "no")
 citdata3 <- data.frame(Age, LikeUser)
-kable(citdata3, caption = "Ordered data set with mean age levels to illustrate numeric splits in conditional inference trees.")
+# inspect data
+datatable(citdata3, rownames = FALSE, options = list(pageLength = 11, scrollX=T), filter = "none")
 ```
 
 Now, we calculate the Gini values for each average level of age. How this is done is shown below for the first split.
@@ -499,7 +520,8 @@ We then have to calculate the gini values for all possible age splits which yiel
 AgeSplit <- c(((15+22)/2), ((22+27)/2), ((27+37)/2), ((37+42)/2), ((42+63)/2))
 Gini <- c(0.4, 0.5,0.444, 0.41, 0.267)
 citdata3 <- data.frame(AgeSplit, Gini)
-kable(citdata3, caption = "Possible age splits and their associated Gini values.")
+# inspect data
+datatable(citdata3, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 The split at 52.5 years of age has the lowest Gini value. Accordingly, we would split the data between speakers who are younger than 52.5 and speakers who are older than 52.5 years of age. The lowest Gini value for any age split would also be the Gini value that would be compared to other variables. 
@@ -521,7 +543,7 @@ Conditional Inference Trees are very intuitive, multivariate, non-parametric, th
 
 An extension which remedies these problems is to grow many varied trees - this is called a Random Forest Analysis and will have a look at how Random Forests work and how to implement them in R in the next section. 
 
-#  Random Forests{-}
+#  Random Forests
 
 Random Forests (RFs) are an extension of Conditional Inference Trees [@breiman2001random]. Like Conditional Inference Trees, Random Forests represent a multivariate, non-parametric partitioning method that is particularly useful when dealing with relatively small sample sizes and many predictors (including interactions) and they are insensitive to multicollinearity (if two predictors strongly correlate with the dependent variable AND are highly correlated or collinear, RFs will report both variables as highly important - the ordering in which they were included into the model is irrelevant). The latter point is a real advantage over regression models in particular. Also, RFs outperform CITs in that they are substantially less prone to overfitting and they perform much better when applied to new data. However, random forests have several issues:
 
@@ -543,7 +565,8 @@ citdata <- head(citdata)
 citdata$ID <- 1:nrow(citdata)
 citdata <- citdata %>%
   dplyr::select(ID, Age, Gender, Status, LikeUser)
-kable(citdata, caption = "Example data set to illustrate Random Forests.")
+# inspect data
+datatable(citdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 We now draw a sample from this data set and receive the following data set.
@@ -551,16 +574,17 @@ We now draw a sample from this data set and receive the following data set.
 ```{r rf2, echo=F, message=FALSE, warning=FALSE}
 citdata <- citdata[c(6, 3, 4, 1, 2, 2),]
 rownames(citdata) <- NULL
-kable(citdata, caption = "Bootstrapped data set to illustrate Random Forests.")
+# inspect data
+datatable(citdata, rownames = FALSE, options = list(pageLength = 6, scrollX=T), filter = "none")
 ```
 
 As you can see, the bootstrapped data contains the second row twice while the fifth row is missing.
 
-**Out-Of-Bag data**
+### Out-Of-Bag data{-}
 
 Because the data is reshuffled for every new tree, a part of the data (on average about 30%) remains unused for a given tree. The data that is not used is called Out-Of-Bag data or OOB. The OOB is important because the quality of the overall performance of the random forest can be assessed by applying the resulting tree-model to the data that it was not fit to. The quality of that tree is then measured in the OOB error, which is the error rate of the respective tree if applied to the OOB data.
 
-**Random Variable Selection**
+### Random Variable Selection{-}
 
 Random Forests also differ from simple CITs in that at each step, not all possible variables are considered for a node, but only a subset. For example, we have a data set with five predicting independent variables and one dependent variable. When generating a CIT, all possible variables (variables that do not represent a node further up in the tree) are considered as splitting candidates. In Random Forests, only a fixed number (typically the square-root of the number of independent variables) are considered as candidates for a node. So, at each potential split, a fixed number of randomly selected variables is considered potential node candidates.
 
@@ -572,21 +596,24 @@ This section shows how a Random Forest Analysis can be implemented in R. Ina fir
 # load random forest data
 rfdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/rfdata.txt", header = T, sep = "\t")
 # inspect data
-head(rfdata); str(rfdata)
-
+datatable(rfdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 The data consists of four categorical variables (Gender, Age, ConversationType, and SUFLike). Our dependent variable is SUFLike which stands for speech-unit final like (a pragmatic marker that is common in Irish English and is used as in "A wee girl of her age, like"). While Age and Gender are pretty straight forward what they are called, ConversationType encodes whether a conversation has taken place between interlocutors of the same or of different genders.
 
 Before going any further, we need to factorize the variables as tree-based models require factors instead of character variables (but they can, of course, handle numeric and ordinal variables). In addition, we will check if the data contains missing values (NAs).
 
-```{r rf4, echo=T, message=FALSE, warning=FALSE}
+```{r rf4a, echo=T, message=FALSE, warning=FALSE}
 # factorize variables (rf require factors instead of character vectors)
 fcts <- c("Gender", "Age", "ConversationType", "Priming", "SUFLike")
 rfdata[fcts] <- lapply(rfdata[fcts], factor)
 # inspect data
-str(rfdata)
+datatable(rfdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
+```
 
+We now check if the data contains missing values and remove those (if necessary).
+
+```{r rf4b, echo=T, message=FALSE, warning=FALSE}
 # check for NAs
 natest <- rfdata %>%
   na.omit()
@@ -716,7 +743,7 @@ partialPlot(rfmodel3, rfdata, Age)
 
 Another common way to evaluate the performance of RFs and prune them is to split the data into a test and a training set. the model is then fit to the training set and, after that, applied to the test set. This allows us to evaluate how well the RF performs on data that it was not trained on. This approach is particularly common in machine learning contexts. 
 
-# Boruta{-}
+# Boruta
 
 Boruta [@kursa2010feature] is a variable selection procedure and it represents an extension of random forest analyses [@breiman2001random]. The name “Boruta” is derived from a demon in Slavic mythology who dwelled in pine forests. Boruta is an alternative to regression modelling that is better equipped to handle small data sets because it uses a distributional approach during which hundreds of (random) forests are grown from permutated data sets. Boruta Boruta outperforms random forest analyses because:
 
@@ -744,8 +771,8 @@ We begin by loading and inspecting the data.
 ```{r bo1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load data
 borutadata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/borutadata.txt", header = T, sep = "\t")
-# inspect Boruta data
-str(borutadata)
+# inspect data
+datatable(borutadata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 As the data contains non-factorized character variables, we convert those into factors.
@@ -756,7 +783,7 @@ fcts <- c("Age", "Adjective", "Function", "Priming", "Gender", "Occupation",
           "ConversationType", "AudienceSize", "really", "Gradabilty", "SemanticCategory")
 borutadata[fcts] <- lapply(borutadata[fcts], factor)
 # inspect data
-str(borutadata)
+datatable(borutadata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
 We can now create our initial Boruta model and set a seed for reproducibility.
@@ -797,24 +824,59 @@ getConfirmedFormula(boruta2)
 
 ```
 
-Onlyadjective frequency and adjective type are confirmed as being important while all other variables are considered tentative. However, no more variables need to be removed as all remaining variables are not considered unimportnat. In a last step, we visualize the results of the Boruta analysis.
+Only adjective frequency and adjective type are confirmed as being important while all other variables are considered tentative. However, no more variables need to be removed as all remaining variables are not considered unimportant. In a last step, we visualize the results of the Boruta analysis.
 
 ```{r bo7, echo=T, eval = T, message=FALSE, warning=FALSE}
-par(mar = c(8, 8, 4, 2) + 0.1)
-plot(boruta2, cex.axis=.75, las=2, xlab="", ylab = "", cex = .75, 
-     col = c(rep("grey50", 7),rep("grey90", 3)))
-abline(v = 3.5, lty = "dashed")
-mtext("Predictors", 1, line = 7, at = 7, cex = 1)
-mtext("Control", 1, line = 7, at = 2, cex = 1)
-mtext("Importance", 2, line = 2.5, at = 2.5, cex = 1, las = 0)
-par(mar = c(5, 4, 4, 2) + 0.1)
+library(ggplot2)
+library(tidyr)
+library(stringr)
+borutadf <- as.data.frame(boruta2$ImpHistory) %>%
+  gather(Variable, Importance, Adjective:shadowMin) %>%
+  mutate(Type = ifelse(str_detect(Variable, "shadow"), "Control", "Predictor")) %>%
+  mutate(Type = factor(Type),
+         Variable = factor(Variable))
+ggplot(borutadf, aes(x = reorder(Variable, Importance, mean), y = Importance, fill = Type)) + 
+  geom_boxplot() +
+  geom_vline(xintercept=3.5, linetype="dashed", color = "black") +
+  scale_fill_manual(values = c("gray80", "gray40")) +
+  theme_bw() + 
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle=90)) +
+  labs(x = "Variable")
 ```
 
 Of the remaining variables, adjective frequency and adjective type have the strongest effect and are confirmed as being important while syntactic function fails to perform better than the best shadow variable. All other variables have only a marginal effect on the use of really as an adjective amplifier.
 
-# How to cite this tutorial {-}
 
-Schweinberger, Martin. 2020. *Tree-Based Models with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/advancedstatztrees.html.
+# Citation & Session Info {-}
 
-# References {-}
+Schweinberger, Martin. 2020. *Tree-Based Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/advancedstatztrees.html (Version 2020.09.25).
+
+```
+@manual{schweinberger2020tree,
+  author = {Schweinberger, Martin},
+  title = {Tree-Based Models in R},
+  note = {https://slcladal.github.io/advancedstatztrees.html},
+  year = {2020},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/09/25}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Main page](https://slcladal.github.io/index.html)
+
+***
+
+
+# References{-}
+
+
 
