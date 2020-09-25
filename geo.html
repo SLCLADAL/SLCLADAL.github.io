@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Mel Moreno and Mathieu Basille" />
+
+
+<title>Drawing beautiful maps programmatically with R, sf and ggplot2 - Part 1: Basics</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #ffffff;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+.tocify-subheader {
+  display: inline;
+}
+.tocify-subheader .tocify-item {
+  font-size: 0.95em;
+}
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row-fluid">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">LADAL</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="people.html">OUR PEOPLE</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    NEWS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="news.html">News &amp; Announcements</a>
+    </li>
+    <li>
+      <a href="conferences.html">Events &amp; Presentations</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    DATA SCIENCE BASICS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Introduction to Data Science</li>
+    <li>
+      <a href="introcomputer.html">Working with Computers: Tips and Tricks</a>
+    </li>
+    <li>
+      <a href="reproducibility.html">Data Management, Version Control, and Reproducibility</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Quantitative Research</li>
+    <li>
+      <a href="introquant.html">Introduction to Quantitative Reasoning</a>
+    </li>
+    <li>
+      <a href="basicquant.html">Basic Concepts in Quantitative Research</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Introduction to R</li>
+    <li>
+      <a href="IntroR_workshop.html">Getting started</a>
+    </li>
+    <li>
+      <a href="stringprocessing.html">String Processing</a>
+    </li>
+    <li>
+      <a href="regularexpressions.html">Regular Expressions</a>
+    </li>
+    <li>
+      <a href="introtables.html">Working with Tables</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    TUTORIALS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li class="dropdown-header">Data Visualization</li>
+    <li>
+      <a href="introviz.html">Introduction to Data Viz</a>
+    </li>
+    <li>
+      <a href="basicgraphs.html">Common Visualization Types</a>
+    </li>
+    <li>
+      <a href="basicgraphs.html">Advanced Visualization Methods</a>
+    </li>
+    <li>
+      <a href="maps.html">Displaying Geo-Spatial Data</a>
+    </li>
+    <li>
+      <a href="motion.html">Interactive Charts</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Statistics</li>
+    <li>
+      <a href="descriptivestatz.html">Descriptive Statistics</a>
+    </li>
+    <li>
+      <a href="basicstatz.html">Basic Inferential Statistics</a>
+    </li>
+    <li>
+      <a href="regression.html">Regression Analysis</a>
+    </li>
+    <li>
+      <a href="advancedstatztrees.html">Tree-Based Models</a>
+    </li>
+    <li>
+      <a href="groupingstatz.html">Cluster and Correspondence Analysis</a>
+    </li>
+    <li>
+      <a href="svm.html">Semantic Vector Space Models</a>
+    </li>
+    <li class="divider"></li>
+    <li class="dropdown-header">Text Analytics</li>
+    <li>
+      <a href="textanalysis.html">Text Analysis and Distant Reading</a>
+    </li>
+    <li>
+      <a href="kwics.html">Concordancing (keywords-in-context)</a>
+    </li>
+    <li>
+      <a href="basicnetwork.html">Network Analysis</a>
+    </li>
+    <li>
+      <a href="collocations.html">Co-occurrence and Collocation Analysis</a>
+    </li>
+    <li>
+      <a href="topicmodels.html">Topic Modeling</a>
+    </li>
+    <li>
+      <a href="sentiment.html">Sentiment Analysis</a>
+    </li>
+    <li>
+      <a href="tagging.html">Tagging and Parsing</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+    FOCUS &amp; CASE STUDIES
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="surveys.html">R for analyzing questionnaire and surveys</a>
+    </li>
+    <li>
+      <a href="corplingr.html">Swear words in Irish English</a>
+    </li>
+    <li>
+      <a href="convertpdf2txt.html">Converting PDFs to txt</a>
+    </li>
+    <li>
+      <a href="webcrawling.html">Web Crawling using R</a>
+    </li>
+  </ul>
+</li>
+<li>
+  <a href="services.html">SERVICES &amp; CONTACT</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Drawing beautiful maps programmatically with R, sf and ggplot2 - Part 1: Basics</h1>
+<h4 class="author">Mel Moreno and Mathieu Basille</h4>
+
+</div>
+
+
+<p>DOWNLOADHERE</p>
+<p><em>EDIT: Following a suggestion from Adriano Fantini and code from Andy South, we replaced <code>rworlmap</code> by <code>rnaturalearth</code>.</em></p>
+<p>This tutorial is the first part in a series of three:</p>
+<ul>
+<li>General concepts illustrated with the world Map (this document)</li>
+<li><a href="ggplot2-sf-2.html">Adding additional layers: an example with points and polygons</a></li>
+<li><a href="ggplot2-sf-3.html">Positioning and layout for complex maps</a></li>
+</ul>
+<p>In this part, we will cover the fundamentals of mapping using <code>ggplot2</code> associated to <code>sf</code>, and presents the basics elements and parameters we can play with to prepare a map.</p>
+<p>Maps are used in a variety of fields to express data in an appealing and interpretive way. Data can be expressed into simplified patterns, and this data interpretation is generally lost if the data is only seen through a spread sheet. Maps can add vital context by incorporating many variables into an easy to read and applicable context. Maps are also very important in the information world because they can quickly allow the public to gain better insight so that they can stay informed. It’s critical to have maps be effective, which means creating maps that can be easily understood by a given audience. For instance, maps that need to be understood by children would be very different from maps intended to be shown to geographers.</p>
+<p>Knowing what elements are required to enhance your data is key into making effective maps. Basic elements of a map that should be considered are polygon, points, lines, and text. Polygons, on a map, are closed shapes such as country borders. Lines are considered to be linear shapes that are not filled with any aspect, such as highways, streams, or roads. Finally, points are used to specify specific positions, such as city or landmark locations. With that in mind, one need to think about what elements are required in the map to really make an impact, and convey the information for the intended audience. Layout and formatting are the second critical aspect to enhance data visually. The arrangement of these map elements and how they will be drawn can be adjusted to make a maximum impact.</p>
+<div id="a-solution-using-r-and-its-ecosystem-of-packages" class="section level2">
+<h2><span class="header-section-number">0.1</span> A solution using R and its ecosystem of packages</h2>
+<p>Current solutions for creating maps usually involves GIS software, such as ArcGIS, QGIS, eSpatial, etc., which allow to visually prepare a map, in the same approach as one would prepare a poster or a document layout. On the other hand, R, a free and open-source software development environment (IDE) that is used for computing statistical data and graphic in a programmable language, has developed advanced spatial capabilities over the years, and can be used to draw maps programmatically.</p>
+<p>R is a powerful and flexible tool. R can be used from calculating data sets to creating graphs and maps with the same data set. R is also free, which makes it easily accessible to anyone. Some other advantages of using R is that it has an interactive language, data structures, graphics availability, a developed community, and the advantage of adding more functionalities through an entire ecosystem of packages. R is a scriptable language that allows the user to write out a code in which it will execute the commands specified.</p>
+<p>Using R to create maps brings these benefits to mapping. Elements of a map can be added or removed with ease. R code can be tweaked to make major enhancements with a stroke of a key. It is also easy to reproduce the same maps for different data sets. It is important to be able to script the elements of a map, so that it can be re-used and interpreted by any user. In essence, comparing typical GIS software and R for drawing maps is similar to comparing word processing software (e.g. Microsoft Office or LibreOffice) and a programmatic typesetting system such as LaTeX, in that typical GIS software implement a WYSIWIG approach (“What You See Is What You Get”), while R implements a WYSIWYM approach (“What You See Is What You Mean”).</p>
+<p>The package <code>ggplot2</code> implements the grammar of graphics in R, as a way to create code that make sense to the user: The grammar of graphics is a term used to breaks up graphs into semantic components, such as geometries and layers. Practically speaking, it allows (and forces!) the user to focus on graph elements at a higher level of abstraction, and how the data must be structured to achieve the expected outcome. While <code>ggplot2</code> is becoming the de facto standard for R graphs, it does not handle spatial data specifically. The current state-of-the-art of spatial objects in R relies on <code>Spatial</code> classes defined in the package <a href="https://cran.r-project.org/package=sp"><code>sp</code></a>, but the new package <a href="https://cran.r-project.org/package=sf"><code>sf</code></a> has recently implemented the “simple feature” standard, and is steadily taking over <code>sp</code>. Recently, the package <code>ggplot2</code> has allowed the use of simple features from the package <code>sf</code> as layers in a graph<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>. The combination of <code>ggplot2</code> and <code>sf</code> therefore enables to programmatically create maps, using the grammar of graphics, just as informative or visually appealing as traditional GIS software.</p>
+</div>
+<div id="getting-started" class="section level2">
+<h2><span class="header-section-number">0.2</span> Getting started</h2>
+<p>Many R packages are available from <a href="https://cran.r-project.org/">CRAN</a>, the Comprehensive R Archive Network, which is the primary repository of R packages. The full list of packages necessary for this series of tutorials can be installed with:</p>
+<pre class="r"><code>install.packages(c(&quot;cowplot&quot;, &quot;googleway&quot;, &quot;ggplot2&quot;, &quot;ggrepel&quot;, 
+    &quot;ggspatial&quot;, &quot;libwgeom&quot;, &quot;sf&quot;, &quot;rnaturalearth&quot;, &quot;rnaturalearthdata&quot;)</code></pre>
+<p>We start by loading the basic packages necessary for all maps, i.e. <code>ggplot2</code> and <code>sf</code>. We also suggest to use the classic dark-on-light theme for <code>ggplot2</code> (<code>theme_bw</code>), which is appropriate for maps:</p>
+<pre class="r"><code>library(&quot;ggplot2&quot;)
+theme_set(theme_bw())
+library(&quot;sf&quot;)</code></pre>
+<p>The package <code>rnaturalearth</code> provides a map of countries of the entire world. Use <code>ne_countries</code> to pull country data and choose the scale (<code>rnaturalearthhires</code> is necessary for <code>scale = "large"</code>). The function can return <code>sp</code> classes (default) or directly <code>sf</code> classes, as defined in the argument <code>returnclass</code>:</p>
+<pre class="r"><code>library(&quot;rnaturalearth&quot;)
+library(&quot;rnaturalearthdata&quot;)
+
+world &lt;- ne_countries(scale = &quot;medium&quot;, returnclass = &quot;sf&quot;)
+class(world)</code></pre>
+<pre><code>## [1] &quot;sf&quot;         &quot;data.frame&quot;</code></pre>
+</div>
+<div id="general-concepts-illustrated-with-the-world-map" class="section level1">
+<h1><span class="header-section-number">1</span> General concepts illustrated with the world map</h1>
+<div id="data-and-basic-plot-ggplot-and-geom_sf" class="section level2">
+<h2><span class="header-section-number">1.1</span> Data and basic plot (<code>ggplot</code> and <code>geom_sf</code>)</h2>
+<p>First, let us start with creating a base map of the world using <code>ggplot2</code>. This base map will then be extended with different map elements, as well as zoomed in to an area of interest. We can check that the world map was properly retrieved and converted into an <code>sf</code> object, and plot it with <code>ggplot2</code>:</p>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf()</code></pre>
+<p><img src="geo_files/figure-html/world-plot-1.png" width="90%" /></p>
+<p>This call nicely introduces the structure of a <code>ggplot</code> call: The first part <code>ggplot(data = world)</code> initiates the <code>ggplot</code> graph, and indicates that the main data is stored in the <code>world</code> object. The line ends up with a <code>+</code> sign, which indicates that the call is not complete yet, and each subsequent line correspond to another layer or scale. In this case, we use the <code>geom_sf</code> function, which simply adds a geometry stored in a <code>sf</code> object. By default, all geometry functions use the main data defined in <code>ggplot()</code>, but we will see later how to provide additional data.</p>
+<p>Note that layers are added one at a time in a <code>ggplot</code> call, so the order of each layer is very important. All data will have to be in an <code>sf</code> format to be used by <code>ggplot2</code>; data in other formats (e.g. classes from <code>sp</code>) will be manually converted to <code>sf</code> classes if necessary.</p>
+</div>
+<div id="title-subtitle-and-axis-labels-ggtitle-xlab-ylab" class="section level2">
+<h2><span class="header-section-number">1.2</span> Title, subtitle, and axis labels (<code>ggtitle</code>, <code>xlab</code>, <code>ylab</code>)</h2>
+<p>A title and a subtitle can be added to the map using the function <code>ggtitle</code>, passing any valid character string (e.g. with quotation marks) as arguments. Axis names are absent by default on a map, but can be changed to something more suitable (e.g. “Longitude” and “Latitude”), depending on the map:</p>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf() +
+    xlab(&quot;Longitude&quot;) + ylab(&quot;Latitude&quot;) +
+    ggtitle(&quot;World map&quot;, subtitle = paste0(&quot;(&quot;, length(unique(world$NAME)), &quot; countries)&quot;))</code></pre>
+<p><img src="geo_files/figure-html/world-title-1.png" width="90%" /></p>
+</div>
+<div id="map-color-geom_sf" class="section level2">
+<h2><span class="header-section-number">1.3</span> Map color (<code>geom_sf</code>)</h2>
+<p>In many ways, <code>sf</code> geometries are no different than regular geometries, and can be displayed with the same level of control on their attributes. Here is an example with the polygons of the countries filled with a green color (argument <code>fill</code>), using black for the outline of the countries (argument <code>color</code>):</p>
+<pre class="r"><code>ggplot(data = world) + 
+    geom_sf(color = &quot;black&quot;, fill = &quot;lightgreen&quot;)</code></pre>
+<p><img src="geo_files/figure-html/world-colors-1.png" width="90%" /></p>
+<p>The package <code>ggplot2</code> allows the use of more complex color schemes, such as a gradient on one variable of the data. Here is another example that shows the population of each country. In this example, we use the “viridis” colorblind-friendly palette for the color gradient (with <code>option = "plasma"</code> for the plasma variant), using the square root of the population (which is stored in the variable <code>pop_est</code> of the <code>world</code> object):</p>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf(aes(fill = pop_est)) +
+    scale_fill_viridis_c(option = &quot;plasma&quot;, trans = &quot;sqrt&quot;)</code></pre>
+<p><img src="geo_files/figure-html/world-colors-pop-1.png" width="90%" /></p>
+</div>
+<div id="projection-and-extent-coord_sf" class="section level2">
+<h2><span class="header-section-number">1.4</span> Projection and extent (<code>coord_sf</code>)</h2>
+<p>The function <code>coord_sf</code> allows to deal with the coordinate system, which includes both projection and extent of the map. By default, the map will use the coordinate system of the first layer that defines one (i.e. scanned in the order provided), or if none, fall back on WGS84 (latitude/longitude, the reference system used in GPS). Using the argument <code>crs</code>, it is possible to override this setting, and project on the fly to any projection. This can be achieved using any valid PROJ4 string (here, the European-centric ETRS89 Lambert Azimuthal Equal-Area projection):</p>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf() +
+    coord_sf(crs = &quot;+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs &quot;)</code></pre>
+<p><img src="geo_files/figure-html/world-coord-1.png" width="65%" /></p>
+<p>Spatial Reference System Identifier (SRID) or an European Petroleum Survey Group (EPSG) code are available for the projection of interest, they can be used directly instead of the full PROJ4 string. The two following calls are equivalent for the ETRS89 Lambert Azimuthal Equal-Area projection, which is EPSG code 3035:</p>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf() +
+    coord_sf(crs = &quot;+init=epsg:3035&quot;)
+
+ggplot(data = world) +
+    geom_sf() +
+    coord_sf(crs = st_crs(3035))</code></pre>
+<p>The extent of the map can also be set in <code>coord_sf</code>, in practice allowing to “zoom” in the area of interest, provided by limits on the x-axis (<code>xlim</code>), and on the y-axis (<code>ylim</code>). Note that the limits are automatically expanded by a fraction to ensure that data and axes don’t overlap; it can also be turned off to exactly match the limits provided with <code>expand = FALSE</code>:</p>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf() +
+    coord_sf(xlim = c(-102.15, -74.12), ylim = c(7.65, 33.97), expand = FALSE)</code></pre>
+<p><img src="geo_files/figure-html/world-zoom-1.png" width="65%" /></p>
+</div>
+<div id="scale-bar-and-north-arrow-package-ggspatial" class="section level2">
+<h2><span class="header-section-number">1.5</span> Scale bar and North arrow (package <code>ggspatial</code>)</h2>
+<p>Several packages are available to create a scale bar on a map (e.g. <code>prettymapr</code>, <code>vcd</code>, <code>ggsn</code>, or <code>legendMap</code>). We introduce here the package <code>ggspatial</code>, which provides easy-to-use functions…</p>
+<p><code>scale_bar</code> that allows to add simultaneously the north symbol and a scale bar into the <code>ggplot</code> map. Five arguments need to be set manually: <code>lon</code>, <code>lat</code>, <code>distance_lon</code>, <code>distance_lat</code>, and <code>distance_legend</code>. The location of the scale bar has to be specified in longitude/latitude in the <code>lon</code> and <code>lat</code> arguments. The shaded distance inside the scale bar is controlled by the <code>distance_lon</code> argument. while its width is determined by <code>distance_lat</code>. Additionally, it is possible to change the font size for the legend of the scale bar (argument <code>legend_size</code>, which defaults to 3). The North arrow behind the “N” north symbol can also be adjusted for its length (<code>arrow_length</code>), its distance to the scale (<code>arrow_distance</code>), or the size the N north symbol itself (<code>arrow_north_size</code>, which defaults to 6). Note that all distances (<code>distance_lon</code>, <code>distance_lat</code>, <code>distance_legend</code>, <code>arrow_length</code>, <code>arrow_distance</code>) are set to <code>"km"</code> by default in <code>distance_unit</code>; they can also be set to nautical miles with “nm”, or miles with “mi”.</p>
+<pre class="r"><code>library(&quot;ggspatial&quot;)
+ggplot(data = world) +
+    geom_sf() +
+    annotation_scale(location = &quot;bl&quot;, width_hint = 0.5) +
+    annotation_north_arrow(location = &quot;bl&quot;, which_north = &quot;true&quot;, 
+        pad_x = unit(0.75, &quot;in&quot;), pad_y = unit(0.5, &quot;in&quot;),
+        style = north_arrow_fancy_orienteering) +
+    coord_sf(xlim = c(-102.15, -74.12), ylim = c(7.65, 33.97))</code></pre>
+<pre><code>## Scale on map varies by more than 10%, scale bar may be inaccurate</code></pre>
+<p><img src="geo_files/figure-html/world-scale-north-1.png" width="65%" /></p>
+<p>Note the warning of the inaccurate scale bar: since the map use unprojected data in longitude/latitude (WGS84) on an equidistant cylindrical projection (all meridians being parallel), length in (kilo)meters on the map directly depends mathematically on the degree of latitude. Plots of small regions or projected data will often allow for more accurate scale bars.</p>
+</div>
+<div id="country-names-and-other-names-geom_text-and-annotate" class="section level2">
+<h2><span class="header-section-number">1.6</span> Country names and other names (<code>geom_text</code> and <code>annotate</code>)</h2>
+<p>The <code>world</code> data set already contains country names and the coordinates of the centroid of each country (among more information). We can use this information to plot country names, using <code>world</code> as a regular <code>data.frame</code> in <code>ggplot2</code>. The function <code>geom_text</code> can be used to add a layer of text to a map using geographic coordinates. The function requires the data needed to enter the country names, which is the same data as the world map. Again, we have a very flexible control to adjust the text at will on many aspects:</p>
+<ul>
+<li>The size (argument <code>size</code>);</li>
+<li>The alignment, which is centered by default on the coordinates provided. The text can be adjusted horizontally or vertically using the arguments <code>hjust</code> and <code>vjust</code>, which can either be a number between 0 (right/bottom) and 1 (top/left) or a character (“left”, “middle”, “right”, “bottom”, “center”, “top”). The text can also be offset horizontally or vertically with the argument <code>nudge_x</code> and <code>nudge_y</code>;</li>
+<li>The font of the text, for instance its color (argument <code>color</code>) or the type of font (<code>fontface</code>);</li>
+<li>The overlap of labels, using the argument <code>check_overlap</code>, which removes overlapping text. Alternatively, when there is a lot of overlapping labels, the package <code>ggrepel</code> provides a <code>geom_text_repel</code> function that moves label around so that they do not overlap.</li>
+<li>For the text labels, we are defining the centroid of the counties with <code>st_centroid</code>, from the package <code>sf</code>. Then we combined the coordinates with the centroid, in the <code>geometry</code> of the spatial data frame. The package <code>sf</code> is necessary for the command <code>st_centroid</code>.</li>
+</ul>
+<p>Additionally, the <code>annotate</code> function can be used to add a single character string at a specific location, as demonstrated here to add the Gulf of Mexico:</p>
+<pre class="r"><code>library(&quot;sf&quot;)
+world_points&lt;- st_centroid(world)
+world_points &lt;- cbind(world, st_coordinates(st_centroid(world$geometry)))
+
+ggplot(data = world) +
+    geom_sf() +
+    geom_text(data= world_points,aes(x=X, y=Y, label=name),
+        color = &quot;darkblue&quot;, fontface = &quot;bold&quot;, check_overlap = FALSE) +
+    annotate(geom = &quot;text&quot;, x = -90, y = 26, label = &quot;Gulf of Mexico&quot;, 
+        fontface = &quot;italic&quot;, color = &quot;grey22&quot;, size = 6) +
+    coord_sf(xlim = c(-102.15, -74.12), ylim = c(7.65, 33.97), expand = FALSE)</code></pre>
+<p><img src="geo_files/figure-html/world-country-1.png" width="65%" /></p>
+</div>
+</div>
+<div id="final-map" class="section level1">
+<h1><span class="header-section-number">2</span> Final map</h1>
+<p>Now to make the final touches, the theme of the map can be edited to make it more appealing. We suggested the use of <code>theme_bw</code> for a standard theme, but there are many other themes that can be selected from (see for instance <code>?ggtheme</code> in <code>ggplot2</code>, or the package <a href="https://cran.r-project.org/package=ggthemes"><code>ggthemes</code></a> which provide several useful themes). Moreover, specific theme elements can be tweaked to get to the final outcome:</p>
+<ul>
+<li>Position of the legend: Although not used in this example, the argument <code>legend.position</code> allows to automatically place the legend at a specific location (e.g. <code>"topright"</code>, <code>"bottomleft"</code>, etc.);</li>
+<li>Grid lines (graticules) on the map: by using <code>panel.grid.major</code> and <code>panel.grid.minor</code>, grid lines can be adjusted. Here we set them to a gray color and dashed line type to clearly distinguish them from country borders lines;</li>
+<li>Map background: the argument <code>panel.background</code> can be used to color the background, which is the ocean essentially, with a light blue;</li>
+<li>Many more elements of a theme can be adjusted, which would be too long to cover here. We refer the reader to the documentation for the function <code>theme</code>.</li>
+</ul>
+<pre class="r"><code>ggplot(data = world) +
+    geom_sf(fill= &quot;antiquewhite&quot;) +
+    geom_text(data= world_points,aes(x=X, y=Y, label=name),
+        color = &quot;darkblue&quot;, fontface = &quot;bold&quot;, check_overlap = FALSE) +
+    annotate(geom = &quot;text&quot;, x = -90, y = 26, label = &quot;Gulf of Mexico&quot;, 
+        fontface = &quot;italic&quot;, color = &quot;grey22&quot;, size = 6) +
+    annotation_scale(location = &quot;bl&quot;, width_hint = 0.5) +
+    annotation_north_arrow(location = &quot;bl&quot;, which_north = &quot;true&quot;, 
+        pad_x = unit(0.75, &quot;in&quot;), pad_y = unit(0.5, &quot;in&quot;),
+        style = north_arrow_fancy_orienteering) +
+    coord_sf(xlim = c(-102.15, -74.12), ylim = c(7.65, 33.97), expand = FALSE) +
+    xlab(&quot;Longitude&quot;) + ylab(&quot;Latitude&quot;) +
+    ggtitle(&quot;Map of the Gulf of Mexico and the Caribbean Sea&quot;) +
+    theme(panel.grid.major = element_line(color = gray(.5),
+        linetype = &quot;dashed&quot;, size = 0.5),
+        panel.background = element_rect(fill = &quot;aliceblue&quot;))</code></pre>
+<p><img src="geo_files/figure-html/world-florida-final-1.png" width="65%" /></p>
+<div id="saving-the-map-with-ggsave" class="section level2">
+<h2><span class="header-section-number">2.1</span> Saving the map with <code>ggsave</code></h2>
+<p>The final map now ready, it is very easy to save it using <code>ggsave</code>. This function allows a graphic (typically the last plot displayed) to be saved in a variety of formats, including the most common PNG (raster bitmap) and PDF (vector graphics), with control over the size and resolution of the outcome. For instance here, we save a PDF version of the map, which keeps the best quality, and a PNG version of it for web purposes:</p>
+<pre class="r"><code>ggsave(&quot;map.pdf&quot;)
+ggsave(&quot;map_web.png&quot;, width = 6, height = 6, dpi = &quot;screen&quot;)</code></pre>
+</div>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Note: Support of <code>sf</code> objects is available since version 3.0.0 of <code>ggplot2</code>, recently released on CRAN.<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+</ol>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = false;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
