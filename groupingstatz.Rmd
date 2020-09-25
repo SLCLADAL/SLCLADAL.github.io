@@ -1,5 +1,5 @@
 ---
-title: "Classification and Clustering with R"
+title: "Cluster and Correspondence Analysis in R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -11,7 +11,7 @@ link-citations: yes
 knitr::include_graphics("images/uq1.jpg")
 ```
 
-# Introduction
+# Introduction{-}
 
 This tutorial introduces classification and clustering using R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/groupingstatz.Rmd). 
 
@@ -40,7 +40,7 @@ Once you have installed R-Studio and initiated the session by executing the code
 
 The most common method in linguistics that is sued to detect groups in data are cluster analyses. Cluster analyses are common in linguistics because they not only detect commonalities based on the frequency or occurrence of features but they also allow to visualize when splits between groups have occurred and are thus the method of choice in historical linguistics to determine and show genealogical relationships. 
 
-## Underlying Concepts
+## Underlying Concepts{-}
 
 The next section focuses on the basic idea that underlies all cluster analyses. WE will have a look at some very basic examples to highlight and discuss the principles that cluster analyses rely on. 
 
@@ -173,7 +173,7 @@ kable(diststudentstb, caption = "Distance matrix based of students based on grad
 
 Based on this distance matrix, we can now implement a cluster analysis in `R`. 
 
-## Cluster Analysis: Numeric Data
+## Cluster Analysis on Numeric Data{-}
 
 To create a simple cluster object in R, we use the "hclust" function from the "cluster" package. The resulting object is then plotted to create a dendrogram which shows how students have been amalgamated (combined) by the clustering algorithm (which, in the present case, is called "ward.D").
 
@@ -234,7 +234,7 @@ Now, the lowest distance value occurs between Cluster 1 and Student C. Thus, Stu
 
 How and which elements are merged depends on the what is understood as distance. Since "distance" is such an important concept in cluster analyses, we will briefly discuss this notion to understand why there are so many different types of clustering algorithms and this cluster analyses.
 
-### Distances
+## Distance and Similarity Measures{-}
 
 To understand how a cluster analysis determines to which cluster a given data point belongs, we need to understand what different distance measures represent. Have a look at the Figure below which visually represents three different ways to conceptualize distance.
 
@@ -489,9 +489,7 @@ plot(as.phylo(cd),      # plot cluster object
      label.offset = 1)  # .5 label offset
 ```
 
-
-
-## Cluster Analysis: Nominal Data
+## Cluster Analysis on Nominal Data{-}
 
 So far, all analyses were based on numeric data. However, especially when working with language data, the data is nominal or categorical rather than numeric. The following will thus show to implement a clustering method for nominal data.
 
@@ -567,11 +565,18 @@ assocstats(table(cluster, clsts.df$like))
 Clustering is a highly complex topic and there many more complexities to it. However, this should have helped to get you started.
 
 
-# Vector Space Models
+# Correspondence Analysis
 
-Vector Space Models are particularly useful when dealing with language data as they provide very accurate estimates of "semantic" similarity based on *word embeddings* (or co-occurrence profiles). Word embeddings refer to the vectors which hold the frequency information about how frequently a given word has co-occurred with other words. If the ordering of co-occurring words remains constant, then the vectors can be used to determine which words have similar profiles. 
+Correspondence analysis (CA) represents a multivariate statistical technique that provides a graphic method of exploring the relationship between variables in a contingency table. CA is conceptually similar to principal component analysis (PCA), but applies to categorical rather than continuous data.
 
-To show how vector space models work, we will follow the procedure described in @levshina2015linguistics. However, we will not use her `Rling` package, which is not supported my R version 4.0.2, to calculate cosine similarities but rather the `coop` package [see @coop]. In this tutorial, we investigate similarities among amplifiers based on their co-occurrences (word embeddings) with adjectives. Adjective amplifiers are elements such as those in 1. to 5.
+CA consists out of the following four steps:
+
+1. Computing row and column averages
+2. Computing expected values
+3. Computing the residuals
+4. Plotting residuals
+
+In this tutorial, we investigate similarities among amplifiers based on their co-occurrences (word embeddings) with adjectives. Adjective amplifiers are elements such as those in 1. to 5.
 
 1. The *very*~amplifier~ *nice*~adjective~ man.
 2. A *truely*~amplifier~ *remarkable*~adjective~ woman. 
@@ -579,7 +584,7 @@ To show how vector space models work, we will follow the procedure described in 
 4. The child was *awefully*~amplifier~ *loud*~adjective~.
 5. The festival was *so*~amplifier~ *amazing*~adjective~!
 
-The similarity among adjective amplifiers can then be used to find clusters or groups of amplifiers that "behave" similarly and are interchangeable. To elaborate, adjective amplifiers are interchangeable with some variants but not with others (consider 6. to 8.; the question mark signifies that the example is unlikely to be used or grammatically not acceptable by L1 speakers of English).
+The similarity among adjective amplifiers can then be used to find clusters or groups of amplifiers that *behave* similarly and are interchangeable. To elaborate, adjective amplifiers are interchangeable with some variants but not with others (consider 6. to 8.; the question mark signifies that the example is unlikely to be used or grammatically not acceptable by L1 speakers of English).
 
 6. The *very*~amplifier~ *nice*~adjective~ man.
 7. The *really*~amplifier~ *nice*~adjective~ man.
@@ -589,10 +594,10 @@ We start by loading the required packages, the data, and then displaying the dat
 
 ```{r vsm1}
 # load packages
-library(coop)
 library(dplyr)
-library(tm)
-library(cluster)
+library(FactoMineR)
+library(factoextra)
+library(gplots)
 library(DT)
 # load data
 vsmdata <- read.delim("https://slcladal.github.io/data/vsmdata.txt", sep = "\t", header = T)
@@ -631,118 +636,6 @@ vsmdata_simp <- vsmdata %>%
 datatable(vsmdata_simp, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
 ```
 
-In a next step, we create a matrix from this data frame which maps how often a given amplifier co-occurred with a given adjective. In text mining, this format is called a text-document matrix or tdm (which is a transposed [document-term matrix](https://en.wikipedia.org/wiki/Document-term_matrix) of dtm).
-
-```{r vsm3}
-# tabulate data (create term-document matrix)
-tdm <- ftable(vsmdata_simp$Adjective, vsmdata_simp$Amplifier)
-# extract amplifiers and adjectives 
-amplifiers <- as.vector(unlist(attr(tdm, "col.vars")[1]))
-adjectives <- as.vector(unlist(attr(tdm, "row.vars")[1]))
-# attach row and column names to tdm
-rownames(tdm) <- adjectives
-colnames(tdm) <- amplifiers
-# inspect data
-tdm[1:5, 1:5]
-```
-
-Now that we have a term document matrix, we want to remove adjectives that were never amplified. Note however that if we were interested in classifying adjectives (rather than amplifiers) according to their co-occurrence with amplifiers, we would, of course, not do this, as not being amplified would be a relevant feature for adjectives. But since we are interested in classifying amplifiers, not amplified adjectives do not have any information value.
-
-```{r vsm4}
-# convert frequencies greater than 1 into 1
-tdm <- t(apply(tdm, 1, function(x){ifelse(x > 1, 1, x)}))
-# remove adjectives that we never amplified
-tdm <- tdm[which(rowSums(tdm) > 1),]
-# transpose tdm because we are interested in amplifiers not adjectives
-tdm <- t(tdm)
-# inspect data
-tdm[1:5, 1:5]
-```
-
-In a next step, we extract the expected values of the co-occurrences if the amplifiers were distributed homogeneously and calculate the *Pointwise Mutual Information* (PMI) score and use that to then calculate the *Positive Pointwise Mutual Information* (PPMI) scores. According to @levshina2015linguistics 327 - referring to @bullinaria2007extracting - PPMI perform better than PMI as negative values are replaced with zeros. In a next step, we calculate the cosine similarity which will for the bases for the subsequent clustering.
-
-```{r vsm5}
-# compute expected values
-tdm.exp <- chisq.test(tdm)$expected
-# calculate PMI and PPMI
-PMI <- log2(tdm/tdm.exp)
-PPMI <- ifelse(PMI < 0, 0, PMI)
-# calculate cosine similarity
-cosinesimilarity <- cosine(PPMI)
-# inspect cosine values
-cosinesimilarity[1:5, 1:5]
-```
-
-As we have now obtained a similarity measure, we can go ahead and perform a cluster analysis on these similarity values. However, as we have to extract the maximum values in the similarity matrix that is not 1 as we will use this to create a distance matrix. While we could also have simply subtracted the cosine similarity values from 1 to convert the similarity matrix into a distance matrix, we follow the procedure proposed by @levshina2015linguistics.
-
-```{r vsm6, eval = T, echo=T, message=FALSE, warning=FALSE}
-# find max value that is not 1
-cosinesimilarity.test <- apply(cosinesimilarity, 1, function(x){
-  x <- ifelse(x == 1, 0, x) } )
-maxval <- max(cosinesimilarity.test)
-# create distance matrix
-amplifier.dist <- 1 - (cosinesimilarity/maxval)
-clustd <- as.dist(amplifier.dist)
-```
-
-In a next step, we want to determine the optimal number of clusters. This has two reasons: firstly, we need to establish that we have reason to assume that the data is not homogeneous (this would occur if the optimal number of clusters were 1), and, secondly, we want check how many meaningful clusters there are in our data.
-
-
-```{r vsm7, eval = T, echo=T, message=FALSE, warning=FALSE}
-# find optimal number of clusters
-asw <- as.vector(unlist(sapply(2:nrow(tdm)-1, function(x) pam(clustd, k = x)$silinfo$avg.width)))
-# determine the optimal number of clusters (max width is optimal)
-optclust <- which(asw == max(asw))+1 # optimal number of clusters
-# inspect clustering with optimal number of clusters
-amplifier.clusters <- pam(clustd, optclust)
-# inspect cluster solution
-amplifier.clusters$clustering
-```
-
-In a next step, we visualize the results of the semantic vector space model as a dendrogram.
-
-```{r vsm8, eval = T, echo=T, message=FALSE, warning=FALSE}
-# create cluster object
-cd <- hclust(clustd, method="ward.D")    
-# plot cluster object
-plot(cd, main = "", sub = "", yaxt = "n", ylab = "", xlab = "", cex = .8)
-# add colored ractangles around clusters
-rect.hclust(cd, k = 6, border = "gray60")
-
-```
-
-The clustering solution shows that, as expected, *completely* and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *very* and *really* form a cluster together with the zero variant. This is likely so because *really*, *very*, and the zero variant are the most frequent "variants" but also co-occur with the most variety of adjectives. The results can be interpreted to suggest that *really* and *very* are "default" amplifiers that lack distinct semantic profiles.
-
-There are many more useful methods for classifying and grouping data and the [tutorial by Gede Primahadi Wijaya Rajeg, Karlina Denistia, and Simon Musgrave](https://gederajeg.github.io/vector_space_model_indonesian/) [@rajeg2020semvec] highly recommended to get a better understanding of SVM but this should suffice to get you started.
-
-# Correspondence Analysis
-
-Correspondence analysis (CA) represents a multivariate statistical technique that provides a graphic method of exploring the relationship between variables in a contingency table. CA is conceptually similar to principal component analysis (PCA), but applies to categorical rather than continuous data.
-
-CA consists out of the following four steps:
-
-1. Computing row and column averages
-2. Computing expected values
-3. Computing the residuals
-4. Plotting residuals
-
-As is the tutorial on Semantic Vector Space Models, we will we investigate similarities among amplifiers based on their co-occurrences (word embeddings) with adjectives. To this end, we continue with the simplified `vsmdata` (`vsmdata_simp`).
-
-## Preparation{-}
-
-We start by loading the required packages and by inspecting the simplified `vsmdata` (`vsmdata_simp`)
-
-
-```{r ca1}
-# load libraries
-library(dplyr)
-library(FactoMineR)
-library(factoextra)
-library(gplots)
-library(DT)
-# inspect data
-datatable(vsmdata_simp, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
-```
 We now use a balloon plot to see if tehre are any potential correlations between amplifiers and adjectives.
 
 
@@ -906,7 +799,20 @@ text(x, y, labels = row.names(clus), cex=.7)
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Classification and Clustering with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/groupingstatz.html.
+Schweinberger, Martin. 2020. *Cluster and Correspondence Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/groupingstatz.html (Version 2020/09/25).
+
+```
+@manual{schweinberger2020clust,
+  author = {Schweinberger, Martin},
+  title = {Cluster and Correspondence Analysis in R},
+  note = {https://slcladal.github.io/groupingstatz.html},
+  year = {2020},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/09/23}
+}
+```
+
 
 ```{r fin}
 sessionInfo()
