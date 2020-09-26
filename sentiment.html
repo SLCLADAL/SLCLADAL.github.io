@@ -11,7 +11,7 @@
 
 <meta name="author" content="Martin Schweinberger" />
 
-<meta name="date" content="2020-09-23" />
+<meta name="date" content="2020-09-26" />
 
 <title>Sentiment Analysis in R</title>
 
@@ -443,7 +443,10 @@ div.tocify {
       <a href="advancedstatztrees.html">Tree-Based Models</a>
     </li>
     <li>
-      <a href="groupingstatz.html">Classification</a>
+      <a href="groupingstatz.html">Cluster and Correspondence Analysis</a>
+    </li>
+    <li>
+      <a href="svm.html">Semantic Vector Space Models</a>
     </li>
     <li class="divider"></li>
     <li class="dropdown-header">Text Analytics</li>
@@ -489,6 +492,9 @@ div.tocify {
     <li>
       <a href="webcrawling.html">Web Crawling using R</a>
     </li>
+    <li>
+      <a href="vc.html">Creating Vowel Charts with Praat and R</a>
+    </li>
   </ul>
 </li>
 <li>
@@ -508,7 +514,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Sentiment Analysis in R</h1>
 <h4 class="author">Martin Schweinberger</h4>
-<h4 class="date">2020-09-23</h4>
+<h4 class="date">2020-09-26</h4>
 
 </div>
 
@@ -529,7 +535,7 @@ install.packages(c(&quot;knitr&quot;, &quot;lattice&quot;, &quot;ggplot2&quot;, 
 </div>
 <div id="sentiment-analysis" class="section level1">
 <h1><span class="header-section-number">1</span> Sentiment Analysis</h1>
-<p>Sentiment Analysis is a cover term for approaches which extract information on emotion or opinion from natural language [@]. Sentiment analyses have been successfully applied to analysis of language data in a wide range of disciplines such as psychology, economics, education, as well as political and social sciences. Commonly sentiment analyses are used to determine the stance of a larger group of speakers towards a given phenomenon such as political candidates or parties, product lines or situations. Crucially, sentiment analyses are employed in these domains because they have advantages compared to alternative methods investigating the verbal expression of emotion. One advantage of sentiment analyses is that the emotion coding of sentiment analysis is fully replicable.</p>
+<p>Sentiment Analysis is a cover term for approaches which extract information on emotion or opinion from natural language <span class="citation">(<span class="citeproc-not-found" data-reference-id="silge2017text"><strong>???</strong></span>)</span>. Sentiment analyses have been successfully applied to analysis of language data in a wide range of disciplines such as psychology, economics, education, as well as political and social sciences. Commonly sentiment analyses are used to determine the stance of a larger group of speakers towards a given phenomenon such as political candidates or parties, product lines or situations. Crucially, sentiment analyses are employed in these domains because they have advantages compared to alternative methods investigating the verbal expression of emotion. One advantage of sentiment analyses is that the emotion coding of sentiment analysis is fully replicable.</p>
 <p>Typically, Sentiment Analysis represents a type of classifier only provide information about positive or negative polarity, e.g. whether a tweet is “positive” or “negative”. Therefore, Sentiment Analysis is often regarded as rather coarse-grained and, thus, rather irrelevant for the types of research questions in linguistics.</p>
 <p>In the language sciences, Sentiment Analysis can also be a very helpful tool if the type of Sentiment Analysis provides more fine-grained information. In the following, we will perform such a information-rich Sentiment Analysis. The Sentiment Analysis used here does not only provide information about polarity but it will also provide association values for eight core emotions.</p>
 <p>The more fine-grained output is made possible by relying on the Word-Emotion Association Lexicon (Mohammad &amp; Turney 2013), which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (see <span class="citation">Mohammad and Turney (<a href="#ref-mohammad2013crowdsourcing" role="doc-biblioref">2013</a>)</span>). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word <em>cry</em> or <em>tragedy</em> are more readily associated with SADNESS while words such as <em>happy</em> or <em>beautiful</em> are indicative of JOY and words like <em>fit</em> or <em>burst</em> may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction.</p>
@@ -537,101 +543,22 @@ install.packages(c(&quot;knitr&quot;, &quot;lattice&quot;, &quot;ggplot2&quot;, 
 <h2>Getting started</h2>
 <p>Before turning to the SA, we will load the packages for this tutorial.</p>
 <pre class="r"><code># activate packages
-lapply(c(&quot;knitr&quot;, &quot;lattice&quot;, &quot;ggplot2&quot;, &quot;dplyr&quot;, &quot;likert&quot;, &quot;scales&quot;, 
-         &quot;vcd&quot;, &quot;tm&quot;, &quot;wordcloud&quot;, &quot;stringr&quot;, &quot;SnowballC&quot;, &quot;tidyr&quot;, 
-         &quot;gridExtra&quot;, &quot;knitr&quot;, &quot;kableExtra&quot;, &quot;stringr&quot;), 
-       library, 
-       character.only = TRUE)</code></pre>
-<pre><code>## [[1]]
-## [1] &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot; 
-## [7] &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[2]]
-## [1] &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;    
-## [7] &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[3]]
-##  [1] &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot;
-##  [7] &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[4]]
-##  [1] &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot; 
-##  [7] &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[5]]
-##  [1] &quot;likert&quot;    &quot;xtable&quot;    &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;    
-##  [7] &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;  
-## [13] &quot;base&quot;     
-## 
-## [[6]]
-##  [1] &quot;scales&quot;    &quot;likert&quot;    &quot;xtable&quot;    &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;  
-##  [7] &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot; 
-## [13] &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[7]]
-##  [1] &quot;vcd&quot;       &quot;grid&quot;      &quot;scales&quot;    &quot;likert&quot;    &quot;xtable&quot;    &quot;dplyr&quot;    
-##  [7] &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;     &quot;graphics&quot;  &quot;grDevices&quot;
-## [13] &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[8]]
-##  [1] &quot;tm&quot;        &quot;NLP&quot;       &quot;vcd&quot;       &quot;grid&quot;      &quot;scales&quot;    &quot;likert&quot;   
-##  [7] &quot;xtable&quot;    &quot;dplyr&quot;     &quot;ggplot2&quot;   &quot;lattice&quot;   &quot;knitr&quot;     &quot;stats&quot;    
-## [13] &quot;graphics&quot;  &quot;grDevices&quot; &quot;utils&quot;     &quot;datasets&quot;  &quot;methods&quot;   &quot;base&quot;     
-## 
-## [[9]]
-##  [1] &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;         
-##  [6] &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;       
-## [11] &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;    
-## [16] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
-## 
-## [[10]]
-##  [1] &quot;stringr&quot;      &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;         
-##  [6] &quot;vcd&quot;          &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;      
-## [11] &quot;dplyr&quot;        &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;       
-## [16] &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;     
-## [21] &quot;base&quot;        
-## 
-## [[11]]
-##  [1] &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;          
-##  [6] &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;      
-## [11] &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;       
-## [16] &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;    
-## [21] &quot;methods&quot;      &quot;base&quot;        
-## 
-## [[12]]
-##  [1] &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;    &quot;RColorBrewer&quot;
-##  [6] &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;         &quot;scales&quot;      
-## [11] &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;      &quot;lattice&quot;     
-## [16] &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;    &quot;utils&quot;       
-## [21] &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
-## 
-## [[13]]
-##  [1] &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;   
-##  [6] &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;        
-## [11] &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;     
-## [16] &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;   
-## [21] &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
-## 
-## [[14]]
-##  [1] &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;      &quot;wordcloud&quot;   
-##  [6] &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;          &quot;grid&quot;        
-## [11] &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;        &quot;ggplot2&quot;     
-## [16] &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;     &quot;grDevices&quot;   
-## [21] &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
-## 
-## [[15]]
-##  [1] &quot;kableExtra&quot;   &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;     
-##  [6] &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;         
-## [11] &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;       
-## [16] &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;    
-## [21] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;        
-## 
-## [[16]]
-##  [1] &quot;kableExtra&quot;   &quot;gridExtra&quot;    &quot;tidyr&quot;        &quot;SnowballC&quot;    &quot;stringr&quot;     
-##  [6] &quot;wordcloud&quot;    &quot;RColorBrewer&quot; &quot;tm&quot;           &quot;NLP&quot;          &quot;vcd&quot;         
-## [11] &quot;grid&quot;         &quot;scales&quot;       &quot;likert&quot;       &quot;xtable&quot;       &quot;dplyr&quot;       
-## [16] &quot;ggplot2&quot;      &quot;lattice&quot;      &quot;knitr&quot;        &quot;stats&quot;        &quot;graphics&quot;    
-## [21] &quot;grDevices&quot;    &quot;utils&quot;        &quot;datasets&quot;     &quot;methods&quot;      &quot;base&quot;</code></pre>
+library(knitr)
+library(lattice)
+library(ggplot2)
+library(dplyr)
+library(likert)
+library(scales)
+library(vcd)
+library(tm)
+library(wordcloud)
+library(stringr)
+library(SnowballC)
+library(tidyr)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(stringr)</code></pre>
 <p>In the following, we will perform a sentiment analysis to investigate the emotionality of five different novels. We will start with the first example and load five pieces of literature.</p>
 <pre class="r"><code># read in texts
 darwin &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;)
@@ -664,7 +591,7 @@ husbandemo &lt;- get_nrc_sentiment(husband)
 # inspect data
 head(darwinemo)</code></pre>
 <pre><code>##   anger anticipation disgust fear joy sadness surprise trust negative positive
-## 1     0            0       0    0   0       0        0     0        1        0
+## 1     0            0       0    0   0       0        0     0        0        0
 ## 2     0            0       0    0   0       0        0     0        0        0
 ## 3     0            0       0    0   0       0        0     0        0        0
 ## 4     0            0       0    0   0       0        0     0        0        0
@@ -686,17 +613,17 @@ rownames(emo) &lt;- gsub(&quot;emos&quot;, &quot;&quot;, rownames(emo))
 # inspect data
 head(emo)</code></pre>
 <pre><code>##           anger anticipation disgust fear  joy sadness surprise trust negative
-## darwin     0.80         1.72    0.64 1.46 1.40    1.18     1.10  2.80     2.74
-## twain      1.34         2.12    0.88 1.48 1.96    1.28     1.14  2.32     2.38
-## orwell     1.58         2.10    1.26 2.42 1.72    1.98     0.90  2.60     3.84
-## lovecraft  1.74         2.02    1.76 2.64 1.20    2.52     1.06  1.66     4.92
-## husband    2.04         2.40    1.14 2.26 2.20    2.24     1.24  2.34     4.40
+## darwin     0.74         1.66    0.34 1.46 1.20    1.20     0.76  2.44     2.66
+## twain      0.96         2.02    0.86 1.26 1.36    1.14     0.96  1.56     2.44
+## orwell     1.84         1.90    1.36 2.48 1.58    1.70     1.08  2.60     4.20
+## lovecraft  1.62         1.98    1.52 2.36 1.30    2.34     1.12  1.88     4.58
+## husband    2.06         2.38    1.16 2.26 2.20    2.28     1.22  2.36     4.36
 ##           positive
-## darwin        4.26
-## twain         3.72
-## orwell        4.42
-## lovecraft     2.96
-## husband       4.46</code></pre>
+## darwin        3.54
+## twain         2.68
+## orwell        3.78
+## lovecraft     2.94
+## husband       4.42</code></pre>
 <pre class="r"><code>#convert into data frame
 emo &lt;- as.data.frame(emo)
 # add author column
@@ -708,12 +635,12 @@ emol &lt;- gather(emo, Emotion, Score, anger:positive, factor_key=TRUE)
 # inspect data
 head(emol)</code></pre>
 <pre><code>##      Author      Emotion Score
-## 1    Darwin        anger  0.80
-## 2     Twain        anger  1.34
-## 3    Orwell        anger  1.58
-## 4 Lovecraft        anger  1.74
-## 5   Husband        anger  2.04
-## 6    Darwin anticipation  1.72</code></pre>
+## 1    Darwin        anger  0.74
+## 2     Twain        anger  0.96
+## 3    Orwell        anger  1.84
+## 4 Lovecraft        anger  1.62
+## 5   Husband        anger  2.06
+## 6    Darwin anticipation  1.66</code></pre>
 <p>Based on this table, we can now visualise the relative emotion scores for each book.</p>
 <pre class="r"><code># load library
 library(ggplot2)
@@ -734,15 +661,15 @@ ggplot(emol2,                   # plot barplotdatagg1
 </div>
 <div id="citation-session-info" class="section level1 unnumbered">
 <h1>Citation &amp; Session Info</h1>
-<p>Schweinberger, Martin. 2020. <em>Sentiment Analysis in R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/sentiment.html" class="uri">https://slcladal.github.io/sentiment.html</a>.</p>
+<p>Schweinberger, Martin. 2020. <em>Sentiment Analysis in R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/sentiment.html" class="uri">https://slcladal.github.io/sentiment.html</a> (Version 2020.09.27).</p>
 <pre><code>@manual{schweinberger2020sentiment,
   author = {Schweinberger, Martin},
   title = {Sentiment Analysis in R},
   note = {https://slcladal.github.io/sentiment.html},
   year = {2020},
-  organization = &quot;The University of Queensland, School of Languages and Cultures},
+  organization = {The University of Queensland, School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/09/23}
+  edition = {2020/09/27}
 }</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.0.2 (2020-06-22)
@@ -761,27 +688,27 @@ ggplot(emol2,                   # plot barplotdatagg1
 ## [8] base     
 ## 
 ## other attached packages:
-##  [1] syuzhet_1.0.4      kableExtra_1.2.1   gridExtra_2.3      tidyr_1.1.1       
+##  [1] syuzhet_1.0.4      kableExtra_1.2.1   gridExtra_2.3      tidyr_1.1.2       
 ##  [5] SnowballC_0.7.0    stringr_1.4.0      wordcloud_2.6      RColorBrewer_1.1-2
-##  [9] tm_0.7-7           NLP_0.2-0          vcd_1.4-7          scales_1.1.1      
-## [13] likert_1.3.5       xtable_1.8-4       dplyr_1.0.1        ggplot2_3.3.2     
-## [17] lattice_0.20-41    knitr_1.29        
+##  [9] tm_0.7-7           NLP_0.2-0          vcd_1.4-8          scales_1.1.1      
+## [13] likert_1.3.5       xtable_1.8-4       dplyr_1.0.2        ggplot2_3.3.2     
+## [17] lattice_0.20-41    knitr_1.30        
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] zoo_1.8-8         tidyselect_1.1.0  xfun_0.16         slam_0.1-47      
-##  [5] reshape2_1.4.4    purrr_0.3.4       colorspace_1.4-1  vctrs_0.3.2      
+##  [5] reshape2_1.4.4    purrr_0.3.4       colorspace_1.4-1  vctrs_0.3.4      
 ##  [9] generics_0.0.2    viridisLite_0.3.0 htmltools_0.5.0   yaml_2.2.1       
-## [13] rlang_0.4.7       pillar_1.4.6      glue_1.4.1        withr_2.2.0      
+## [13] rlang_0.4.7       pillar_1.4.6      glue_1.4.2        withr_2.3.0      
 ## [17] lifecycle_0.2.0   plyr_1.8.6        munsell_0.5.0     gtable_0.3.0     
 ## [21] rvest_0.3.6       psych_2.0.8       evaluate_0.14     labeling_0.3     
-## [25] lmtest_0.9-37     parallel_4.0.2    Rcpp_1.0.5        webshot_0.5.2    
+## [25] lmtest_0.9-38     parallel_4.0.2    Rcpp_1.0.5        webshot_0.5.2    
 ## [29] tmvnsim_1.0-2     farver_2.0.3      mnormt_2.0.2      digest_0.6.25    
-## [33] stringi_1.4.6     tools_4.0.2       magrittr_1.5      tibble_3.0.3     
+## [33] stringi_1.5.3     tools_4.0.2       magrittr_1.5      tibble_3.0.3     
 ## [37] crayon_1.3.4      pkgconfig_2.0.3   ellipsis_0.3.1    MASS_7.3-51.6    
 ## [41] xml2_1.3.2        httr_1.4.2        rmarkdown_2.3     rstudioapi_0.11  
 ## [45] R6_2.4.1          nlme_3.1-148      compiler_4.0.2</code></pre>
 <hr />
-<p><a href="https://slcladal.github.io/index.html">Go back to the main page</a></p>
+<p><a href="https://slcladal.github.io/index.html">Main page</a></p>
 <hr />
 </div>
 <div id="references" class="section level1 unnumbered">
