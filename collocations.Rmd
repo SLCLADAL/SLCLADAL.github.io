@@ -1,5 +1,5 @@
 ---
-title: "Analyzing co-occurrences and collocations using R"
+title: "Analyzing Co-Occurrences and Collocations in R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -11,19 +11,18 @@ link-citations: yes
 knitr::include_graphics("images/uq1.jpg")
 ```
 
-# Introduction
+# Introduction{-}
 
-This tutorial introduces collocation and co-occurrence analysis with *R* and shows how to extract and visualize semantic links between words. Parts of this tutorial build on @wiedemann2017textmining. The code for this stutorial can be downloaded [here](https://slcladal.github.io/rscripts/collocations.r).  
+This tutorial introduces collocation and co-occurrence analysis with *R* and shows how to extract and visualize semantic links between words. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/collocations.Rdm). Parts of this tutorial build on and use materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) on co-occurrence analysis with R by Andreas Niekler and Gregor Wiedemann [see @WN17].
 
 How would you find words that are associated with a specific term and how can you visualize such word nets? This tutorial addresses this issue by focusing on co-occurrence and collocations of words. Collocations are words that occur very frequently together. For example, *Merry Christmas* is a collocation because *merry* and *Christmas* occur more frequently together than would be expected by chance. This means that if you were to shuffle all words in a corpus and would then test the frequency of how often *merry* and *Christmas* co-occurred, they would occur significantly less often in the shuffled or randomized corpus than in a corpus that contain non-shuffled natural speech. 
 
 But how can you determine if words occur more frequently together than would be expected by chance? This tutorial will answer this question. 
 
-**Preparation and session set up**
+## Preparation and session set up{-}
 
-As all calculations and visualizations in this tutorial rely on *R*, it is necessary to install *R* and *RStudio*. If these programs (or, in the case of *R*, environments) are not already installed on your machine, please search for them in your favorite search engine and add the term *download*. Open any of the first few links and follow the installation instructions (they are easy to follow, do not require any specifications, and are pretty much self-explanatory).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
-In addition, certain *packages* need to be installed so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # clean current workspace
@@ -33,187 +32,375 @@ options(stringsAsFactors = F)
 options(scipen = 999)
 options(max.print=10000)
 # install packages
-install.packages("corpus", "dplyr", "quanteda", "stringr", "tidyr", "tm")
-# for visualization
-install.packages("GGally", "network", "sna", "ggplot2")
-# for statistics
-install.packages("collostructions")
+install.packages("corpus", "dplyr", "quanteda", "stringr", "tidyr", "tm",
+                 "GGally", "network", "sna", "ggplot2", "collostructions")
 ```
 
-Once you have installed *R* and *R-Studio*, and have also initiated the session by executing the code shown above, you are good to go.
-
-# Visualizing Collocations of *America* in Trump's 2020 SOTU Address
-
-In the following example, we will analyze which words collocate with the term *america* in Trump's 2020 State of the Union address. The analysis consists of the following steps:
-
-* Data processing
-
-* Creating a co-occurence matrix
-
-* Finding significant collocations 
-
-* Extracting the network of collocations
-
-* Visualizing the network of collocations
+Once you have installed R-Studio and initiated the session by executing the code shown above, you are good to go.
 
 
-## Data processing
+# Extracting N-Grams and Collocations
 
-We start by initiating the session and loading the packages from the R library that we are going to use in this tutorial.
+Collocations are terms that co-occur (significantly) more often together than would be expected by chance. A typical example of a collocation is *Merry Christmas* because the words *merry* and *Christmas* occur together more frequently together than would be expected, if words were just randomly stringed together.  
 
-```{r prep2, echo=T, eval = T, message=FALSE, warning=FALSE}
-# clean current workspace
-rm(list=ls(all=T))
-# set options
-options(stringsAsFactors = F)
-options(scipen = 999)
-options(max.print=10000)
-# load packages
-# for data porcessing
-library(corpus)
+N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the "Origin" to create a bi-gram list. As a first step, we load the data and split it into individual words.
+
+```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load libraries
 library(dplyr)
-library(quanteda)
 library(stringr)
-library(tidyr)
 library(tm)
-# for visualization
-library(GGally)
-library(network)
-library(sna)
-library(ggplot2)
-```
-
-We continue the analysis by loading the data and defining the key term. The key term forms the center of the collocation network. 
-
-```{r coll_01_01, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load data
-textdata <- readLines("https://SLCLADAL.github.io/data/sotutrump.txt", 
-                     skipNul = T, encoding = "unknown")
-# define collocterm
-collocterm <- "america"
-# inspect data
-str(textdata)
-```
-
-The separation of the text into semantic analysis units is important for co-occurrence analysis. Context windows can be for instance documents, paragraphs or sentences or neighboring words. One of the most frequently used context window is the sentence. The sentence segmentation must take place *before* the other preprocessing steps because the sentence-segmentation-model relies on intact word forms and punctuation marks.
-
-```{r coll_01_03, echo=T, eval = T, message=FALSE, warning=FALSE}
-# clean data
-textdata <- textdata %>%
-  stringr::str_replace_all("AUDIENCE:.*", "") %>%
-  stringr::str_replace_all(" {2,}", " ") %>%
-  stringr::str_replace_all("THE PRESIDENT:", "") %>%
-  stringr::str_replace_all("Mr.", "Mr") %>%
-  stringr::str_replace_all("\\(applause.{0,1}\\)", "") %>%
-  stringr::str_replace_all("\\(APPLAUSE.{0,1}\\)", "") %>%
-  paste(collapse = " ") %>%
-  str_squish() %>%
-  stripWhitespace()
-# split text into sentences
-sentences <- unlist(strsplit(as.character(textdata), "(?<=\\.)\\s(?=[A-Z])", perl = T))
-# inspect data
-head(sentences)
-```
-
-A word of warning is in order here: the newly decomposed corpus has now reached a considerable size of `r length(sentences)` sentences. Older computers may get in trouble because of insufficient memory during this preprocessing step.
-
-Now we going to implement a pre-processing chain and apply it on the separated sentences. Preprocessing consists of cleaning the data by removing punctuation, numbers, superfluous white spaces, and so-called stop words which do not have semantic meaning.
-
-```{r coll_01_05, echo=T, eval = T, message=FALSE, warning=FALSE}
-# convert to lower case
-sentencesclean <- sentences %>%
-  tolower() %>%
-  # remove punctuation
+library(DT)
+# read in text
+darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
+  paste(sep = " ", collapse = " ") %>%
+  str_squish()
+# select sample
+darwin <- substr(darwin, 1000000, 1100000)
+# further processing
+darwin_split <- darwin %>% 
   removePunctuation() %>%
-  # remove non alphanumeric characters
-  stringr::str_replace_all("[^[:alnum:][:space:]_]", "") %>%
-  # remove numbers
-  removeNumbers()
-# remove stop words
-english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
-sentencesclean <- removeWords(sentencesclean, english_stopwords) %>%
-  # strip white spaces
+  str_replace_all("\\W", " ") %>%
+  tolower() %>%
   str_squish() %>%
-  stripWhitespace()
-# remove emplty elements
-sentencesclean <- sentencesclean[sentencesclean != ""]
-# stem words
-sentencesclean <- as.vector(sapply(sentencesclean, function(x){
-  x <- text_tokens(x, stemmer = "en")
-  x <- as.vector(unlist(x))
-  x <- stringr::str_c(x, sep = " ", collapse = " ")}))
-# select a sample
-#sentencesclean <- sample(sentencesclean, 100)
+  strsplit(" ") %>%
+  unlist()
 # inspect data
-head(sentencesclean)
+head(darwin_split)
 ```
- 
-## Creating a co-occurrence matrix
+We can create bi-grams (N-grams consisting of two elements) by pasting every word together with the ford that immediately follows it. To do this, we could use a function that is already available but we can also very simply to this manually. The first step in creating bigrams manually consists in creating a table which holds every word in a corpus and the word that immediately precedes it. 
 
-In a next step, we create a co-occurence matrix from the words in the sentences.
-
-```{r coll_01_09, echo=T, eval = T, message=FALSE, warning=FALSE}
-sentencecorpus <- Corpus(VectorSource(sentencesclean))
-DTM <- DocumentTermMatrix(sentencecorpus, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin)) 
-# Convert to sparseMatrix matrix
-require(Matrix)
-DTM <- sparseMatrix(i = DTM$i, 
-                    j = DTM$j, 
-                    x = DTM$v, 
-                    dims = c(DTM$nrow, DTM$ncol), 
-                    dimnames = dimnames(DTM))
-# Matrix multiplication for co-occurrence counts
-coocCounts <- t(DTM) %*% DTM 
-cooc <- as.matrix(coocCounts)
-cooc[1:5, 1:5]
-```
-
-The matrix has `nrow(cooc)` rows and columns and is symmetric. Each cell contains the number of joint occurrences. In the diagonal, the frequencies of single occurrences of each term are encoded.
-
-The part of the co-occurrence matrix that is displayed shows that `r colnames(cooc)[4]` appears together `r cooc[4, 5]` times with `r colnames(cooc)[5]` in the `r nrow(cooc)` sentences of the SUTO addresses. `r colnames(cooc)[4]` alone occurs `r cooc[4, 4]` times.
-
-We can also use this co-occurrence table to create a co-occurence graph.
-
-```{r coll_01_11, echo=T, eval = T, message=FALSE, warning=FALSE}
-simplecooctb <- cooc[rownames(cooc) == "american",]
-simplecoocdf <- data.frame(rep("american", length(simplecooctb)),
-                           names(simplecooctb),
-                           simplecooctb)
-colnames(simplecoocdf) <- c("Term", "Cooc", "Freq")
+```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create data frame
+darwindf <- data.frame(darwin_split[1:length(darwin_split)-1], 
+                       darwin_split[2:length(darwin_split)])
+# add column names
+colnames(darwindf) <- c("Word1", "Word2")
 # inspect results
-head(simplecoocdf)
+datatable(head(darwindf, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
-  
-```{r coll_01_13, echo=T, eval = T, message=FALSE, warning=FALSE}
-simplecooc <- simplecoocdf %>%
-  dplyr::select(Term, Cooc, Freq)
-simplecoocterms <- rep(simplecooc$Term, simplecooc$Freq)
-simplecooccoocs <- rep(simplecooc$Cooc, simplecooc$Freq)
-simplecoocdf <- data.frame(simplecoocterms, simplecooccoocs)
-colnames(simplecoocdf) <- c("Term", "CoocTerm")
-simplecoocnet <- network(simplecoocdf,
+
+We can the paste the elements in these two column together and also inspect the frequency of each bigram.
+
+```{r coll3, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+darwin2grams <- darwindf %>%
+  mutate(Bigram = paste(Word1, Word2, sep = " ")) %>%
+  group_by(Bigram) %>%
+  summarise(Frequency = n()) %>%
+  arrange(-Frequency)
+# inspect results
+datatable(head(darwin2grams, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
+
+In the following, we will extract collocations from Charles Darwin's *On the Origin of Species by Means of Natural Selection*. In a first step, we will split the Origin into individual sentences.
+
+```{r coll4, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# read in text
+darwinsentences <- darwin %>%
+  str_squish() %>%
+  str_replace_all("([A-Z]{2,} [A-Z]{2,}) ([A-Z][a-z]{1,} )", "\\1 qwertz\\2") %>%
+  str_replace_all("([a-z]{2,}\\.) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
+    str_replace_all("([a-z]{2,}\\?) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
+  strsplit("qwertz")%>%
+  unlist() %>%
+  str_remove_all("- ") %>%
+  str_replace_all("\\W", " ") %>%
+  str_squish()
+# inspect data
+head(darwinsentences)
+```
+
+The first element does not represent a full sentence because we selected a sample of the text which began in the middle of a sentence rather than at its beginning. In a next step, we will create a matrix that shows how often each word co-occurred with each other word in the data.
+
+```{r coll5, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# convert into corpus
+darwincorpus <- Corpus(VectorSource(darwinsentences))
+# create vector with words to remove
+extrawords <- c("the", "can", "get", "got", "can", "one", 
+                "dont", "even", "may", "but", "will", 
+                "much", "first", "but", "see", "new", 
+                "many", "less", "now", "well", "like", 
+                "often", "every", "said", "two")
+# clean corpus
+darwincorpusclean <- darwincorpus %>%
+  tm_map(removePunctuation) %>%
+  tm_map(removeNumbers) %>%
+  tm_map(tolower) %>%
+  tm_map(removeWords, stopwords()) %>%
+  tm_map(removeWords, extrawords)
+# create document term matrix
+darwindtm <- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
+# load library
+library(Matrix)
+# convert dtm into sparse matrix
+darwinsdtm <- sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
+                           x = darwindtm$v, 
+                           dims = c(darwindtm$nrow, darwindtm$ncol),
+                           dimnames = dimnames(darwindtm))
+# calculate co-occurrence counts
+coocurrences <- t(darwinsdtm) %*% darwinsdtm
+# convert into matrix
+collocates <- as.matrix(coocurrences)
+# inspect results
+datatable(collocates[1:10, 1:10], rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+We can inspect this co-occurrence matrix and check how many terms (words or elements) it represents using the `ncol` function from base R. We can also check how often terms occur in the data using the `summary` function from base R. The output of the `summary` function tells us that the minimum frequency of a word in the data is 2 with a maximum of 1,474. The difference between the median (36.00) and the mean (74.47) indicates that the frequencies are distributed very non-normally - which is common for language data. 
+
+```{r coll6, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# inspect size of matrix
+ncol(collocates)
+summary(rowSums(collocates))
+```
+
+We will now use an example of one individual word (*selection*) to show, how collocation strength for individual terms is calculated and how it can be visualized or displayed. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) [see also @WN17].
+
+```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load function for co-occurrence calculation
+source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
+# define term
+coocTerm <- "selection"
+# calculate cooccurence statistics
+coocs <- calculateCoocStatistics(coocTerm, darwinsdtm, measure="LOGLIK")
+# inspect results
+coocs[1:20]
+```
+
+# Visualizing Collocations
+
+There are various visualizations options for collocations. Which visualization method is appropriate depends on what the visualizations should display. 
+
+## Association Strength{-}
+
+We start with the most basic and visualize the collocation strength using a simple dot chart.
+
+```{r}
+coocdf <- coocs %>%
+  as.data.frame() %>%
+  mutate(CollStrength = coocs,
+         Term = names(coocs)) %>%
+  filter(CollStrength > 5)
+library(ggplot2)
+ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
+         geom_point() +
+         coord_flip() +
+  theme_bw()
+```
+
+The dot chart shows that *natural* is collocating more strongly with *selection* compared to any other term. This substantiates that *natural* and *selection* are a collocation in Darwin's *On the Origin of Species by Means of Natural Selection* (which is unsurprising, of course).
+
+## Dnedrograms{-}
+
+Another method for visualizing collocations are dendrograms. Dendrograms (also called tree-diagrams) show how similar elements are based on one or many features. As such, dendrograms are sued to indicate groupings as they show elements (words) that are notably similar or different with respect to their association strength. To use this method, we first need to generate a distance matrix from our co-occurrence matrix.
+
+```{r coll7, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+coolocs <- c(coocdf$Term, "selection")
+# remove non-collocating terms
+collocates_redux <- collocates[rownames(collocates) %in% coolocs, ]
+collocates_redux <- collocates_redux[, colnames(collocates_redux) %in% coolocs]
+# create distance matrix
+distmtx <- dist(collocates_redux)
+# activate library
+library("cluster")         # activate library
+clustertexts <- hclust(    # hierarchical cluster object
+  distmtx,                 # use distance matrix as data
+  method="ward.D2")        # ward.D as linkage method
+library(ggdendro)
+ggdendrogram(clustertexts) +
+  ggtitle("Terms strongly collocating with *selection*")
+```
+
+## Network Graphs{-}
+
+Network graphs are a very useful tool to show relationships (or the absence of relationships) between elements. Network graphs are highly useful when it comes to displaying the relationships that words have among each other and which properties these networks of words have.
+
+### Basic Network Graphs{-}
+
+In order to display a network, we need to create a network graph by using the `network` function from the `network` package. 
+
+```{r net1, warning=F, message=F}
+library(network)
+net = network(collocates_redux,
               directed = FALSE,
               ignore.eval = FALSE,
               names.eval = "weights"
-              )
-ggnet2(simplecoocnet, 
-       size = 6, 
-       color = "goldenrod", 
-       edge.size = .5,
-       edge.color = "lightgrey", 
-       label = TRUE, 
-       label.size = 3)
+)
+# vertex names
+network.vertex.names(net) = rownames(collocates_redux)
+net
 ```
 
-However, this network is not really useful as it does not distinguish between co-occurences and collocates, i.e. terms that occur significantly more frequently with the keyterm than would be expected by chance. Therefore, we now proceed to extract collocations.
+Now that we have generated a network object, we visualize the network.
 
-## Finding significant collocates
+```{r net2}
+library(GGally)
+ggnet2(net, 
+       label = TRUE, 
+       label.size = 4,
+       alpha = 0.2,
+       size.cut = 3,
+       edge.alpha = 0.3) +
+  guides(color = FALSE, size = FALSE)
+```
 
-In order to identify which words occur together more frequently than would be expected by chance, we have to determine if their co-occurence frequency is statistical significant. 
 
-In a first step, we will determine which terms collocate significantly with the key term we are intersted in. In a second step, we will extract the network of collocations around this key term.
+The network is already informative but we will customize the network object so that the visualization becomes more appealing and informative. To add information, we create vector of words that contain different groups, e.g. terms that rarely, sometimes, and frequently collocate with *selection* (I used the dendrogram which displayed the cluster analysis as the basis for  the categorization). 
 
-To determine which terms collocate significantly with the key term ("america), we will use multiple Fisher's Exact tests which require the following information:
+Based on these vectors, we can then change or adapt the default values of certain attributes or parameters of the network object (e.g. weights. linetypes, and colors).
+
+```{r net3}
+# create vectors with collocation occurrences as categories
+mid <- c("theory", "variations", "slight", "variation")
+high <- c("natural", "selection")
+infreq <- colnames(collocates_redux)[!colnames(collocates_redux) %in% mid & !colnames(collocates_redux) %in% high]
+# add color by group
+net %v% "Collocation" = ifelse(network.vertex.names(net) %in% infreq, "weak", 
+                   ifelse(network.vertex.names(net) %in% mid, "medium", 
+                   ifelse(network.vertex.names(net) %in% high, "strong", "other")))
+# modify color
+net %v% "color" = ifelse(net %v% "Collocation" == "weak", "gray60", 
+                  ifelse(net %v% "Collocation" == "medium", "orange", 
+                  ifelse(net %v% "Collocation" == "strong", "indianred4", "gray60")))
+# rescale edge size
+set.edge.attribute(net, "weights", ifelse(net %e% "weights" < 1, 0.1, 
+                                   ifelse(net %e% "weights" <= 2, .5, 1)))
+# define line type
+set.edge.attribute(net, "lty", ifelse(net %e% "weights" <=.1, 3, 
+                                      ifelse(net %e% "weights" <= .5, 2, 1)))
+```
+
+We can now display the network object and make use of the added information.
+
+```{r net4}
+ggnet2(net, 
+       color = "color", 
+       label = TRUE, 
+       label.size = 4,
+       alpha = 0.2,
+       size = "degree",
+       edge.size = "weights",
+       edge.lty = "lty",
+       edge.alpha = 0.2) +
+  guides(color = FALSE, size = FALSE)
+```
+
+
+### Advanced Network Graphs{-}
+
+@WN17 have written a very recommendable tutorial on co-occurrence analysis and they propose an alternative, yet more complex network visualization for co-occurrences. Their approach is to create and customize a graph object based on the `iGraph` package.
+
+The code below is based on [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) and is included to show the flexibility of the approach used by @WN17. 
+
+```{r net11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+numberOfCoocs <- 10
+# create graph object
+resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+# create data frame
+tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+# fill data frame to produce the correct number of lines
+tmpGraph[1:numberOfCoocs, 3] <- coocs[1:numberOfCoocs]
+# enter search word into the first column in all lines
+tmpGraph[, 1] <- coocTerm
+# enter co-occurrences into second column
+tmpGraph[, 2] <- names(coocs)[1:numberOfCoocs]
+# enter collocation strength
+tmpGraph[, 3] <- coocs[1:numberOfCoocs]
+# attach data frame to resultGraph
+resultGraph <- rbind(resultGraph, tmpGraph)
+```
+
+Calculate cooccurence statistics and add them to the graph object. 
+
+```{r net12, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# iterate over most significant numberOfCoocs co-occurrences
+for (i in 1:numberOfCoocs){
+  # calculate co-occurrence strength for term i
+  newCoocTerm <- names(coocs)[i]
+  coocs2 <- calculateCoocStatistics(newCoocTerm, darwinsdtm, measure="LOGLIK")
+  # fill temporary graph object
+  tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+  tmpGraph[1:numberOfCoocs, 3] <- coocs2[1:numberOfCoocs]
+  tmpGraph[, 1] <- newCoocTerm
+  tmpGraph[, 2] <- names(coocs2)[1:numberOfCoocs]
+  tmpGraph[, 3] <- coocs2[1:numberOfCoocs]
+  # append results to the result graph data frame
+  resultGraph <- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
+}
+```
+
+Now, we can create a network graph object. 
+
+```{r net13, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load packages
+library(igraph)
+# define graph and type ("F" means "Force Directed")
+graphNetwork <- graph.data.frame(resultGraph, directed = F)
+# identify nodes with fewer than 2 edges
+graphVs <- V(graphNetwork)[degree(graphNetwork) < 2]
+# removed these edges from graph
+graphNetwork <- delete.vertices(graphNetwork, graphVs) 
+# sssign colors to edges and nodes (searchterm blue, rest orange)
+V(graphNetwork)$color <- ifelse(V(graphNetwork)$name == coocTerm, 'cornflowerblue', 'orange') 
+# Edges with a significance of at least 50% of the maximum significance in the graph are drawn in orange
+halfMaxSig <- max(E(graphNetwork)$sig) * 0.5
+E(graphNetwork)$color <- ifelse(E(graphNetwork)$sig > halfMaxSig, "coral", "azure3")
+# disable edges with radius
+E(graphNetwork)$curved <- 0 
+# size the nodes by their degree of networking
+V(graphNetwork)$size <- log(degree(graphNetwork)) * 5
+# all nodes must be assigned a standard minimum-size
+V(graphNetwork)$size[V(graphNetwork)$size < 5] <- 3 
+# edge thickness
+E(graphNetwork)$width <- 1.5
+```
+
+And finally, we can visualize the network.
+
+```{r net14, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Define the frame and spacing for the plot
+par(mai=c(0,0,1,0)) 
+# Finaler Plot
+plot(graphNetwork,              
+     layout = layout.fruchterman.reingold,  # Force Directed Layout 
+     main = paste("Cooccurrence network for", " \"", coocTerm, "\""),
+     vertex.label.family = "sans",
+     vertex.label.cex = .75,
+     vertex.shape = "circle",
+     vertex.label.dist = 2,           # Labels of the nodes moved slightly
+     vertex.frame.color = 'darkolivegreen',
+     vertex.label.color = 'black',      # Color of node names
+     vertex.label.font = 2,         # Font of node names
+     vertex.label = V(graphNetwork)$name,       # node names
+     vertex.label.cex = .75 # font size of node names 
+)
+```
+
+
+The advantage of this more elaborate technique to visualize network lies in its flexibility. In contrast to the basic network visualization shown above, this network object can be customized to show very specific aspects of the data.
+
+## Biplots{-}
+
+An alternative way to display co-occurrence patterns are bi-plots which are used to display the results of Correspondence Analyses. They are useful, in particular, when one is not interested in one particular key term and its collocations but in the overall similarity of many terms. Semantic similarity in this case refers to a shared semantic and this distributional profile. As such, words can be deemed semantically similar if they have a similar co-occurrence profile - i.e. they co-occur with the same elements. Biplots can be sued to visualize collocations because collocates co-occur and thus share semantic properties which renders then more similar to each other compared with other terms. 
+
+```{r coll8, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load packages
+library(FactoMineR)
+library(factoextra)
+# perform correspondence analysis
+res.ca <- CA(collocates_redux, graph = FALSE)
+# plot results
+plot(res.ca, title = "", col.col = "gray20")
+```
+
+
+The bi-plot shows that *natural* and *selection* collocate as they are plotted in close proximity. The advantage of the biplot becomes apparent when we fcus on other terms because the biplot also shows other collocates such as *vary* and *independently* or *might injurious*. 
+
+# Determining Significance
+
+In order to identify which words occur together significantly(1) more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *selection*.
+
+To determine which terms collocate significantly with the key term (*selection*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
 
 * a = Number of times `coocTerm` occurs with term j
 
@@ -226,7 +413,7 @@ To determine which terms collocate significantly with the key term ("america), w
 In a first step, we create a table which holds these quantities.
 
 ```{r coll_01_15, echo=T, eval = T, message=FALSE, warning=FALSE}
-coocdf <- as.data.frame(as.matrix(cooc))
+coocdf <- as.data.frame(as.matrix(collocates))
 cooctb <- coocdf %>%
   dplyr::mutate(Term = rownames(coocdf)) %>%
   tidyr::gather(CoocTerm, TermCoocFreq,
@@ -245,17 +432,18 @@ cooctb <- coocdf %>%
                 c = CoocFreq - a, 
                 d = AllFreq - (a + b + c)) %>%
   dplyr::mutate(NRows = nrow(coocdf))
-cooctb
+# inspect results
+datatable(head(cooctb, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
-We now select the term for which we want to check the collocation network. In this example, we want to analyze the network of `collocterm`. Thus, we remove all rows from the data that do not involve `collocterm`. 
+We now select the key term (*selection*). If we wanted to find all collocations that are present in the data, we would use the entire data rather than only the subset that contains  *selection*. 
 
 ```{r coll_01_23, echo=T, eval = T, message=FALSE, warning=FALSE}
 cooctb_redux <- cooctb %>%
-  dplyr::filter(Term == collocterm)
+  dplyr::filter(Term == coocTerm)
 ```
 
-Next, we calculate which terms are collocating with `collocterm` but we also test which terms are not used with `collocterm`.
+Next, we calculate which terms are (significantly) over- and under-proportionately used with *selection*. It is important to note that this procedure informs about both: over- and under-use! This is especially crucial when analyzing if specific words are attracted o repelled by certain constructions. Of course, this approach is not restricted to analyses of constructions and it can easily be generalized across domains and has also been used in machine learning applications.
 
 ```{r coll_01_25, echo=T, eval = T, message=FALSE, warning=FALSE}
 coocStatz <- cooctb_redux %>%
@@ -269,15 +457,18 @@ coocStatz <- cooctb_redux %>%
                                ifelse(p <= .01, "p<.01",
                                ifelse(p <= .001, "p<.001", "n.s."))))
 # inspect results
-coocStatz
+datatable(coocStatz, rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
+
+We now add information to the table and remove superfluous columns s that the table can be more easily parsed. 
+
 
 ```{r coll_01_27, echo=T, eval = T, message=FALSE, warning=FALSE}
 coocStatz <- coocStatz %>%
   dplyr::ungroup() %>%
   dplyr::arrange(p) %>%
   dplyr::mutate(j = 1:n()) %>%
-  # perform benjamini-holm correction
+  # perform benjamini-hochberg correction
   dplyr::mutate(corr05 = ((j/NRows)*0.05)) %>%
   dplyr::mutate(corr01 = ((j/NRows)*0.01)) %>%
   dplyr::mutate(corr001 = ((j/NRows)*0.001)) %>%
@@ -292,117 +483,27 @@ coocStatz <- coocStatz %>%
   dplyr::select(-a, -b, -c, -d, -j, -NRows, -corr05, -corr01, -corr001) %>%
   dplyr::mutate(Type = ifelse(expected > TermCoocFreq, "Antitype", "Type"))
 # inspect results
-coocStatz
+datatable(coocStatz, rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
+The results show that *selection* collocates significantly with *selection* (of course) but also, as expected, with *natural*. The corrected p-values shows that after Benjamini-Hochberg correction for multiple/repeated testing [see @field2012discovering] these are the only significant collocates of *selection*. Corrections are necessary when performing multiple tests because otherwise, the reliability of the test result would be strongly impaired as repeated testing causes substantive $\alpha$-error inflation. The Benjamini-Hochberg correction that has been used here is preferrable over the more popular Bonferroni correction because it is less conservative and therefore less likely to result in $\beta$-errors [see again @field2012discovering].
 
-## Extracting a collocation network
 
-Now that we have determined which words collocate with the key term (`collocterm`), we extract the collocation network.
+# Comparive Analyses of Collocation Strength
 
-```{r coll_01_29, echo=T, eval = T, message=FALSE, warning=FALSE}
-colloctermtb <- cooctb %>%
-  dplyr::filter(Term == collocterm,
-                TermCoocFreq > 0)
-colloctermtb
-```
-
-## Extracting collocations
-
-We now extract terms that collocate with the key term (`collocterm`).
-
-```{r coll_01_31, echo=T, eval = T, message=FALSE, warning=FALSE}
-coocStatz_redux <- coocStatz %>%
-  dplyr::filter(Significance != "n.s.")
-coocStatz_redux 
-```
-
-```{r coll_01_33, echo=T, eval = T, message=FALSE, warning=FALSE}
-coocnet <- cooc[which(rownames(cooc) %in% coocStatz_redux$CoocTerm), which(colnames(cooc) %in% coocStatz_redux$CoocTerm)]
-coocnet[1:5, 1:5]
-```
-
-## Visualizing the collocation network
-
-Now, we can visualize the collocation network of the key term. In a first step, we create a network object.
-
-```{r coll_01_35, echo=T, eval = T, message=FALSE, warning=FALSE}
-collocnet = network(coocnet,
-              directed = FALSE,
-              ignore.eval = FALSE,
-              names.eval = "weights"
-              )
-```
-
-Now, we create a simple network of the collocations.
-
-```{r coll_01_37, echo=T, eval = T, message=FALSE, warning=FALSE}
-ggnet2(collocnet, 
-       size = 6, 
-       color = "goldenrod", 
-       edge.size = .5,
-       edge.color = "lightgrey", 
-       label = TRUE, 
-       label.size = 3)
-```
-
-The network only shows the collocates (as nodes) and which of these terms collocate. In a next step, we add information to the graph to show the collocation strength.  In order to add information, we inspect the data that is underlying the simple network graph.
-
-```{r coll_01_41, echo=T, eval = T, message=FALSE, warning=FALSE}
-ggnet2(collocnet)$data
-```
-
-Next, we modify the size of the icicles which should represent the frequency of the co-occurrence.
-
-```{r coll_01_53, echo=T, eval = T, message=FALSE, warning=FALSE}
-# rescale edge size
-set.edge.attribute(collocnet, "weights", ifelse(collocnet %e% "weights" <= 1,
-                                                1, 
-                                   ifelse(collocnet %e% "weights" <= 3, 2, 3)))
-# define line type
-set.edge.attribute(collocnet, "lty", ifelse(collocnet %e% "weights" == 0.25, 3, 
-                                      ifelse(collocnet %e% "weights" == .5, 2, 1)))
-```
-
-Now that we have set specified the edge size, and line type we visualize the network again. 
-
-```{r coll_01_57, echo=T, eval = T, message=FALSE, warning=FALSE}
-ggnet2(collocnet,
-       label = TRUE,
-       color = "red",
-       label.size = 3,
-       alpha = .5,
-       size = "degree",
-       edge.size = "weights",
-       edge.lty = "lty",
-       edge.alpha = .2,
-legend.position = "bottom") +
-  guides(color = FALSE, size = FALSE)
-```
-
-We now have a meaningful collocation network. All of the terms that are shown collocates with `collocterm` and the thickness of the lines shows how often the key term (`collocterm`) co-occurs with each of the terms. The size of the icicles shows how frequent the terms are. 
-
-# Analyzing Changes in Collocation Strength across Time
-
-This section focuses on changes in collocation strength across apparent time. The example focuses on adjective amplification in Australian English. The issue we will analyse here is whether we can unearth changes in the collocation pattern of adjective amplifiers such as *very*, *really*, or *so*. In other words, we will investigate if amplifiers associate with different adjectives among speakers from different age groups. 
+We now turn to analyses of changes in collocation strength over apparent time. The example focuses on adjective amplification in Australian English. The issue we will analyze here is whether we can unearth changes in the collocation pattern of adjective amplifiers such as *very*, *really*, or *so*. In other words, we will investigate if amplifiers associate with different adjectives among speakers from different age groups. 
 
 In a first step,  we activate packages and load the data.
 
 ```{r coll_02_01, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load packages
-library(dplyr)
-library(ggplot2)
 # load functions
 source("https://SLCLADAL.github.io/rscripts/collexcovar.R")
 # load data
 ampaus <- read.table("https://SLCLADAL.github.io/data/ampaus.txt", sep = "\t", header = T)
-# inspect data
-str(ampaus)
+# inspect results
+datatable(head(ampaus, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
-The data consists of three variables (Adjective, Variant, and Age).
-
-
-Now, we perform a co-varying collexeme analysis for really versus other amplifiers. The function takes a data set consisting of three columns labelled keys, colls, and time
+The data consists of three variables (`Adjective`, `Variant`, and `Age`). In a next step, we perform a co-varying collexeme analysis for *really* versus all other amplifiers. For this reason, we reduce the data set and retain only The function takes a data set consisting of three columns labeled `keys`, `colls`, and `time`.
 
 ```{r coll_02_05, echo=T, eval = T, message=FALSE, warning=FALSE}
 # rename data
@@ -411,9 +512,10 @@ ampaus <- ampaus %>%
 # perform analysis
 collexcovar_really <- collexcovar(data = ampaus, keyterm = "really")
 # inspect results
-collexcovar_really
+datatable(collexcovar_really, rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
+Now, that the data has the correct labels, we can continue with the implementation of the co-varying collexeme analysis. 
 
 ```{r coll_02_07, echo=T, eval = T, message=FALSE, warning=FALSE}
 # perform analysis
@@ -422,7 +524,7 @@ collexcovar_so <- collexcovar(data = ampaus, keyterm = "so")
 collexcovar_very <- collexcovar(data = ampaus, keyterm = "very")
 ```
 
-For other amplifiers, we have to change the label "other" to "bin" as the function already has a a label "other". Once we have changed other to bin, we perform the analysis.
+For other amplifiers, we have to change the label *other* to *bin* as the function already has a a label *other*. Once we have changed other to bin, we perform the analysis.
 
 ```{r coll_02_09, echo=T, eval = T, message=FALSE, warning=FALSE}
 ampaus <- ampaus %>%
@@ -442,7 +544,7 @@ collexcovar_ampaus <- collexcovar_ampaus %>%
   dplyr::mutate(Variant = ifelse(Variant == "bin", "other", Variant)) %>%
   dplyr::arrange(Age)
 # inspect results
-collexcovar_ampaus
+datatable(collexcovar_ampaus, rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
 We now modify the data set so that we can plot the collocation strength across apparent time.
@@ -473,36 +575,19 @@ ampauscoll
 In a final step, we visualize the results of our analysis.
 
 ```{r coll_02_15, echo=F, eval = T, message=FALSE, warning=FALSE}
-p1 <-ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)), 
-                             y = phi, group = Variant, 
-                      color = Variant, linetype = Variant)) +
+ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)),
+                       y = phi, group = Variant)) +
   facet_wrap(vars(Adjective)) +
   geom_line() +
-  guides(color=guide_legend(override.aes=list(fill=NA))) +
-  scale_color_manual(values = 
-                       c("gray70", "gray70", "gray20", "gray70", "gray20"),
-                        name="Variant",
-                        breaks = c("other", "pretty", "really", "so", "very"), 
-                        labels = c("other", "pretty", "really", "so", "very")) +
-  scale_linetype_manual(values = 
-                          c("dotted", "dotdash", "longdash", "dashed", "solid"),
-                        name="Variant",
-                        breaks = c("other", "pretty", "really", "so", "very"), 
-                        labels = c("other",  "pretty", "really", "so", "very")) +
   theme_set(theme_bw(base_size = 12)) +
-  theme(legend.position="top", 
-        axis.text.x = element_text(size=12),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank()) +
-  coord_cartesian(ylim = c(-.2, .4)) +
-  labs(x = "Age", y = "Collocation Strength") +
-  guides(size = FALSE)+
-  guides(alpha = FALSE)
+  coord_cartesian(ylim = c(-.2, .4))
 ```
 
+
+
 ```{r coll_02_17, echo=T, eval = T, message=FALSE, warning=FALSE}
-ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)), 
-                             y = phi, group = Variant, 
+ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)),
+                       y = phi, group = Variant, 
                       color = Variant, linetype = Variant)) +
   facet_wrap(vars(Adjective)) +
   geom_line() +
@@ -517,11 +602,11 @@ ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)),
                         name="Variant",
                         breaks = c("other", "pretty", "really", "so", "very"), 
                         labels = c("other",  "pretty", "really", "so", "very")) +
-  theme_set(theme_bw(base_size = 12)) +
   theme(legend.position="top", 
         axis.text.x = element_text(size=12),
         panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank()) +
+  theme_set(theme_bw(base_size = 12)) +
   coord_cartesian(ylim = c(-.2, .4)) +
   labs(x = "Age", y = "Collocation Strength") +
   guides(size = FALSE)+
@@ -540,9 +625,17 @@ Collostructional  analysis [@stefanowitsch2003collostructions; @stefanowitsch200
 
 * Co-Varying Collexeme Analysis
 
-The analyses performed here are based on the collostructions package [@flach2017collostructions].
+The analyses performed here are based on the `collostructions` package [@flach2017collostructions].
 
-## Simple Collexeme Analysis
+## Simple Collexeme Analysis{-}
+
+***
+
+NOTE!
+
+The code in this section does not work at the moment as the `collostructions` package has not yet been updated and is therefore still incompatible with the R version used for this tutorial. The code is merely displayed and would work is processed with an older R versions.
+
+***
 
 Simple Collexeme Analysis determines if a word is significantly attracted to a specific construction within a corpus. The idea is that the frequency of the word that is attracted to a construction is significantly higher within the construction than would be expected by chance.
 
@@ -550,7 +643,7 @@ The example here analyzses the Go + Verb construction (e.g. "Go suck a nut!"). T
 
 In a first step, we load the collostructions package and inspect the data. In this case, we will only use a sample of 100 rows from the data set as the output would become hard to read.
 
-```{r coll_03_01, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r coll_03_01, echo=T, eval = F, message=FALSE, warning=FALSE}
 # load library
 library(collostructions)
 # draw a sample of the data
@@ -563,7 +656,7 @@ The collex function which calculates the results of a simple collexeme analysis 
 
 To perform the simple collexeme analysis, we need the overal size of the corpus, the frequency with which a word occurs in the construction under investigation and the frequency of that construction.
 
-```{r coll_03_03, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r coll_03_03, echo=T, eval = F, message=FALSE, warning=FALSE}
 # define corpus size
 crpsiz <- sum(goVerb$CORP.FREQ)
 # perform simple collexeme analysis
@@ -577,19 +670,19 @@ head(scollex_results)
 
 The results show which words are significantly attracted to the construction. If the ASSOC column did not show *attr*, then the word would be repelled by the construction.
 
-## Covarying Collexeme Analysis
+## Covarying Collexeme Analysis{-}
 
 Covarying collexeme analysis determines if the occurrence of a word in the first slot of a constructions affects the occurrence of another word in the second slot of the construction. As such, covarying collexeme analysis analyzes constructions with two slots and how the lexical elemenst within the two slots affect each other.
 
 The data we will use consists of two columns which contain in the first column (CXN.TYPE) the word in the first slot (either *cannot* or *can't*) and in the second slot (COLLEXEME) the word in the second slot, i.e. the collexeme, which the verb that follows after *cannot* or *can't*. The first six rows of the data are shown below.
 
-```{r coll_03_07, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r coll_03_07, echo=T, eval = F, message=FALSE, warning=FALSE}
 head(cannot)
 ```
 
 We now perform the collexeme analysis and oinspect the results.
 
-```{r coll_03_09, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r coll_03_09, echo=T, eval = F, message=FALSE, warning=FALSE}
 covar_results <- collex.covar(cannot)
 # inspect results
 head(covar_results)
@@ -597,13 +690,13 @@ head(covar_results)
 
 The results show if a words in the first and second slot attract or repel each other (ASSOC) and provide uncorrceted significance levels.
 
-## Distinctive Collexeme Analysis
+## Distinctive Collexeme Analysis{-}
 
 Distinctive Collexeme Analysis determines if the frequencies of items in two alternating constructions or under two conditions differ significantly. This analysis can be extended to analyze if the use of a word differs between two corpora.
 
 Again, we use the cannot data.
 
-```{r coll_03_11, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r coll_03_11, echo=T, eval = F, message=FALSE, warning=FALSE}
 collexdist_results <- collex.dist(cannot, raw = TRUE)
 # inspect results
 head(collexdist_results)
@@ -611,8 +704,33 @@ head(collexdist_results)
 
 The results show if words are significantly attracted or repelled by either the contraction (*can't*) or the full form (*cannot*). In this example, *remember* - like all other words shown in the results - is significantly attracted to the contraction (*can't*).
 
-# How to cite this tutorial {-}
 
-Schweinberger, Martin. 2020. *Analyzing co-occurrences and collocations using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/collocations.html.
+# Citation & Session Info {-}
 
-# References
+Schweinberger, Martin. 2020. *Analyzing Co-Occurrences and Collocations in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/collocations.html (Version 2020.09.26).
+
+```
+@manual{schweinberger2020coll,
+  author = {Schweinberger, Martin},
+  title = {Analyzing Co-Occurrences and Collocations in R},
+  note = {https://slcladal.github.io/maps.html},
+  year = {2020},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/09/25}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Main page](https://slcladal.github.io/index.html)
+
+***
+
+# References {-}
+
