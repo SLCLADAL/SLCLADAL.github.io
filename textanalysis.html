@@ -11,7 +11,7 @@
 
 <meta name="author" content="UQ SLC Digital Team" />
 
-<meta name="date" content="2020-09-24" />
+<meta name="date" content="2020-09-26" />
 
 <title>Text Analysis and Distant Reading using R</title>
 
@@ -443,7 +443,10 @@ div.tocify {
       <a href="advancedstatztrees.html">Tree-Based Models</a>
     </li>
     <li>
-      <a href="groupingstatz.html">Classification</a>
+      <a href="groupingstatz.html">Cluster and Correspondence Analysis</a>
+    </li>
+    <li>
+      <a href="svm.html">Semantic Vector Space Models</a>
     </li>
     <li class="divider"></li>
     <li class="dropdown-header">Text Analytics</li>
@@ -489,6 +492,9 @@ div.tocify {
     <li>
       <a href="webcrawling.html">Web Crawling using R</a>
     </li>
+    <li>
+      <a href="vc.html">Creating Vowel Charts with Praat and R</a>
+    </li>
   </ul>
 </li>
 <li>
@@ -508,7 +514,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Text Analysis and Distant Reading using R</h1>
 <h4 class="author">UQ SLC Digital Team</h4>
-<h4 class="date">2020-09-24</h4>
+<h4 class="date">2020-09-26</h4>
 
 </div>
 
@@ -870,180 +876,6 @@ head(darwin2gramsdf)</code></pre>
 ## 48173    on the       744
 ## 30694 have been       624</code></pre>
 <p>Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.</p>
-<p>In the following, we will extract collocations from Darwin’s “Origin”. In a first step, we will split the Origin into smaller chunks.</p>
-<pre class="r"><code># read in text
-darwinsentences &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;) %&gt;%
-  paste(sep = &quot; &quot;, collapse = &quot; &quot;) %&gt;%
-  str_replace_all(&quot; {2,}&quot;, &quot; &quot;) %&gt;%
-  str_replace_all(&quot;([A-Z]{2,} [A-Z]{2,}) ([A-Z][a-z]{1,} )&quot;, &quot;\\1 qwertz\\2&quot;) %&gt;%
-  str_replace_all(&quot;([a-z]{2,}\\.) ([A-Z] {0,1}[a-z]{0,30})&quot;, &quot;\\1qwertz\\2&quot;) %&gt;%
-    str_replace_all(&quot;([a-z]{2,}\\?) ([A-Z] {0,1}[a-z]{0,30})&quot;, &quot;\\1qwertz\\2&quot;) %&gt;%
-  strsplit(&quot;qwertz&quot;)%&gt;%
-  unlist()
-# inspect data
-head(darwinsentences)</code></pre>
-<pre><code>## [1] &quot;THE ORIGIN OF SPECIES BY CHARLES DARWIN AN HISTORICAL SKETCH OF THE PROGRESS OF OPINION ON THE ORIGIN OF SPECIES INTRODUCTION &quot;                                                                                                                                                
-## [2] &quot;When on board H.M.S. &#39;Beagle,&#39; as naturalist, I was much struck with certain facts in the distribution of the organic beings in- habiting South America, and in the geological relations of the present to the past inhabitants of that continent.&quot;                            
-## [3] &quot;These facts, as will be seen in the latter chapters of this volume, seemed to throw some light on the origin of species — that mystery of mysteries, as it has been called by one of our greatest philosophers.&quot;                                                               
-## [4] &quot;On my return home, it occurred to me, in 1837, that something might perhaps be made out on this question by patiently accumulating and reflecting on all sorts of facts which could possibly have any bearing on it.&quot;                                                          
-## [5] &quot;After five years&#39; work I allowed myself to specu- late on the subject, and drew up some short notes; these I enlarged in 1844 into a sketch of the conclusions, which then seemed to me probable; from that period to the present day I have steadily pursued the same object.&quot;
-## [6] &quot;I hope that I may be excused for entering on these personal details, as I give them to show that I have not been hasty in coming to a decision.&quot;</code></pre>
-<p>In a next step, we will create a matrix that shows cooccurrence of words.</p>
-<pre class="r"><code># convert into corpus
-darwincorpus &lt;- Corpus(VectorSource(darwinsentences))
-# create vector with words to remove
-extrawords &lt;- c(&quot;the&quot;, &quot;can&quot;, &quot;get&quot;, &quot;got&quot;, &quot;can&quot;, &quot;one&quot;, 
-                &quot;dont&quot;, &quot;even&quot;, &quot;may&quot;, &quot;but&quot;, &quot;will&quot;, 
-                &quot;much&quot;, &quot;first&quot;, &quot;but&quot;, &quot;see&quot;, &quot;new&quot;, 
-                &quot;many&quot;, &quot;less&quot;, &quot;now&quot;, &quot;well&quot;, &quot;like&quot;, 
-                &quot;often&quot;, &quot;every&quot;, &quot;said&quot;, &quot;two&quot;)
-# clean corpus
-darwincorpusclean &lt;- darwincorpus %&gt;%
-  tm_map(removePunctuation) %&gt;%
-  tm_map(tolower) %&gt;%
-  tm_map(removeWords, stopwords(kind = &quot;en&quot;)) %&gt;%
-  tm_map(removeWords, extrawords)
-# create document term matrix
-darwindtm &lt;- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
-# load library
-library(Matrix)
-# convert dtm into sparse matrix
-darwinsdtm &lt;- sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
-                           x = darwindtm$v, 
-                           dims = c(darwindtm$nrow, darwindtm$ncol),
-                           dimnames = dimnames(darwindtm))
-# calculate cooccurrence counts
-coocurrences &lt;- t(darwinsdtm) %*% darwinsdtm
-# convert into matrix
-collocates &lt;- as.matrix(coocurrences)
-# inspect results
-collocates[1:8, 1:5]</code></pre>
-<pre><code>##              charles darwin historical introduction opinion
-## charles            9      1          1            1       1
-## darwin             1      1          1            1       1
-## historical         1      1          4            1       1
-## introduction       1      1          1            7       1
-## opinion            1      1          1            1      10
-## origin             1      1          2            2       1
-## progress           1      1          1            1       1
-## sketch             1      1          1            1       1</code></pre>
-<pre class="r"><code># inspect size of matrix
-ncol(collocates)</code></pre>
-<pre><code>## [1] 10548</code></pre>
-<pre class="r"><code>summary(rowSums(collocates))</code></pre>
-<pre><code>##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##       1      23      45     191     124   25722</code></pre>
-<pre class="r"><code># remove terms that do not collocate with other terms
-noncoll &lt;- colnames(collocates)[which(rowSums(collocates) &lt; 5000)]
-# remove non-collocating terms
-collocates &lt;- collocates[!rownames(collocates) %in% noncoll, ]
-collocates &lt;- collocates[, !colnames(collocates) %in% noncoll]
-# create distance matrix
-distmtx &lt;- dist(collocates)
-# activate library
-library(&quot;cluster&quot;)         # activate library
-clustertexts &lt;- hclust(    # hierarchical cluster object
-  distmtx,                 # use data diststudents
-  method=&quot;ward.D2&quot;)         # ward.D as linkage method
-plot(clustertexts,         # plot result as dendrogram
-     hang = .25,           # labels at split
-     main = &quot;&quot;)            # no title</code></pre>
-<p><img src="textanalysis_files/figure-html/coll7-1.png" width="672" /></p>
-<p>An alternative way to display cooccurrence patterns are bi-plots. Biplots are commonly used to display, for instance, the results of Correspondence Analyses.</p>
-<pre class="r"><code># load library
-library(&quot;FactoMineR&quot;)
-library(&quot;factoextra&quot;)
-# perform correspondence analysis
-res.ca &lt;- CA(collocates, graph = FALSE)
-# plot results
-plot(res.ca, shadow = T, cex = 1, selectRow = &quot;cos2 0.1&quot;, selectCol = &quot;cos2 0.9&quot;, col.row = &quot;gray50&quot;, title = &quot;&quot;)</code></pre>
-<p><img src="textanalysis_files/figure-html/coll8-1.png" width="672" /></p>
-<p>The bi-plot shows that “natural” and “selection” collocate, as do “animals” and “plants”, “period”, “long”, and “time” as well as “conditions” and “life”. Other words with lower collocation strength are masked from the bi-plot.</p>
-<p>We will now use an example of one individual word to show, how collocation strength for individual terms is calculated and displayed as a network.</p>
-<pre class="r"><code># load function for co-occurrence calculation
-source(&quot;https://slcladal.github.io/rscripts/calculateCoocStatistics.R&quot;)
-# define minimum number of cooccurences
-numberOfCoocs &lt;- 10
-# define term
-coocTerm &lt;- &quot;selection&quot;
-# calculate cooccurence statistics
-coocs &lt;- calculateCoocStatistics(coocTerm, darwinsdtm, measure=&quot;LOGLIK&quot;)
-# show strenght of cooccurence
-print(coocs[1:numberOfCoocs])</code></pre>
-<pre><code>##       natural        theory    variations       effects          acts 
-##    1476.38620     121.48373     112.17318      66.45145      51.64986 
-## modifications        sexual         power        slight        disuse 
-##      45.69396      44.95857      43.80820      42.97196      41.69089</code></pre>
-<p>Now, we can visualize the collocation network for our example term. Unfortunately, creating a graph object is rather complex.</p>
-<pre class="r"><code># create graph object
-resultGraph &lt;- data.frame(from = character(), to = character(), sig = numeric(0))
-# create data frame
-tmpGraph &lt;- data.frame(from = character(), to = character(), sig = numeric(0))
-# fill data frame to produce the correct number of lines
-tmpGraph[1:numberOfCoocs, 3] &lt;- coocs[1:numberOfCoocs]
-# enter search word into the first column in all lines
-tmpGraph[, 1] &lt;- coocTerm
-# enter co-occurrences into second column
-tmpGraph[, 2] &lt;- names(coocs)[1:numberOfCoocs]
-# enter collocation strength
-tmpGraph[, 3] &lt;- coocs[1:numberOfCoocs]
-# attach data frame to resultGraph
-resultGraph &lt;- rbind(resultGraph, tmpGraph)</code></pre>
-<p>Calculate cooccurence statistics and add them to the graph object.</p>
-<pre class="r"><code># iterate over most significant numberOfCoocs co-occurrences
-for (i in 1:numberOfCoocs){
-  # calculate co-occurrence strength for term i
-  newCoocTerm &lt;- names(coocs)[i]
-  coocs2 &lt;- calculateCoocStatistics(newCoocTerm, darwinsdtm, measure=&quot;LOGLIK&quot;)
-  # fill temporary graph object
-  tmpGraph &lt;- data.frame(from = character(), to = character(), sig = numeric(0))
-  tmpGraph[1:numberOfCoocs, 3] &lt;- coocs2[1:numberOfCoocs]
-  tmpGraph[, 1] &lt;- newCoocTerm
-  tmpGraph[, 2] &lt;- names(coocs2)[1:numberOfCoocs]
-  tmpGraph[, 3] &lt;- coocs2[1:numberOfCoocs]
-  # append results to the result graph data frame
-  resultGraph &lt;- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
-}</code></pre>
-<p>Now, we can create a network graph object.</p>
-<pre class="r"><code># load packages
-library(igraph)
-# define graph and type (&quot;F&quot; means &quot;Force Directed&quot;)
-graphNetwork &lt;- graph.data.frame(resultGraph, directed = F)
-# identify nodes with fewer than 2 edges
-graphVs &lt;- V(graphNetwork)[degree(graphNetwork) &lt; 2]
-# removed these edges from graph
-graphNetwork &lt;- delete.vertices(graphNetwork, graphVs) 
-# sssign colors to edges and nodes (searchterm blue, rest orange)
-V(graphNetwork)$color &lt;- ifelse(V(graphNetwork)$name == coocTerm, &#39;cornflowerblue&#39;, &#39;orange&#39;) 
-# Edges with a significance of at least 50% of the maximum significance in the graph are drawn in orange
-halfMaxSig &lt;- max(E(graphNetwork)$sig) * 0.5
-E(graphNetwork)$color &lt;- ifelse(E(graphNetwork)$sig &gt; halfMaxSig, &quot;coral&quot;, &quot;azure3&quot;)
-# disable edges with radius
-E(graphNetwork)$curved &lt;- 0 
-# size the nodes by their degree of networking
-V(graphNetwork)$size &lt;- log(degree(graphNetwork)) * 5
-# all nodes must be assigned a standard minimum-size
-V(graphNetwork)$size[V(graphNetwork)$size &lt; 5] &lt;- 3 
-# edge thickness
-E(graphNetwork)$width &lt;- 1.5</code></pre>
-<p>And finally, we can visualize the network.</p>
-<pre class="r"><code># Define the frame and spacing for the plot
-par(mai=c(0,0,1,0)) 
-# Finaler Plot
-plot(graphNetwork,              
-     layout = layout.fruchterman.reingold,  # Force Directed Layout 
-     main = paste(&quot;Cooccurrence network for&quot;, &quot; \&quot;&quot;, coocTerm, &quot;\&quot;&quot;),
-     vertex.label.family = &quot;sans&quot;,
-     vertex.label.cex = .75,
-     vertex.shape = &quot;circle&quot;,
-     vertex.label.dist = 2,           # Labels of the nodes moved slightly
-     vertex.frame.color = &#39;darkolivegreen&#39;,
-     vertex.label.color = &#39;black&#39;,      # Color of node names
-     vertex.label.font = 2,         # Font of node names
-     vertex.label = V(graphNetwork)$name,       # node names
-     vertex.label.cex = .75 # font size of node names 
-)</code></pre>
-<p><img src="textanalysis_files/figure-html/coll14-1.png" width="672" /></p>
 </div>
 <div id="text-classification" class="section level1">
 <h1><span class="header-section-number">7</span> Text Classification</h1>
@@ -1215,7 +1047,7 @@ library(&quot;class&quot;)
 prediction &lt;- class::knn(train[,2:ncol(train)], test[,2:ncol(test)], cl = train[, 1], k = 3)
 # inspect the result
 prediction</code></pre>
-<pre><code>## [1] Spanish
+<pre><code>## [1] English
 ## Levels: English German Spanish</code></pre>
 <p>Based on the frequencies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley’s <em>Brave New World</em>. The training texts were German, English, and Spanish translations of a subsection of Wikipedia’s article for Hermann Hesse’s <em>Steppenwolf</em>.</p>
 </div>
@@ -1261,95 +1093,18 @@ orwellpeople</code></pre>
 ## [22] &quot;Tom&quot;                 &quot;Winston&quot;             &quot;Winston Smith&quot;      
 ## [25] &quot;Withers&quot;</code></pre>
 </div>
-<div id="topic-modelling" class="section level1">
-<h1><span class="header-section-number">9</span> Topic Modelling</h1>
-<p>Topic Modelling is a procedure that allows to extract clusters of key words. These key word clusters can represent topics and the extraction and detection of such key word clusters builds on word frequencies and correlations between word frequencies.</p>
-<pre class="r"><code># load data
-darwin &lt;- readLines(&quot;https://slcladal.github.io/data/origindarwin.txt&quot;)
-twain &lt;- readLines(&quot;https://slcladal.github.io/data/twainhuckfinn.txt&quot;)
-orwell &lt;- readLines(&quot;https://slcladal.github.io/data/orwell.txt&quot;)
-# clean files 
-darwin &lt;- paste(gsub(&quot; {2,}&quot;, &quot; &quot;, darwin), sep = &quot; &quot;, collapse = &quot; &quot;)
-twain &lt;- paste(gsub(&quot; {2,}&quot;, &quot;  &quot;, twain), sep = &quot; &quot;, collapse = &quot; &quot;)
-orwell &lt;- paste(gsub(&quot; {2,}&quot;, &quot; &quot;, orwell), sep = &quot; &quot;, collapse = &quot; &quot;)
-# inspect data
-str(orwell)</code></pre>
-<pre><code>##  chr &quot;1984 George Orwell Part 1, Chapter 1 It was a bright cold day in April, and the clocks were striking thirteen. &quot;| __truncated__</code></pre>
-<p>Now, we create a corpus object and clean the corpus.</p>
-<pre class="r"><code># load library
-library(tm)
-# create corpus object
-texts &lt;- Corpus(VectorSource(c(darwin, twain, orwell)))
-# create vector with words to remove
-extrawords &lt;- c(&quot;the&quot;, &quot;can&quot;, &quot;get&quot;, &quot;got&quot;, &quot;can&quot;, &quot;one&quot;, 
-                &quot;dont&quot;, &quot;even&quot;, &quot;may&quot;, &quot;but&quot;, &quot;will&quot;, 
-                &quot;much&quot;, &quot;first&quot;, &quot;but&quot;, &quot;see&quot;, &quot;new&quot;, 
-                &quot;many&quot;, &quot;less&quot;, &quot;now&quot;, &quot;well&quot;, &quot;like&quot;, 
-                &quot;often&quot;, &quot;every&quot;, &quot;said&quot;, &quot;two&quot;)
-# load libraries
-library(dplyr)
-library(stringr)
-# clean corpus
-textsclean &lt;- texts %&gt;%
-  tm_map(removePunctuation) %&gt;%
-  tm_map(removeNumbers) %&gt;% 
-  tm_map(tolower) %&gt;%
-  tm_map(removeWords, stopwords(kind = &quot;en&quot;)) %&gt;%
-  tm_map(removeWords, extrawords)</code></pre>
-<p>We now create a document term matrix and perform a Linear Discriminant Analysis (LDA). An LDA is a type of classification procedure that is commonly used in machine learning (similar to KNN-Clustering or other classification methods). To obtain even better results, dimensionality reduction procedures such as Principal Component Analysis (PCA) or Multidimensional Scaling (MDS) could be performed prior to applying the LDA ( <a href="https://towardsdatascience.com/linear-discriminant-analysis-lda-101-using-r-6a97217a55a6">see here for an example</a>). We will not perform any dimension reduction here fro the sake of brevity though.</p>
-<pre class="r"><code># create DTM
-textsdtm &lt;- DocumentTermMatrix(textsclean)
-# load library
-library(topicmodels)
-# perform LDA
-textslda &lt;- LDA(textsdtm, k = 3, control = list(seed = 20190712))
-textslda</code></pre>
-<pre><code>## A LDA_VEM topic model with 3 topics.</code></pre>
-<p>We can now inspect which words are particularly associated with which topic.</p>
-<pre class="r"><code># load library
-library(tidytext)
-# convert data into tidy format
-textstopics &lt;- tidy(textslda, matrix = &quot;beta&quot;)
-textstopics</code></pre>
-<pre><code>## # A tibble: 61,596 x 3
-##    topic term            beta
-##    &lt;int&gt; &lt;chr&gt;          &lt;dbl&gt;
-##  1     1 abdomen    4.99e-108
-##  2     2 abdomen    2.19e-  5
-##  3     3 abdomen    5.34e-163
-##  4     1 aberrant   9.46e-108
-##  5     2 aberrant   7.66e-  5
-##  6     3 aberrant   7.53e-163
-##  7     1 aberration 2.96e-108
-##  8     2 aberration 2.19e-  5
-##  9     3 aberration 5.88e-163
-## 10     1 abhorrent  2.18e-108
-## # ... with 61,586 more rows</code></pre>
-<p>The beta values show how strongly a given term correlates with one of the topics. For example, the term “abdomen”, is very unlikely associated with topic 1 or 3 as the beta values are very low (4.988e-108 and 5.344e-163). In contrast, the beta value for topic 2 is 2.189e-5 and thus much higher than the beta values for topic 1 and 3. Therefore, the term “abdomen” is most likely indicative of or associated with topic 2.</p>
-<p>In a next step, we visualize the keyterms for each topic to check if the topics happen to reflect the monograph themes.</p>
-<pre class="r"><code># load libraries
-library(ggplot2)
-library(dplyr)
-# extract top words
-textstopicstop &lt;- textstopics %&gt;%
-  group_by(topic) %&gt;%
-  top_n(15, beta) %&gt;%
-  ungroup() %&gt;%
-  arrange(term, -beta)
-# create plots
-textstopicstop %&gt;%
-  mutate(term = reorder(term, beta)) %&gt;%
-  ggplot(aes(term, beta, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = &quot;free&quot;) +
-  coord_flip()</code></pre>
-<p><img src="textanalysis_files/figure-html/tm5-1.png" width="672" /></p>
-<p>The topic modelling does, in fact, reflect the narrative topics of the three monographs with the first topic representing Orwell’s “1984”, the second topic representing Darwin’s “On the origin of species”, and the third topic representing Twain’s “Adventures of Huckleberry Finn”.</p>
-<p>Topic Models can be refined and made more meaningful in various ways. For instance, the topic model shown here could be improved by splitting the monographs into chapters and running the analysis on the individual chapters rather than the entire monograph. Also, a very interesting application of Topic Models would be to investigate changes in topics over time which is dealt with in the tutorial that delves deeper into topic modeling.</p>
-</div>
 <div id="citation-session-info" class="section level1 unnumbered">
 <h1>Citation &amp; Session Info</h1>
-<p>Schweinberger, Martin. 2020. <em>Text Analysis and Distant Reading using R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/textanalysis.html" class="uri">https://slcladal.github.io/textanalysis.html</a>.</p>
+<p>Schweinberger, Martin. 2020. <em>Text Analysis and Distant Reading using R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/textanalysis.html" class="uri">https://slcladal.github.io/textanalysis.html</a> (Version 2020.09.27).</p>
+<pre><code>@manual{schweinberger2020ta,
+  author = {Schweinberger, Martin},
+  title = {Text Analysis and Distant Reading using R},
+  note = {https://slcladal.github.io/textanalysis.html},
+  year = {2020},
+  organization = &quot;The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/09/27}
+}</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.0.2 (2020-06-22)
 ## Platform: x86_64-w64-mingw32/x64 (64-bit)
@@ -1366,37 +1121,27 @@ textstopicstop %&gt;%
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] tidytext_0.2.5      topicmodels_0.2-11  openNLPdata_1.5.3-4
-##  [4] openNLP_0.2-7       class_7.3-17        tidyr_1.1.1        
-##  [7] igraph_1.2.5        slam_0.1-47         factoextra_1.0.7   
-## [10] FactoMineR_2.3      cluster_2.1.0       Matrix_1.2-18      
-## [13] knitr_1.29          xtable_1.8-4        wordcloud_2.6      
-## [16] RColorBrewer_1.1-2  tm_0.7-7            NLP_0.2-0          
-## [19] ggplot2_3.3.2       plyr_1.8.6          stringr_1.4.0      
-## [22] dplyr_1.0.1         png_0.1-7          
+##  [1] openNLPdata_1.5.3-4 openNLP_0.2-7       class_7.3-17       
+##  [4] cluster_2.1.0       tidyr_1.1.2         knitr_1.30         
+##  [7] xtable_1.8-4        wordcloud_2.6       RColorBrewer_1.1-2 
+## [10] tm_0.7-7            NLP_0.2-0           ggplot2_3.3.2      
+## [13] plyr_1.8.6          stringr_1.4.0       dplyr_1.0.2        
+## [16] png_0.1-7          
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] ggrepel_0.8.2        Rcpp_1.0.5           lattice_0.20-41     
-##  [4] utf8_1.1.4           assertthat_0.2.1     digest_0.6.25       
-##  [7] R6_2.4.1             stats4_4.0.2         evaluate_0.14       
-## [10] highr_0.8            pillar_1.4.6         rlang_0.4.7         
-## [13] rmarkdown_2.3        labeling_0.3         splines_4.0.2       
-## [16] munsell_0.5.0        compiler_4.0.2       janeaustenr_0.1.5   
-## [19] xfun_0.16            pkgconfig_2.0.3      mgcv_1.8-31         
-## [22] htmltools_0.5.0      flashClust_1.01-2    tidyselect_1.1.0    
-## [25] tibble_3.0.3         fansi_0.4.1          crayon_1.3.4        
-## [28] withr_2.2.0          MASS_7.3-51.6        leaps_3.1           
-## [31] SnowballC_0.7.0      grid_4.0.2           nlme_3.1-148        
-## [34] gtable_0.3.0         lifecycle_0.2.0      magrittr_1.5        
-## [37] scales_1.1.1         tokenizers_0.2.1     cli_2.0.2           
-## [40] stringi_1.4.6        reshape2_1.4.4       farver_2.0.3        
-## [43] scatterplot3d_0.3-41 xml2_1.3.2           ellipsis_0.3.1      
-## [46] generics_0.0.2       vctrs_0.3.2          tools_4.0.2         
-## [49] glue_1.4.1           purrr_0.3.4          parallel_4.0.2      
-## [52] yaml_2.2.1           colorspace_1.4-1     rJava_0.9-13        
-## [55] modeltools_0.2-23</code></pre>
+##  [1] Rcpp_1.0.5       pillar_1.4.6     compiler_4.0.2   highr_0.8       
+##  [5] tools_4.0.2      digest_0.6.25    evaluate_0.14    lifecycle_0.2.0 
+##  [9] tibble_3.0.3     gtable_0.3.0     nlme_3.1-148     lattice_0.20-41 
+## [13] mgcv_1.8-31      pkgconfig_2.0.3  rlang_0.4.7      Matrix_1.2-18   
+## [17] parallel_4.0.2   yaml_2.2.1       xfun_0.16        rJava_0.9-13    
+## [21] xml2_1.3.2       withr_2.3.0      generics_0.0.2   vctrs_0.3.4     
+## [25] grid_4.0.2       tidyselect_1.1.0 glue_1.4.2       R6_2.4.1        
+## [29] rmarkdown_2.3    farver_2.0.3     purrr_0.3.4      magrittr_1.5    
+## [33] scales_1.1.1     ellipsis_0.3.1   htmltools_0.5.0  splines_4.0.2   
+## [37] colorspace_1.4-1 labeling_0.3     stringi_1.5.3    munsell_0.5.0   
+## [41] slam_0.1-47      crayon_1.3.4</code></pre>
 <hr />
-<p><a href="https://slcladal.github.io/index.html">Go back to the main page</a></p>
+<p><a href="https://slcladal.github.io/index.html">Main page</a></p>
 <hr />
 </div>
 <div id="references" class="section level1 unnumbered">
