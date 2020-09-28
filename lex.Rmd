@@ -1,0 +1,174 @@
+---
+title: "Lexicography with R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces lexicography with R and shows how to use R to create dictionaries and find synonyms through determining semantic similarity in R. While the initial example focuses on English, subsequent sections show how easily this approach can be generalized to languages other than English (e.g. German, French, Spanish, Italian, or Dutch). The entire R-markdown document for the sections below can be downloaded [here](https://slcladal.github.io/lex.Rmd).
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# clean current workspace
+rm(list=ls(all=T))
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
+# install libraries
+install.packages(c("tidyr", "tidytext", "quanteda", "koRpus", 
+                   "koRpus.lang.en", "DT", "hunspell"))
+```
+
+Once you have installed R Studio and initiated the session by executing the code shown above, you are good to go.
+
+# Creating a basic dictionary for English
+
+In a first step, we load the necessary packages from the library and define the location of the engine which we use for the part-of-speech tagging. In this case, we will use the TreeTagger [see @schmid1994treetagger; @schmid2007enriched,; @schmid2013probabilistic]. How to install and then use the TreeTagger for English as well as for German, French, Spanish, Italian, and Dutch is demonstrated and explained [here](https://slcladal.github.io/tagging.html#TreeTagger:_pos-tagging_languages_other_than_English).
+
+***
+
+NOTE
+
+You will have to install TreeTagger and change the path used below (`"C:\\TreeTagger\\bin\\tag-english.bat"`) to the location where you have installed TreeTagger on your machine. If you do not know how to install TreeTagger or encounter problems, read [this tutorial](https://slcladal.github.io/tagging.html)!
+
+In addition, you can download the pos-tagged text [here](https://slcladal.github.io/data/orwell.txt) so you can sinply skip the next code chunk and load the data as shown below.
+
+***
+
+
+```{r lex1, message=FALSE, warning=FALSE}
+# activate packages
+library(tidyr)
+library(tidytext)
+library(quanteda)
+library(koRpus)
+library(koRpus.lang.en)
+library(DT)
+library(hunspell)
+# define location of pos-tagger engine
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-english.bat", lang="en") 
+```
+
+In a next step, we load and process the data which in this tutorial represents the text from George Orwell's *Nineteen Eighty-Four*. We will not pre-process the data by for instance repairing broken or otherwise compromised words and continue by directly implementing the part-of-speech tagger.
+
+```{r lex3, eval = F, message=FALSE, warning=FALSE}
+# load and pos-tag data
+#orwell_pos <- treetag("https://slcladal.github.io/data/orwell.txt")
+orwell_pos <- treetag("data/orwell.txt")
+# select data frame
+orwell_pos <- orwell_pos@tokens
+# write data to disc
+#write.table(orwell_pos, "D:\\Uni\\UQ\\SLC\\LADAL\\SLCLADAL.github.io\\data/orwell_pos.txt", sep = "\t", row.names = F)
+# inspect  results
+datatable(head(orwell_pos, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+
+If you could not pos-tag the text, you can simply execute the following code chunk which loads the pos-tagged text from the LADAL repository.
+
+```{r lex5, echo = T, eval = T, message=FALSE, warning=FALSE}
+# load pos-taged data
+#orwell_pos <- read.delim("https://slcladal.github.io/data/orwell_pos.txt", sep = "\t", header = T)
+orwell_pos <- read.delim("D:\\Uni\\UQ\\SLC\\LADAL\\SLCLADAL.github.io\\data/orwell_pos.txt", sep = "\t", header = T)
+# inspect  results
+datatable(head(orwell_pos, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+We can now use the resulting table to generate a first, basic dictionary that holds information about the word form (*token*), the part-of speech tag (*tag*), the lemmatized word type (*lemma*), the general word category (*wclass*), and the frequency with which the word form is used as that part-of speech.
+
+```{r lex7, message=FALSE, warning=FALSE}
+# generate dictionary
+orwell_dic_raw <- orwell_pos %>%
+  dplyr::select(token, tag, lemma, wclass) %>%
+  dplyr::group_by(token, tag, lemma, wclass) %>%
+  dplyr::summarise(frequency = dplyr::n()) %>%
+  dplyr::arrange(lemma)
+# inspect  results
+datatable(head(orwell_dic_raw, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+## Cleaning dictionary entries{-}
+
+However, as the resulting table shows, the data is still very noisy, i.e. it contains a lot of *non-words*, i.e words that may be mis-spelled, broken, or otherwise compromised. In order to get rid of these, we can simply check if the word lemma exists in an existing dictionary. When you aim to identify exactly those words that are not yet part of an established dictionary, you could of course do it the other way around and remove all words that are already present in an existing dictionary.
+
+
+```{r lex11, message=FALSE, warning=FALSE}
+# generate dictionary
+orwell_dic_clean <- orwell_dic_raw %>%
+  dplyr::filter(hunspell_check(lemma)) %>%
+  dplyr::filter(!stringr::str_detect(lemma, "\\W\\w{1,}"))
+# inspect  results
+datatable(head(orwell_dic_clean, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+
+We have now checked the entries against an existing dictionary and removed non-word elements. As such, we are left with a clean dictionary based on George Orwell's *Nineteen Eighty-Four*. 
+
+
+# Extending dictionaries
+
+Extending dictionaries, that is adding additional layers of information or other types of annotation, e.g. url's to relevant references or sources,  is fortunately very easy in R and can be done without much additional computing. To keep this tutorial simply and straight-forward, we will add information about the polarity and emotionality of the words in the dictionary that we have just generated. We can do this by performing a sentiment analysis on the lemmas using the `tidytext` package.
+
+```{r ext1, message=FALSE, warning=FALSE}
+# generate dictionary
+orwell_dic_ext <- orwell_dic_clean %>%
+  dplyr::left_join(get_sentiments("nrc"))
+# inspect  results
+datatable(head(orwell_dic_ext, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+
+
+
+
+# Finding synonyms
+
+
+
+# Going further: crowd-sourced dictionaries with R and Git
+
+
+
+
+We have reached the end of this tutorial and you now know how to create and modify networks in R and how you can highlight aspects of your data. 
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. 2020. *Lexicography with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/lex.html (Version 2020.09.28).
+
+```
+@manual{schweinberger2020lex,
+  author = {Schweinberger, Martin},
+  title = {Lexicography with R},
+  note = {https://slcladal.github.io/lex.html},
+  year = {2020},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/09/28}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+# References{-}
+
+***
+
+[Main page](https://slcladal.github.io/index.html)
+
+***
+
