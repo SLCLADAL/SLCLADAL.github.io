@@ -26,13 +26,13 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
 # install libraries
-install.packages(c("tidyr", "tidytext", "quanteda", "koRpus", 
+install.packages(c("tidyr", "tidytext", "textdata", "quanteda", "koRpus", 
                    "koRpus.lang.en", "DT", "hunspell"))
 ```
 
 Once you have installed R Studio and initiated the session by executing the code shown above, you are good to go.
 
-# Creating a basic dictionary for English
+# Creating dictionaries
 
 In a first step, we load the necessary packages from the library and define the location of the engine which we use for the part-of-speech tagging. In this case, we will use the TreeTagger [see @schmid1994treetagger; @schmid2007enriched,; @schmid2013probabilistic]. How to install and then use the TreeTagger for English as well as for German, French, Spanish, Italian, and Dutch is demonstrated and explained [here](https://slcladal.github.io/tagging.html#TreeTagger:_pos-tagging_languages_other_than_English).
 
@@ -51,6 +51,7 @@ In addition, you can download the pos-tagged text [here](https://slcladal.github
 # activate packages
 library(tidyr)
 library(tidytext)
+library(textdata)
 library(quanteda)
 library(koRpus)
 library(koRpus.lang.en)
@@ -64,12 +65,9 @@ In a next step, we load and process the data which in this tutorial represents t
 
 ```{r lex3, eval = F, message=FALSE, warning=FALSE}
 # load and pos-tag data
-#orwell_pos <- treetag("https://slcladal.github.io/data/orwell.txt")
-orwell_pos <- treetag("data/orwell.txt")
+orwell_pos <- treetag("https://slcladal.github.io/data/orwell.txt")
 # select data frame
 orwell_pos <- orwell_pos@tokens
-# write data to disc
-#write.table(orwell_pos, "D:\\Uni\\UQ\\SLC\\LADAL\\SLCLADAL.github.io\\data/orwell_pos.txt", sep = "\t", row.names = F)
 # inspect  results
 datatable(head(orwell_pos, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
@@ -79,8 +77,7 @@ If you could not pos-tag the text, you can simply execute the following code chu
 
 ```{r lex5, echo = T, eval = T, message=FALSE, warning=FALSE}
 # load pos-taged data
-#orwell_pos <- read.delim("https://slcladal.github.io/data/orwell_pos.txt", sep = "\t", header = T)
-orwell_pos <- read.delim("D:\\Uni\\UQ\\SLC\\LADAL\\SLCLADAL.github.io\\data/orwell_pos.txt", sep = "\t", header = T)
+orwell_pos <- read.delim("https://slcladal.github.io/data/orwell_pos.txt", sep = "\t", header = T)
 # inspect  results
 datatable(head(orwell_pos, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
@@ -116,30 +113,92 @@ datatable(head(orwell_dic_clean, 100), rownames = FALSE, options = list(pageLeng
 We have now checked the entries against an existing dictionary and removed non-word elements. As such, we are left with a clean dictionary based on George Orwell's *Nineteen Eighty-Four*. 
 
 
-# Extending dictionaries
+## Extending dictionaries{-}
 
-Extending dictionaries, that is adding additional layers of information or other types of annotation, e.g. url's to relevant references or sources,  is fortunately very easy in R and can be done without much additional computing. To keep this tutorial simply and straight-forward, we will add information about the polarity and emotionality of the words in the dictionary that we have just generated. We can do this by performing a sentiment analysis on the lemmas using the `tidytext` package.
+Extending dictionaries, that is adding additional layers of information or other types of annotation, e.g. url's to relevant references or sources,  is fortunately very easy in R and can be done without much additional computing. 
+
+We will begin to extend our dictionary by adding an additional column (called `annotation`) in which we will add information.
+
 
 ```{r ext1, message=FALSE, warning=FALSE}
 # generate dictionary
 orwell_dic_ext <- orwell_dic_clean %>%
-  dplyr::left_join(get_sentiments("nrc"))
+  dplyr::mutate(annotation = NA) %>%
+  dplyr::mutate(annotation = ifelse(token == "3rd", "also 3.",
+                                    ifelse(token == "4th", "also 4.", annotation)))
+# inspect  results
+datatable(head(orwell_dic_ext, 10), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+
+To make it a bit more interesting but also keep this tutorial simple and straight-forward, we will add information about the polarity and emotionally of the words in our dictionary. We can do this by performing a sentiment analysis on the lemmas using the `tidytext` package.
+
+The `tidytext` package contains three sentiment dictionaries (`nrc`, `bing`, and `afinn`). For the present purpose, we use the `ncr`dictionary which represents the Word-Emotion Association Lexicon [@@mohammad2013crowdsourcing]. The Word-Emotion Association Lexicon which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (see @mohammad2013crowdsourcing). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word *cry* or *tragedy* are more readily associated with SADNESS while words such as *happy* or *beautiful* are indicative of JOY and words like *fit* or *burst* may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction.
+
+To be able to use the Word-Emotion Association Lexicon we need to add another column to our data frame called `word` which simply contains the lemmatized word. The reason is that the lexicon expects this column and only works if it finds a word column in the data. The code below shows how to add the emotion and polarity entries to our dictionary.
+
+
+```{r ext3, message=FALSE, warning=FALSE}
+# generate dictionary
+orwell_dic_ext <- orwell_dic_ext %>%
+  dplyr::mutate(word = lemma) %>%
+  dplyr::left_join(get_sentiments("nrc")) %>%
+  tidyr::spread(sentiment, sentiment)
 # inspect  results
 datatable(head(orwell_dic_ext, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
-
-
-
+The resulting extended dictionary now contains not only the token, the pos-tag, the lemma, and the generalized word class, but also the emotional and polarity scores from the Word-Emotion Association Lexicon.
 
 # Finding synonyms
+
+Another task that is quite common in lexicography is to determine if words share some form of relationship such as whether they are synonyms or antonyms. In computational linguistics, this is commonly determined based on the collocational profiles of words. These collocational profiles are also called *word vectors* or *word embeddings* and approaches which determine semantic similarity based on collocational profiles or word embeddings are called distributional approaches (or distributional semantics). The basic assumption of distributional approaches is that words that occur in the same context and therefore have similar collocational profiles are also semantically similar. In fact, various packages, such as `qdap` or , `wordnet` already provide synonyms for terms (all of which are based on similar collocational profiles) but we would like to determine if words are similar without knowing it in advance. 
+
+In this example, we want to determine if two degree adverbs (such as *very*, *really*, *so*, *completely*, *totally*, *amazingly*, etc.) are synonymous and can therefore be exchanged without changing the meaning of the sentence (or, at least, not changing it dramatically). This is relevant in lexicography as such terms can then be linked to each other and inform readers that these words are interchangeable. 
+
+As a first step, we load the data which contains three columns: 
+
+* one column holding the degree adverbs which is called *pint* 
+
+* one column called *adjs* holding the adjectives that the degree adverbs have modified
+
+* one column called *remove* which contains the word *keep* and which we will remove as it is not relevant for this tutorial
+
+When loading the data, we 
+
+* remove the *remove* column 
+
+* rename the *pint* column as *degree_adverb* 
+
+* rename the *adjs* column as *adjectives*
+
+* filter out all instances where the degree adverb column has the value `0` (which means that the adjective was not modified)
+
+```{r syn1, message=FALSE, warning=FALSE}
+# load data
+degree_adverbs <- read.delim("https://slcladal.github.io/data/data04.txt", sep = "\t", header = T) %>%
+  dplyr::select(-remove) %>%
+  dplyr::rename(degree_adverb = pint,
+                adjective = adjs) %>%
+  dplyr::filter(degree_adverb != "0")
+# inspect  results
+datatable(head(degree_adverbs, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+We can now use the `textstat_similarity` function from the `quanteda` package to determine which degree adverbs are similar to each other and which degree adverbs are rather different. After applying the `textstat_similarity` function, we then plot the similarity as a dendrogram to inspect the semantic similarity among degree adverbs.
+
 
 
 
 # Going further: crowd-sourced dictionaries with R and Git
 
+While it would go beyond the scope of this tutorial, it should be noted that the approach for creating dictionaries can be applied to crowed-sourced dictionaries. To do this, you could, e.g. upload your dictionary to a Git repository such as [GitHub](https://github.com/) or [GitLab](https://about.gitlab.com/) which would then allow everybody with an account on either of these platforms to add content to the dictionary. To add to the dictionary, contributors would simply have to fork the repository of the dictionary and then merge with the existing, original dictionary repository. The quality of the data would meanwhile remain under control of the owner of the original repository he they can decide on a case-by-case basis which change they would like to accept. In addition, and because Git is a version control environment, the owner could also go back to previous versions, if they think they erroneously accepted a change (merge).
 
+```{r git1, echo=FALSE, out.width= "50%", out.extra='style="float:right; padding:15px"'}
+knitr::include_graphics("images/git.png")
+```
 
+This option is particularly interesting for the approach to creating dictionaries presented here because R Studio has an integrated and very easy to use pipeline to Git (see, e.g.,  [here](https://support.rstudio.com/hc/en-us/articles/200532077-Version-Control-with-Git-and-SVN) and [here](https://happygitwithr.com/rstudio-git-github.html))
 
 We have reached the end of this tutorial and you now know how to create and modify networks in R and how you can highlight aspects of your data. 
 
