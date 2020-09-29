@@ -42,7 +42,7 @@ NOTE
 
 You will have to install TreeTagger and change the path used below (`"C:\\TreeTagger\\bin\\tag-english.bat"`) to the location where you have installed TreeTagger on your machine. If you do not know how to install TreeTagger or encounter problems, read [this tutorial](https://slcladal.github.io/tagging.html)!
 
-In addition, you can download the pos-tagged text [here](https://slcladal.github.io/data/orwell.txt) so you can sinply skip the next code chunk and load the data as shown below.
+In addition, you can download the pos-tagged text [here](https://slcladal.github.io/data/orwell.txt) so you can simply skip the next code chunk and load the data as shown below.
 
 ***
 
@@ -155,6 +155,90 @@ datatable(head(orwell_dic_ext, 100), rownames = FALSE, options = list(pageLength
 
 The resulting extended dictionary now contains not only the token, the pos-tag, the lemma, and the generalized word class, but also the emotional and polarity scores from the Word-Emotion Association Lexicon.
 
+# Generating dictionaries for other languages
+
+As mentioned above, the procedure for generating dictionaries can easily be applied to languages other than English. If you want to follow exactly the procedure described above, then the language set of the TreeTagger is the limiting factors as its R implementation only supports English, German, French, Italian, Spanish, and Dutch. fa part-of-speech tagged text in another language is already available to you, and you do not require the TreeTagger for the part-of-speech tagging, then you can skip the code chunk that is related to the tagging and you can modify the procedure described above to virtually any language.
+
+We will now briefly create a German dictionary based on a subsection of the fairy tales collected by the brothers Grimm to show how the above procedure can be applied to a language other than English. In a  first step, we load a German text into R. 
+
+
+```{r none1, eval = F, echo = F}
+grimm <- readLines("data/GrimmsFairytales.txt")# %>%
+#  str_replace_all(fixed("u<U+0364>"), "ü") %>%
+#  str_replace_all(fixed("a<U+0364>"), "ä") %>%
+#  str_replace_all(fixed("<U+017F>"), "s") %>%
+#  paste0(sep = " ", collapse = " ") %>%
+#  str_squish() %>%
+#  str_remove(".*Freimund. Vorrede. ")
+str(grimm)
+
+#writeLines(grimm, "data/GrimmsFairytales.txt")
+```
+```{r none3, message=FALSE, warning=FALSE}
+# define location of pos-tagger engine
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-german.bat", lang="de") 
+# pos-tag data
+grimm_pos <- treetag("https://slcladal.github.io/data/GrimmsFairytales.txt")
+```
+
+For other languages, you would need to adapt the path to the pos-tagger engine to match the language of your text. The code chunk below shows how you would do that for French, Spanish, Italian, and Dutch.
+
+***
+
+NOTE
+
+You would need to adapt the path to the TreeTagger engine as well as the path to the data! The paths below are specified to my computer.
+
+***
+
+```{r none3, eval = F, message=FALSE, warning=FALSE}
+# French
+# define location of pos-tagger engine
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-french.bat", lang="fr") 
+# pos-tag data
+text_pos <- treetag("PathToFrenchText.txt")
+
+# Spanish
+# define location of pos-tagger engine
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-spanish.bat", lang="es") 
+# pos-tag data
+text_pos <- treetag("PathToSpanishText.txt")
+
+# Italian
+# define location of pos-tagger engine
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-italian.bat", lang="it") 
+# pos-tag data
+text_pos <- treetag("PathToItalianText.txt")
+
+# Dutch
+# define location of pos-tagger engine
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-dutch.bat", lang="nl") 
+# pos-tag data
+text_pos <- treetag("PathToDutchText.txt")
+
+
+```
+
+
+We will now continue with generating the dictionary based on teh brothers' Grimm fairy tales. We go through the same steps as for the English dictionary and collapse all the steps into a single code block. 
+
+
+```{r none5, message=FALSE, warning=FALSE}
+# select data frame
+grimm_pos <- grimm_pos@tokens
+# generate dictionary
+grimm_dic_raw <- grimm_pos %>%
+  dplyr::select(token, tag, lemma, wclass) %>%
+  dplyr::group_by(token, tag, lemma, wclass) %>%
+  dplyr::summarise(frequency = dplyr::n()) %>%
+  dplyr::arrange(lemma)
+# clean dictionary
+grimm_dic_clean <- grimm_dic_raw %>%
+  dplyr::filter(!stringr::str_detect(lemma, "\\W\\w{1,}"))
+# inspect  results
+datatable(head(grimm_dic_clean, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
 # Finding synonyms
 
 Another task that is quite common in lexicography is to determine if words share some form of relationship such as whether they are synonyms or antonyms. In computational linguistics, this is commonly determined based on the collocational profiles of words. These collocational profiles are also called *word vectors* or *word embeddings* and approaches which determine semantic similarity based on collocational profiles or word embeddings are called distributional approaches (or distributional semantics). The basic assumption of distributional approaches is that words that occur in the same context and therefore have similar collocational profiles are also semantically similar. In fact, various packages, such as `qdap` or , `wordnet` already provide synonyms for terms (all of which are based on similar collocational profiles) but we would like to determine if words are similar without knowing it in advance. 
@@ -243,7 +327,7 @@ cd <- hclust(clustd, method="ward.D")
 plot(cd, main = "", sub = "", yaxt = "n", ylab = "", xlab = "", cex = .8)
 ```
 
-The clustering solution shows that, as expected, *completely*, *extremely*, and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *real* and *really* form a cluster together. The clustering of *pretty*, *so*, *really*, and *real* suggest that these amplifiers are more or less interchangeable. 
+The clustering solution shows that, as expected, *completely*, *extremely*, and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *real* and *really* form a cluster together. The clustering of *very*, *pretty*, *so*, *really*, and *real* suggest that these amplifiers are more or less interchangeable with each other but not with *totally*, *completely*, and *extremely*. 
 
 ***
 
