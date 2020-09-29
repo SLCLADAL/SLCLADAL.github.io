@@ -51,12 +51,17 @@ In addition, you can download the pos-tagged text [here](https://slcladal.github
 # activate packages
 library(tidyr)
 library(tidytext)
+library(stringr)
 library(textdata)
 library(quanteda)
 library(koRpus)
 library(koRpus.lang.en)
 library(DT)
 library(hunspell)
+library(coop)
+library(dplyr)
+library(tm)
+library(cluster)
 # define location of pos-tagger engine
 set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-english.bat", lang="en") 
 ```
@@ -173,37 +178,82 @@ When loading the data, we
 * rename the *adjs* column as *adjectives*
 
 * filter out all instances where the degree adverb column has the value `0` (which means that the adjective was not modified)
-
+ * remove instances where *well* functions as a degree adverb (because it behaves rather differently from other degree adverbs)
+ 
 ```{r syn1, message=FALSE, warning=FALSE}
 # load data
 degree_adverbs <- read.delim("https://slcladal.github.io/data/data04.txt", sep = "\t", header = T) %>%
   dplyr::select(-remove) %>%
   dplyr::rename(degree_adverb = pint,
                 adjective = adjs) %>%
-  dplyr::filter(degree_adverb != "0")
-# inspect  results
-datatable(head(degree_adverbs, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
-```
-
-We can now use the `textstat_simil` function from the `quanteda` package to determine which degree adverbs are similar to each other and which degree adverbs are rather different. After applying the `textstat_simil` function, we then plot similarity scores which show which terms are most similar to each other.
-
-```{r syn3, eval = F, message=FALSE, warning=FALSE}
-similarity <- textstat_simil(dfmat_inaug_post1980, dfmat_inaug_post1980[c("2009-Obama", 
-    "2013-Obama"), ], margin = "documents", method = "cosine")
+  dplyr::filter(degree_adverb != "0",
+                degree_adverb != "well")
 # inspect  results
 datatable(head(degree_adverbs, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
 
-    
-In addition, we can also use the `textstat_dist` function from the `quanteda` package to generate a distance matrix, which we can display as a dendrogram. 
+In a next step, we create a matrix from this data frame which maps how often a given amplifier co-occurred with a given adjective. In text mining, this format is called a text-document matrix or tdm (which is a transposed [document-term matrix](https://en.wikipedia.org/wiki/Document-term_matrix) of dtm).
 
-```{r syn5, eval = F, message=FALSE, warning=FALSE}
-tstat_dist <- textstat_dist(dfm_weight(dfmat_sotu, scheme = "prop"))
-# inspect  results
-datatable(head(degree_adverbs, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```{r vsm3}
+# tabulate data (create term-document matrix)
+tdm <- ftable(degree_adverbs$adjective, degree_adverbs$degree_adverb)
+# extract amplifiers and adjectives 
+amplifiers <- as.vector(unlist(attr(tdm, "col.vars")[1]))
+adjectives <- as.vector(unlist(attr(tdm, "row.vars")[1]))
+# attach row and column names to tdm
+rownames(tdm) <- adjectives
+colnames(tdm) <- amplifiers
+# inspect data
+tdm[1:5, 1:5]
 ```
 
+In a next step, we extract the expected values of the co-occurrences if the amplifiers were distributed homogeneously and calculate the *Pointwise Mutual Information* (PMI) score and use that to then calculate the *Positive Pointwise Mutual Information* (PPMI) scores. According to @levshina2015linguistics 327 - referring to @bullinaria2007extracting - PPMI perform better than PMI as negative values are replaced with zeros. In a next step, we calculate the cosine similarity which will for the bases for the subsequent clustering.
+
+```{r vsm5}
+# compute expected values
+tdm.exp <- chisq.test(tdm)$expected
+# calculate PMI and PPMI
+PMI <- log2(tdm/tdm.exp)
+PPMI <- ifelse(PMI < 0, 0, PMI)
+# calculate cosine similarity
+cosinesimilarity <- cosine(PPMI)
+# inspect cosine values
+cosinesimilarity[1:5, 1:5]
+```
+
+As we have now obtained a similarity measure, we can go ahead and perform a cluster analysis on these similarity values. However, as we have to extract the maximum values in the similarity matrix that is not 1 as we will use this to create a distance matrix. While we could also have simply subtracted the cosine similarity values from 1 to convert the similarity matrix into a distance matrix, we follow the procedure proposed by @levshina2015linguistics.
+
+```{r vsm6, message=FALSE, warning=FALSE}
+# find max value that is not 1
+cosinesimilarity.test <- apply(cosinesimilarity, 1, function(x){
+  x <- ifelse(x == 1, 0, x) } )
+maxval <- max(cosinesimilarity.test)
+# create distance matrix
+amplifier.dist <- 1 - (cosinesimilarity/maxval)
+clustd <- as.dist(amplifier.dist)
+```
+
+In a next step, we visualize the results of the semantic vector space model as a dendrogram.
+
+```{r vsm8, message=FALSE, warning=FALSE}
+# create cluster object
+cd <- hclust(clustd, method="ward.D")    
+# plot cluster object
+plot(cd, main = "", sub = "", yaxt = "n", ylab = "", xlab = "", cex = .8)
+```
+
+The clustering solution shows that, as expected, *completely*, *extremely*, and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *real* and *really* form a cluster together. The clustering of *pretty*, *so*, *really*, and *real* suggest that these amplifiers are more or less interchangeable. 
+
+***
+
+NOTE
+
+Remember that this is only a tutorial! A proper study would have to take the syntactic context into account because, while we can say *This really great tutorial helped me a lot*. we probably would not say *This so great tutorial helped me a lot*. This is because so syntactically more restricted and is strongly disfavored in attributive contexts. Therefore, the syntactic context would have to be considered in a more thorough study.
+
+***
+
+There are many more useful methods for identifying semantic similarity. A very useful method (which we have implemented here but only superficially is Semantci Vector Space Modelling. If you want to know more about this, this [tutorial by Gede Primahadi Wijaya Rajeg, Karlina Denistia, and Simon Musgrave](https://gederajeg.github.io/vector_space_model_indonesian/) [@rajeg2020semvec] is highly recommended and will give a better understanding of SVM but this should suffice to get you started.
 
 # Going further: crowd-sourced dictionaries with R and Git
 
