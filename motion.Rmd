@@ -1,5 +1,5 @@
 ---
-title: "Creating motion charts using R"
+title: "Creating Interactive Visualizations in R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -13,7 +13,9 @@ knitr::include_graphics("images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces motion charts in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/motion.Rmd). Motion charts are dynamic charts that are used to explore changes in several variables across time. Motion charts are rendered within the browser using Flash which means that when you create a motion chart using the `plot` function, we new window in your browser will open and display the motion chart.
+This tutorial shows how to generate interactive data visualizations in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/motion.Rmd). Interactive visualization refers to a type of graphic visualization that allows the viewer to interact with the data or the information that is visualized. As such, interactive visualizations are more engaging or appealing compared with non-interactive visualization. However, interactive visualizations cannot be implemented in reports that are printed on paper but are restricted to digital formats (e.g. websites, presentations, etc.).
+
+There are various options to generate interactive data visualizations in R. The most popular option is to create a `shiny` app. This tutorial will not use `shiny` because `shiny` requires that the computation on which the computation that underlies the visualization is performed on a server. Rather, we will use options for generating interactive visualizations that use the computer  (or the browser) of the viewer to perform the computation. Thus, the interactive visualizations shown here do not require an external server.
 
 ## Preparation and session set up{-}
 
@@ -25,204 +27,127 @@ rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
-op <- options(gvis.plot.tag='chart')  # set gViz options
+# Warning: the following option adaptation requires re-setting during session outro!
+op <- options(gvis.plot.tag='chart')  # set gViz options 
 # install libraries
-install.packages(c("googleVis", "dplyr"))
+install.packages(c("googleVis", "dplyr", "tidyr", "DT"))
 ```
 
 ```{r prep2, echo=F, eval = T, message=FALSE, warning=FALSE}
 op <- options(gvis.plot.tag='chart')  # set gViz options
 ```
 
-Once you have installed R  and  initiated the session by executing the code shown above, you are good to go.
+Once you have installed R  and initiated the session by executing the code shown above, you are good to go.
 
-# Getting started with Motion Charts
+# Motion Charts
 
-To get started with motion charts, we load the `googleVis` package and use an in-built data set called `Fruits`.
+Motion charts are dynamic charts that are used to explore changes in several variables across time. Motion charts are rendered within the browser using Flash which means that when you create a motion chart using the `plot` function, we new window in your browser will open and display the motion chart.
 
-```{r mot1, message=FALSE, warning=FALSE}
-# load library
+In this example, we want to analyze if the percentage with which an adjective is modified by *very* changes over time. 
+
+To get started with motion charts, we load the `googleVis` package for the visualizations, the `dplyr` and the `tidyr` packages for data processing and also load a data set called `coocdata`. The `coocdata` contains information about how often adjectives were amplified by a degree adverb across time (see below). 
+
+```{r mc1, message=FALSE, warning=FALSE}
+# load packages
 library(googleVis)
-# inspect fruid data set
-str(Fruits)
-```
-
-We can now generate a motion chart using the `gvisMotionChart` function which takes a data set, an id-variable and a time-variables as its main arguments.
-
-```{r mot2, message=FALSE, warning=FALSE}
-# create motion chart object
-M <- gvisMotionChart(Fruits, idvar = "Fruit", timevar = "Year")
-```
-
-Next, We display the motion chart using the `plot` function.
-
-```{r results='asis'}
-print(M, 'chart')
-```
-
-If you execute this code on your computer, a browser window should open and and if you accept Adobe Player, then motion chart showing the population size by country should pop up. You can hoover over any country and see its population size. 
-
-```{r mot3, echo=F, eval = T, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("images/motionchart_fruits.png")
-```
-
-The motion chart shows changes in Sales (x-axis) and Expenses (y-axis) of apples, bananas, and oranges over time.
-
-# Motion Charts and Language Data
-
-We now turn to a linguistic example. The phenomenon we will display relates to different verb types and the complement clauses that they take. 
-
-```{r mot4, eval = T, echo = T, message=FALSE, warning=FALSE}
-# read in data
-compdata <- read.table("https://slcladal.github.io/data/compdata.txt", sep = "\t", header = T)
-# inspect data structure
-str(compdata)
-```
-
-
-```{r mot5, message=FALSE, warning=FALSE}
-# create motion chart object
-MC <- gvisMotionChart(compdata, idvar = "verb", timevar = "decade")
-```
-
-```{r results='asis'}
-print(MC, 'chart')
-```
-
-```{r mot6, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("images/motionchart_verbs.png")
-```
-
-# Linguistic Example: which verbs take which complement clause type?
-
-```{r mot9, message=FALSE, warning=FALSE}
-# load data
-convdata <- read.table("https://slcladal.github.io/data/convdata.txt", sep = "\t", header = T)
-# inspect data structure
-str(convdata)
-```
-
-
-```{r mot10, message=FALSE, warning=FALSE}
-# create motion chart object
-MC <- gvisMotionChart(convdata, idvar = "VERB", timevar = "DECADE")
-```
-
-```{r results='asis'}
-print(MC, 'chart')
-```
-
-
-```{r mot11, message=FALSE, warning=FALSE}
-# load data
-ampadjdata <- read.table("https://slcladal.github.io/data/collex_decade.txt", sep = "\t", header = T)
-# load library
 library(dplyr)
-# process data
-ampadjdata <- ampadjdata %>%
-  select(Decade, Amp, Adjective, OBS) %>%
-  rename(Frequency = OBS) %>%
-  mutate(Bigram = paste(Amp, Adjective, sep = "_")) %>%
-  group_by(Decade, Bigram) %>%
-  summarise(Frequency = sum(Frequency))
+library(tidyr)
+library(DT)
+# load data
+coocdata <- read.table("https://slcladal.github.io/data/collex_decade.txt", sep = "\t", header = T)
 # inspect data
-head(ampadjdata)
+head(coocdata, 10)
 ```
 
-```{r mot12, echo=T, eval = T, message=FALSE, warning=FALSE}
+The `coocdata` is rather complex and requires some processing. First, we rename the columns to render their naming more meaningful. In this context we rename the *OBS* column *Frequency* and the *Amp* column *Amplifier*. As we are only interested if an adjective was amplified by *very*, we collapse all amplifiers that are not *very* in a bin category called *other*. We then calculate the frequency of the adjective within each time period and also the frequency with which each adjective is amplified by either *very* or *other* amplifiers. Then, we calculate the percentage with which each adjective is amplified by *very*.
+
+
+
+```{r mc3, message=FALSE, warning=FALSE}
+# process data
+coocs <- coocdata %>%
+  select(Decade, Amp, Adjective, OBS) %>%
+  rename(Frequency = OBS,
+         Amplifier = Amp) %>%
+  mutate(Amplifier = ifelse(Amplifier == "very", "very", "other")) %>%
+  group_by(Decade, Adjective, Amplifier) %>%
+  summarise(Frequency = sum(Frequency)) %>%
+  ungroup() %>%
+  spread(Amplifier, Frequency) %>%
+  group_by(Decade, Adjective) %>%
+  mutate(Frequency_Adjective = sum(other + very),
+         Percent_very = round(very/(other+very)*100, 2)) %>%
+  mutate(Percent_very = ifelse(is.na(Percent_very), 0, Percent_very))
+# inspect data
+head(coocs, 10)
+```
+
+We now have a data set that we can display as motion chart and we therefore continue by generating a motion chart using the `gvisMotionChart` function which takes a data set, an id-variable and a time-variables as its main arguments. In addition, the  `gvisMotionChart` function takes various additional arguments such as what should be shown on the x- and y-axes, if the color or the size of the dots in the motion chart should represent another feature of teh data.
+
+```{r mc5, echo=T, eval = T, message=FALSE, warning=FALSE}
 # create motion chart
-MC <- gvisMotionChart(ampadjdata, idvar = "Bigram", timevar = "Decade")
+MC <- gvisMotionChart(coocs, 
+                      idvar = "Adjective", 
+                      timevar = "Decade",
+                      xvar = "Percent_very",
+                      yvar = "Frequency_Adjective",
+                      size = "Frequency_Adjective")
+```
+
+After generating the motion chart, we not plot it.
+
+Now, we can then simply plot this map object using the `plot` function.
+
+```{r mc7, eval = F, message=FALSE, warning=FALSE}
+plot(MC)
 ```
 
 ```{r results='asis'}
-plot(MC)
+print(MC, 'chart')
 ```
 
+A browser window should open and and if you accept and execute Adobe Flash, then an interactive motion chart, like the one above, should appear which shows the  frequencies of adjectives across time as well as the percentage with which these adjectives were modified by *very*. You should also be able to hoover over any dot and see which adjective it stands for.
 
+# Interactive Maps
 
-```{r mot13, echo=T, eval = F, message=FALSE, warning=FALSE}
-intsaus <- read.table("https://slcladal.github.io/data/datadf5.txt", 
-                      sep = "\t", header = T)
-intsaus <- intsaus[intsaus$int == 1,]
-intsaus <- intsaus[intsaus$txtyp == "PrivateDialogue",]
-# label infrequent amplifier as "other"
-freqpinttb <- table(intsaus$pint)
-freqpint <- names(freqpinttb)[which(freqpinttb >= 10)]
-intsaus$pint <- as.vector(unlist(sapply(intsaus$pint, function(x){
-  x <- ifelse(x %in% freqpint, x, "other")
-})))
-# label infrequent adjective as "other"
-freqadjtb <- table(intsaus$adj)
-freqadj <- names(freqadjtb)[which(freqadjtb >= 20)]
-intsaus$adj <- as.vector(unlist(sapply(intsaus$adj, function(x){
-  x <- ifelse(x %in% freqadj, x, "other")
-})))
+You can also use the `googleVis` package to create interactive maps. In this example, we want to display the average life expectancy across the world for which we load a data set called *gapminder*. In addition, we reduce the data set by only selecting data from 2007 and only the average life expectancy as well as the country.
 
-
-table(intsaus$pint)
-str(intsaus)
+```{r imap1, message=FALSE, warning=FALSE}
+# load data 
+mapdata <- read.delim("https://slcladal.github.io/data/gapminder.txt",
+                            header = T, sep = "\t") %>%
+  select(country, year, lifeExp) %>%
+  filter(year == "2007") %>%
+  rename(Country = country,
+         Year = year,
+         LifeExpectancy = lifeExp)
+# inspect data
+datatable(mapdata, rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
-```{r mot16, echo=T, eval = F, message=FALSE, warning=FALSE}
+Now that we have data in a format that we can generate an interactive map, we use the `gvisGeoMap` function to create a map object.
 
-t1 <- ftable(intsaus$pint, intsaus$adj, intsaus$age)
-t1
+```{r imap3, message=FALSE, warning=FALSE}
+# create motion chart object
+Geo=gvisGeoMap(mapdata, locationvar = "Country", numvar = "LifeExpectancy", 
+               options = list(height = 350, dataMode = 'regions'))
 ```
 
-```{r mot15, echo=F, eval = F, message=FALSE, warning=FALSE}
-amplifiers <- as.vector(unlist(attr(t1, "row.vars")[1]))
-adjectives <- as.vector(unlist(attr(t1, "row.vars")[2]))
-age <- as.vector(unlist(attr(t1, "col.vars")[1]))
+Now, we can then simply plot this map object using the `plot` function.
 
-age
-
-amp <- c(rep(c(rep(amplifiers, each = 5)), 5))
-adj <- c(rep(c(rep(adjectives, 5)), 5))
-age <- rep(age, 25)         
-freqs <- as.vector(unlist(t1))
-
-ampaus <- data.frame(age, amp, adj, freqs)
-colnames(ampaus) <- c("age", "amp", "adj", "freqs")
-ampaus$age <- as.numeric(as.factor(ampaus$age))
-
-ampaus <- ampaus[order(ampaus$age),]
-
-#tapply(ampaus$age, list(ampaus$amp, ampaus$adj, ampaus$freq), mean)
-
-head(ampaus, 20)
-
-MC <- gvisMotionChart(ampaus, idvar = "amp", timevar = "age")
-plot(MC)
+```{r imap5, eval = F, message=FALSE, warning=FALSE}
+plot(Geo)
 ```
 
-
-```{r mot18, echo=F, eval = F, message=FALSE, warning=FALSE}
-intsaus <- read.table("D:\\Uni\\Projekte\\02-Intensification\\07AmpAusENZE\\AmpAusENZE/ptbintsausattr_tb01.txt", 
-                      sep = "\t", header = T)
-intsaus <- t(intsaus)
-intsausdf <- as.data.frame(intsaus)
-colnames(intsausdf) <- c("pretty", "really", "so", "very")
-rownames(intsausdf) <- c(5, 4, 3, 2, 1)
-str(intsausdf)
-intsausdf
+```{r results='asis'}
+print(Geo, 'chart')
 ```
 
-```{r mot17, echo=F, eval = F, message=FALSE, warning=FALSE}
+A browser window should open and and if you accept and execute Adobe Flash, then an interactive motion chart, like the one above, should appear which shows the life expectancy by country. You should also be able to hoover over any country and see its available life expectancy. 
 
-age <- rep(rownames(intsausdf), 4)
-amplifier <- rep(colnames(intsausdf), each = 5)
-frequency <- as.vector(unlist(intsausdf))
-pintaus <- data.frame(age, amplifier, frequency)
-pintaus$age <- as.numeric(pintaus$age)
-str(pintaus)
-pintaus
-```
+## Session Outro{-}
 
-```{r mot50, echo=F, eval = F, message=FALSE, warning=FALSE}
-
-MC <- gvisMotionChart(pintaus, idvar = "amplifier", timevar = "age")
-plot(MC)
-```
+When cerating interactive maps, it is importnat that you reset the default graphica parametsra s these had to be adapted in the sessions et-up. Therefore, in a final step, we restore the default graphics options.
 
 ```{r resetOptions}
 ## Set options back to original options
@@ -231,7 +156,7 @@ options(op)
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Creating motion charts using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/motion.html (Version 2020.09.27)
+Schweinberger, Martin. 2020. *Creating Interactive Visualization in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/motion.html (Version 2020.09.30)
 
 ```
 @manual{schweinberger2020motion,
@@ -241,7 +166,7 @@ Schweinberger, Martin. 2020. *Creating motion charts using R*. Brisbane: The Uni
   year = {2020},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/09/27}
+  edition = {2020/09/30}
 }
 ```
 
