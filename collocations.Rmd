@@ -13,7 +13,7 @@ knitr::include_graphics("images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces collocation and co-occurrence analysis with *R* and shows how to extract and visualize semantic links between words. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/collocations.Rdm). Parts of this tutorial build on and use materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) on co-occurrence analysis with R by Andreas Niekler and Gregor Wiedemann [see @WN17].
+This tutorial introduces collocation and co-occurrence analysis with *R* and shows how to extract and visualize semantic links between words. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/collocations.Rmd). Parts of this tutorial build on and use materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) on co-occurrence analysis with R by Andreas Niekler and Gregor Wiedemann [see @WN17].
 
 How would you find words that are associated with a specific term and how can you visualize such word nets? This tutorial addresses this issue by focusing on co-occurrence and collocations of words. Collocations are words that occur very frequently together. For example, *Merry Christmas* is a collocation because *merry* and *Christmas* occur more frequently together than would be expected by chance. This means that if you were to shuffle all words in a corpus and would then test the frequency of how often *merry* and *Christmas* co-occurred, they would occur significantly less often in the shuffled or randomized corpus than in a corpus that contain non-shuffled natural speech. 
 
@@ -43,54 +43,100 @@ Once you have installed R-Studio and initiated the session by executing the code
 
 Collocations are terms that co-occur (significantly) more often together than would be expected by chance. A typical example of a collocation is *Merry Christmas* because the words *merry* and *Christmas* occur together more frequently together than would be expected, if words were just randomly stringed together.  
 
-N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the "Origin" to create a bi-gram list. As a first step, we load the data and split it into individual words.
+N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the Charles Darwin's *On the Origin of Species by Means of Natural Selection* as a data source and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
 
 ```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load libraries
 library(dplyr)
+library(quanteda)
 library(stringr)
+library(tidytext)
 library(tm)
 library(DT)
 # read in text
 darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
   paste(sep = " ", collapse = " ") %>%
-  str_squish()
-# select sample
-darwin <- substr(darwin, 1000000, 1100000)
+  str_squish() %>%
+  str_remove_all("- ")
 # further processing
 darwin_split <- darwin %>% 
-  removePunctuation() %>%
   str_replace_all("\\W", " ") %>%
-  tolower() %>%
-  str_squish() %>%
-  strsplit(" ") %>%
-  unlist()
+  as_tibble() %>%
+  unnest_tokens(words, value)
 # inspect data
-head(darwin_split)
+head(darwin_split, 15)
 ```
 We can create bi-grams (N-grams consisting of two elements) by pasting every word together with the ford that immediately follows it. To do this, we could use a function that is already available but we can also very simply to this manually. The first step in creating bigrams manually consists in creating a table which holds every word in a corpus and the word that immediately precedes it. 
 
 ```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # create data frame
-darwindf <- data.frame(darwin_split[1:length(darwin_split)-1], 
-                       darwin_split[2:length(darwin_split)])
-# add column names
-colnames(darwindf) <- c("Word1", "Word2")
+darwin_words <- darwin_split %>%
+  mutate(word1 = c(words),
+         word2 = c(NA, words[2:length(words)])) %>%
+  na.omit() %>%
+  select(-words)
 # inspect results
-datatable(head(darwindf, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+head(darwin_words, 15)
 ```
 
 We can the paste the elements in these two column together and also inspect the frequency of each bigram.
 
-```{r coll3, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-darwin2grams <- darwindf %>%
-  mutate(Bigram = paste(Word1, Word2, sep = " ")) %>%
-  group_by(Bigram) %>%
-  summarise(Frequency = n()) %>%
-  arrange(-Frequency)
+```{r coll3a, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+darwin2grams <- darwin_words %>%
+  mutate(bigram = paste(word1, word2, sep = " ")) %>%
+  group_by(bigram) %>%
+  summarise(frequency = n()) %>%
+  arrange(-frequency)
 # inspect results
-datatable(head(darwin2grams, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+head(darwin2grams, 15)
 ```
+
+The table show that among the 15 most frequent bigrams, there is only a single bigram (*natural selection*) which does not involve stop words (words that do not have referential but only relational meaning). 
+
+We can remove bigrams that include stops words rather easily as shown below.
+
+```{r coll3b, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# define stopwords
+stps <- paste0(tm::stopwords(kind = "en"), collapse = "\\b|\\b")
+# clean bigram table
+darwin2grams_clean <- darwin2grams %>%
+  dplyr::filter(!str_detect(bigram, stps))
+# inspect results
+head(darwin2grams_clean, 15)
+```
+
+## Extracting N-Grams with quanteda{-}
+
+The `quanteda` package [see @quanteda] offers excellent and very fast functions for extracting bigrams.
+
+```{r coll3c, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+#clean corpus
+darwin_clean <- darwin %>%
+  str_to_title()
+# tokenize corpus
+darwin_tokzd <- tokens(darwin_clean)
+# extract bigrams
+BiGrams <- darwin_tokzd %>% 
+       tokens_remove(stopwords("en")) %>% 
+       tokens_select(pattern = "^[A-Z]", valuetype = "regex", 
+                     case_insensitive = FALSE, padding = TRUE) %>% 
+       textstat_collocations(min_count = 5, tolower = FALSE)
+# inspect results
+head(BiGrams)
+```
+
+We can also extract bigrams very easily using the `tokens_compound` function which understands that we are looking for two-word expressions.
+
+```{r coll3d, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+ngram_extract <- tokens_compound(darwin_tokzd, pattern = BiGrams)
+# inspect kwic of two bigrams
+head(kwic(ngram_extract, pattern = c("Natural_Selection", "South_America")), 15)
+```
+
+The disadvantage here is that we are strictly speaking only extracting N-Grams but not collocates as collocates do not necessarily have to occur in direct adjacency. The following section shoes how to expand the extraction of n-grams to the extraction of collocates.
+
+# Finding Collocations
+
 Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
 
 In the following, we will extract collocations from Charles Darwin's *On the Origin of Species by Means of Natural Selection*. In a first step, we will split the Origin into individual sentences.
@@ -143,7 +189,7 @@ coocurrences <- t(darwinsdtm) %*% darwinsdtm
 # convert into matrix
 collocates <- as.matrix(coocurrences)
 # inspect results
-datatable(collocates[1:10, 1:10], rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+datatable(collocates[1:10, 1:10], rownames = T, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
 We can inspect this co-occurrence matrix and check how many terms (words or elements) it represents using the `ncol` function from base R. We can also check how often terms occur in the data using the `summary` function from base R. The output of the `summary` function tells us that the minimum frequency of a word in the data is 2 with a maximum of 1,474. The difference between the median (36.00) and the mean (74.47) indicates that the frequencies are distributed very non-normally - which is common for language data. 
@@ -639,11 +685,18 @@ The code in this section does not work at the moment as the `collostructions` pa
 
 Simple Collexeme Analysis determines if a word is significantly attracted to a specific construction within a corpus. The idea is that the frequency of the word that is attracted to a construction is significantly higher within the construction than would be expected by chance.
 
-The example here analyzses the Go + Verb construction (e.g. "Go suck a nut!"). The question is which verbs are attracted to this constructions (in this case, if *suck* is attracted to this construction).
+The example here analyzses the Go + Verb construction (e.g. *Go suck a nut!*). The question is which verbs are attracted to this constructions (in this case, if *suck* is attracted to this construction).
 
 In a first step, we load the collostructions package and inspect the data. In this case, we will only use a sample of 100 rows from the data set as the output would become hard to read.
 
-```{r coll_03_01, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r coll_03_01, eval = F, message=FALSE, warning=FALSE}
+install.packages("C:\\Users\\marti\\OneDrive\\Dokumente\\R\\win-library\\4.0\\collostructions_0.1.2", repos = NULL)
+```
+
+
+
+
+```{r coll_03_02, message=FALSE, warning=FALSE}
 # load library
 library(collostructions)
 # draw a sample of the data
@@ -656,7 +709,7 @@ The collex function which calculates the results of a simple collexeme analysis 
 
 To perform the simple collexeme analysis, we need the overal size of the corpus, the frequency with which a word occurs in the construction under investigation and the frequency of that construction.
 
-```{r coll_03_03, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r coll_03_03, message=FALSE, warning=FALSE}
 # define corpus size
 crpsiz <- sum(goVerb$CORP.FREQ)
 # perform simple collexeme analysis
@@ -672,17 +725,17 @@ The results show which words are significantly attracted to the construction. If
 
 ## Covarying Collexeme Analysis{-}
 
-Covarying collexeme analysis determines if the occurrence of a word in the first slot of a constructions affects the occurrence of another word in the second slot of the construction. As such, covarying collexeme analysis analyzes constructions with two slots and how the lexical elemenst within the two slots affect each other.
+Covarying collexeme analysis determines if the occurrence of a word in the first slot of a constructions affects the occurrence of another word in the second slot of the construction. As such, covarying collexeme analysis analyzes constructions with two slots and how the lexical elements within the two slots affect each other.
 
 The data we will use consists of two columns which contain in the first column (CXN.TYPE) the word in the first slot (either *cannot* or *can't*) and in the second slot (COLLEXEME) the word in the second slot, i.e. the collexeme, which the verb that follows after *cannot* or *can't*. The first six rows of the data are shown below.
 
-```{r coll_03_07, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r coll_03_07, message=FALSE, warning=FALSE}
 head(cannot)
 ```
 
 We now perform the collexeme analysis and oinspect the results.
 
-```{r coll_03_09, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r coll_03_09, message=FALSE, warning=FALSE}
 covar_results <- collex.covar(cannot)
 # inspect results
 head(covar_results)
@@ -696,7 +749,7 @@ Distinctive Collexeme Analysis determines if the frequencies of items in two alt
 
 Again, we use the cannot data.
 
-```{r coll_03_11, echo=T, eval = F, message=FALSE, warning=FALSE}
+```{r coll_03_11, message=FALSE, warning=FALSE}
 collexdist_results <- collex.dist(cannot, raw = TRUE)
 # inspect results
 head(collexdist_results)
