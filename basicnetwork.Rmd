@@ -17,7 +17,7 @@ This tutorial introduces network analysis using R. Network analysis is a method 
 
 How can you display the relationship between different elements, be they authors, characters, or words?
 
-The most common way to visualize such relationships are networks. Networks, also called graphs, consist of nodes (typically represented as dots) and edges (typically represented as lines) and they can be directed or undirected networks. 
+The most common way to visualize such relationships are networks [@silge2017text : 131-137]. Networks, also called graphs, consist of nodes (typically represented as dots) and edges (typically represented as lines) and they can be directed or undirected networks. 
 
 In directed networks, the direction of edges is captured. For instance, the exports of countries. In such cases the lines are directed and typically have arrows to indicate direction. The thinkness of lines can also be ustilized to encode information such as frequency of contact.
 
@@ -77,100 +77,28 @@ In a first step, we load the necessary packages from the library.
 
 ```{r net1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # activate packages
-lapply(c("GGally", "network", "ggplot2", "dplyr", "sna", "knitr", "kableExtra", 
-         "gutenbergr", "stringr", "tm", "Matrix"), 
-       library, character.only = TRUE)
+library(GGally)
+library(network)
+library(ggplot2)
+library(dplyr)
+library(sna)
+library(knitr)
+library(kableExtra)
+library(gutenbergr)
+library(stringr)
+library(tm)
+library(Matrix)
+library(tibble)
 ```
 
 
-The issue we want to investigate here relates to networks of personas in Shakespeare's "Romeo and Juliet".
+The issue we want to investigate here relates to networks of personas in Shakespeare's *Romeo and Juliet* and we thus load this famous work of fiction. Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
 
 ```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load data
-romeo <- gutenberg_works(title == "Romeo and Juliet") %>%
-  gutenberg_download(meta_fields = "title")
+romeo <- read.delim("https://slcladal.github.io/data/romeo.txt", sep = "\t")
 # inspect data
 romeo
-```
-
-Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
-
-```{r na2, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load split
-romeoscenes <- romeo %>%
-  select(text) %>%
-  as.vector() %>%
-  str_replace_all(fixed("\""), "") %>%
-  str_replace_all(fixed("\n"), "") %>%
-  paste(collapse = " ") %>%
-  str_replace_all("(Scene )", "qwertz\\1") %>%
-  strsplit("qwertz") %>%
-  unlist()
-# inspect data
-str(romeoscenes[2])
-```
-
-Now we extract the persons that are present in each scene.
-
-```{r na3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# extract persons
-romeopersonas <- romeoscenes %>%
-  str_match_all(" , [A-Z][a-z]{2,} {0,1}[A-Z]{0,1}[a-z]{0,}\\.")
-# inspect data
-str(romeopersonas[1:5])
-```
-
-We now clean and vectorize the data.
-
-```{r na4, echo=T, eval = T, message=FALSE, warning=FALSE}
-# extract personas per scene
-personas <- sapply(romeopersonas, function(x){
-  x <- unlist(x)
-  x <- gsub(",", "", x)
-  x <- gsub("\\.", "", x)
-  x <- gsub(" ", "", x)
-  x <- unique(x)
-  x <- as.vector(x)
-  x <- paste(x, collapse = " ")
-  x <- gsub(" ActV", "", x)
-  x <- gsub(" Page", "", x)
-})
-# inspect data
-personas
-```
-
-
-We will delete the first element as it only contains the choir but none of the main personas. 
-
-```{r na6, echo=T, eval = T, message=FALSE, warning=FALSE}
-# remove first elements
-personas <- personas[2:length(personas)]
-str(personas)
-```
-
-The vectors must now be transformed into a sparse matrix.
-
-```{r na7, echo=T, eval = T, message=FALSE, warning=FALSE}
-# create corpus
-corpus <- Corpus(VectorSource(personas))
-# create document term matrix
-scenepersonas <- DocumentTermMatrix(corpus) 
-# convert dtm into sparse matrix
-rnjdtm <- sparseMatrix(i = scenepersonas$i, j = scenepersonas$j, 
-                           x = scenepersonas$v, 
-                           dims = c(scenepersonas$nrow,
-                                    scenepersonas$ncol),
-                           dimnames = dimnames(scenepersonas))
-# calculate co-occurrence counts
-coocurrence <- t(rnjdtm) %*% rnjdtm
-# convert into matrix
-romeom <- as.matrix(coocurrence)
-romeo <- as.data.frame(romeom)
-colnames(romeo) <- str_to_title(colnames(romeo))
-rownames(romeo) <- str_to_title(rownames(romeo))
-# inspect data
-kable(romeo[1:5, 1:5], caption = "First 5 rows and columns of the  romeo data") %>%
-  kable_styling(bootstrap_options = "striped", full_width = T, position = "left")
 ```
 
 The data shows how often a character has appeared with each other character in the play - only Friar Lawrence and Friar John were excluded because they only appear in one scene where they talk to each other. 
@@ -263,16 +191,10 @@ The `quanteda` package contains many very useful functions for analyzing texts. 
 
 We could simply start with the romeo data that we have processed above. However, as the `quanteda` package offers useful text processing functions, we will start with the `personas` data set that we have created before so as to show how handy and easy to use the `quanteda` functions are. In a first step, we transform the text vectors of the `persons` data into a document-feature matrix using the `dfm ` function. 
 
+
 ```{r qtda01, warning=F, message=F}
 library(quanteda)
-romeo_dfm <- dfm(personas, remove_punct = TRUE)
-head(romeo_dfm)
-```
-
-We can then easily transform this document-feature matrix into a feature-co-occurrence matrix using the `fcm` function.
-
-```{r qtda02}
-romeo_fcm <- fcm(romeo_dfm)
+romeo_fcm <- fcm(romeo)
 head(romeo_fcm)
 ```
 
@@ -291,6 +213,98 @@ textplot_network(romeo_fcm, min_freq = 2,
                  edge_size = 5)
 ```
 
+
+# Creating networks with iGraph
+
+
+
+@WN17 have written a very recommendable tutorial on co-occurrence analysis and they propose an alternative, yet more complex network visualization for co-occurrences. Their approach is to create and customize a graph object based on the `iGraph` package.
+
+The code below is based on [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) and is included to show the flexibility of the approach used by @WN17. 
+
+```{r net11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+numberOfCoocs <- 10
+# create graph object
+resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+# create data frame
+tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+# fill data frame to produce the correct number of lines
+tmpGraph[1:numberOfCoocs, 3] <- coocs[1:numberOfCoocs]
+# enter search word into the first column in all lines
+tmpGraph[, 1] <- coocTerm
+# enter co-occurrences into second column
+tmpGraph[, 2] <- names(coocs)[1:numberOfCoocs]
+# enter collocation strength
+tmpGraph[, 3] <- coocs[1:numberOfCoocs]
+# attach data frame to resultGraph
+resultGraph <- rbind(resultGraph, tmpGraph)
+```
+
+Calculate cooccurence statistics and add them to the graph object. 
+
+```{r net12, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# iterate over most significant numberOfCoocs co-occurrences
+for (i in 1:numberOfCoocs){
+  # calculate co-occurrence strength for term i
+  newCoocTerm <- names(coocs)[i]
+  coocs2 <- calculateCoocStatistics(newCoocTerm, darwinsdtm, measure="LOGLIK")
+  # fill temporary graph object
+  tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
+  tmpGraph[1:numberOfCoocs, 3] <- coocs2[1:numberOfCoocs]
+  tmpGraph[, 1] <- newCoocTerm
+  tmpGraph[, 2] <- names(coocs2)[1:numberOfCoocs]
+  tmpGraph[, 3] <- coocs2[1:numberOfCoocs]
+  # append results to the result graph data frame
+  resultGraph <- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
+}
+```
+
+Now, we can create a network graph object. 
+
+```{r net13, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load packages
+library(igraph)
+# define graph and type ("F" means "Force Directed")
+graphNetwork <- graph.data.frame(resultGraph, directed = F)
+# identify nodes with fewer than 2 edges
+graphVs <- V(graphNetwork)[degree(graphNetwork) < 2]
+# removed these edges from graph
+graphNetwork <- delete.vertices(graphNetwork, graphVs) 
+# sssign colors to edges and nodes (searchterm blue, rest orange)
+V(graphNetwork)$color <- ifelse(V(graphNetwork)$name == coocTerm, 'cornflowerblue', 'orange') 
+# Edges with a significance of at least 50% of the maximum significance in the graph are drawn in orange
+halfMaxSig <- max(E(graphNetwork)$sig) * 0.5
+E(graphNetwork)$color <- ifelse(E(graphNetwork)$sig > halfMaxSig, "coral", "azure3")
+# disable edges with radius
+E(graphNetwork)$curved <- 0 
+# size the nodes by their degree of networking
+V(graphNetwork)$size <- log(degree(graphNetwork)) * 5
+# all nodes must be assigned a standard minimum-size
+V(graphNetwork)$size[V(graphNetwork)$size < 5] <- 3 
+# edge thickness
+E(graphNetwork)$width <- 1.5
+```
+
+And finally, we can visualize the network.
+
+```{r net14, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Define the frame and spacing for the plot
+par(mai=c(0,0,1,0)) 
+# Finaler Plot
+plot(graphNetwork,              
+     layout = layout.fruchterman.reingold,  # Force Directed Layout 
+     main = paste("Cooccurrence network for", " \"", coocTerm, "\""),
+     vertex.label.family = "sans",
+     vertex.label.cex = .75,
+     vertex.shape = "circle",
+     vertex.label.dist = 2,           # Labels of the nodes moved slightly
+     vertex.frame.color = 'darkolivegreen',
+     vertex.label.color = 'black',      # Color of node names
+     vertex.label.font = 2,         # Font of node names
+     vertex.label = V(graphNetwork)$name,       # node names
+     vertex.label.cex = .75 # font size of node names 
+)
+```
 
 # Creating two-layer networks 
 

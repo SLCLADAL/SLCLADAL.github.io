@@ -13,9 +13,7 @@ knitr::include_graphics("images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial shows how to download and clean works from the Project Gutenberg database using R. The entire R-markdown document for the sections below can be downloaded [here](https://slcladal.github.io/gutenberg.Rmd).
-
-The example that we will be concerned with focuses on the first type of data as it is by far the most common way in which relationships are coded.To show how to create a network, we will have a look at the network that the characters in William Shakespeare's *Romeo and Juliet* form.
+This tutorial shows how to download and clean works from the [Project Gutenberg](https://www.gutenberg.org/) archive using R. Project Gutenberg is a data base whcih contains roughly 60,000 texts for which the US copyright ahs expired. The entire R-markdown document for the sections below can be downloaded [here](https://slcladal.github.io/gutenberg.Rmd).
 
 ## Preparation and session set up{-}
 
@@ -28,65 +26,137 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("GGally", "network", "sna", "ggplot2", "dplyr", "knitr", 
-                   "kableExtra", "gutenbergr", "stringr", "tm", "Matrix"))
+install.packages(c("dplyr", "gutenbergr", "stringr"))
 ```
 
-Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
+Once you have installed R-Studio and initiated the session by executing the code shown above, you are good to go.
 
-# Creating a network of characters in *Romeo and Juliet*
+# Loading texts from Project Gutenberg
 
-In a first step, we load the necessary packages from the library.
+In a first step, we load the necessary packages from the library. To download and work with texts from the Project Gutenberg, you specifically need to load the `gutenbergr` package.
 
-```{r net1, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r gb1}
 # activate packages
-library(GGally)
-library(network)
-library(ggplot2)
 library(dplyr)
-library(sna)
-library(knitr)
-library(kableExtra)
 library(gutenbergr)
 library(stringr)
-library(tm)
-library(Matrix)
+library(flextable)
+library(officer)
 ```
 
 
-The issue we want to investigate here relates to networks of personas in Shakespeare's "Romeo and Juliet".
+To inspect which works are available for download, we can type `gutenberg()` or simply `gutenberg_metadata` which will output a table containing  all available texts.
 
-```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r gb3, eval = F}
+gutenberg_metadata
+```
+
+The table below shows the first 15 lines of the overview table which shows all available texts. As there are currently 51,997 texts available, we limit the output here to 15.
+
+```{r gb5, echo = F}
+overview <- gutenberg_metadata
+ft <- flextable(head(overview, 10))
+ft <- set_caption(ft, "First 10 texts in the overview of texts available in the Gutenberg data base.")
+ft <- autofit(ft)
+ft
+```
+
+To find all works by a specific author, you need to specify the *author* in the `gutenberg_works` function as shown below.
+
+```{r gb7}
+# load data
+darwin <- gutenberg_works(author == "Darwin, Charles")
+# inspect data
+ft <- flextable(darwin)
+ft <- set_caption(ft, "All texts of Charles Darwin available through Project Gutenberg.")
+ft <- autofit(ft)
+ft
+```
+
+To find all texts in, for example, German, you need to specify the *language* in the `gutenberg_works` function as shown below.
+
+```{r gb9}
+# load data
+german <- gutenberg_works(languages = "de", all_languages = TRUE) %>%
+  count(language, sort = TRUE)
+# inspect data
+ft <- flextable(head(german, 15))
+ft <- set_caption(ft, "Number of texts in German available through Project Gutenberg.")
+ft <- fit_to_width(ft, max_width = 6)
+ft
+```
+
+# Loading individual texts
+
+To download any of these text, you need to specify the text you want, e.g. by specifying the title. In a next step, you can then use the `gutenberg_download` function to download the text. To exemplify how this works we download William Shakespeare's *Romeo and Juliet*.
+
+```{r gb11}
 # load data
 romeo <- gutenberg_works(title == "Romeo and Juliet") %>%
   gutenberg_download(meta_fields = "title")
 # inspect data
-romeo
+ft <- flextable(head(romeo, 15))
+ft <- set_caption(ft, "First 15 lines of William Shakespeare's *Romeo and Juliet*.")
+ft <- autofit(ft)
+ft
 ```
 
-Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
+We could also use the *gutenberg_id* to download this text.
 
-```{r na2, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load split
-romeoscenes <- romeo %>%
-  select(text) %>%
-  as.vector() %>%
-  str_replace_all(fixed("\""), "") %>%
-  str_replace_all(fixed("\n"), "") %>%
-  paste(collapse = " ") %>%
-  str_replace_all("(Scene )", "qwertz\\1") %>%
-  strsplit("qwertz") %>%
-  unlist()
+```{r gb15}
+# load data
+romeo <- gutenberg_works(gutenberg_id == "1513") %>%
+  gutenberg_download(meta_fields = "gutenberg_id")
 # inspect data
-str(romeoscenes[2])
+ft <- flextable(head(romeo, 15))
+ft <- set_caption(ft, "First 15 lines of William Shakespeare's *Romeo and Juliet*.")
+ft <- autofit(ft)
+ft
 ```
 
-Now we extract the persons that are present in each scene.
+# Loading texts simultaneously
 
-```{r na3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# extract persons
-romeopersonas <- romeoscenes %>%
-  str_match_all(" , [A-Z][a-z]{2,} {0,1}[A-Z]{0,1}[a-z]{0,}\\.")
+To load more than one text, you can use the `|` (or) operator to inform R that you want to download the text with the *gutenberg_id* 1513 and/or the text with the *gutenberg_id* 1.
+
+```{r gb17}
+texts <- gutenberg_works(gutenberg_id == "1513"|gutenberg_id == "1") %>%
+  gutenberg_download(meta_fields = "title")
 # inspect data
-str(romeopersonas[1:5])
+ft <- flextable(as.data.frame(table(texts$gutenberg_id)))
+ft <- set_caption(ft, "Texts loaded from Project Gutenberg.")
+ft <- fit_to_width(ft, max_width = 6)
+ft
 ```
+
+Feel free to have a look at different texts provided by the Project Gutenberg!
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. 2020. *Downloading Texts from Project Gutenberg using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/topicmodels.html (Version 2020.09.29).
+
+```
+@manual{schweinberger2020gb,
+  author = {Schweinberger, Martin},
+  title = {Downloading Texts from Project Gutenberg using R},
+  note = {https://slcladal.github.io/gutenberg.html},
+  year = {2020},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2020/10/14}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Main page](https://slcladal.github.io/index.html)
+
+***
+
+
+
