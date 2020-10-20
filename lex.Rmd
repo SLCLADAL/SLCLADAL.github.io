@@ -8,7 +8,7 @@ bibliography: bibliography.bib
 link-citations: yes
 ---
 ```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("images/uq1.jpg")
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 ```
 
 # Introduction{-}
@@ -68,6 +68,7 @@ library(dplyr)
 library(tm)
 library(cluster)
 # define location of pos-tagger engine
+# WARNING: this needs to be the path to the TreeTagger on YOUR machine!
 set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-english.bat", lang="en") 
 ```
 
@@ -273,7 +274,7 @@ datatable(head(grimm_dic_clean, 100), rownames = FALSE, options = list(pageLengt
 
 As with the English dictionary, we have created a customized German dictionary based of a subsample of the brothers' Grimm fairy tales holding the word form(*token*), the part-of-speech tag (*tag*), the lemmatized word type (*lemma*), the general word class (*wclass*), ad the frequency with which a word form occurs as a part-of-speech in the data (*frequency*).
 
-# Finding synonyms
+# Finding synonyms: generating a custom thesaurus
 
 Another task that is quite common in lexicography is to determine if words share some form of relationship such as whether they are synonyms or antonyms. In computational linguistics, this is commonly determined based on the collocational profiles of words. These collocational profiles are also called *word vectors* or *word embeddings* and approaches which determine semantic similarity based on collocational profiles or word embeddings are called distributional approaches (or distributional semantics). The basic assumption of distributional approaches is that words that occur in the same context and therefore have similar collocational profiles are also semantically similar. In fact, various packages, such as `qdap` or , `wordnet` already provide synonyms for terms (all of which are based on similar collocational profiles) but we would like to determine if words are similar without knowing it in advance. 
 
@@ -328,7 +329,7 @@ tdm[1:5, 1:5]
 
 In a next step, we extract the expected values of the co-occurrences if the amplifiers were distributed homogeneously and calculate the *Pointwise Mutual Information* (PMI) score and use that to then calculate the *Positive Pointwise Mutual Information* (PPMI) scores. According to @levshina2015linguistics 327 - referring to @bullinaria2007extracting - PPMI perform better than PMI as negative values are replaced with zeros. In a next step, we calculate the cosine similarity which will for the bases for the subsequent clustering.
 
-```{r vsm5}
+```{r vsm5, message=F, warning=F}
 # compute expected values
 tdm.exp <- chisq.test(tdm)$expected
 # calculate PMI and PPMI
@@ -363,6 +364,23 @@ plot(cd, main = "", sub = "", yaxt = "n", ylab = "", xlab = "", cex = .8)
 
 The clustering solution shows that, as expected, *completely*, *extremely*, and *totally* - while similar to each other and thus interchangeable with each other - form a separate cluster from all other amplifiers. In addition, *real* and *really* form a cluster together. The clustering of *very*, *pretty*, *so*, *really*, and *real* suggest that these amplifiers are more or less interchangeable with each other but not with *totally*, *completely*, and *extremely*. 
 
+To extract synonyms automatically, we can use the cosine similarity matrix that a´we generated before. This is what we need to do:
+
+* generate a column called word
+* replace the perfect similarity values of the diagonal with 0
+* look up the lowest value, i.e. the word that has the lowest distance to a given word
+* create a vector which holds those words (the synonym candidates).
+
+```{r vsm9, message=FALSE, warning=FALSE}
+syntb <- cosinesimilarity %>%
+  as.data.frame() %>%
+  mutate(word = colnames(cosinesimilarity)) %>%
+  mutate_each(funs(replace(., . == 1, 0))) %>%
+  mutate(synonym = colnames(.)[apply(.,1,which.max)]) %>%
+  select(word, synonym)
+syntb
+```
+
 ***
 
 NOTE
@@ -371,14 +389,135 @@ Remember that this is only a tutorial! A proper study would have to take the syn
 
 ***
 
-There are many more useful methods for identifying semantic similarity. A very useful method (which we have implemented here but only superficially is Semantci Vector Space Modelling. If you want to know more about this, this [tutorial by Gede Primahadi Wijaya Rajeg, Karlina Denistia, and Simon Musgrave](https://gederajeg.github.io/vector_space_model_indonesian/) [@rajeg2020semvec] is highly recommended and will give a better understanding of SVM but this should suffice to get you started.
+There are many more useful methods for identifying semantic similarity. A very useful method (which we have implemented here but only superficially is Semantic Vector Space Modeling. If you want to know more about this, this [tutorial by Gede Primahadi Wijaya Rajeg, Karlina Denistia, and Simon Musgrave](https://gederajeg.github.io/vector_space_model_indonesian/) [@rajeg2020semvec] is highly recommended and will give a better understanding of SVM but this should suffice to get you started.
+
+# Creating bilingual dictionaries
+
+Dictionaries commonly contain information about elements. Bilingual or translation dictionaries represent a sub-category of dictionaries that provide a specific type of information about a given word: the translation of that word in another language. In principle, generating translation dictionaries is relatively easy and straight forward. However, not only is the devil hidden in the details but the generation of data-driven translation dictionaries also require a substantial data set consisting of sentences and their translation. This is often quite tricky as well aligned translations are unfortunately, and unexpectedly, rather hard to come by. 
+
+Despite these issues, if you have access to clean and well aligned, parallel multilingual data, then you simply need to check which correlation between the word in language A and language B is the highest and you have a likely candidate for its translation. The same procedure can be extended to generate multilingual dictionaries. Problems arise due to grammatical differences between languages, idiomatic expressions, homonymy and polysemy as well as due to word class issues. The latter, word class issues, can be solved by part-of-speech tagging and then only considering words that belong to the same (or realistically similar) parts-of speech. The other issues can also be solved but require substantial amounts of (annotated) data.   
+
+To explore how to generate a multilingual lexicon, we load a sample of English sentences and their German translations.
+
+```{r trans1}
+# load translations
+translations <- readLines("https://slcladal.github.io/data/translation.txt",
+                          encoding = "UTF-8", skipNul = T)
+# inspect table
+head(translations, 10)
+```
+
+In a next step, we generate separate tables which hold the German and English sentences. However, the sentences and their translations are identified by an identification number (*id*) so that we keep the information about which sentence is linked to which translation.
+
+
+```{r trans2}
+# german sentences
+german <- str_remove_all(translations, " — .*") %>%
+  str_remove_all(., "[:punct:]")
+# english sentences
+english <- str_remove_all(translations, ".* — ") %>%
+  str_remove_all(., "[:punct:]")
+# sentence id
+sentence <- 1:length(german)
+# combine into table
+germantb <- data.frame(sentence, german)
+# sentence id
+sentence <- 1:length(english)
+# combine into table
+englishtb <- data.frame(sentence, english)
+# inspect table
+head(germantb, 10)
+```
+
+We now unnest the tokens (split the sentences into words) and subsequently add the translations which we again unnest. The resulting table consists of two columns holding German and English words. The relevant point here is that each German word is linked with each English word that occurs in the translated sentence.
+
+
+```{r trans3, warning = F, message=F}
+library(plyr)
+# tokenize by sentence: german
+transtb <- germantb %>%
+  unnest_tokens(word, german) %>%
+  plyr::join(., englishtb, by = "sentence") %>%
+  unnest_tokens(trans, english) %>%
+  dplyr::rename(german = word,
+                english = trans) %>%
+  dplyr::select(german, english) %>%
+  dplyr::mutate(german = factor(german),
+                english = factor(english))
+# inspect data
+head(transtb)
+```
+
+Based on this table, we can now generate a term-document matrix which shows how frequently each word co-occurred in the translation of any of the sentences. For instance, the German word *alles* occurred one time in a translation of a sentence which contained the English word *all*.
+
+```{r trans4}
+# tabulate data (create term-document matrix)
+tdm <- ftable(transtb$german, transtb$english)
+# extract amplifiers and adjectives 
+german <- as.vector(unlist(attr(tdm, "col.vars")[1]))
+english <- as.vector(unlist(attr(tdm, "row.vars")[1]))
+# attach row and column names to tdm
+rownames(tdm) <- english
+colnames(tdm) <- german
+# inspect data
+tdm[1:10, 1:10]
+```
+
+Now, we reformat this co-occurrence matrix so that we have the frequency information that is necessary for setting up 2x2 contingency tables which we will use to calculate the co-occurrence strength between each word and its potential translation. 
+
+
+```{r trans5}
+coocdf <- as.data.frame(as.matrix(tdm))
+cooctb <- coocdf %>%
+  dplyr::mutate(German = rownames(coocdf)) %>%
+  tidyr::gather(English, TermCoocFreq,
+                colnames(coocdf)[1]:colnames(coocdf)[ncol(coocdf)]) %>%
+  dplyr::mutate(German = factor(German),
+                English = factor(English)) %>%
+  dplyr::mutate(AllFreq = sum(TermCoocFreq)) %>%
+  dplyr::group_by(German) %>%
+  dplyr::mutate(TermFreq = sum(TermCoocFreq)) %>%
+  dplyr::ungroup(German) %>%
+  dplyr::group_by(English) %>%
+  dplyr::mutate(CoocFreq = sum(TermCoocFreq)) %>%
+  dplyr::arrange(German) %>%
+  dplyr::mutate(a = TermCoocFreq,
+                b = TermFreq - a,
+                c = CoocFreq - a, 
+                d = AllFreq - (a + b + c)) %>%
+  dplyr::mutate(NRows = nrow(coocdf))%>%
+  filter(TermCoocFreq > 0)
+# inspect results
+head(cooctb, 10)
+```
+
+In a final step, we extract those potential translations that correlate most strongly with each given term. The results then form a list of words and their most likely translation. 
+
+```{r trans6, warning = F, message=F}
+translationtb <- cooctb  %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(p = round(as.vector(unlist(fisher.test(matrix(c(a, b, c, d), ncol = 2, byrow = T))[1])), 5), 
+                x2 = round(as.vector(unlist(chisq.test(matrix(c(a, b, c, d), ncol = 2, byrow = T))[1])), 3)) %>%
+  dplyr::mutate(phi = round(sqrt((x2/(a + b + c + d))), 3),
+                expected = as.vector(unlist(chisq.test(matrix(c(a, b, c, d), ncol = 2, byrow = T))$expected[1]))) %>%
+  dplyr::filter(TermCoocFreq > expected) %>%
+  dplyr::arrange(-phi) %>%
+  dplyr::select(-AllFreq, -a, -b, -c, -d, -NRows, -expected)
+# inspect results
+datatable(head(translationtb, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+The results show that even using the very limited data base can produce some very reasonable results. In fact, based on the data that we used here, the first translations appear to be very sensible, but the mismatches also show that more data is required to disambiguate potential translations.
+
+While this method still requires manual correction, it is a very handy and useful tool for generating custom bilingual dictionaries that can be extended to any set of languages as long as these languages can be represented as distinct words and as long as parallel data is available. 
+
 
 # Going further: crowd-sourced dictionaries with R and Git
 
 While it would go beyond the scope of this tutorial, it should be noted that the approach for creating dictionaries can be applied to crowed-sourced dictionaries. To do this, you could, e.g. upload your dictionary to a Git repository such as [GitHub](https://github.com/) or [GitLab](https://about.gitlab.com/) which would then allow everybody with an account on either of these platforms to add content to the dictionary. To add to the dictionary, contributors would simply have to fork the repository of the dictionary and then merge with the existing, original dictionary repository. The quality of the data would meanwhile remain under control of the owner of the original repository he they can decide on a case-by-case basis which change they would like to accept. In addition, and because Git is a version control environment, the owner could also go back to previous versions, if they think they erroneously accepted a change (merge).
 
 ```{r git1, echo=FALSE, out.width= "30%", out.extra='style="float:right; padding:15px"'}
-knitr::include_graphics("images/git.png")
+knitr::include_graphics("https://slcladal.github.io/images/git.png")
 ```
 
 This option is particularly interesting for the approach to creating dictionaries presented here because R Studio has an integrated and very easy to use pipeline to Git (see, e.g.,  [here](https://support.rstudio.com/hc/en-us/articles/200532077-Version-Control-with-Git-and-SVN) and [here](https://happygitwithr.com/rstudio-git-github.html))
@@ -389,7 +528,7 @@ We have reached the end of this tutorial and you now know how to create and modi
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Lexicography with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/lex.html (Version 2020.09.28).
+Schweinberger, Martin. 2020. *Lexicography with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/lex.html (Version 2020.10.20).
 
 ```
 @manual{schweinberger2020lex,
@@ -399,7 +538,7 @@ Schweinberger, Martin. 2020. *Lexicography with R*. Brisbane: The University of 
   year = {2020},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/09/28}
+  edition = {2020/10/20}
 }
 ```
 
