@@ -47,8 +47,8 @@ options(stringsAsFactors = F)
 options(scipen = 999)
 options(max.print=10000)
 # install packages
-install.packages("corpus", "dplyr", "quanteda", "stringr", "tidyr", "tm",
-                 "GGally", "network", "sna", "ggplot2", "collostructions")
+install.packages("corpus", "tidyverse", "quanteda", "stringr", "tm",
+                 "GGally", "network", "sna", "collostructions")
 ```
 
 Once you have installed R-Studio and initiated the session by executing the code shown above, you are good to go.
@@ -62,9 +62,8 @@ N-grams are related to collocates in that they represent words that occur togeth
 
 ```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load libraries
-library(dplyr)
+library(tidyverse)
 library(quanteda)
-library(stringr)
 library(tidytext)
 library(tm)
 library(DT)
@@ -81,15 +80,16 @@ darwin_split <- darwin %>%
 # inspect data
 head(darwin_split, 15)
 ```
+
 We can create bi-grams (N-grams consisting of two elements) by pasting every word together with the ford that immediately follows it. To do this, we could use a function that is already available but we can also very simply to this manually. The first step in creating bigrams manually consists in creating a table which holds every word in a corpus and the word that immediately precedes it. 
 
 ```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # create data frame
 darwin_words <- darwin_split %>%
-  mutate(word1 = c(words),
-         word2 = c(NA, words[2:length(words)])) %>%
+  dplyr::mutate(word1 = c(words),
+                word2 = c(NA, words[2:length(words)])) %>%
   na.omit() %>%
-  select(-words)
+  dplyr::select(-words)
 # inspect results
 head(darwin_words, 15)
 ```
@@ -127,15 +127,17 @@ The `quanteda` package [see @quanteda] offers excellent and very fast functions 
 ```{r coll3c, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 #clean corpus
 darwin_clean <- darwin %>%
-  str_to_title()
+  stringr::str_to_title()
 # tokenize corpus
-darwin_tokzd <- tokens(darwin_clean)
+darwin_tokzd <- quanteda::tokens(darwin_clean)
 # extract bigrams
 BiGrams <- darwin_tokzd %>% 
-       tokens_remove(stopwords("en")) %>% 
-       tokens_select(pattern = "^[A-Z]", valuetype = "regex", 
-                     case_insensitive = FALSE, padding = TRUE) %>% 
-       textstat_collocations(min_count = 5, tolower = FALSE)
+       quanteda::tokens_remove(stopwords("en")) %>% 
+       quanteda::tokens_select(pattern = "^[A-Z]", 
+                               valuetype = "regex",
+                               case_insensitive = FALSE, 
+                               padding = TRUE) %>% 
+       quanteda::textstat_collocations(min_count = 5, tolower = FALSE)
 # inspect results
 head(BiGrams)
 ```
@@ -143,7 +145,7 @@ head(BiGrams)
 We can also extract bigrams very easily using the `tokens_compound` function which understands that we are looking for two-word expressions.
 
 ```{r coll3d, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-ngram_extract <- tokens_compound(darwin_tokzd, pattern = BiGrams)
+ngram_extract <- quanteda::tokens_compound(darwin_tokzd, pattern = BiGrams)
 # inspect kwic of two bigrams
 head(kwic(ngram_extract, pattern = c("Natural_Selection", "South_America")), 15)
 ```
@@ -159,15 +161,15 @@ In the following, we will extract collocations from Charles Darwin's *On the Ori
 ```{r coll4, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # read in text
 darwinsentences <- darwin %>%
-  str_squish() %>%
-  str_replace_all("([A-Z]{2,} [A-Z]{2,}) ([A-Z][a-z]{1,} )", "\\1 qwertz\\2") %>%
-  str_replace_all("([a-z]{2,}\\.) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
-    str_replace_all("([a-z]{2,}\\?) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
+  stringr::str_squish() %>%
+  stringr::str_replace_all("([A-Z]{2,} [A-Z]{2,}) ([A-Z][a-z]{1,} )", "\\1 qwertz\\2") %>%
+  stringr::str_replace_all("([a-z]{2,}\\.) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
+  stringr::str_replace_all("([a-z]{2,}\\?) ([A-Z] {0,1}[a-z]{0,30})", "\\1qwertz\\2") %>%
   strsplit("qwertz")%>%
   unlist() %>%
-  str_remove_all("- ") %>%
-  str_replace_all("\\W", " ") %>%
-  str_squish()
+  stringr::str_remove_all("- ") %>%
+  stringr::str_replace_all("\\W", " ") %>%
+  stringr::str_squish()
 # inspect data
 head(darwinsentences)
 ```
@@ -185,11 +187,11 @@ extrawords <- c("the", "can", "get", "got", "can", "one",
                 "often", "every", "said", "two")
 # clean corpus
 darwincorpusclean <- darwincorpus %>%
-  tm_map(removePunctuation) %>%
-  tm_map(removeNumbers) %>%
-  tm_map(tolower) %>%
-  tm_map(removeWords, stopwords()) %>%
-  tm_map(removeWords, extrawords)
+  tm::tm_map(removePunctuation) %>%
+  tm::tm_map(removeNumbers) %>%
+  tm::tm_map(tolower) %>%
+  tm::tm_map(removeWords, stopwords()) %>%
+  tm::tm_map(removeWords, extrawords)
 # create document term matrix
 darwindtm <- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
 # load library
@@ -239,13 +241,13 @@ We start with the most basic and visualize the collocation strength using a simp
 ```{r}
 coocdf <- coocs %>%
   as.data.frame() %>%
-  mutate(CollStrength = coocs,
-         Term = names(coocs)) %>%
-  filter(CollStrength > 30)
-library(ggplot2)
+  dplyr::mutate(CollStrength = coocs,
+                Term = names(coocs)) %>%
+  dplyr::filter(CollStrength > 30)
+# plot
 ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
-         geom_point() +
-         coord_flip() +
+  geom_point() +
+  coord_flip() +
   theme_bw()
 ```
 
@@ -328,7 +330,7 @@ set.edge.attribute(net, "weights", ifelse(net %e% "weights" < 1, 0.1,
                                    ifelse(net %e% "weights" <= 2, .5, 1)))
 # define line type
 set.edge.attribute(net, "lty", ifelse(net %e% "weights" <=.1, 3, 
-                                      ifelse(net %e% "weights" <= .5, 2, 1)))
+                               ifelse(net %e% "weights" <= .5, 2, 1)))
 ```
 
 We can now display the network object and make use of the added information.
@@ -790,10 +792,8 @@ Schweinberger, Martin. 2020. *Analyzing Co-Occurrences and Collocations in R*. B
 sessionInfo()
 ```
 
-```{r detach, echo = F}
-library(nothing)
-require(nothing, quietly = TRUE)
-```
+
+
 
 ***
 
