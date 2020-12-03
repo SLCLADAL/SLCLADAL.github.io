@@ -3,7 +3,9 @@ title: "Network Analysis using R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
-  bookdown::html_document2: default
+  bookdown::html_document2:  
+    includes:
+      in_header: GoogleAnalytics.html
 bibliography: bibliography.bib
 link-citations: yes
 ---
@@ -65,27 +67,25 @@ rm(list=ls(all=T))
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # supress math annotation
 # install libraries
-install.packages(c("GGally", "network", "sna", "ggplot2", "dplyr", "knitr", 
-                   "kableExtra", "gutenbergr", "stringr", "tm", "Matrix"))
+install.packages(c("GGally", "network", "sna", "tidyverse", "knitr", 
+                   "kableExtra", "gutenbergr", "tm", "Matrix"))
 ```
 
 Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
 
-# Creating a network of characters in *Romeo and Juliet*
+# A network of *Romeo and Juliet*
 
-In a first step, we load the necessary packages from the library.
+This section shows hw to create a network that shows which characters in William Shakespeare's *Romeo and Juliet* co-occurred in the play and how often they co-occurred. In a first step, we load the necessary packages from the library.
 
 ```{r net1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # activate packages
 library(GGally)
 library(network)
-library(ggplot2)
-library(dplyr)
+library(tidyverse)
 library(sna)
 library(knitr)
 library(kableExtra)
 library(gutenbergr)
-library(stringr)
 library(tm)
 library(Matrix)
 library(tibble)
@@ -118,7 +118,7 @@ net
 
 Unfortunately, network object are somewhat obscure in that they can not be displayed as simple data frames. 
 
-## Creating basic networks
+## Creating basic networks{-}
 
 However, this does not matter at this point and we continue by visualizing the network in a simple network plot using the ggnet2 function.
 
@@ -134,7 +134,7 @@ ggnet2(net,
 
 The basic network shown above only shows who has co-occurred with whom but it is not really informative. Therefore, we add information to the network object. 
 
-## Modifying networks
+## Modifying networks{-}
 
 To add information to a simple network graph, we create a new variable. This variable shows to which family each of the characters belong. To do this, we create a separate vector for each family which holds the characters that are members of this family. Then, we create a variable in the network object called "Family" which represents the family which the characters belong to. 
 
@@ -194,7 +194,8 @@ We could simply start with the romeo data that we have processed above. However,
 
 ```{r qtda01, warning=F, message=F}
 library(quanteda)
-romeo_fcm <- fcm(romeo)
+romeo_dfm <- as.dfm(romeo)
+romeo_fcm <- fcm(romeo_dfm)
 head(romeo_fcm)
 ```
 
@@ -216,95 +217,8 @@ textplot_network(romeo_fcm, min_freq = 2,
 
 # Creating networks with iGraph
 
+@WN17 have written a very recommendable tutorial on co-occurrence analysis and they propose an alternative, yet more complex network visualization for co-occurrences. Their approach is to create and customize a graph object based on the `iGraph` package. To see how to cerate sophisticated network graphs using the `iGraph` package, see [this tutorial](https://slcladal.github.io/collocations.html) on analyzing collocations or  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html). 
 
-
-@WN17 have written a very recommendable tutorial on co-occurrence analysis and they propose an alternative, yet more complex network visualization for co-occurrences. Their approach is to create and customize a graph object based on the `iGraph` package.
-
-The code below is based on [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) and is included to show the flexibility of the approach used by @WN17. 
-
-```{r net11, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-numberOfCoocs <- 10
-# create graph object
-resultGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
-# create data frame
-tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
-# fill data frame to produce the correct number of lines
-tmpGraph[1:numberOfCoocs, 3] <- coocs[1:numberOfCoocs]
-# enter search word into the first column in all lines
-tmpGraph[, 1] <- coocTerm
-# enter co-occurrences into second column
-tmpGraph[, 2] <- names(coocs)[1:numberOfCoocs]
-# enter collocation strength
-tmpGraph[, 3] <- coocs[1:numberOfCoocs]
-# attach data frame to resultGraph
-resultGraph <- rbind(resultGraph, tmpGraph)
-```
-
-Calculate cooccurence statistics and add them to the graph object. 
-
-```{r net12, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# iterate over most significant numberOfCoocs co-occurrences
-for (i in 1:numberOfCoocs){
-  # calculate co-occurrence strength for term i
-  newCoocTerm <- names(coocs)[i]
-  coocs2 <- calculateCoocStatistics(newCoocTerm, darwinsdtm, measure="LOGLIK")
-  # fill temporary graph object
-  tmpGraph <- data.frame(from = character(), to = character(), sig = numeric(0))
-  tmpGraph[1:numberOfCoocs, 3] <- coocs2[1:numberOfCoocs]
-  tmpGraph[, 1] <- newCoocTerm
-  tmpGraph[, 2] <- names(coocs2)[1:numberOfCoocs]
-  tmpGraph[, 3] <- coocs2[1:numberOfCoocs]
-  # append results to the result graph data frame
-  resultGraph <- rbind(resultGraph, tmpGraph[2:length(tmpGraph[, 1]), ])
-}
-```
-
-Now, we can create a network graph object. 
-
-```{r net13, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# load packages
-library(igraph)
-# define graph and type ("F" means "Force Directed")
-graphNetwork <- graph.data.frame(resultGraph, directed = F)
-# identify nodes with fewer than 2 edges
-graphVs <- V(graphNetwork)[degree(graphNetwork) < 2]
-# removed these edges from graph
-graphNetwork <- delete.vertices(graphNetwork, graphVs) 
-# sssign colors to edges and nodes (searchterm blue, rest orange)
-V(graphNetwork)$color <- ifelse(V(graphNetwork)$name == coocTerm, 'cornflowerblue', 'orange') 
-# Edges with a significance of at least 50% of the maximum significance in the graph are drawn in orange
-halfMaxSig <- max(E(graphNetwork)$sig) * 0.5
-E(graphNetwork)$color <- ifelse(E(graphNetwork)$sig > halfMaxSig, "coral", "azure3")
-# disable edges with radius
-E(graphNetwork)$curved <- 0 
-# size the nodes by their degree of networking
-V(graphNetwork)$size <- log(degree(graphNetwork)) * 5
-# all nodes must be assigned a standard minimum-size
-V(graphNetwork)$size[V(graphNetwork)$size < 5] <- 3 
-# edge thickness
-E(graphNetwork)$width <- 1.5
-```
-
-And finally, we can visualize the network.
-
-```{r net14, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# Define the frame and spacing for the plot
-par(mai=c(0,0,1,0)) 
-# Finaler Plot
-plot(graphNetwork,              
-     layout = layout.fruchterman.reingold,  # Force Directed Layout 
-     main = paste("Cooccurrence network for", " \"", coocTerm, "\""),
-     vertex.label.family = "sans",
-     vertex.label.cex = .75,
-     vertex.shape = "circle",
-     vertex.label.dist = 2,           # Labels of the nodes moved slightly
-     vertex.frame.color = 'darkolivegreen',
-     vertex.label.color = 'black',      # Color of node names
-     vertex.label.font = 2,         # Font of node names
-     vertex.label = V(graphNetwork)$name,       # node names
-     vertex.label.cex = .75 # font size of node names 
-)
-```
 
 # Creating two-layer networks 
 
