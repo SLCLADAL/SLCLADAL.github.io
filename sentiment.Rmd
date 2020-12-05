@@ -84,15 +84,15 @@ txtclean <- function(x, title){
   x <- x %>%
     tolower() %>%
     paste0(collapse = " ") %>%
-    str_squish()%>%
-    str_split(" ") %>%
+    stringr::str_squish()%>%
+    stringr::str_split(" ") %>%
     unlist() %>%
     tibble() %>%
-    select(word = 1, everything()) %>%
-    mutate(novel = title) %>%
-    anti_join(stop_words) %>%
-    mutate(word = str_remove_all(word, "\\W")) %>%
-    filter(word != "")
+    dplyr::select(word = 1, everything()) %>%
+    dplyr::mutate(novel = title) %>%
+    dplyr::anti_join(stop_words) %>%
+    dplyr::mutate(word = str_remove_all(word, "\\W")) %>%
+    dplyr::filter(word != "")
 }
 ```
 
@@ -114,10 +114,10 @@ In a next step, we clean the data, convert it to lower case, and split it into i
 
 ```{r bsa1, message=FALSE, warning=FALSE}
 novels_anno <- rbind(darwin_clean, twain_clean, orwell_clean, lovecraft_clean) %>%
-  group_by(novel) %>%
-  mutate(words = n()) %>%
-  left_join(get_sentiments("nrc")) %>%
-  mutate(novel = factor(novel),
+  dplyr::group_by(novel) %>%
+  dplyr::mutate(words = n()) %>%
+  dplyr::left_join(get_sentiments("nrc")) %>%
+  dplyr::mutate(novel = factor(novel),
          sentiment = factor(sentiment))
 # inspect results
 head(novels_anno, 15)
@@ -127,13 +127,13 @@ We will now summarize the results of the sentiment analysis and calculate the pe
 
 ```{r bsa3, message=FALSE, warning=FALSE}
 novels <- novels_anno %>%
-  group_by(novel) %>%
-  group_by(novel, sentiment) %>%
+  dplyr::group_by(novel) %>%
+  dplyr::group_by(novel, sentiment) %>%
   dplyr::summarise(sentiment = unique(sentiment),
                    sentiment_freq = n(),
                    words = unique(words)) %>%
-  filter(is.na(sentiment) == F) %>%
-  mutate(percentage = round(sentiment_freq/words*100, 1))
+  dplyr::filter(is.na(sentiment) == F) %>%
+  dplyr::mutate(percentage = round(sentiment_freq/words*100, 1))
 # inspect data
 head(novels, 15)
 ```
@@ -142,7 +142,7 @@ After performing the Sentiment Analysis, visualize the results and show the scor
 
 ```{r bsa5, message=FALSE, warning=FALSE}
 novels %>%
-  filter(sentiment != "positive",
+  dplyr::filter(sentiment != "positive",
          sentiment != "negative") %>%
   ggplot(aes(sentiment, percentage, fill = novel)) +    
   geom_bar(stat="identity",   
@@ -156,9 +156,9 @@ We can also display the emotions by book and re-level sentiment so that the diff
 
 ```{r bsa7, message=FALSE, warning=FALSE}
 novels %>%
-  filter(sentiment != "positive",
+  dplyr::filter(sentiment != "positive",
          sentiment != "negative") %>%
-  mutate(sentiment = factor(sentiment, 
+  dplyr::mutate(sentiment = factor(sentiment, 
                             levels = c("anger", "fear", "disgust", "sadness",
                                    "surprise", "anticipation", "trust", "joy"))) %>%
   ggplot(aes(novel, percentage, fill = sentiment)) +    
@@ -176,19 +176,19 @@ We now check, which words have contributed to the emotionality scores. In other 
 
 ```{r contribsa1, message=FALSE, warning=FALSE}
 novels_impw <- novels_anno %>%
-  filter(!is.na(sentiment),
+  dplyr::filter(!is.na(sentiment),
          sentiment != "anticipation",
          sentiment != "surprise",
          sentiment != "disgust",
          sentiment != "negative",
          sentiment != "sadness",
          sentiment != "positive") %>%
-  mutate(sentiment = factor(sentiment, levels = c("anger", "fear",  "trust", "joy"))) %>%
-  group_by(novel) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  group_by(novel, sentiment) %>%
-  top_n(3) %>%
-  mutate(score = n/sum(n))
+  dplyr::mutate(sentiment = factor(sentiment, levels = c("anger", "fear",  "trust", "joy"))) %>%
+  dplyr::group_by(novel) %>%
+  dplyr::count(word, sentiment, sort = TRUE) %>%
+  dplyr::group_by(novel, sentiment) %>%
+  dplyr::top_n(3) %>%
+  dplyr::mutate(score = n/sum(n))
 # inspect results
 head(novels_impw, 15)
 ```
@@ -209,15 +209,15 @@ Now, we visualize the polarity of each book, i.e. the ratio of the number of pos
 
 ```{r pol1, message=FALSE, warning=FALSE}
 novels %>%
-  filter(sentiment == "positive" | sentiment == "negative") %>%
-  select(-percentage, -words) %>%
-  mutate(sentiment_sum = sum(sentiment_freq),
+  dplyr::filter(sentiment == "positive" | sentiment == "negative") %>%
+  dplyr::select(-percentage, -words) %>%
+  dplyr::mutate(sentiment_sum = sum(sentiment_freq),
          positive = sentiment_sum-sentiment_freq) %>%
-  filter(sentiment != "positive") %>%
-  rename(negative = sentiment_freq) %>%
-  select(novel, positive, negative) %>%
-  group_by(novel) %>%
-  summarise(polarity = positive/negative) %>%
+  dplyr::filter(sentiment != "positive") %>%
+  dplyr::rename(negative = sentiment_freq) %>%
+  dplyr::select(novel, positive, negative) %>%
+  dplyr::group_by(novel) %>%
+  dplyr::summarise(polarity = positive/negative) %>%
   ggplot(aes(reorder(novel, polarity, mean), polarity)) +    
   geom_point(size = 3) + 
   theme_bw() +
@@ -235,9 +235,9 @@ There are two main methods for tracking changes in polarity: binning and moving 
 
 ```{r bin1, message=FALSE, warning=FALSE}
 novels_bin <- novels_anno %>%
-  group_by(novel) %>%
-  filter(is.na(sentiment) | sentiment == "negative" | sentiment == "positive") %>%
-  mutate(sentiment = as.character(sentiment),
+  dplyr::group_by(novel) %>%
+  dplyr::filter(is.na(sentiment) | sentiment == "negative" | sentiment == "positive") %>%
+  dplyr::mutate(sentiment = as.character(sentiment),
          sentiment = case_when(is.na(sentiment) ~ "0", 
                                TRUE ~ sentiment),
          sentiment= case_when(sentiment == "0" ~ 0,
@@ -245,7 +245,7 @@ novels_bin <- novels_anno %>%
                               TRUE ~ -1),
          id = 1:n(),
          index = as.numeric(cut2(id, m=100))) %>%
-  group_by(novel, index) %>%
+  dplyr::group_by(novel, index) %>%
   dplyr::summarize(index = unique(index),
             polarity = mean(sentiment))
 # inspect results
@@ -273,16 +273,16 @@ To calculate moving averages, we will assign words with positive polarity a valu
 
 ```{r ma1, message=FALSE, warning=FALSE}
 novels_change <- novels_anno %>%
-  filter(is.na(sentiment) | sentiment == "negative" | sentiment == "positive") %>%
-  group_by(novel) %>%
-  mutate(sentiment = as.character(sentiment),
+  dplyr::filter(is.na(sentiment) | sentiment == "negative" | sentiment == "positive") %>%
+  dplyr::group_by(novel) %>%
+  dplyr::mutate(sentiment = as.character(sentiment),
          sentiment = case_when(is.na(sentiment) ~ "0", 
                                TRUE ~ sentiment),
          sentiment= case_when(sentiment == "0" ~ 0,
                               sentiment == "positive" ~ 1,
                               TRUE ~ -1),
          id = 1:n()) %>%
-       summarise(id = id,
+  dplyr::summarise(id = id,
                  rmean=rollapply(sentiment, 100, mean, align='right', fill=NA)) %>%
   na.omit()
 # inspect results
@@ -316,12 +316,12 @@ We begin by cleaning George Orwell's *Nineteen Eighty-Four*, then splitting it i
 orwell_sent <- orwell %>%
   iconv(to = "latin1") %>%
   paste0(collapse = " ") %>%
-  str_replace_all(., "([a-z])- ([a-z])", "\\1\\2") %>%
-  str_squish() %>%
+  stringr::str_replace_all(., "([a-z])- ([a-z])", "\\1\\2") %>%
+  stringr::str_squish() %>%
   tibble() %>%
-  select(text = 1, everything()) %>%
-  unnest_tokens(sentence, text, token = "sentences") %>%
-  top_n(50)
+  dplyr::select(text = 1, everything()) %>%
+  tidytext::unnest_tokens(sentence, text, token = "sentences") %>%
+  dplyr::top_n(50)
 # inspect results
 head(orwell_sent, 10)
 ```
@@ -330,7 +330,7 @@ In a next step, we load the `sentimentr` package which allows us to extract nega
 
 ```{r neg3, message=FALSE, warning=FALSE}
 orwell_sent_class <- orwell_sent %>%
-  mutate(ressent = sentiment(sentence)$sentiment)
+  dplyr::mutate(ressent = sentiment(sentence)$sentiment)
 # inspect results
 head(orwell_sent_class)
 ```
