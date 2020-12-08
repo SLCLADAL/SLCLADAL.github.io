@@ -1,0 +1,161 @@
+# This script opens each sound file in a directory, looks for a corresponding TextGrid 
+# in the same directory, and extracts the file name, the TextGridLabel, the starting 
+# and end point, the duration, f0 at midpoint, 
+# F1 Onset value, the F1 Offset value, F1 at midpoint, F1 mean and median, 
+# F2 Onset value, the F2 Offset value, F2 at midpoint, F2 mean and median,
+# F3 Onset value, the F3 Offset value, F3 at midpoint, F3 mean and median, 
+# of any labelled interval(s) in the specified TextGrid tier. 
+# All these results are written to a tab-delimited text file.
+#
+# The script is based on a modified version of the script 
+# "collect_formant_data_from_files.praat" by Mietta Lennes, 
+# available here: http://www.helsinki.fi/~lennes/praat-scripts/
+#
+# The first modifications were done by Dan McCloy (drmccloy@uw.edu) in December 2011.
+# parts of the script were adapted from http://user.keio.ac.jp/~kawahara/pdf/PraatScriptingDummies.pdf
+#
+# The second modification was done by Martin Schweinberger (martin.schweinberger@uni-hamburg.de) in October 2016.
+#
+# This script is distributed under the GNU General Public License.
+# Copyright 1.10.2016 Martin Schweinberger
+
+form Get pitch formants and duration from labeled segments in files
+	comment Directory of sound files. Be sure to include the final "\"
+	text sound_directory D:\Uni\Projekte\01-Vokaltrapeze\01L3Prof_Vokaltrapeze\RecordingVCP\female\
+	sentence Sound_file_extension .wav
+	comment Directory of TextGrid files. Be sure to include the final "\"
+	text textGrid_directory D:\Uni\Projekte\01-Vokaltrapeze\01L3Prof_Vokaltrapeze\RecordingVCP\female\
+	sentence TextGrid_file_extension .TextGrid
+	comment Full path of the resulting text file:
+	text resultsfile D:\Uni\Projekte\01-Vokaltrapeze\01L3Prof_Vokaltrapeze\Results\WS201718/ResultsFemalesF4.txt
+	comment Which tier do you want to analyze?
+	integer Tier 1
+	comment Formant analysis parameters
+	positive Time_step 0.01
+	integer Maximum_number_of_formants 4
+	positive Maximum_formant_(Hz) 5500
+	positive Window_length_(s) 0.025
+	real Preemphasis_from_(Hz) 50
+	comment Pitch analysis parameters
+	positive Pitch_time_step 0.01
+	positive Minimum_pitch_(Hz) 75
+	positive Maximum_pitch_(Hz) 300
+endform
+
+# Make a listing of all the sound files in a directory:
+Create Strings as file list... list 'sound_directory$'*'sound_file_extension$'
+numberOfFiles = Get number of strings
+
+# Check if the result file exists:
+if fileReadable (resultsfile$)
+	pause The file 'resultsfile$' already exists! Do you want to overwrite it?
+	filedelete 'resultsfile$'
+endif
+
+# Create a header row for the result file: (remember to edit this if you add or change the analyses!)
+header$ = "Filename	TextGridLabel	start	end	duration	f0_midpoint	F1_Onset	F1_Offset	F1_midpoint	F1_mean	F1_median	F1_sd	F2_Onset	F2_Offset	F2_midpoint	F2_mean	F2_median	F2_sd	F3_Onset	F3_Offset	F3_midpoint	F3_mean	F3_median	F3_sd'newline$'"
+fileappend "'resultsfile$'" 'header$'
+
+# Open each sound file in the directory:
+for ifile to numberOfFiles
+	filename$ = Get string... ifile
+	Read from file... 'sound_directory$''filename$'
+
+	# get the name of the sound object:
+	soundname$ = selected$ ("Sound", 1)
+
+	# Look for a TextGrid by the same name:
+	gridfile$ = "'textGrid_directory$''soundname$''textGrid_file_extension$'"
+
+	# if a TextGrid exists, open it and do the analysis:
+	if fileReadable (gridfile$)
+		Read from file... 'gridfile$'
+
+		select Sound 'soundname$'
+		To Formant (burg)... time_step maximum_number_of_formants maximum_formant window_length preemphasis_from
+
+		select Sound 'soundname$'
+		To Pitch... pitch_time_step minimum_pitch maximum_pitch
+
+		select TextGrid 'soundname$'
+		numberOfIntervals = Get number of intervals... tier
+
+		# Pass through all intervals in the designated tier, and if they have a label, do the analysis:
+		for interval to numberOfIntervals
+			label$ = Get label of interval... tier interval
+			if label$ <> ""
+				# duration:
+				start = Get starting point... tier interval
+				end = Get end point... tier interval
+				duration = end-start
+				midpoint = (start + end) / 2
+
+				# formants mean:
+				select Formant 'soundname$'
+				f1_mean = Get mean... 1 'start' 'end' Hertz
+				f2_mean = Get mean... 2 'start' 'end' Hertz
+				f3_mean = Get mean... 3 'start' 'end' Hertz
+
+				# formants median:
+				select Formant 'soundname$'
+				f1_median = Get quantile... 1 'start' 'end' Hertz 0.50
+				f2_median = Get quantile... 2 'start' 'end' Hertz 0.50
+				f3_median = Get quantile... 3 'start' 'end' Hertz 0.50
+
+				# formants midpoint:
+				select Formant 'soundname$'
+				f1_mid = Get value at time... 1 midpoint Hertz Linear
+				f2_mid = Get value at time... 2 midpoint Hertz Linear
+				f3_mid = Get value at time... 3 midpoint Hertz Linear
+
+				# formants standard deviation:
+				select Formant 'soundname$'
+				sd1 = Get standard deviation... 1 'start' 'end' Hertz
+				sd2 = Get standard deviation... 2 'start' 'end' Hertz
+				sd3 = Get standard deviation... 3 'start' 'end' Hertz
+
+				# pitch:
+				select Pitch 'soundname$'
+				f0_mid = Get value at time... midpoint Hertz Linear
+				
+				# defining landmarks
+				preVend = start-0.01
+				preVstart = start-0.03
+				postVstart = end+0.01
+				postVend = end+0.03
+				fricstart = start+0.01
+				fricend = end-0.01
+				
+				# evaluation
+				select Formant 'soundname$'
+				foneOffset = Get mean... 1 'preVstart' 'preVend' Hertz
+				ftwoOffset = Get mean... 2 'preVstart' 'preVend' Hertz
+				fthreeOffset = Get mean... 3 'preVstart' 'preVend' Hertz
+
+				foneOnset = Get mean... 1 'postVstart' 'postVend' Hertz
+				ftwoOnset = Get mean... 2 'postVstart' 'postVend' Hertz
+				fthreeOnset = Get mean... 3 'postVstart' 'postVend' Hertz
+				
+				# Save result to text file:
+				resultline$ = "'soundname$'	'label$'	'start'	'end'	'duration'	'f0_mid'	'f1_mean'	'foneOnset'	'foneOffset'	'f1_median'	'f1_mid'	'sd1'	'ftwoOnset'	'ftwoOffset'	'f2_mean'	'f2_median'	'f2_mid'	'sd2'	'fthreeOnset'	'fthreeOffset'	'f3_mean'	'f3_median'	'f3_mid'	'sd3''newline$'"
+				fileappend "'resultsfile$'" 'resultline$'
+				
+				# select the TextGrid so we can iterate to the next interval:
+				select TextGrid 'soundname$'
+			endif
+		endfor
+		# Remove the TextGrid, Formant, and Pitch objects
+		select TextGrid 'soundname$'
+		plus Formant 'soundname$'
+		plus Pitch 'soundname$'
+		Remove
+	endif
+	# Remove the Sound object
+	select Sound 'soundname$'
+	Remove
+	# and go on with the next sound file!
+	select Strings list
+endfor
+
+# When everything is done, remove the list of sound file paths:
+Remove
