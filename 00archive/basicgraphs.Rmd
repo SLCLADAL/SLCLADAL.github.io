@@ -1,5 +1,5 @@
 ---
-title: "Basic Data Visualization in R"
+title: "Data Visualization with R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -29,7 +29,7 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 This tutorial introduces different types of data visualization. The entire R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/basicgraphs.Rmd).  A more in-depth and highly recommendable resource for data visualization in R is @wickham2016ggplot2. A more general introduction to data visualization - which is still highly recommendable is @healy2018data.
 
 
-## Different philosophies: base R, lattice, and ggplot{-}
+## Graphics philosophies{-}
 
 Before we start, a few words on different frameworks for creating graphics in R are in order. There are three main frameworks in which to create graphics in R. The *basic* framework, the *lattice* framework, and the *ggplot* or *tidyverse* framework. These frameworks reflect the changing nature of R as a programming language (or as a programming environment). The so-called *base R* consists of about 30 packages that are always loaded automatically when you open R - it is, so to say - the default version of using R when nothing else is loaded. The *base R* framework is the oldest way to generate visualizations in R that was used when other packages did not exists yet. However, *base R* can and is still used to create visualizations although most visualizations are now generated using the *ggplot* or *tidyverse* framework. The *lattice* framework followed the *base R* framework and offered some advantages such as handy ways to split up visualizations. However, *lattice* was replaced by the *ggplot* or *tidyverse* framework because the latter are much more flexible, offer full control, and follow an easy to understand syntax.
 
@@ -87,43 +87,46 @@ library(flextable)
 ```
 
 
-Also, we will load the data that we will display. The data set is called `lmmdata` but we will change the name to `plotdata` for this tutorial. The data set is based on the [*Penn Parsed Corpora of Historical English*](https://www.ling.upenn.edu/hist-corpora/) (PPC) and it contains the date when a text was written (`Date`), the genre of the text (`Genre`), the name of the text (`Text`), the relative frequency of prepositions in the text (`Prepositions`), and the region in which the text was written (`Region`). We also add two more variables to the data called `GenreRedux` and `DateRedux`. `GenreRedux` collapses the existing genres into five main categories (*Conversational*, *Religious*, *Legal*, *Fiction*, and *NonFiction*) while `DateRedux` collapses the dates when the texts were composed into five main periods (1150-1499, 1500-1599, 1600-1699, 1700-1799, and 1800-1913). We also factorize non-numeric variables. 
+Also, we will load the data that we will display. The data set is called `lmmdata` but we will change the name to `pdat` for this tutorial. The data set is based on the [*Penn Parsed Corpora of Historical English*](https://www.ling.upenn.edu/hist-corpora/) (PPC) and it contains the date when a text was written (`Date`), the genre of the text (`Genre`), the name of the text (`Text`), the relative frequency of prepositions in the text (`Prepositions`), and the region in which the text was written (`Region`). We also add two more variables to the data called `GenreRedux` and `DateRedux`. `GenreRedux` collapses the existing genres into five main categories (*Conversational*, *Religious*, *Legal*, *Fiction*, and *NonFiction*) while `DateRedux` collapses the dates when the texts were composed into five main periods (1150-1499, 1500-1599, 1600-1699, 1700-1799, and 1800-1913). We also factorize non-numeric variables. 
 
 ```{r prep3}
 # load data
-plotdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE) %>%
-  mutate(GenreRedux = case_when(str_detect(.$Genre, "Letter") ~ "Conversational",
+pdat <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TRUE) %>%
+  dplyr::mutate(GenreRedux = case_when(str_detect(.$Genre, "Letter") ~ "Conversational",
                                 Genre == "Diary" ~ "Conversational",
                                 Genre == "Bible"|Genre == "Sermon" ~ "Religious",
                                 Genre == "Law"|Genre == "TrialProceeding" ~ "Legal",
                                 Genre == "Fiction" ~ "Fiction",
                                 TRUE ~ "NonFiction")) %>%
-  mutate(DateRedux = case_when(Date < 1500 ~ "1150-1499",
+  dplyr::mutate(DateRedux = case_when(Date < 1500 ~ "1150-1499",
                                Date < 1600 ~ "1500-1599",
                                Date < 1700 ~ "1600-1699",
                                Date < 1800 ~ "1700-1799",
                                TRUE ~ "1800-1913")) %>%
-  mutate(Genre = factor(Genre),
-         Text = factor(Text),
-         Region = factor(Region),
-         GenreRedux = factor(GenreRedux),
-         DateRedux = factor(DateRedux))
-# inspect data
-datatable(plotdata, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+  dplyr::mutate_if(is.character, factor)
+```
+
+Let's briefly inspect the data.
+
+```{r prep7, echo = F}
+DT::datatable(pdat, rownames = FALSE, filter="none", caption = "Overview of the data set.", 
+              options = list(pageLength = 10, scrollX=T))
 ```
 
 In addition, we will create a vector with colors that we will be using throughout this tutorial. This is not really necessary but it shares us from having to specify colors every time when we do not want to use the default colors that R provides. In this case, we will specify five colors but this palette could be extended. You can also check out the colors that are available in R  [here](http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf) and the palettes or sets of colors  [here](https://www.datanovia.com/en/blog/top-r-color-palettes-to-know-for-great-data-visualization/).
 
 
 ```{r prep4}
-mycol <- c("indianred4", "gray30", "darkblue", "orange", "gray80")
+clrs5 <- c("indianred4", "gray30", "darkblue", "orange", "gray80")
+clrs3 <- c("indianred4", "gray30", "darkblue")
+clrs2 <- c("orange", "gray80")
 ```
 
 We will now turn to creating the graphs.
 
-# Scatter Plots{-}
+# Dot and Scatter Plots{-}
 
-The first, and simplest graph, is a so-called *scatterplot*. Scatterplots are used when the graph is set up to display the relationship between two numeric variables. We will start off with creating a scatter plot in *base*, then in *lattice* and finally in the *ggplot* environment.
+The first, and simplest graph, is a so-called *scatter* or *dot plot*. Scatterplots are used when the graph is set up to display the relationship between two numeric variables. We will start off with creating a scatter plot in *base*, then in *lattice* and finally in the *ggplot* environment.
 
 ## Scatter Plots in base{-} 
 
@@ -133,14 +136,14 @@ The most fundamental function to create plots in the *base* environment is to us
 # create simple scatter plot
 plot(Prepositions ~ Date,                 # plot Prepositions by Date
      type = "p",                          # plot type p (points) 
-     data = plotdata,                     # data from data set plotdata  
+     data = pdat,                     # data from data set pdat  
      ylab = "Prepositions (Frequency)",   # add y-axis label 
      xlab = "Date (year of composition)", # add x-axis label 
      main = "plot type 'p' (points)"      # add title 
      )                                    # end drawing plot
 ```
 
-Let us go over the command. The first part of the call is `plot` which is the function for plotting data in base R. In the round brackets are the arguments in which we specify what the plot should look like. The `Prepositions ~ Date` part tells R which variables should be displayed and the `type = "p"` part tells R which type of plot we want (`p` stands for points, `l` for lines, `b` for both lines and points). The part `data = plotdata` tells R which data set to take the data from, and `ylab = "Prepositions (Frequency)"` and `xlab = "Date (year of composition)"` informs R about the axes' labels. The part `main = "plot type 'p' (points)"` informs R about what we want as the main title of the plot. 
+Let us go over the command. The first part of the call is `plot` which is the function for plotting data in base R. In the round brackets are the arguments in which we specify what the plot should look like. The `Prepositions ~ Date` part tells R which variables should be displayed and the `type = "p"` part tells R which type of plot we want (`p` stands for points, `l` for lines, `b` for both lines and points). The part `data = pdat` tells R which data set to take the data from, and `ylab = "Prepositions (Frequency)"` and `xlab = "Date (year of composition)"` informs R about the axes' labels. The part `main = "plot type 'p' (points)"` informs R about what we want as the main title of the plot. 
 
 In a next step, we will change the title, add two regression lines to the scatterplot (in the first case a linear and in the second case a smoothed regression line) and we will change the points as well as the color of the points.
 
@@ -148,7 +151,7 @@ In a next step, we will change the title, add two regression lines to the scatte
 # create simple scatter plot with regression lines (ablines)
 plot(Prepositions ~ Date,                 # plot Prepositions by Date
      type = "p",                          # plot type p (points) 
-     data = plotdata,                     # data from data set iris  
+     data = pdat,                     # data from data set iris  
      ylab = "Prepositions (Frequency)",   # add y-axis label 
      xlab = "Date (year of composition)", # add x-axis label 
      main = "Scatterplot",                # add title 
@@ -156,11 +159,11 @@ plot(Prepositions ~ Date,                 # plot Prepositions by Date
      col = "lightgrey"                    # define symbol colour as light grey
      )                                    # end drawing plot
 abline(                                   # add regression line (y~x) 
-  lm(plotdata$Prepositions ~ plotdata$Date),      # draw regression line of linear model (lm) 
+  lm(pdat$Prepositions ~ pdat$Date),      # draw regression line of linear model (lm) 
   col="red"                               # define line colour as red
   )                                       # end drawing line             
 lines(                                    # add line (x,y)
-  lowess(plotdata$Prepositions ~ plotdata$Date),  # draw smoothed lowess line (x,y) 
+  lowess(pdat$Prepositions ~ pdat$Date),  # draw smoothed lowess line (x,y) 
   col="blue"                              # define line colour as blue
   )                                       # end drawing line
 ```
@@ -175,7 +178,7 @@ The only things that are different in the main call are the "pch" argument with 
 > Tipp: Use the code below to load the data.
 >
 
-```{r scatter 3, eval = T, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter 3, eval = T,  results = 'asis', message=FALSE, warning=FALSE}
 # load data03
 data03 <- read.delim("https://slcladal.github.io/data/data03.txt", sep = "\t", header = T)
 ```
@@ -209,21 +212,21 @@ plot(Variable2 ~ Variable1,
 
 ## Scatter Plots in lattice{-}
 
-We now turn to data visualization in *lattice*. As the *lattice* package is already loaded, we can create a first simple scatter plot using the "xyplot" function form the "lattice" package. The scatter plot shows the relative frequency of prepositions by year of composition.
+We now turn to data visualization in `lattice`. As the `lattice` package is already loaded, we can create a first simple scatter plot using the `xyplot` function form the `lattice` package. The scatter plot shows the relative frequency of prepositions by year of composition.
 
-```{r scatter6, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter6,  results = 'asis', message=FALSE, warning=FALSE}
 # create simple scatter plot
 xyplot(Prepositions ~ Date,  
        # add y-axis label 
        ylab = "Prepositions (Frequency)",   
        # add x-axis label
        xlab = "Date (year of composition)", 
-       data = plotdata)                                    
+       data = pdat)                                    
 ```
 
-Since the "lattice" package was created to plot multiple relationships with a single call, we will now make use of that feature and plot multiple relationships at once. In addition, we will add a grid to the plot to improve comparability of data points within the graph. Thus, the scatter plot shows the relative frequency of prepositions by year of composition and genre.
+Since the `lattice` package was created to plot multiple relationships with a single call, we will now make use of that feature and plot multiple relationships at once. In addition, we will add a grid to the plot to improve comparability of data points within the graph. Thus, the scatter plot shows the relative frequency of prepositions by year of composition and genre.
 
-```{r scatter7, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter7,  results = 'asis', message=FALSE, warning=FALSE}
 # create scatter plots by species
 xyplot(Prepositions ~ Date | Genre,     
        # add y-axis label
@@ -232,7 +235,7 @@ xyplot(Prepositions ~ Date | Genre,
        xlab = "Date (year of composition)", 
        # add grids to panels
        grid = TRUE,
-       data = plotdata
+       data = pdat
        )    
 ```
 
@@ -240,7 +243,7 @@ The only new code in the chunk above is the "| Genre" part. This part means that
 
 Like in base, we can modify lattice-plots and specify, e.g. the symbols that are plotted or their color. 
 
-```{r scatter7b, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter7b,  results = 'asis', message=FALSE, warning=FALSE}
 # create scatter plots by species
 xyplot(Prepositions ~ Date | Genre,
        ylab = "Prepositions (Frequency)",  
@@ -250,7 +253,7 @@ xyplot(Prepositions ~ Date | Genre,
        pch = 20,            
        # color of symbols
        col = "black",
-       data = plotdata
+       data = pdat
        ) 
 ```
 
@@ -261,10 +264,10 @@ Next, we will use the `ggplot2` package to create a scatter plot.
 
 We now turn to data visualization using *ggplot*. As the *ggplot2* package is already loaded, we create a very basic scatterplot in *ggplot2* using the `geom_point` function to show the advantages of creating visualizations in this environment.
 
-```{r scatter9, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r scatter9,  results = 'asis', message=FALSE, warning=FALSE}
 # create simple scatter plot
-# use data set "plotdata"
-ggplot(plotdata,  
+# use data set "pdat"
+ggplot(pdat,  
        # define axes
        aes(x= Date,        
            y= Prepositions)) + 
@@ -276,8 +279,8 @@ Let's go over the code above. The function call for plotting in "ggplot2" is sim
 
 The advantage of "ggplot2" is that is really easy to modify the plot by adding new layers and to change the basic outlook by modifying the theme which is what we will do in the code below.
 
-```{r scatter10, echo = T, eval = T}
-ggplot(plotdata,    
+```{r scatter10,  eval = T}
+ggplot(pdat,    
        # define axes
        aes(x=Date,             
            y= Prepositions, 
@@ -289,44 +292,33 @@ ggplot(plotdata,
   theme_bw()                   
 ```
 
-The example above is intended to show that creating ggplots is can be very simple but "ggplot2" is extremely flexible and thus allows us to modify the plot in various ways. To exemplify how a ggplot may be modified, we will change the color of the dots (and use the colors that we have specified earlier), add a white rather than a gray background.
 
-```{r scatter11, echo = T, eval = T}
+The white background is created by specifying the theme as a black and white theme (`theme_bw()`) while the color of the dots is changed by specifying that the color should be applied by Species (`color = GenreRedux`). Then, the colors to be used are defined in the function `scale_color_manual`. 
+
+We can now specify the symbols in the scatter plot.
+
+```{r scatter12,  eval = T}
 # create scatter plot colored by genre
-ggplot(plotdata, aes(x=Date, y= Prepositions, color = GenreRedux)) +
-  geom_point() +
-  theme_bw() +
-  scale_color_manual(values = mycol)
-```
-
-The white background is created by specifying the theme as a black and white theme (`theme_bw()`) while the colour of the dots is changed by specifying that the color should be applied by Species (`color = GenreRedux`). Then, the colours to be used are defined in the function `scale_color_manual`. 
-
-## Using symbols in scatter plots{-}
-
-We can now specify the symbols in the scatterplot.
-
-```{r scatter12, echo = T, eval = T}
-# create scatter plot colored by genre
-ggplot(plotdata, aes(Date, Prepositions, color = GenreRedux, shape = GenreRedux)) +
+ggplot(pdat, aes(Date, Prepositions, color = GenreRedux, shape = GenreRedux)) +
   geom_point() +
   guides(shape=guide_legend(override.aes=list(fill=NA))) +
   scale_shape_manual(name = "Genre", 
-                     breaks = names(table(plotdata$GenreRedux)), 
+                     breaks = names(table(pdat$GenreRedux)), 
                      values = 1:5) +
   scale_color_manual(name = "Genre", 
-                     breaks = names(table(plotdata$GenreRedux)), 
-                     values = mycol) +
+                     breaks = names(table(pdat$GenreRedux)), 
+                     values = clrs5) +
   theme_bw() +
   theme(legend.position="top")
 ```
 
-## Dot plots with error bars{-}
+## Extensions of dot plots{-}
 
 In addition, we can add regression lines with error bars by Species and, if we want to show separate windows for the plots, we can use the "facet_grid" or "facet_wrap" function and define by which variable we want to create different panels.
 
-```{r scatter13, echo = T, eval = T}
+```{r scatter13, message=F, error=F}
 # create scatter plot colored by genre in different panels
-ggplot(plotdata, aes(Date, Prepositions,  color = Genre)) +
+ggplot(pdat, aes(Date, Prepositions,  color = Genre)) +
   facet_wrap(vars(Genre), ncol = 4) +
   geom_point() + 
   geom_smooth(method = "lm", se = F) +
@@ -337,9 +329,9 @@ ggplot(plotdata, aes(Date, Prepositions,  color = Genre)) +
 
 If we only want to show the lines, we simply drop the "geom_point" function.
 
-```{r scatter14, echo = T, eval = T}
+```{r scatter14,  eval = T}
 # create scatter plot colored by genre in different panels
-ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
+ggplot(pdat, aes(x=Date, y= Prepositions,  color = Genre)) +
   facet_wrap(vars(Genre), ncol = 4) +
   geom_smooth(method = "lm", se = F) +
   theme_bw() +
@@ -349,9 +341,9 @@ ggplot(plotdata, aes(x=Date, y= Prepositions,  color = Genre)) +
 
 Another option is to plot density layers instead of plotting the data points.
 
-```{r scatter15, echo = T, eval = T}
+```{r scatter15,  eval = T}
 # create scatter density plot
-ggplot(plotdata, aes(x=Date, y= Prepositions,  color = GenreRedux)) +
+ggplot(pdat, aes(x=Date, y= Prepositions,  color = GenreRedux)) +
     facet_wrap(vars(GenreRedux), ncol = 5) +
   theme_bw() +                  
   geom_density_2d() +
@@ -362,16 +354,10 @@ ggplot(plotdata, aes(x=Date, y= Prepositions,  color = GenreRedux)) +
 
 Although these are not scatterplots, plots with dot-symbols are very flexible and can be extended to show properties of the distribution of values. One way to create such a plot is to plot means as dot-symbols and add error bars to provide information about the underlying distribution. The plot below illustrates such a plot and additionally shows how plots can be further customized.
 
-```{r scatter16, echo = T, eval = T}
+```{r scatter16, message=F, warning=F}
 # scatter plot with error bars
-ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  group = Genre)) +                 
-  # add title
-  ggtitle("Prepositions by Genre") +          
-  # create a dot at means
-  stat_summary(fun.y = mean, geom = "point",     
-               # means by Species
-               aes(group= Genre)) +          
-  # bootstrap data
+ggplot(pdat, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  group = Genre)) +                 
+  stat_summary(fun = mean, geom = "point", aes(group= Genre)) +          
   stat_summary(fun.data = mean_cl_boot,       
                # add error bars
                geom = "errorbar", width = 0.2) + 
@@ -388,23 +374,84 @@ ggplot(plotdata, aes(x=reorder(Genre, Prepositions, mean), y= Prepositions,  gro
   scale_color_manual(guide = FALSE)          
 ```
 
-In the following, we will simply go over the most common types of graphs and use examples to show what they look like and how they can be created. The main graph types we will have a look at are:
+Balloon plots are an extension of scatter plots that are typically used to display data that represents
+* two categorical variables
+* one numeric variable.
 
-* line graphs ("geom_line" and "geom_smooth")
-* bar plots ("geom_bar")
-* boxplots ("geom_box" and "geom_violin")
-* density plots ("geom_density")
+```{r bal1,  results = 'asis', message=FALSE, warning=FALSE}
+# ballon plot
+pdat %>%
+  dplyr::mutate(DateRedux = factor(DateRedux)) %>%
+  dplyr::group_by(DateRedux, GenreRedux) %>%
+  dplyr::summarise(Prepositions = mean(Prepositions)) %>%
+  ggplot(aes(DateRedux, 100, 
+             size = Prepositions,
+             fill = GenreRedux)) +
+  facet_grid(vars(GenreRedux)) +
+  geom_point(shape = 21) +
+  scale_size_area(max_size = 15) +
+  coord_cartesian(ylim = c(50, 150)) +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  scale_fill_discrete(guide = "none")
+```
+
+
+
+# Density Plots{-}
+
+Another way to visualize the distribution of the data with respect to numeric variables are density plots or Kernel Density Plots. Density plots smooth the data using so-called kernel smoothing to even out the distribution of frequencies along the lines of a numeric or interval variable. The peaks of density plots help display where values are concentrated over the interval. To show the relationship between the variable and the density plot, we will first create a scatter plot and then create a density plot of the variable displayed on the x-axis of the scatter plot.
+
+```{r dens1,  results = 'asis', message=FALSE, warning=FALSE}
+# create dot plot
+ggplot(pdat, aes(x = Date, y = Prepositions, color=Region)) +  
+  geom_point() +  
+  scale_color_manual(values = clrs2) + 
+  theme(legend.position=c(0,1), legend.justification=c(0,1)) 
+```
+
+We will now create a marginal density plot of Date (x-axis) to show when texts from the north and south were particularly common.
+
+```{r dens2,  results = 'asis', message=FALSE, warning=FALSE}
+# create dot plot
+ggplot(pdat, aes(Date, fill=Region)) +  
+  geom_density(alpha=.5) +  
+  scale_fill_manual(values = clrs2) + 
+  theme(legend.position=c(0,1), legend.justification=c(0,1)) 
+```
+
+The density plot shows that the texts differ substantially with respect to where they were written as the distribution of texts written in southern Britain continues way into the 19^th^ century while we only have texts written in north until about 1800. 
+
+
+```{r dens3,  results = 'asis', message=FALSE, warning=FALSE}
+# create dot plot
+ggplot(pdat, aes(Date, Prepositions)) +  
+  geom_density2d_filled()
+```
+
+An altrenative method for displaying densities is by using a hex plot as shown below. Hex plots divide the plotting area into hexagons and display density as hue of the hexagons.
+
+```{r hex_01,  results = 'asis', message=FALSE, warning=FALSE}
+# create dot plot
+pdat %>%
+  ggplot(aes(x = Date, y = Prepositions)) +  
+  geom_hex()
+```
 
 We are now in a position to start creating line graphs with *ggplot*.
+
+
 
 # Line Graphs{-}
 
 Line graphs are used when we have numeric values that are linked (in one way or another) because they come from the same speaker or genre as in our case). 
 
-```{r line1}
-plotdata %>%
-  group_by(DateRedux, GenreRedux) %>%
-  summarise(Frequency = mean(Prepositions)) %>%
+```{r line1, warning=F, message=F}
+pdat %>%
+  dplyr::group_by(DateRedux, GenreRedux) %>%
+  dplyr::summarise(Frequency = mean(Prepositions)) %>%
   ggplot(aes(x=DateRedux, y= Frequency, group= GenreRedux, color = GenreRedux)) +
   # add geom layer with lines
   geom_line()
@@ -415,17 +462,17 @@ plotdata %>%
 
 Another very useful function when creating line graphs with "ggplot" is "geom_smooth" which *smoothes* the lines to be drawn. 
 
-```{r line2, echo = T, eval = T, warning = F, message = F}
-ggplot(plotdata, aes(x=DateRedux, y= Prepositions, group= GenreRedux, color = GenreRedux)) +
+```{r line2, warning = F, message = F}
+ggplot(pdat, aes(x=DateRedux, y= Prepositions, group= GenreRedux, color = GenreRedux)) +
   # add geom layer with lines
   geom_smooth()
 ```
 
 As this smoothed line graph is extremely useful, we will customize it to show how to modify your graph.
 
-```{r line3, echo = T, eval = T}
+```{r line3, message=F, warning=F}
 # define aesthetics
-ggplot(plotdata, aes(x=Date, y= Prepositions,  color = GenreRedux, linetype = GenreRedux)) +
+ggplot(pdat, aes(x=Date, y= Prepositions,  color = GenreRedux, linetype = GenreRedux)) +
   # add geom layer with lines
   geom_smooth(se = F) +  
   # legend without background color
@@ -437,17 +484,17 @@ ggplot(plotdata, aes(x=Date, y= Prepositions,  color = GenreRedux, linetype = Ge
                         # def. legend header
                         name=c("Genre"),
                         # def. linetypes
-                        breaks = names(table(plotdata$GenreRedux)),
+                        breaks = names(table(pdat$GenreRedux)),
                         # def. labels
-                        labels = names(table(plotdata$GenreRedux))) + 
+                        labels = names(table(pdat$GenreRedux))) + 
   # def. col.
-  scale_colour_manual(values=mycol,
+  scale_colour_manual(values=clrs5,
                       # define legend header
                       name=c("Genre"),
                       # define elements
-                      breaks=names(table(plotdata$GenreRedux)),  
+                      breaks=names(table(pdat$GenreRedux)),  
                       # define labels
-                      labels = names(table(plotdata$GenreRedux))) +
+                      labels = names(table(pdat$GenreRedux))) +
   # add x-axis label
   labs(x = "Year") +      
   # customize x-axis tick positions
@@ -464,33 +511,52 @@ ggplot(plotdata, aes(x=Date, y= Prepositions,  color = GenreRedux, linetype = Ge
 
 Although the code for the customized smoothed line graph is much longer and requires addition specifications, it is a very nice way to portrait the development over time.
 
+## Ribbon plots{-}
+
+Ribbon plots show an area, typically between minimum and maximum values. In addition, ribbon plots commonly also show the mean as depicted below.
+
+```{r rib_01,  results = 'asis', message=FALSE, warning=FALSE}
+# create dot plot
+pdat %>%
+  dplyr::mutate(DateRedux = as.numeric(DateRedux)) %>%
+  dplyr::group_by(DateRedux) %>%
+  dplyr::summarise(Mean = mean(Prepositions),
+                   Min = min(Prepositions),
+                   Max = max(Prepositions)) %>%
+  ggplot(aes(x = DateRedux, y = Mean)) +  
+  geom_ribbon(aes(ymin = Min, ymax = Max), fill = "gray80") +
+  geom_line() +
+  scale_x_continuous(labels = names(table(pdat$DateRedux)))
+```
+
+
 ## Line graphs for Likert data{-}
 
 A special case of line graphs is used when dealing with Likert-scaled variables. In such cases, the line graph displays the density of cumulative frequencies of responses. The difference between the cumulative frequencies of responses displays differences in preferences. We will only focus on how to create such graphs using the "ggplot" environment here as it has an inbuild function ("ecdf") which is designed to handle such data.
 
 In a first step, we create a data set which consists of a Likert-scaled variable. The fictitious data created here consists of rating of students from three courses about how satisfied they were with their language-learning course. The response to the Likert item is numeric so that "strongly disagree/very dissatisfied" would get the lowest and "strongly agree/very satisfied" the highest numeric value. 
 
-```{r line9, echo=T, eval = T}
-likertdata <- read.delim("https://slcladal.github.io/data/likertdata1.txt", header = TRUE)
-# inspect data
-ft <- flextable(likertdata)
-ft <- set_caption(ft,
-                  caption = "Overview of the likertdata.")
-ft <- autofit(ft)
-# inspect data
-ft
+```{r llik_01}
+ldat <- read.delim("https://slcladal.github.io/data/likertdata1.txt", header = TRUE)
+```
+
+Let's briefly inspect the data.
+
+```{r llik_03, echo = F}
+DT::datatable(ldat, rownames = FALSE, filter="none", caption = "Overview of the data set.", 
+              options = list(pageLength = 10, scrollX=T))
 ```
 
 Now that we have data resembling a Likert-scaled item from a questionnaire, we will display the data in a cumulative line graph.
 
-```{r line10}
+```{r llik_05, warning=F, message=F}
 # create cumulative density plot
-ggplot(likertdata,aes(x = Satisfaction, color = Course)) + 
+ggplot(ldat,aes(x = Satisfaction, color = Course)) + 
   geom_step(aes(y = ..y..), stat = "ecdf") +
   labs(y = "Cumulative Density") + 
   scale_x_discrete(limits = 1:5, breaks = 1:5,
         labels=c("very dissatisfied", "dissatisfied", "neutral", "satisfied", "very satisfied")) + 
-  scale_colour_manual(values = mycol)  
+  scale_colour_manual(values = clrs3)  
 ```
 
 The satisfaction of the German course was the lowest as the red line shows the highest density (frequency of responses) of "very dissatisfied" and "dissatisfied" ratings. The students in our fictitious data set were most satisfied with the Chinese course as the blue line is the lowest for "very dissatisfied" and "dissatisfied" ratings while the difference between the courses shrinks for "satisfied" and "very satisfied". The Japanese language course is in-between the German and the Chinese course.  
@@ -502,40 +568,43 @@ Most commonly, the data for visualization comes from tables of absolute frequenc
 
 In a first step, we modify the original data to get counts and percentages. The data represents the number of documents per time period and the percentage of those documents across all time periods.
 
-```{r pie1}
+```{r pie_01, message=F, warning=F}
 # create bar plot data
-bardata <- plotdata %>%
+bdat <- pdat %>%
   dplyr::mutate(DateRedux = factor(DateRedux)) %>%
   group_by(DateRedux) %>%
   dplyr::summarise(Frequency = n()) %>%
   dplyr::mutate(Percent = round(Frequency/sum(Frequency)*100, 1))
-# inspect data
-ft <- flextable(bardata)
-ft <- set_caption(ft,
-                  caption = "Overview of the bardata.")
-ft <- autofit(ft)
-# inspect data
-ft
 ```
+
+
+Let's briefly inspect the data.
+
+```{r pie_02, echo = F}
+DT::datatable(bdat, rownames = FALSE, filter="none", caption = "Overview of the data set.", 
+              options = list(pageLength = 10, scrollX=T))
+```
+
+
 
 Before creating bar plots, we will briefly turn to pie charts because pie charts are very common despite suffering from certain shortcomings. Consider the following example which highlights some of the issues that arise when using pie charts. In base R, we cerate pie charts using the `pie` function as shown below.
 
-```{r pie2, echo = T, results = 'asis', message=FALSE, warning=FALSE}
-pie(bardata$Percent,
-    col = mycol,
-    labels = bardata$Percent)
-legend("topright", names(table(bardata$DateRedux)), 
-       fill = mycol)
+```{r pie_03,  results = 'asis', message=FALSE, warning=FALSE}
+pie(bdat$Percent,
+    col = clrs5,
+    labels = bdat$Percent)
+legend("topright", names(table(bdat$DateRedux)), 
+       fill = clrs5)
 ```
 
 In ggplot, we create pie charts by using the `geom_bar` and then define `coord_polar("y", start=0). In contrast to base R, the labeling is not as easy as in base R. We will thus start with a pie chart without labels and then add the labels in a next step.
 
 
-```{r pie3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
-ggplot(bardata,  aes("", Percent, fill = DateRedux)) + 
+```{r pie_05, results = 'asis', message=FALSE, warning=FALSE}
+ggplot(bdat,  aes("", Percent, fill = DateRedux)) + 
   geom_bar(stat="identity", width=1, color = "white") +
   coord_polar("y", start=0) +
-  scale_fill_manual(values = mycol) +
+  scale_fill_manual(values = clrs5) +
   theme_void()
 ```
 
@@ -544,36 +613,71 @@ If the slices of the pie chart are not labelled, it is difficult to see which sl
 
 The labelling of pie charts is, however, somewhat tedious as the positioning is tricky. Below is an example for adding labels without specification.
 
-```{r pie4, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie_07, results = 'asis', message=FALSE, warning=FALSE}
 # create pie chart
-ggplot(bardata,  aes("", Percent, fill = DateRedux)) + 
+ggplot(bdat,  aes("", Percent, fill = DateRedux)) + 
   geom_bar(stat="identity", width=1, color = "white") +
   coord_polar("y", start=0) +
-  scale_fill_manual(values = mycol) +
+  scale_fill_manual(values = clrs5) +
   theme_void() +
   geom_text(aes(y = Percent, label = Percent), color = "white", size=6)
 ```
 
 To place the labels where they make sense, we will add another variable to the data called "Position".
 
-```{r pie5, echo = T, results = 'asis', message=FALSE, warning=FALSE}
-piedata <- bardata %>%
+```{r pie_09, results = 'asis', message=FALSE, warning=FALSE}
+piedata <- bdat %>%
   dplyr::arrange(desc(DateRedux)) %>%
   dplyr::mutate(Position = cumsum(Percent)- 0.5*Percent)
-# inspect data
-datatable(piedata, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T))
+```
+
+Let's briefly inspect the data.
+
+```{r pie_10, echo = F}
+DT::datatable(piedata, rownames = FALSE, filter="none", caption = "Overview of the editeddata set.", 
+              options = list(pageLength = 10, scrollX=T))
 ```
 
 Now that we have specified the position, we can include it into the pie chart.
 
-```{r pie6, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r pie_11,  results = 'asis', message=FALSE, warning=FALSE}
 # create pie chart
 ggplot(piedata,  aes("", Percent, fill = DateRedux)) + 
   geom_bar(stat="identity", width=1, color = "white") +
   coord_polar("y", start=0) +
-  scale_fill_manual(values = mycol) +
+  scale_fill_manual(values = clrs5) +
   theme_void() +
   geom_text(aes(y = Position, label = Percent), color = "white", size=6)
+```
+
+# Histograms{-}
+
+Histograms summarize numeric variables by showing their distribution across bins. 
+
+## Histograms in base R{-}
+
+To create histograms in base R, we simply use the `hist` function and add the variable that we want to summarize as its argument.
+
+```{r hist_01}
+hist(pdat$Prepositions,
+     xlab = "Prepositions (per 1,000 words)",
+     main = "")
+```
+
+## Histograms in ggplot{-}
+
+Using `ggplot`, we specify the variable we want to summarize in the aesthetics and use the `geom_histogram` function to generate a histogram.
+
+```{r hist_02, message=F, warning=F}
+ggplot(pdat, aes(Prepositions)) +
+  geom_histogram()
+```
+
+We can simply add information about a second variable by specifying this variable as the basis for the coloring of the bars (which we do by specify the `fill` argument). 
+
+```{r hist_03, message=F, warning=F}
+ggplot(pdat, aes(Prepositions, fill = Region)) +
+  geom_histogram()
 ```
 
 # Bar plots{-}
@@ -584,52 +688,52 @@ Like pie charts, bar plot display frequency information across categorical varia
 
 In base R, we use the `barplot` function to create barplots. The `barplot` function is very flexible but takes a table with frequency counts as its main argument. We can also specify axes labels, a title, the color of the bras, and the axes limits.  We specify text, grids, and boxes separately after the `barplot` function call.
 
-```{r bar1, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar1,  results='hide', message=FALSE, warning=FALSE}
 # create simple scatter plot
-barplot(table(plotdata$DateRedux),        # plot Texts by DateRedux
+barplot(table(pdat$DateRedux),        # plot Texts by DateRedux
      ylab = "Texts (Frequency)",          # add y-axis label 
      xlab = "Period of composition",      # add x-axis label 
      main = "bar plot in base R",         # add title
-     col = mycol,                         # add colors
+     col = clrs5,                         # add colors
      ylim = c(0, 250)                     # define y-axis limits
      )                                    # end drawing plot
 grid()                                    # add grid
 text(seq(0.7, 5.5, 1.2),                  # add label positions (x-axis)
-     table(plotdata$DateRedux)+10,        # add label positions (y-axis)
-     table(plotdata$DateRedux))           # add labels
+     table(pdat$DateRedux)+10,        # add label positions (y-axis)
+     table(pdat$DateRedux))           # add labels
 box()                                     # add box
 ```
 
 
 To create grouped bar plots, we tabulate the variables that we are interested in. In the this example, we group by Region as shown below. 
 
-```{r bar2, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar2,  results='hide', message=FALSE, warning=FALSE}
 # create simple scatter plot
-barplot(table(plotdata$DateRedux, plotdata$Region), # plot Texts by DateRedux
+barplot(table(pdat$DateRedux, pdat$Region), # plot Texts by DateRedux
         beside = T,                          # bars beside each other
         ylab = "Texts (Frequency)",          # add y-axis label 
         xlab = "Period of composition",      # add x-axis label
         main = "grouped bar plot in base R", # add title
-        col = mycol,                         # add colors
+        col = clrs5,                         # add colors
         ylim = c(0, 250)                     # define y-axis limits
         )                                    # end drawing plot
 grid()                                       # add grid
 text(c(seq(1.5, 5.5, 1.0), seq(7.5, 11.5, 1.0)),    # add label positions (x-axis)
-     table(plotdata$DateRedux, plotdata$Region)+10, # add label positions (y-axis)
-     table(plotdata$DateRedux, plotdata$Region))    # add labels
-legend("topleft", names(table(plotdata$DateRedux)), # add legend
-       fill = mycol)                        # add colors
+     table(pdat$DateRedux, pdat$Region)+10, # add label positions (y-axis)
+     table(pdat$DateRedux, pdat$Region))    # add labels
+legend("topleft", names(table(pdat$DateRedux)), # add legend
+       fill = clrs5)                        # add colors
 box()                                       # add box
 ```
 
 To transpose the plot, i.e. showing the Frequencies on the x- rather than the y-axis, we set the argument `horiz` to `TRUE`.
 
-```{r bar3, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar3,  results='hide', message=FALSE, warning=FALSE}
 # create simple scatter plot
-barplot(table(plotdata$DateRedux),        # plot Texts by DateRedux
+barplot(table(pdat$DateRedux),        # plot Texts by DateRedux
      ylab = "Texts (Frequency)",          # add y-axis label 
      xlab = "Period of composition",      # add x-axis label
-     col = mycol,                         # add colors
+     col = clrs5,                         # add colors
      horiz = T,                           # horizontal bars
      xlim = c(0, 250),                    # define x-axis limits
      las = 2,                             # change direction of axis labels
@@ -641,15 +745,15 @@ box()                                     # add box
 
 The creation of barplots in ggplot works just like other types of visualizations in this framework. We first define the data and the aesthetics and then use the `geom_bar` to create a barplot.
 
-```{r bar4, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar4,  results='hide', message=FALSE, warning=FALSE}
 # bar plot
-ggplot(bardata, aes(DateRedux, Percent, fill = DateRedux)) +
+ggplot(bdat, aes(DateRedux, Percent, fill = DateRedux)) +
   geom_bar(stat="identity") +          # determine type of plot
   theme_bw() +                         # use black & white theme
   # add and define text
   geom_text(aes(y = Percent-5, label = Percent), color = "white", size=3) + 
   # add colors
-  scale_fill_manual(values = mycol) +
+  scale_fill_manual(values = clrs5) +
   # supress legend
   theme(legend.position="none")
 ```
@@ -658,33 +762,33 @@ Compared with the pie chart, it is much easier to grasp the relative size and or
 
 Bar plot can be grouped to add another layer of information which is particularly useful when dealing with frequency counts across multiple categorical variables. To create grouped bar plots, we plot `Region` while including `DateRedux` as the `fill` argument. Also, we use the command `position=position_dodge()`.
 
-```{r bar5, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar5,  results='hide', message=FALSE, warning=FALSE}
 # bar plot
-ggplot(plotdata, aes(Region, fill = DateRedux)) + 
+ggplot(pdat, aes(Region, fill = DateRedux)) + 
   geom_bar(position = position_dodge(), stat = "count") +  
   theme_bw() +
-  scale_fill_manual(values = mycol)
+  scale_fill_manual(values = clrs5)
 ```
 If we leave out the `position=position_dodge()` argument, we get a stacked bar plot as shown below.
 
-```{r bar6, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar6,  results='hide', message=FALSE, warning=FALSE}
 # bar plot
-ggplot(plotdata, aes(DateRedux, fill = GenreRedux)) + 
+ggplot(pdat, aes(DateRedux, fill = GenreRedux)) + 
   geom_bar(stat="count") +  
   theme_bw() +
-  scale_fill_manual(values = mycol)    
+  scale_fill_manual(values = clrs5)    
 ```
 
 One issue to consider when using stacked bar plots is the number of variable levels: when dealing with many variable levels, stacked bar plots tend to become rather confusing. This can be solved by either collapsing infrequent variable levels or choose a colour palette that reflects some other inherent piece of information such as *formality* (e.g. blue) versus *informality* (e.g. red).
 
 Stacked bar plots can also be normalized so that changes in percentages become visible. This is done by exchanging `position=position_dodge()` with `position="fill"`. 
 
-```{r bar7, echo = T, results='hide', message=FALSE, warning=FALSE}
+```{r bar7,  results='hide', message=FALSE, warning=FALSE}
 # bar plot
-ggplot(plotdata, aes(DateRedux, fill = GenreRedux)) + 
+ggplot(pdat, aes(DateRedux, fill = GenreRedux)) + 
   geom_bar(stat="count", position="fill") +  
   theme_bw() +
-  scale_fill_manual(values = mycol) +
+  scale_fill_manual(values = clrs5) +
   labs(y = "Probability")
 ```
 
@@ -698,22 +802,21 @@ In a first step, we recreate the data set which we have used above. The data set
 
 ```{r bar8, echo=T, message=FALSE, warning=FALSE}
 # create likert data
-newlikertdata <- likertdata %>%
-  group_by(Course, Satisfaction) %>%
-  mutate(Frequency = n())
-newlikertdata <- unique(newlikertdata)
+nlik <- ldat %>%
+  dplyr::group_by(Course, Satisfaction) %>%
+  dplyr::summarize(Frequency = n())
 # inspect data
-head(newlikertdata)
+head(nlik)
 ```
 
 Now that we have data resembling a Likert-scaled item from a questionnaire, we will display the data in a cumulative line graph.
 
 ```{r bar9, echo=T, message=FALSE, warning=FALSE}
 # create grouped bar plot
-ggplot(newlikertdata, aes(Satisfaction, Frequency,  fill = Course)) +
+ggplot(nlik, aes(Satisfaction, Frequency,  fill = Course)) +
   geom_bar(stat="identity", position=position_dodge()) +
   # define colors
-  scale_fill_manual(values=mycol) + 
+  scale_fill_manual(values=clrs5) + 
   # add text and define colour
   geom_text(aes(label=Frequency), vjust=1.6, color="white", 
             # define text position and size
@@ -726,23 +829,77 @@ ggplot(newlikertdata, aes(Satisfaction, Frequency,  fill = Course)) +
 
 Another and very interesting way to display such data is by using the Likert package. In a first step, we need to activate the package, clean the data, and extract a subset for the data visualization example.
 
-```{r bar10, echo = T, results='hide', message=FALSE, warning=FALSE}
-# load data
-data(pisaitems)           # use a provided dataset called pisaitems
-# extract subset from data for visualization
-items28 <- pisaitems[, substr(names(pisaitems), 1, 5) == "ST24Q"]
-# transform into a likert object
-questionl28 <- likert(items28)
-# summarize data
-summary(questionl28) 
+```{r likert1}
+sdat <- read.delim("https://slcladal.github.io/data/survey.txt", header = TRUE)
 ```
 
-After extracting a sample of the data, we plot it to show how the Likert data can be displayed.
-
-```{r bar11, echo = T, results='hide', message=FALSE, warning=FALSE}
-# plot likert data
-plot(questionl28)
+```{r likert2, echo = F}
+DT::datatable(sdat, rownames = FALSE, filter="none", caption = "Overview of survey data.", 
+              options = list(pageLength = 10, scrollX=T))
 ```
+
+
+As you can see, we need to clean and adapt the column names. To do this, we will 
+
+* add an identifier which shows which question we are dealing with (e.g. Q 1: question text)
+* remove the dots between words with spaces
+* add a question mark at the end of questions
+* remove superfluous white speaces
+
+```{r likert7}
+# clean column names
+colnames(sdat)[3:ncol(sdat)] <- paste0("Q ", str_pad(1:10, 2, "left", "0"), ": ", colnames(sdat)[3:ncol(sdat)]) %>%
+  stringr::str_replace_all("\\.", " ") %>%
+  stringr::str_squish() %>%
+  stringr::str_replace_all("$", "?")
+# inspect column names
+colnames(sdat)
+```  
+
+Now, that we have nice column names, we will replace the numeric values (1 to 5) with labels ranging from *disagree* to *agree* and convert our data into a data frame.
+
+```{r likert9}
+lbs <- c("disagree", "somewhat disagree", "neither agree nor disagree",  "somewhat agree", "agree")
+survey <- sdat %>%
+  dplyr::mutate_if(is.character, factor) %>%
+  dplyr::mutate_if(is.numeric, factor, levels = 1:5, labels = lbs) %>%
+  drop_na() %>%
+  as.data.frame()
+```
+
+```{r likert11, echo = F}
+DT::datatable(survey, rownames = FALSE, filter="none", caption = "Overview of edited survey data.", 
+              options = list(pageLength = 10, scrollX=T))
+```
+
+
+Now, we can use the `plot` and the `likert` function to visualize the survey data.
+
+```{r likert13}
+plot(likert(survey[,3:12]), ordered = F, wrap= 60)
+```
+
+
+To save this plot, you can use the `save_plot` function from the `cowplot` package as shown below.
+
+```{r likert15, eval = F}
+survey_p1 <- plot(likert(survey[,3:12]), ordered = F, wrap= 60)
+# save plot
+cowplot::save_plot(here("images", "stu_p1.png"), # where to save the plot
+                   survey_p1,        # object to plot
+                   base_asp = 1.5,  # ratio of space fro questions vs space for plot
+                   base_height = 8) # size! higher for smaller font size
+
+```
+
+
+An additional and very helpful feature is that the `likert` package enables grouping the data as shown below. The display columns 3 to 8 and use column 1 for grouping.
+
+```{r likert17, fig.height = 10, fig.width = 8, fig.align = "center"}
+# create plot
+plot(likert(survey[,3:8], grouping = survey[,1]))
+```
+
 
 ## Comparative bar plots with negative values{-}
 
@@ -805,7 +962,7 @@ ggplot(plottable,
   # supress legend   
   guides(fill=FALSE) + 
   # def. colours   
-  geom_bar(stat="identity", fill=rep(mycol[1:3], 3)) + 
+  geom_bar(stat="identity", fill=rep(clrs5[1:3], 3)) + 
   # axes titles
   labs(x = "", y = "Score")                                               
 ```  
@@ -816,42 +973,43 @@ So far, we have plotted values but we have not plotted the underlying distributi
 
 Boxplots, or Box-and-Whisker Plots, are exploratory graphics first created by John W. Tukey and they show the relationships between categorical and numeric variables. They are very useful because they not only provide measures of central tendency (the median which is the line in the middle of the box) but they also offer information about the distribution of the data. To elaborate, fifty percent of data points fall within the box while seventy-five percent of data points fall within the whiskers (the lines which look like extended error bars): the box thus encompasses the interquartile range between the first and third quartile. The whiskers show the minimum and maximum values in the data and only outliers (data points that lie 1.5 times the interquartile range or more above the third quartile or 1.5 times the interquartile range or more below the first quartile. If the whiskers differ in length, then this means that the data is asymmetrically distributed.
 
-```{r box1, echo = T, results = 'asis', message=FALSE, warning=FALSE}
-# create data
-boxdata <- plotdata %>%
-  dplyr::mutate(DateRedux = factor(DateRedux))
-# inspect data
-head(boxdata)
-```
-
-We will now create simple boxplots that show the distribution of prepositions per time period.
-
-```{r box2, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r box1,  results = 'asis', message=FALSE, warning=FALSE}
 # create boxplot
-ggplot(boxdata, aes(DateRedux, Prepositions, color = GenreRedux)) +                 
-  geom_boxplot(fill=mycol, 
+ggplot(pdat, aes(DateRedux, Prepositions, color = GenreRedux)) +                 
+  geom_boxplot(fill=clrs5, 
                color="black") 
 ```
 
 Another interesting feature of boxplots is that they allow us to visually get an idea whether categories differ significantly. Because if add "notch = T" and the notches of the boxplots do not overlap, then this is a very strong indication that the categories actually differ significantly (see below). 
 
-```{r box3, echo = T, results = 'asis', message=FALSE, warning=FALSE}
+```{r box3,  results = 'asis', message=FALSE, warning=FALSE}
 # create boxplot
-ggplot(boxdata, aes(DateRedux, Prepositions, color = GenreRedux)) +                 
+ggplot(pdat, aes(DateRedux, Prepositions, color = GenreRedux)) +                 
   geom_boxplot(outlier.colour="red", 
                outlier.shape=2, 
                outlier.size=5, 
                notch=T, 
-               fill=mycol, 
+               fill=clrs5, 
                color="black") 
 ```
 
+# Violin plots{-}
+
+An alternative to boxplots which display the distribution within the data even more accurately are violin plots. 
+
+```{r vio1,  results = 'asis', message=FALSE, warning=FALSE}
+ggplot(pdat, aes(DateRedux, Prepositions, fill = DateRedux)) +  
+  geom_violin(trim = FALSE) +  
+  scale_fill_manual(values = clrs5) +
+  theme_bw() +
+  theme(legend.position = "none")         
+```
 
 # Word clouds{-}
 
 Word clouds visualize word frequencies of either single corpus or different corpora. Although word clouds are rarely used in academic publications, they are a common way to display language data and the topics of texts - which may be thought of as their semantic content. To exemplify how to use word clouds, we are going to have a look at rally speeches of Hillary Clinton and Donald Trump that were given during their 2016 campaigns. In a first step, we load and process the data as the relevant packages are already loaded.
 
-```{r wc2, eval = T, echo = T, message=FALSE, warning=FALSE}
+```{r wc2, eval = T,  message=FALSE, warning=FALSE}
 # load and process speeches by clinton
 clinton <- readLines("https://slcladal.github.io/data/Clinton.txt") %>%
   paste(sep = " ", collapse = " ")
@@ -862,15 +1020,15 @@ trump <- readLines("https://slcladal.github.io/data/Trump.txt") %>%
 
 After loading the data, we need to clean it.
 
-```{r wc3, eval = T, echo = T, message=FALSE, warning=FALSE}
+```{r wc3, eval = T,  message=FALSE, warning=FALSE}
 # clean texts
 docs <- Corpus(VectorSource(c(clinton, trump))) %>%
-  tm_map(removePunctuation) %>%
-  tm_map(removeNumbers) %>%
-  tm_map(tolower)  %>%
-  tm_map(removeWords, stopwords("english")) %>%
-  tm_map(stripWhitespace) %>%
-  tm_map(PlainTextDocument)
+  tm::tm_map(removePunctuation) %>%
+  tm::tm_map(removeNumbers) %>%
+  tm::tm_map(tolower)  %>%
+  tm::tm_map(removeWords, stopwords("english")) %>%
+  tm::tm_map(stripWhitespace) %>%
+  tm::tm_map(PlainTextDocument)
 # create term document matrix
 tdm <- TermDocumentMatrix(docs) %>%
   as.matrix()
@@ -879,7 +1037,7 @@ colnames(tdm) <- c("Clinton","Trump")
 
 Next, we normalize the absolute frequencies of the terms in the document by converting them into relative frequencies.
 
-```{r wc4, echo = T, message=FALSE, warning=FALSE}
+```{r wc4,  message=FALSE, warning=FALSE}
 # calculate rel. freq.
 tdm[, 1] <- as.vector(unlist(sapply(tdm[, 1], function(x) round(x/colSums(tdm)[1]*1000, 0) )))
 # calculate rel. freq.
@@ -896,7 +1054,7 @@ Common or simple word clouds simply show the frequency of word types while compa
 
 Let us first inspect a common word cloud of the corpus.
 
-```{r wc5, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r wc5, message=FALSE, warning=FALSE}
 # create word cloud
 wordcloud(docs, max.words = 100, 
           colors = brewer.pal(6, "BrBG"), 
@@ -905,7 +1063,7 @@ wordcloud(docs, max.words = 100,
 
 The common word cloud shows the frequencies of words regardless of who used them. In contrast, the comparative cloud shown below highlights words that differ most with respect to their frequencies in the sub-corpora under investigation.  
 
-```{r wc6, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r wc6, message=FALSE, warning=FALSE}
 # create comparison cloud
 comparison.cloud(tdm, 
                  max.words = 100, 
@@ -917,7 +1075,7 @@ comparison.cloud(tdm,
 
 The opposite of comparative clouds are commonality clouds which highlight words that use with similar relative frequencies in the sub-corpora under investigation and that are therefore particularly indistinctive.  
 
-```{r wc7, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r wc7, message=FALSE, warning=FALSE}
 # create commonality cloud
 commonality.cloud(tdm, 
                   max.words = 100, 
@@ -927,19 +1085,107 @@ commonality.cloud(tdm,
 
 At first, I thought that word clouds are simply a fancy but not very helpful way to inspect language data but I have to admit that word clouds really surprised me as they do appear to possess potential to provide an idea of what groups of people are talking about. The comparative word cloud shows that the Trump uses a lot of contractions ("'re", "'ll", etc.) and stresses concepts linked to the future (*going*) thereby stressing his vision of the US (*great*). In Contrast, Clinton did not use contractions but talked about *Americans*, *work*, the *economy*, and *women*.
 
+
+# Association plots{-}
+
+Another plot type that is related to bar plots is the association plot. Association plots are similar to bar plots in that they display difference as bars above or below a line (as shown above). However, association plots show the difference between the observed and expected frequencies rather than differences as deviations from a reference. Therefore, they are often used when graphically representing tables with absolute frequencies. We use the already loaded *vcd* package to create association plots. 
+
+We also modify the reduced pdat as association plots work on matrices rather than data frames or tibbles. In addition, we will drop more genres as to avoid overlap in the y-axis labels later on.
+
+```{r ass2,  results = 'asis', message=FALSE, warning=FALSE}
+# reduce data
+assocdata <- pdat %>%
+  droplevels() %>%
+  dplyr::mutate(GenreRedux <- as.character(GenreRedux),
+                GenreRedux = dplyr::case_when(GenreRedux == "Conversational" ~ "Conv.",
+                                              GenreRedux == "Religious" ~ "Relig.",
+                                              TRUE ~ GenreRedux)) %>%
+  dplyr::group_by(GenreRedux, DateRedux) %>%
+  dplyr::summarise(Prepositions = round(mean(Prepositions), 0)) %>%
+  tidyr::spread(DateRedux, Prepositions)
+# create matrix 
+assocmx <- as.matrix(assocdata[,2:6])
+attr(assocmx, "dimnames")[1] <- as.vector(assocdata[,1])
+```
+
+Let's briefly inspect the data set.
+
+```{r bar_04, echo = F}
+DT::datatable(assocmx, rownames = T, filter="none", caption = "Overview of the matrix.")
+```
+
+Association plots are created by using the `assoc` function which takes a table (or a similar format such as a matrix or a data frame) as their argument. In addition, we specify `shade` as `T` in order to color code the bars in the association plot and to add a legend.
+
+```{r ass3,  results = 'asis', message=FALSE, warning=FALSE}
+# create association plot
+assoc(assocmx, shade=TRUE)
+```
+
+The bars above the line indicate that the observed frequency is higher than expected, bars under the line indicate frequencies that are lower than expected. Darker shades of blue and red coloring suggest that there are significant differences between the observed and the expected frequencies. In the present example, this means that the frequencies of prepositions differ significantly across genres and periods. *However(!) as shown in the table above, this result is an artifact because the first period does not contain any data points for conversational or legal texts!*
+
+
+
+# Mosaic plots{-}
+
+Another plot which is useful to graphically depict the relationship of categorical variables is the mosaic plot. The size of the boxes in a mosaic plot indicate how frequent that subcategory is and the colors show whether or not the category differs from the value that is expected if given the overall distribution in the table. In addition, the hue of the color shows how great the difference between observed and expected is and thus indicates whether the respective subcategory deviates significantly from the expected frequency. Boxes that are gray suggest the absence of significant differences. 
+
+```{r mos1,  results = 'asis', message=FALSE, warning=FALSE}
+# create a mosaic plot
+mosaic(assocmx, shade=T, legend=TRUE)  
+```
+ 
+According to the mosaic plot above, there are some potentially significant differences in the first and second period. This, however, is still likely to be caused by the absence of data points from conversational or legal texts in the first period. Also, the absence of boxes for these text types in the first period indicate that there is a potential problem - something that was not visible in the mosaic plot!
+
+# Heat maps{-}
+
+Heat maps are similar to mosaic plots in that they display frequency information and use color-coding to indicate high and low values. Heat maps also work on matrices but they are much more powerful and versatile that mosaic plots. 
+
+Heat maps are a very popular way to display frequency information and various packages have been written to create or customize heatmaps (for example the packages "ComplexHeatmap", "dendextend", "d3heatmap", "pheatmap") which means that many aspects of heatmaps can be modified. In this example, we will only use the most basic function to create a heat map.
+
+We again modify the data and create a matrix from the original pdat. In addition, we scale the frequencies. This is not necessary in the present case but when dealing with variables which differ in their mean and variance because they reflect different variables, scaling will normalize such variables and render their values comparable. 
+
+```{r heat_01,  results = 'asis', message=FALSE, warning=FALSE}
+# create data
+heatdata <- pdat %>%
+  dplyr::group_by(DateRedux, GenreRedux) %>%
+  dplyr::summarise(Prepositions = round(mean(Prepositions), 0)) %>%
+  tidyr::spread(DateRedux, Prepositions)
+# create matrix 
+heatmx <- as.matrix(heatdata[,2:5])
+attr(heatmx, "dimnames")[1] <- as.vector(heatdata[,1])
+heatmx <- scale(heatmx)
+```
+
+Let's briefly inspect the data set.
+
+```{r heat_03, echo = F}
+DT::datatable(heatmx, rownames = FALSE, filter="none", caption = "Overview of the matrix.", 
+              options = list(pageLength = 10, scrollX=T))
+```
+
+Now that we have created a data matrix, we can cerate a simple heat map.
+
+```{r heat_05, message=FALSE, warning=FALSE}
+# create heat map
+heatmap(heatmx, scale = "none", cexCol = 1, cexRow = 1)
+```
+
+The dendrogram on the top shows that documents from 1600 and 1700 as well as documents from 1800 and 1900 are grouped together and thus are more similar with respect to their preposition frequencies. The dendrogram on the left indicates that we have two categories of documents: the genres to towards the bottom tend to have fewer prepositions (indicated by the light colours) while the documents to the top tend to have more prepositions (thus the darker hues). Legal texts (genre = Law) have notably higher rates of prepositions as is derivable from the dark red colour of such texts.  
+
+
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Basic Data Visualization in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/basicgraphs.html (Version 2020.12.03).
+Schweinberger, Martin. 2020. *Data Visualization with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/basicgraphs.html (Version 2020.12.12).
 
 ```
 @manual{schweinberger2020adviz,
   author = {Schweinberger, Martin},
-  title = {Basic Data Visualization in R},
+  title = {Data Visualization with R},
   note = {https://slcladal.github.io/basicgraphs.html},
   year = {2020},
   organization = {The University of Queensland, School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/12/03}
+  edition = {2020/12/12}
 }
 ```
 
