@@ -64,8 +64,6 @@ Once you have installed R and RStudio and initiated the session by executing the
 
 For this tutorial we will be primarily requiring 3 packages: *tidytext*, *janeaustenr* and *tidyverse*. The *tidytext* package provides functions and supporting data sets to allow conversion of text to and from tidy formats, and to switch seamlessly between tidy tools and existing text mining packages. The *janeaustenr* package is used to load the collection of novels by Jane Austen. The *tidyverse* package provides functions for data processing and visualization.
 
-# Identifying Characteristic Terms{-}
-
 We will start by loading the required packages. 
 
 ```{r pack_01, message=FALSE, warning=FALSE}
@@ -76,17 +74,34 @@ library(forcats)
 library(quanteda)
 ```
 
+# Extracting words{-}
 
-The problem underlying the identification of characteristic terms is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the *bind_tf_idf()* function from the *tidytext* package, we can extract *tf-idf* scores which represent these relative weights and we can also  report other parameters such as number of occurrences of that word, total number of words and term frequency.
+```{r kwic_01, eval = F}
+austen_texts <- austen_books() %>%
+  dplyr::group_by(book) %>%
+  dplyr::summarise(text = paste(text, collapse = " ")) %>%
+  stringr::str_squish()
+names(austen_texts)  <- austen_books() %>%
+  dplyr::group_by(book) %>%
+  dplyr::summarise(book = unique(book)) %>%
+  dplyr::pull(book)
+pride <- quanteda::kwic(austen_texts, "pride") %>%
+  as.data.frame()
+# inspect data
+head(pride)
+```
+
+
+# Identifying Keywords{-}
+
+The problem underlying the identification of keywords is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the *bind_tf_idf()* function from the *tidytext* package, we can extract *tf-idf* scores which represent these relative weights and we can also  report other parameters such as number of occurrences of that word, total number of words and term frequency.
 
 ```{r book_tf_idf, warning=F, message = F}
 book_words <- austen_books() %>%
   tidytext::unnest_tokens(word, text) %>%
-  dplyr::count(book, word, sort = TRUE)
-total_words <- book_words %>% 
+  dplyr::count(book, word, sort = TRUE) %>% 
   dplyr::group_by(book) %>% 
   dplyr::summarize(total = sum(n))
-book_words <- dplyr::left_join(book_words, total_words)
 book_tf_idf <- book_words %>%
   tidytext::bind_tf_idf(word, book, n)
 # inspect data
@@ -114,21 +129,24 @@ book_tf_idf %>%
   labs(x = "tf-idf", y = NULL)
 ```
 
+As you can see, the method has indeed extracted words (and by extension concepts) that are characteristic of the texts. 
 
 # Extracting Structural Features{-}
+
+Extracting structural features of texts is a very common and has a wide range of applications. 
+
+## Word-Frequency Distributions{-}
 
 Next, we load Jane Austen's novels and determine term-frequency and then determine idf.
 
 ```{r book_words, message=FALSE, warning=FALSE}
 book_words <- austen_books() %>%
   tidytext::unnest_tokens(word, text) %>%
-  dplyr::count(book, word, sort = TRUE)
-total_words <- book_words %>% 
+  dplyr::count(book, word, sort = TRUE)  %>% 
   dplyr::group_by(book) %>% 
-  dplyr::summarize(total = sum(n))
-book_words <- dplyr::left_join(book_words, total_words)
-
-print(book_words)
+  dplyr::mutate(total = sum(n))
+# inspect data
+head(book_words)
 ```
 
 From the above table it is evident that the usual suspects "the", "and" ,"to" and so-forth are leading in terms of their usage in that book. Now let us look at the distribution of *n/total* for each novel, which actually is the term frequency.
@@ -247,9 +265,40 @@ austen_sentences %>%
 ## Similarity among literary texts{-}
 
 ```{r clust, eval = F}
-austen_sentences %>%
+feature_mat <- austen %>%
+  quanteda::corpus() %>%
+  quanteda::dfm(remove_punct = TRUE, remove_url = TRUE, remove_symbols = TRUE) %>% 
+  quanteda::dfm_remove(pattern = stopwords("en"))
+# inspect data
+ndoc(feature_mat)
+```
+```{r}
+topfeatures(feature_mat)
 ```
 
+```{r}
+austen_dist <- as.dist(textstat_dist(feature_mat))
+austen_clust <- hclust(austen_dist)
+plot(austen_clust)
+```
+
+## Networks of Personas{-}
+
+```{r net_01, message=FALSE, warning=FALSE}
+# load data
+romeo <- read.delim("https://slcladal.github.io/data/romeo.txt", sep = "\t")
+# convert into feature co-occurrence matrix
+romeo_fcm <- as.fcm(as.matrix(romeo))
+# inspect data
+romeo_fcm
+```
+
+
+
+
+```{r net_05, message=FALSE, warning=FALSE}
+textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)
+```
 
 
 
