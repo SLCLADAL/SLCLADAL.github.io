@@ -14,7 +14,7 @@
 
 <meta name="author" content="Dattatreya Majumdar and Martin Schweinberger" />
 
-<meta name="date" content="2020-12-13" />
+<meta name="date" content="2021-01-23" />
 
 <title>Computational Literary Stylistics with R</title>
 
@@ -358,13 +358,15 @@ div.tocify {
 <div class="navbar navbar-default  navbar-fixed-top" role="navigation">
   
   <!-- Added by SKC - LADAL image and thicker top with   -->
-  <div class="container-fluid" >
+  <div class="container-fluid navbar-top" >
+    <a href="index.html"> <!-- Make entire top row and text clickable home link  -->
         <div class="row">
             <div class="navbar-brand col-md-12">
-              <a href="index.html"><img src="ladal_icon_cas_tran_white.png" class="navbar-icon" alt="LADAL"/> </a>
+              <img src="ladal_icon_cas_tran_white_trimed.png" class="navbar-icon" alt="LADAL"/>
               <span class="navbar-title-note navbar-collapse collapse" >Language Technology and Data Analysis Laboratory</span>
             </div>
         </div>
+    </a>
   </div>
   
   <div class="container">
@@ -374,11 +376,14 @@ div.tocify {
         <span class="icon-bar"></span>
         <span class="icon-bar"></span>
       </button>
-      <!-- SKC removed  navbar brand - included it in the -->
+      <!-- SKC removed  navbar brand -->
     </div>
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
         <li>
+  <a href="index.html">HOME</a>
+</li>
+<li>
   <a href="people.html">OUR PEOPLE</a>
 </li>
 <li>
@@ -539,7 +544,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Computational Literary Stylistics with R</h1>
 <h4 class="author">Dattatreya Majumdar and Martin Schweinberger</h4>
-<h4 class="date">2020-12-13</h4>
+<h4 class="date">2021-01-23</h4>
 
 </div>
 
@@ -576,35 +581,60 @@ rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)
 # install libraries
-install.packages(c(&quot;tidytext&quot;,&quot;janeaustenr&quot;,&quot;ggplot2&quot;))</code></pre>
+install.packages(c(&quot;tidytext&quot;,&quot;janeaustenr&quot;,&quot;tidyverse&quot;))</code></pre>
 <p>Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.</p>
 </div>
 </div>
 <div id="getting-started" class="section level1 unnumbered">
 <h1>Getting started</h1>
 <p>For this tutorial we will be primarily requiring 3 packages: <em>tidytext</em>, <em>janeaustenr</em> and <em>tidyverse</em>. The <em>tidytext</em> package provides functions and supporting data sets to allow conversion of text to and from tidy formats, and to switch seamlessly between tidy tools and existing text mining packages. The <em>janeaustenr</em> package is used to load the collection of novels by Jane Austen. The <em>tidyverse</em> package provides functions for data processing and visualization.</p>
-</div>
-<div id="identifying-characteristic-terms" class="section level1 unnumbered">
-<h1>Identifying Characteristic Terms</h1>
 <p>We will start by loading the required packages.</p>
 <pre class="r"><code>library(tidyverse)
 library(janeaustenr)
 library(tidytext)
 library(forcats)
 library(quanteda)</code></pre>
-<p>The problem underlying the identification of characteristic terms is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the <em>bind_tf_idf()</em> function from the <em>tidytext</em> package, we can extract <em>tf-idf</em> scores which represent these relative weights and we can also report other parameters such as number of occurrences of that word, total number of words and term frequency.</p>
+</div>
+<div id="extracting-words" class="section level1 unnumbered">
+<h1>Extracting words</h1>
+<pre class="r"><code>austen_texts &lt;- austen_books() %&gt;%
+  dplyr::filter(book == &quot;Pride &amp; Prejudice&quot;) %&gt;%
+  dplyr::summarise(text = paste0(text, collapse = &quot; &quot;)) %&gt;%
+  stringr::str_squish()
+names(austen_texts)  &lt;- &quot;Pride &amp; Prejudice&quot;
+pride &lt;- quanteda::kwic(austen_texts, &quot;pride&quot;) %&gt;%
+  as.data.frame()
+# inspect data
+head(pride)</code></pre>
+<pre><code>##             docname from   to                          pre keyword
+## 1 Pride &amp; Prejudice    1    1                                PRIDE
+## 2 Pride &amp; Prejudice 6073 6073            he is eat up with   pride
+## 3 Pride &amp; Prejudice 6179 6179                him . &quot; &quot; His   pride
+## 4 Pride &amp; Prejudice 6194 6194       offend _me_ so much as   pride
+## 5 Pride &amp; Prejudice 6266 6266 I could easily forgive _his_   pride
+## 6 Pride &amp; Prejudice 6277 6277       mortified _mine_ . &quot; &quot;   Pride
+##                           post pattern
+## 1 AND PREJUDICE By Jane Austen   pride
+## 2             , and I dare say   pride
+## 3          , &quot; said Miss Lucas   pride
+## 4   often does , because there   pride
+## 5              , if he had not   pride
+## 6          , &quot; observed Mary ,   pride</code></pre>
+</div>
+<div id="identifying-keywords" class="section level1 unnumbered">
+<h1>Identifying Keywords</h1>
+<p>The problem underlying the identification of keywords is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the <em>bind_tf_idf()</em> function from the <em>tidytext</em> package, we can extract <em>tf-idf</em> scores which represent these relative weights and we can also report other parameters such as number of occurrences of that word, total number of words and term frequency.</p>
 <pre class="r"><code>book_words &lt;- austen_books() %&gt;%
   tidytext::unnest_tokens(word, text) %&gt;%
-  dplyr::count(book, word, sort = TRUE)
-total_words &lt;- book_words %&gt;% 
+  dplyr::count(book, word, sort = TRUE) %&gt;% 
   dplyr::group_by(book) %&gt;% 
-  dplyr::summarize(total = sum(n))
-book_words &lt;- dplyr::left_join(book_words, total_words)
+  dplyr::mutate(total = sum(n))
 book_tf_idf &lt;- book_words %&gt;%
   tidytext::bind_tf_idf(word, book, n)
 # inspect data
 book_tf_idf</code></pre>
 <pre><code>## # A tibble: 40,379 x 7
+## # Groups:   book [6]
 ##    book              word      n  total     tf   idf tf_idf
 ##    &lt;fct&gt;             &lt;chr&gt; &lt;int&gt;  &lt;int&gt;  &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;
 ##  1 Mansfield Park    the    6206 160460 0.0387     0      0
@@ -623,6 +653,7 @@ book_tf_idf</code></pre>
   dplyr::select(-total) %&gt;%
   dplyr::arrange(desc(tf_idf))</code></pre>
 <pre><code>## # A tibble: 40,379 x 6
+## # Groups:   book [6]
 ##    book                word          n      tf   idf  tf_idf
 ##    &lt;fct&gt;               &lt;chr&gt;     &lt;int&gt;   &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt;
 ##  1 Sense &amp; Sensibility elinor      623 0.00519  1.79 0.00931
@@ -651,33 +682,31 @@ book_tf_idf</code></pre>
 Highest tf-idf words in each of Jane Austen’s Novels
 </p>
 </div>
+<p>As you can see, the method has indeed extracted words (and by extension concepts) that are characteristic of the texts.</p>
 </div>
 <div id="extracting-structural-features" class="section level1 unnumbered">
 <h1>Extracting Structural Features</h1>
+<p>Extracting structural features of texts is a very common and has a wide range of applications.</p>
+<div id="word-frequency-distributions" class="section level2 unnumbered">
+<h2>Word-Frequency Distributions</h2>
 <p>Next, we load Jane Austen’s novels and determine term-frequency and then determine idf.</p>
 <pre class="r"><code>book_words &lt;- austen_books() %&gt;%
   tidytext::unnest_tokens(word, text) %&gt;%
-  dplyr::count(book, word, sort = TRUE)
-total_words &lt;- book_words %&gt;% 
+  dplyr::count(book, word, sort = TRUE)  %&gt;% 
   dplyr::group_by(book) %&gt;% 
-  dplyr::summarize(total = sum(n))
-book_words &lt;- dplyr::left_join(book_words, total_words)
-
-print(book_words)</code></pre>
-<pre><code>## # A tibble: 40,379 x 4
-##    book              word      n  total
-##    &lt;fct&gt;             &lt;chr&gt; &lt;int&gt;  &lt;int&gt;
-##  1 Mansfield Park    the    6206 160460
-##  2 Mansfield Park    to     5475 160460
-##  3 Mansfield Park    and    5438 160460
-##  4 Emma              to     5239 160996
-##  5 Emma              the    5201 160996
-##  6 Emma              and    4896 160996
-##  7 Mansfield Park    of     4778 160460
-##  8 Pride &amp; Prejudice the    4331 122204
-##  9 Emma              of     4291 160996
-## 10 Pride &amp; Prejudice to     4162 122204
-## # ... with 40,369 more rows</code></pre>
+  dplyr::mutate(total = sum(n))
+# inspect data
+head(book_words)</code></pre>
+<pre><code>## # A tibble: 6 x 4
+## # Groups:   book [2]
+##   book           word      n  total
+##   &lt;fct&gt;          &lt;chr&gt; &lt;int&gt;  &lt;int&gt;
+## 1 Mansfield Park the    6206 160460
+## 2 Mansfield Park to     5475 160460
+## 3 Mansfield Park and    5438 160460
+## 4 Emma           to     5239 160996
+## 5 Emma           the    5201 160996
+## 6 Emma           and    4896 160996</code></pre>
 <p>From the above table it is evident that the usual suspects “the”, “and” ,“to” and so-forth are leading in terms of their usage in that book. Now let us look at the distribution of <em>n/total</em> for each novel, which actually is the term frequency.</p>
 <pre class="r"><code>ggplot(book_words, aes(n/total, fill = book)) +
   geom_histogram(show.legend = FALSE) +
@@ -690,6 +719,7 @@ Term frequency distribution in Jane Austen’s novels
 </p>
 </div>
 <p>From the plots it is clear that there many words which occur rarely and fewer words that occur frequently.</p>
+</div>
 <div id="zipfs-law" class="section level2 unnumbered">
 <h2>Zipf’s Law</h2>
 <p>Zipf’s Law represents an empirical power law or power function that was established in the 1930s and it is the most fundamental law in linguistics <span class="citation">(see Zipf <a href="#ref-george1935zipf" role="doc-biblioref">1935</a>)</span>. This law states that the frequency that a word is inversely proportional to its rank in a text or collection of texts.</p>
@@ -829,20 +859,70 @@ head(austen_sentences)</code></pre>
 </div>
 <div id="similarity-among-literary-texts" class="section level2 unnumbered">
 <h2>Similarity among literary texts</h2>
-<pre class="r"><code>austen_sentences %&gt;%</code></pre>
+<pre class="r"><code>feature_mat &lt;- austen %&gt;%
+  quanteda::corpus() %&gt;%
+  quanteda::dfm(remove_punct = TRUE, remove_url = TRUE, remove_symbols = TRUE) %&gt;% 
+  quanteda::dfm_remove(pattern = stopwords(&quot;en&quot;))
+# inspect data
+ndoc(feature_mat)</code></pre>
+<pre><code>## [1] 6</code></pre>
+<pre class="r"><code>topfeatures(feature_mat)</code></pre>
+<pre><code>##    mr   mrs  must  said  much  miss   one every think  well 
+##  3015  2446  2071  2041  1935  1855  1822  1455  1440  1420</code></pre>
+<pre class="r"><code>austen_dist &lt;- as.dist(textstat_dist(feature_mat))
+austen_clust &lt;- hclust(austen_dist)
+plot(austen_clust)</code></pre>
+<p><img src="litsty_files/figure-html/sim03-1.png" width="672" /></p>
+</div>
+<div id="networks-of-personas" class="section level2 unnumbered">
+<h2>Networks of Personas</h2>
+<pre class="r"><code># load data
+romeo &lt;- read.delim(&quot;https://slcladal.github.io/data/romeo.txt&quot;, sep = &quot;\t&quot;)
+# convert into feature co-occurrence matrix
+romeo_fcm &lt;- as.fcm(as.matrix(romeo))
+# inspect data
+romeo_fcm</code></pre>
+<pre><code>## Feature co-occurrence matrix of: 23 by 23 features.
+##                features
+## features        Abraham Benvolio LordCapulet Gregory LadyCapulet LadyMontague
+##   Abraham             1        1           1       1           1            1
+##   Benvolio            1        7           3       1           2            1
+##   LordCapulet         1        3           9       1           7            1
+##   Gregory             1        1           1       1           1            1
+##   LadyCapulet         1        2           7       1          10            1
+##   LadyMontague        1        1           1       1           1            1
+##   LordMontague        1        2           2       1           3            1
+##   PrinceEscalus       1        2           2       1           3            1
+##   Romeo               1        7           5       1           4            1
+##   Sampson             1        1           1       1           1            1
+##                features
+## features        LordMontague PrinceEscalus Romeo Sampson
+##   Abraham                  1             1     1       1
+##   Benvolio                 2             2     7       1
+##   LordCapulet              2             2     5       1
+##   Gregory                  1             1     1       1
+##   LadyCapulet              3             3     4       1
+##   LadyMontague             1             1     1       1
+##   LordMontague             3             3     3       1
+##   PrinceEscalus            3             3     3       1
+##   Romeo                    3             3    14       1
+##   Sampson                  1             1     1       1
+## [ reached max_feat ... 13 more features, reached max_nfeat ... 13 more features ]</code></pre>
+<pre class="r"><code>textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)</code></pre>
+<p><img src="litsty_files/figure-html/net_05-1.png" width="672" /></p>
 </div>
 </div>
 <div id="citation-session-info" class="section level1 unnumbered">
 <h1>Citation &amp; Session Info</h1>
-<p>Majumdar, Dattatreya and Martin Schweinberger. 2020. <em>Literary Stylistics with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/litsty.html" class="uri">https://slcladal.github.io/litsty.html</a> (Version 2020.11.20).</p>
-<pre><code>@manual{Majumdar2020ta,
+<p>Majumdar, Dattatreya and Martin Schweinberger. 2021. <em>Literary Stylistics with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/litsty.html" class="uri">https://slcladal.github.io/litsty.html</a> (Version 2021.01.23).</p>
+<pre><code>@manual{Majumdar2021ta,
   author = {Majumdar, Dattatreya and Martin Schweinberger},
   title = {Literary Stylistics with R},
   note = {https://slcladal.github.io/litsty.html},
-  year = {2020},
+  year = {2021},
   organization = &quot;The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/11/20}
+  edition = {2021.01.23}
 }</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.0.3 (2020-10-10)
@@ -866,35 +946,38 @@ head(austen_sentences)</code></pre>
 ## [13] tidyverse_1.3.0  
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] fs_1.5.0            usethis_1.6.3       lubridate_1.7.9    
-##  [4] RColorBrewer_1.1-2  httr_1.4.2          SnowballC_0.7.0    
-##  [7] tools_4.0.3         backports_1.1.10    utf8_1.1.4         
-## [10] R6_2.5.0            rpart_4.1-15        Hmisc_4.4-1        
-## [13] DBI_1.1.0           colorspace_1.4-1    nnet_7.3-14        
-## [16] withr_2.3.0         tidyselect_1.1.0    gridExtra_2.3      
-## [19] compiler_4.0.3      cli_2.1.0           rvest_0.3.6        
-## [22] htmlTable_2.1.0     xml2_1.3.2          labeling_0.4.2     
-## [25] scales_1.1.1        checkmate_2.0.0     digest_0.6.27      
-## [28] foreign_0.8-80      rmarkdown_2.5       base64enc_0.1-3    
-## [31] jpeg_0.1-8.1        pkgconfig_2.0.3     htmltools_0.5.0    
-## [34] dbplyr_2.0.0        highr_0.8           htmlwidgets_1.5.2  
-## [37] rlang_0.4.8         readxl_1.3.1        rstudioapi_0.11    
-## [40] farver_2.0.3        generics_0.1.0      jsonlite_1.7.1     
-## [43] tokenizers_0.2.1    magrittr_1.5        Formula_1.2-4      
-## [46] Matrix_1.2-18       Rcpp_1.0.5          munsell_0.5.0      
-## [49] fansi_0.4.1         lifecycle_0.2.0     stringi_1.5.3      
-## [52] yaml_2.2.1          grid_4.0.3          crayon_1.3.4       
-## [55] lattice_0.20-41     haven_2.3.1         splines_4.0.3      
-## [58] hms_0.5.3           knitr_1.30          pillar_1.4.6       
-## [61] stopwords_2.0       fastmatch_1.1-0     reprex_0.3.0       
-## [64] glue_1.4.2          evaluate_0.14       latticeExtra_0.6-29
-## [67] data.table_1.13.2   RcppParallel_5.0.2  modelr_0.1.8       
-## [70] vctrs_0.3.4         png_0.1-7           cellranger_1.1.0   
-## [73] gtable_0.3.0        assertthat_0.2.1    xfun_0.19          
-## [76] broom_0.7.2         survival_3.2-7      cluster_2.1.0      
-## [79] ellipsis_0.3.1</code></pre>
+##  [1] fs_1.5.0             usethis_1.6.3        lubridate_1.7.9     
+##  [4] RColorBrewer_1.1-2   httr_1.4.2           SnowballC_0.7.0     
+##  [7] tools_4.0.3          backports_1.1.10     utf8_1.1.4          
+## [10] R6_2.5.0             rpart_4.1-15         Hmisc_4.4-1         
+## [13] DBI_1.1.0            colorspace_1.4-1     nnet_7.3-14         
+## [16] withr_2.3.0          tidyselect_1.1.0     gridExtra_2.3       
+## [19] proxyC_0.1.5         compiler_4.0.3       cli_2.1.0           
+## [22] rvest_0.3.6          htmlTable_2.1.0      network_1.16.1      
+## [25] xml2_1.3.2           labeling_0.4.2       scales_1.1.1        
+## [28] checkmate_2.0.0      digest_0.6.27        foreign_0.8-80      
+## [31] rmarkdown_2.5        base64enc_0.1-3      jpeg_0.1-8.1        
+## [34] pkgconfig_2.0.3      htmltools_0.5.0      dbplyr_2.0.0        
+## [37] highr_0.8            htmlwidgets_1.5.2    rlang_0.4.8         
+## [40] readxl_1.3.1         rstudioapi_0.11      farver_2.0.3        
+## [43] generics_0.1.0       jsonlite_1.7.1       statnet.common_4.4.1
+## [46] tokenizers_0.2.1     magrittr_1.5         Formula_1.2-4       
+## [49] Matrix_1.2-18        Rcpp_1.0.5           munsell_0.5.0       
+## [52] fansi_0.4.1          lifecycle_0.2.0      stringi_1.5.3       
+## [55] yaml_2.2.1           grid_4.0.3           ggrepel_0.8.2       
+## [58] crayon_1.3.4         lattice_0.20-41      haven_2.3.1         
+## [61] splines_4.0.3        hms_0.5.3            sna_2.6             
+## [64] knitr_1.30           pillar_1.4.6         stopwords_2.0       
+## [67] rle_0.9.2            fastmatch_1.1-0      reprex_0.3.0        
+## [70] glue_1.4.2           evaluate_0.14        latticeExtra_0.6-29 
+## [73] data.table_1.13.2    RcppParallel_5.0.2   modelr_0.1.8        
+## [76] vctrs_0.3.4          png_0.1-7            cellranger_1.1.0    
+## [79] gtable_0.3.0         assertthat_0.2.1     xfun_0.19           
+## [82] broom_0.7.2          coda_0.19-4          survival_3.2-7      
+## [85] cluster_2.1.0        ellipsis_0.3.1</code></pre>
 <hr />
-<p><a href="https://slcladal.github.io/index.html">Main page</a></p>
+<p><a href="#introduction">Back to top</a></p>
+<p><a href="https://slcladal.github.io/index.html">Back to HOME</a></p>
 <hr />
 </div>
 <div id="references" class="section level1 unnumbered">
