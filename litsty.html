@@ -14,7 +14,7 @@
 
 <meta name="author" content="Dattatreya Majumdar and Martin Schweinberger" />
 
-<meta name="date" content="2021-01-23" />
+<meta name="date" content="2021-02-04" />
 
 <title>Computational Literary Stylistics with R</title>
 
@@ -544,7 +544,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Computational Literary Stylistics with R</h1>
 <h4 class="author">Dattatreya Majumdar and Martin Schweinberger</h4>
-<h4 class="date">2021-01-23</h4>
+<h4 class="date">2021-02-04</h4>
 
 </div>
 
@@ -563,68 +563,167 @@ div.tocify {
 <p><img src="https://slcladal.github.io/images/uq1.jpg" width="100%" /></p>
 <div id="introduction" class="section level1 unnumbered">
 <h1>Introduction</h1>
-<p>This tutorial focuses on computational literary stylistics (also digital literary stylistics) and exemplifies how computational literary stylistic analyses can be done in R. This tutorial builds on and expands <span class="citation">Silge and Robinson (<a href="#ref-silge2017text" role="doc-biblioref">2017</a>)</span> (see <a href="https://www.tidytextmining.com/">here</a>) and the entire code for the sections below can be downloaded <a href="https://slcladal.github.io/litsty.Rmd">here</a>.</p>
-<p><strong>Literary stylistics</strong></p>
-<p>Literary stylistics refers to analyses of the language of literary texts by computational means using linguistic concepts and categories, with the goal of finding patters among the literary texts under investigation and explaining how literary meanings are created by specific language choices and patterning, the linguistic foregrounding, in the text.</p>
-<p>Before we continue, we need to define certain terms of concepts that rae related to literary stylistics and that we will use repeatedly in this tutorials and that we need to define so that the analysis shown below makes sense.</p>
-<p><em>Term Frequency</em> is the measure of importance of a word in a document or how frequently it appears in that document. However there are some words such as “the”,“is”, “of”, etc. which appear frequently even though they might not be important. An approach of using a list of stop-words and removing them before analysis can be useful but in case of some documents these words might be highly relevant.</p>
-<p><em>Inverse Document Frequency</em> decreases the weight for most used words and increases the weight for words that are not much used in a collection of documents. This together with the Term Frequency can be used to calculate a term’s <em>tf-idf</em> (the multiplication of both the terms) which adjusts the frequency of the term based on how rarely it is used. Mathematically <em>idf</em> can be expressed as follows:</p>
-<p><span class="math display">\[\begin{equation}
-  idf_{(term)}=  ln (\frac{n_{documents}}{n_{documents\; containing\; term}})
-\end{equation}\]</span></p>
-<p>For this tutorial we will analyze the data set pertaining to Jane Austen’s novels.</p>
+<p>This tutorial focuses on <strong>computational literary stylistics</strong> (also digital literary stylistics) and shows how fictional texts can be analyzed by using computational means. The entire code for the sections below can be downloaded <a href="https://slcladal.github.io/litsty.Rmd">here</a>.</p>
+<p>Computational literary stylistics refers to analyses of the language of literary texts by computational means using linguistic concepts and categories, with the goal of finding patters among the literary texts and explaining how literary meaning/s is/are created by specific language choices. Computational literary stylistics has been linked with distant reading which aims to find patterns in large amounts of literary data that would not be detectable by traditional close reading techniques.</p>
+<p>While this tutorial builds on <span class="citation">Silge and Robinson (<a href="#ref-silge2017text" role="doc-biblioref">2017</a>)</span> (see <a href="https://www.tidytextmining.com/">here</a>), it substantially expands <span class="citation">Silge and Robinson (<a href="#ref-silge2017text" role="doc-biblioref">2017</a>)</span> in terms of the range of methods that are presented and the data sources that are used.</p>
 <div id="preparation-and-session-set-up" class="section level2 unnumbered">
 <h2>Preparation and session set up</h2>
-<p>This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R <a href="https://slcladal.github.io/IntroR_workshop.html">here</a>. For this tutorials, we need to install certain <em>packages</em> from an R <em>library</em> so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).</p>
+<p>This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R <a href="https://slcladal.github.io/IntroR_workshop.html">here</a>. For this tutorials, we need to install certain <em>packages</em> from an R <em>library</em> so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).</p>
 <pre class="r"><code># clean current workspace
 rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)
 # install libraries
-install.packages(c(&quot;tidytext&quot;,&quot;janeaustenr&quot;,&quot;tidyverse&quot;))</code></pre>
+install.packages(c(&quot;tidytext&quot;,&quot;janeaustenr&quot;,&quot;tidyverse&quot;, &quot;quanteda&quot;, &quot;forcats&quot;, &quot;gutenbergr&quot;))</code></pre>
 <p>Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.</p>
 </div>
 </div>
 <div id="getting-started" class="section level1 unnumbered">
 <h1>Getting started</h1>
-<p>For this tutorial we will be primarily requiring 3 packages: <em>tidytext</em>, <em>janeaustenr</em> and <em>tidyverse</em>. The <em>tidytext</em> package provides functions and supporting data sets to allow conversion of text to and from tidy formats, and to switch seamlessly between tidy tools and existing text mining packages. The <em>janeaustenr</em> package is used to load the collection of novels by Jane Austen. The <em>tidyverse</em> package provides functions for data processing and visualization.</p>
-<p>We will start by loading the required packages.</p>
+<p>For this tutorial we will use several packages that contain functions that are particularly useful for computational literary stylistics. We will start by loading the required packages.</p>
 <pre class="r"><code>library(tidyverse)
 library(janeaustenr)
 library(tidytext)
 library(forcats)
-library(quanteda)</code></pre>
+library(quanteda)
+library(gutenbergr)</code></pre>
+<p>After loading the packages, we will download data from the Project Gutenberg. For this tutorial, we will download William Shakespeare’s <em>Romeo and Juliet</em>, Charles Darwin’s <em>On the Origin of Species</em>, Edgar Allan Poe’s <em>The Raven</em>, Jane Austen’s <em>Pride and Prejudice</em>, Athur Conan Doyle’s <em>The Adventures of Sherlock Holmes</em>, and Mark Twain’s <em>The Adventures of Tom Sawyer</em> (to see how to download data from Project Gutenberg, check out this <a href="https://slcladal.github.io/gutenberg.html">tutorial</a>).</p>
+<p>The code below downloads the data from a server that mirrors the content of Project Gutenberg (which is more stable than the Project itself).</p>
+<pre class="r"><code>shakespeare &lt;- gutenberg_works(gutenberg_id == &quot;1513&quot;) %&gt;%
+  gutenberg_download(mirror = &quot;http://mirrors.xmission.com/gutenberg/&quot;)
+darwin &lt;- gutenberg_works(gutenberg_id == &quot;1228&quot;) %&gt;%
+  gutenberg_download(mirror = &quot;http://mirrors.xmission.com/gutenberg/&quot;)
+twain &lt;- gutenberg_works(gutenberg_id == &quot;74&quot;) %&gt;%
+  gutenberg_download(mirror = &quot;http://mirrors.xmission.com/gutenberg/&quot;)
+poe &lt;- gutenberg_works(gutenberg_id == &quot;1065&quot;) %&gt;%
+  gutenberg_download(mirror = &quot;http://mirrors.xmission.com/gutenberg/&quot;)
+austen &lt;- gutenberg_works(gutenberg_id == &quot;1342&quot;) %&gt;%
+  gutenberg_download(mirror = &quot;http://mirrors.xmission.com/gutenberg/&quot;)
+doyle &lt;- gutenberg_works(gutenberg_id == &quot;1661&quot;) %&gt;%
+  gutenberg_download(mirror = &quot;http://mirrors.xmission.com/gutenberg/&quot;)
+# inspect data
+head(shakespeare, 15)</code></pre>
+<pre><code>## # A tibble: 15 x 2
+##    gutenberg_id text                             
+##           &lt;int&gt; &lt;chr&gt;                            
+##  1         1513 &quot;THE TRAGEDY OF ROMEO AND JULIET&quot;
+##  2         1513 &quot;&quot;                               
+##  3         1513 &quot;&quot;                               
+##  4         1513 &quot;&quot;                               
+##  5         1513 &quot;by William Shakespeare&quot;         
+##  6         1513 &quot;&quot;                               
+##  7         1513 &quot;&quot;                               
+##  8         1513 &quot;&quot;                               
+##  9         1513 &quot;&quot;                               
+## 10         1513 &quot;&quot;                               
+## 11         1513 &quot;&quot;                               
+## 12         1513 &quot;Contents&quot;                       
+## 13         1513 &quot;&quot;                               
+## 14         1513 &quot;THE PROLOGUE.&quot;                  
+## 15         1513 &quot;&quot;</code></pre>
+<p>We can now begin to load and n a next step process the data.</p>
 </div>
 <div id="extracting-words" class="section level1 unnumbered">
 <h1>Extracting words</h1>
-<pre class="r"><code>austen_texts &lt;- austen_books() %&gt;%
-  dplyr::filter(book == &quot;Pride &amp; Prejudice&quot;) %&gt;%
+<p>The most basic but also most common task is to extract instances of individual words and seeing how they are used in context. This is also called <em>concordancing</em>. When extracting words, they are typically displayed in context which is why their display is called a <em>keyword in context concordance</em> or kwic, for short.</p>
+<p>The code below extracts the word <em>pride</em> from the novel <em>Pride and Prejudice</em> and displays the resulting instances of this keyword in a kwic.</p>
+<pre class="r"><code># extract text
+austen_text &lt;- austen %&gt;%
   dplyr::summarise(text = paste0(text, collapse = &quot; &quot;)) %&gt;%
   stringr::str_squish()
-names(austen_texts)  &lt;- &quot;Pride &amp; Prejudice&quot;
-pride &lt;- quanteda::kwic(austen_texts, &quot;pride&quot;) %&gt;%
+# give text a name
+names(austen_text)  &lt;- &quot;Pride &amp; Prejudice&quot;
+# extract instances of pride
+pride &lt;- quanteda::kwic(austen_text, &quot;pride&quot;) %&gt;%
   as.data.frame()
 # inspect data
 head(pride)</code></pre>
 <pre><code>##             docname from   to                          pre keyword
-## 1 Pride &amp; Prejudice    1    1                                PRIDE
-## 2 Pride &amp; Prejudice 6073 6073            he is eat up with   pride
-## 3 Pride &amp; Prejudice 6179 6179                him . &quot; &quot; His   pride
-## 4 Pride &amp; Prejudice 6194 6194       offend _me_ so much as   pride
-## 5 Pride &amp; Prejudice 6266 6266 I could easily forgive _his_   pride
-## 6 Pride &amp; Prejudice 6277 6277       mortified _mine_ . &quot; &quot;   Pride
+## 1 Pride &amp; Prejudice   19   19            [ # 42671 ] cover   Pride
+## 2 Pride &amp; Prejudice 6214 6214            he is eat up with   pride
+## 3 Pride &amp; Prejudice 6320 6320                him . &quot; &quot; His   pride
+## 4 Pride &amp; Prejudice 6335 6335       offend _me_ so much as   pride
+## 5 Pride &amp; Prejudice 6407 6407 I could easily forgive _his_   pride
+## 6 Pride &amp; Prejudice 6418 6418       mortified _mine_ . &quot; &quot;   Pride
 ##                           post pattern
-## 1 AND PREJUDICE By Jane Austen   pride
+## 1 and Prejudice By Jane Austen   pride
 ## 2             , and I dare say   pride
 ## 3          , &quot; said Miss Lucas   pride
 ## 4   often does , because there   pride
 ## 5              , if he had not   pride
 ## 6          , &quot; observed Mary ,   pride</code></pre>
+<p>The kwic display could now be processed further or could be inspected to see how the keyword in question (<em>pride</em>) is used in this novel.</p>
+<p>We can also inspect the use of phrases, for example <em>natural selection</em>, expand the context window size, and clean the output (as shown below).</p>
+<pre class="r"><code># extract text
+darwin_text &lt;- darwin %&gt;%
+  dplyr::summarise(text = paste0(text, collapse = &quot; &quot;)) %&gt;%
+  stringr::str_squish()
+# generate kwics
+ns &lt;- quanteda::kwic(darwin_text, phrase(&quot;natural selection&quot;), window = 10) %&gt;%
+  as.data.frame() %&gt;%
+  dplyr::select(-docname, -from, -to, -pattern)
+# inspect data
+head(ns)</code></pre>
+<pre><code>##                                                                  pre
+## 1                         TOC ) On the Origin of Species BY MEANS OF
+## 2                          NATURE . 3 . STRUGGLE FOR EXISTENCE . 4 .
+## 3                    . CHAPTER 3 . STRUGGLE FOR EXISTENCE . Bears on
+## 4                  the most important of all relations . CHAPTER 4 .
+## 5                 of all relations . CHAPTER 4 . NATURAL SELECTION .
+## 6 of the same species . Circumstances favourable and unfavourable to
+##             keyword
+## 1 NATURAL SELECTION
+## 2 NATURAL SELECTION
+## 3 natural selection
+## 4 NATURAL SELECTION
+## 5 Natural Selection
+## 6 Natural Selection
+##                                                            post
+## 1       , OR THE PRESERVATION OF FAVOURED RACES IN THE STRUGGLE
+## 2                    . 5 . LAWS OF VARIATION . 6 . DIFFICULTIES
+## 3                 . The term used in a wide sense . Geometrical
+## 4 . Natural Selection : its power compared with man&#39;s selection
+## 5         : its power compared with man&#39;s selection , its power
+## 6  , namely , intercrossing , isolation , number of individuals</code></pre>
 </div>
 <div id="identifying-keywords" class="section level1 unnumbered">
 <h1>Identifying Keywords</h1>
-<p>The problem underlying the identification of keywords is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the <em>bind_tf_idf()</em> function from the <em>tidytext</em> package, we can extract <em>tf-idf</em> scores which represent these relative weights and we can also report other parameters such as number of occurrences of that word, total number of words and term frequency.</p>
-<pre class="r"><code>book_words &lt;- austen_books() %&gt;%
+<p>Another common task in literary stylistics is to extract terms that are particularly characteristic of a given text. The problem underlying the identification of keywords is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the <code>bind_tf_idf()</code> function from the <em>tidytext</em> package, we can extract the <em>term frequency - inverse document frequency</em>, or tf-idf, scores which represent these relative weights and we can also report other parameters such as number of occurrences of that word, total number of words and term frequency.</p>
+<p>Before we continue, we need to define certain terms of concepts that are related to literary stylistics and that we will use repeatedly in this tutorials and that we need to define so that the analysis shown below makes sense.</p>
+<p><em>Term Frequency</em> is the measure of importance of a word in a document or how frequently it appears in that document. However there are some words such as <em>the</em>,<em>is</em>, <em>of</em>, etc. which appear frequently even though they might not be important. An approach of using a list of stop-words and removing them before analysis can be useful but in case of some documents these words might be highly relevant.</p>
+<p>The <em>Inverse Document Frequency</em> decreases the weight for most used words and increases the weight for words that are not much used in a collection of documents. This together with the Term Frequency can be used to calculate a term’s <em>tf-idf</em> (the multiplication of both the terms) which adjusts the frequency of the term based on how rarely it is used. Mathematically <em>idf</em> can be expressed as follows:</p>
+<p><span class="math display">\[\begin{equation}
+  idf_{(term)}=  ln (\frac{n_{documents}}{n_{documents\; containing\; term}})
+\end{equation}\]</span></p>
+<p>Before we calculate the <em>tf-idf</em>, we will collapse all the books into a single data frame though.</p>
+<pre class="r"><code>books &lt;- rbind(shakespeare, darwin, twain, poe, austen, doyle)
+# add names to books 
+books$book &lt;- c(
+  rep(&quot;Shakespeare&quot;, nrow(shakespeare)),
+  rep(&quot;Darwin&quot;, nrow(darwin)),
+  rep(&quot;Twain&quot;, nrow(twain)),
+  rep(&quot;Poe&quot;, nrow(poe)),
+  rep(&quot;Austen&quot;, nrow(austen)),
+  rep(&quot;Doyle&quot;, nrow(doyle))
+)
+# clean data
+books &lt;- books %&gt;%
+  dplyr::filter(text != &quot;&quot;) %&gt;%
+  dplyr::mutate(book = factor(book)) %&gt;%
+  dplyr::select(-gutenberg_id)
+# inspect data
+head(books)</code></pre>
+<pre><code>## # A tibble: 6 x 2
+##   text                            book       
+##   &lt;chr&gt;                           &lt;fct&gt;      
+## 1 THE TRAGEDY OF ROMEO AND JULIET Shakespeare
+## 2 by William Shakespeare          Shakespeare
+## 3 Contents                        Shakespeare
+## 4 THE PROLOGUE.                   Shakespeare
+## 5 ACT I                           Shakespeare
+## 6 Scene I. A public place.        Shakespeare</code></pre>
+<p>Now, we continue by calculating the <em>tf-idf</em> for eahc term in each of the books.</p>
+<pre class="r"><code>book_words &lt;- books %&gt;%
   tidytext::unnest_tokens(word, text) %&gt;%
   dplyr::count(book, word, sort = TRUE) %&gt;% 
   dplyr::group_by(book) %&gt;% 
@@ -633,41 +732,41 @@ book_tf_idf &lt;- book_words %&gt;%
   tidytext::bind_tf_idf(word, book, n)
 # inspect data
 book_tf_idf</code></pre>
-<pre><code>## # A tibble: 40,379 x 7
+<pre><code>## # A tibble: 33,833 x 7
 ## # Groups:   book [6]
-##    book              word      n  total     tf   idf tf_idf
-##    &lt;fct&gt;             &lt;chr&gt; &lt;int&gt;  &lt;int&gt;  &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;
-##  1 Mansfield Park    the    6206 160460 0.0387     0      0
-##  2 Mansfield Park    to     5475 160460 0.0341     0      0
-##  3 Mansfield Park    and    5438 160460 0.0339     0      0
-##  4 Emma              to     5239 160996 0.0325     0      0
-##  5 Emma              the    5201 160996 0.0323     0      0
-##  6 Emma              and    4896 160996 0.0304     0      0
-##  7 Mansfield Park    of     4778 160460 0.0298     0      0
-##  8 Pride &amp; Prejudice the    4331 122204 0.0354     0      0
-##  9 Emma              of     4291 160996 0.0267     0      0
-## 10 Pride &amp; Prejudice to     4162 122204 0.0341     0      0
-## # ... with 40,369 more rows</code></pre>
+##    book   word      n  total     tf   idf tf_idf
+##    &lt;fct&gt;  &lt;chr&gt; &lt;int&gt;  &lt;int&gt;  &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;
+##  1 Darwin the   10303 157049 0.0656     0      0
+##  2 Darwin of     7865 157049 0.0501     0      0
+##  3 Doyle  the    5630 105426 0.0534     0      0
+##  4 Darwin and    4444 157049 0.0283     0      0
+##  5 Austen the    4331 122343 0.0354     0      0
+##  6 Austen to     4162 122343 0.0340     0      0
+##  7 Darwin in     4019 157049 0.0256     0      0
+##  8 Twain  the    3792  72201 0.0525     0      0
+##  9 Darwin to     3613 157049 0.0230     0      0
+## 10 Austen of     3611 122343 0.0295     0      0
+## # ... with 33,823 more rows</code></pre>
 <p>From the above table it is evident that the extremely common words have a very low inverse document frequency and thus a low tf-idf score. The inverse document frequency will be a higher number for words that occur in fewer documents in the collection of novels.</p>
 <pre class="r"><code>book_tf_idf %&gt;%
   dplyr::select(-total) %&gt;%
   dplyr::arrange(desc(tf_idf))</code></pre>
-<pre><code>## # A tibble: 40,379 x 6
+<pre><code>## # A tibble: 33,833 x 6
 ## # Groups:   book [6]
-##    book                word          n      tf   idf  tf_idf
-##    &lt;fct&gt;               &lt;chr&gt;     &lt;int&gt;   &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt;
-##  1 Sense &amp; Sensibility elinor      623 0.00519  1.79 0.00931
-##  2 Sense &amp; Sensibility marianne    492 0.00410  1.79 0.00735
-##  3 Mansfield Park      crawford    493 0.00307  1.79 0.00551
-##  4 Pride &amp; Prejudice   darcy       373 0.00305  1.79 0.00547
-##  5 Persuasion          elliot      254 0.00304  1.79 0.00544
-##  6 Emma                emma        786 0.00488  1.10 0.00536
-##  7 Northanger Abbey    tilney      196 0.00252  1.79 0.00452
-##  8 Emma                weston      389 0.00242  1.79 0.00433
-##  9 Pride &amp; Prejudice   bennet      294 0.00241  1.79 0.00431
-## 10 Persuasion          wentworth   191 0.00228  1.79 0.00409
-## # ... with 40,369 more rows</code></pre>
-<p>For better visualisation of the words having high tf-idf scores in Jane Austen’s novels the following plots will be helpful.</p>
+##    book        word          n      tf   idf  tf_idf
+##    &lt;fct&gt;       &lt;chr&gt;     &lt;int&gt;   &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt;
+##  1 Shakespeare romeo       300 0.0115   1.79 0.0206 
+##  2 Poe         nevermore    11 0.0100   1.79 0.0180 
+##  3 Twain       tom         722 0.0100   1.79 0.0179 
+##  4 Darwin      species    1546 0.00984  1.79 0.0176 
+##  5 Poe         lenore        8 0.00730  1.79 0.0131 
+##  6 Shakespeare juliet      178 0.00681  1.79 0.0122 
+##  7 Poe         raven        11 0.0100   1.10 0.0110 
+##  8 Shakespeare capulet     141 0.00540  1.79 0.00967
+##  9 Austen      elizabeth   597 0.00488  1.79 0.00874
+## 10 Doyle       holmes      462 0.00438  1.79 0.00785
+## # ... with 33,823 more rows</code></pre>
+<p>Next, we plot the 15 words with the highest tf-idf scores for each novel to show which words are particularly charateristic of each of the novels.</p>
 <pre class="r"><code>book_tf_idf %&gt;%
   dplyr::group_by(book) %&gt;%
   slice_max(tf_idf, n = 15) %&gt;%
@@ -686,11 +785,11 @@ Highest tf-idf words in each of Jane Austen’s Novels
 </div>
 <div id="extracting-structural-features" class="section level1 unnumbered">
 <h1>Extracting Structural Features</h1>
-<p>Extracting structural features of texts is a very common and has a wide range of applications.</p>
+<p>Extracting structural features of texts is a very common and has a wide range of applications such as determining if texts belong to the same genre or if texts represent a real language or a made up nonsensical language, for example.</p>
 <div id="word-frequency-distributions" class="section level2 unnumbered">
 <h2>Word-Frequency Distributions</h2>
-<p>Next, we load Jane Austen’s novels and determine term-frequency and then determine idf.</p>
-<pre class="r"><code>book_words &lt;- austen_books() %&gt;%
+<p>Word-frequency distributions can be used to determine if a text represents natural language (or a simple replacement cipher, for example) or if the text does not represent natural language (or a more complex cipher). In the following, we will check if the language used in texts we have downloaded from Project Gutenberg aligns with distributions that we would expect when dealing with natural language. In a first step, we determine both the term-frequency and the idf.</p>
+<pre class="r"><code>book_words &lt;- books %&gt;%
   tidytext::unnest_tokens(word, text) %&gt;%
   dplyr::count(book, word, sort = TRUE)  %&gt;% 
   dplyr::group_by(book) %&gt;% 
@@ -698,37 +797,42 @@ Highest tf-idf words in each of Jane Austen’s Novels
 # inspect data
 head(book_words)</code></pre>
 <pre><code>## # A tibble: 6 x 4
-## # Groups:   book [2]
-##   book           word      n  total
-##   &lt;fct&gt;          &lt;chr&gt; &lt;int&gt;  &lt;int&gt;
-## 1 Mansfield Park the    6206 160460
-## 2 Mansfield Park to     5475 160460
-## 3 Mansfield Park and    5438 160460
-## 4 Emma           to     5239 160996
-## 5 Emma           the    5201 160996
-## 6 Emma           and    4896 160996</code></pre>
-<p>From the above table it is evident that the usual suspects “the”, “and” ,“to” and so-forth are leading in terms of their usage in that book. Now let us look at the distribution of <em>n/total</em> for each novel, which actually is the term frequency.</p>
+## # Groups:   book [3]
+##   book   word      n  total
+##   &lt;fct&gt;  &lt;chr&gt; &lt;int&gt;  &lt;int&gt;
+## 1 Darwin the   10303 157049
+## 2 Darwin of     7865 157049
+## 3 Doyle  the    5630 105426
+## 4 Darwin and    4444 157049
+## 5 Austen the    4331 122343
+## 6 Austen to     4162 122343</code></pre>
+<p>From the above table it is evident that the usual suspects <em>the</em>, <em>and</em>, <em>to</em> and so-forth are leading in terms of their usage frequencies in the novels. Now let us look at the distribution of <em>n/total</em> for each term in each of the novels (which represents the normalized term frequency).</p>
 <pre class="r"><code>ggplot(book_words, aes(n/total, fill = book)) +
   geom_histogram(show.legend = FALSE) +
-  xlim(NA, 0.0009) +
+  xlim(NA, 0.005) +
   facet_wrap(~book, ncol = 2, scales = &quot;free_y&quot;)</code></pre>
 <div class="figure">
-<img src="litsty_files/figure-html/tfplot-1.png" alt="Term frequency distribution in Jane Austen's novels" width="576" />
+<img src="litsty_files/figure-html/tfplot-1.png" alt="Term frequency distributions" width="576" />
 <p class="caption">
-Term frequency distribution in Jane Austen’s novels
+Term frequency distributions
 </p>
 </div>
-<p>From the plots it is clear that there many words which occur rarely and fewer words that occur frequently.</p>
+<p>From the plots it is clear that we are dealing with a negative exponential distribution and that many words occur only rarely and that only few words occur frequently. In other words, only few words occur frequently while most words occur rarely. This relationship represents a distribution that is captured by <em>Zipf’s law</em>.</p>
 </div>
 <div id="zipfs-law" class="section level2 unnumbered">
 <h2>Zipf’s Law</h2>
-<p>Zipf’s Law represents an empirical power law or power function that was established in the 1930s and it is the most fundamental law in linguistics <span class="citation">(see Zipf <a href="#ref-george1935zipf" role="doc-biblioref">1935</a>)</span>. This law states that the frequency that a word is inversely proportional to its rank in a text or collection of texts.</p>
-<p>Let * N be the number of elements in a text (or collection of texts); * k be their rank; * s be the value of the exponent characterizing the distribution.</p>
+<p>Zipf’s Law represents an empirical power law or power function that was established in the 1930s. Zipf’s law is one of the most fundamental laws in linguistics <span class="citation">(see Zipf <a href="#ref-george1935zipf" role="doc-biblioref">1935</a>)</span> and it states that the frequency of a word is inversely proportional to its rank in a text or collection of texts.</p>
+<p>Let</p>
+<ul>
+<li><p>N be the number of elements in a text (or collection of texts);</p></li>
+<li><p>k be their rank;</p></li>
+<li><p>s be the value of the exponent characterizing the distribution.</p></li>
+</ul>
 <p>Zipf’s law then predicts that out of a population of N elements, the normalized frequency of the element of rank k, f(k;s,N), is:</p>
 <p><span class="math display">\[\begin{equation}
 f(k;s,N)={\frac {1/k^{s}}{\sum \limits _{n=1}^{N}(1/n^{s})}} 
 \end{equation}\]</span></p>
-<p>In the code chunk below, we check if Zipf’s Law applies to the words that occur in Jane Austen’s novels.</p>
+<p>In the code chunk below, we check if Zipf’s Law applies to the words that occur in texts that we have downloaded from Project Gutenberg.</p>
 <pre class="r"><code>freq_by_rank &lt;- book_words %&gt;% 
   dplyr::group_by(book) %&gt;% 
   dplyr::mutate(rank = row_number(), 
@@ -736,146 +840,170 @@ f(k;s,N)={\frac {1/k^{s}}{\sum \limits _{n=1}^{N}(1/n^{s})}}
   dplyr::ungroup()
 # inspect data
 freq_by_rank</code></pre>
-<pre><code>## # A tibble: 40,379 x 6
-##    book              word      n  total  rank `term frequency`
-##    &lt;fct&gt;             &lt;chr&gt; &lt;int&gt;  &lt;int&gt; &lt;int&gt;            &lt;dbl&gt;
-##  1 Mansfield Park    the    6206 160460     1           0.0387
-##  2 Mansfield Park    to     5475 160460     2           0.0341
-##  3 Mansfield Park    and    5438 160460     3           0.0339
-##  4 Emma              to     5239 160996     1           0.0325
-##  5 Emma              the    5201 160996     2           0.0323
-##  6 Emma              and    4896 160996     3           0.0304
-##  7 Mansfield Park    of     4778 160460     4           0.0298
-##  8 Pride &amp; Prejudice the    4331 122204     1           0.0354
-##  9 Emma              of     4291 160996     4           0.0267
-## 10 Pride &amp; Prejudice to     4162 122204     2           0.0341
-## # ... with 40,369 more rows</code></pre>
-<p>To get a better understating of Zipf’s law, let us visualize the distribution by plotting on the logged rank of elements on the x-axis and logged frequency of the terms on the y-axis.</p>
+<pre><code>## # A tibble: 33,833 x 6
+##    book   word      n  total  rank `term frequency`
+##    &lt;fct&gt;  &lt;chr&gt; &lt;int&gt;  &lt;int&gt; &lt;int&gt;            &lt;dbl&gt;
+##  1 Darwin the   10303 157049     1           0.0656
+##  2 Darwin of     7865 157049     2           0.0501
+##  3 Doyle  the    5630 105426     1           0.0534
+##  4 Darwin and    4444 157049     3           0.0283
+##  5 Austen the    4331 122343     1           0.0354
+##  6 Austen to     4162 122343     2           0.0340
+##  7 Darwin in     4019 157049     4           0.0256
+##  8 Twain  the    3792  72201     1           0.0525
+##  9 Darwin to     3613 157049     5           0.0230
+## 10 Austen of     3611 122343     3           0.0295
+## # ... with 33,823 more rows</code></pre>
+<p>To get a better understanding of Zipf’s law, let us visualize the distribution by plotting on the logged rank of elements on the x-axis and logged frequency of the terms on the y-axis. If Zipf’s law holds, then we should see more or less straight lines that go from top left to bottom right.</p>
 <pre class="r"><code>freq_by_rank %&gt;% 
   ggplot(aes(rank, `term frequency`, color = book)) + 
   geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
   scale_x_log10() +
   scale_y_log10()</code></pre>
 <div class="figure">
-<img src="litsty_files/figure-html/fr-1.png" alt="Zipf's law for Jane Austen's novels" width="480" />
+<img src="litsty_files/figure-html/fr-1.png" alt="Zipf's law for a sample of literary texts" width="480" />
 <p class="caption">
-Zipf’s law for Jane Austen’s novels
+Zipf’s law for a sample of literary texts
 </p>
 </div>
-<p>We can see that the plot has a negative slope which corroborates the inverse relationship of rank with respect to term frequency which shows that the words in Jane Austin’s novels follow Zipf’s law.</p>
+<p>We can see that the plot has a negative slope which corroborates the inverse relationship of rank with respect to term frequency which shows that the words in the texts from Project Gutenberg follow Zipf’s law. This would ascertain that we are dealing with natural language and not a made up nonsense language or a complex cipher.</p>
 </div>
 <div id="lexical-diversity" class="section level2 unnumbered">
 <h2>Lexical Diversity</h2>
-<p>Lexical diversity is a complexity measure that provides information about the lexicon size of a text, i.e. how many different words occur in a text given the size of the text. Typically higher values indicate higher lexical diversity. For example, the Type-Token-Ratio (TTR) provides information about the number of word tokens (individual instances of a word) divided by the number of different word types (word forms).</p>
-<p>To elaborate, the sentence <em>The dog chased the cat</em> contains five tokens but only 4 types because <em>the</em> occurs twice. More complex texts or more advanced learners of a language commonly have higher TTRs compared to simpler texts or less advanced language learners.</p>
-<p>In the following example, we calculate the TTRs for the novels of Jane Austen.</p>
-<pre class="r"><code>austen_books &lt;- austen_books() %&gt;%
+<p>Lexical diversity is a complexity measure that provides information about the lexicon size of a text, i.e. how many different words occur in a text given the size of the text. The Type-Token-Ratio (TTR) provides information about the number of word tokens (individual instances of a word) divided by the number of different word types (word forms). Let’s briefly elaborate on that and look a bit more closely at the terms <em>types</em> and <em>tokens</em>. The sentence <em>The dog chased the cat</em> contains five tokens but only 4 types because <em>the</em> occurs twice. Now, a text that is 100 words long and consist of 50 distinct words would have a TTR of .5 (50/100) while a text that is 100 words long but consist of 80 distinct words would have a TTR of .8 (80/100). Thus, typically, higher values indicate higher lexical diversity and more complex texts or more advanced learners of a language commonly have higher TTRs compared to simpler texts or less advanced language learners.</p>
+<p>As such, we can use lexical diversity measures to analyze the complexity of the language in which a text is written which can be used to inspect the advances a language learner makes when acquiring a language: initially, the learner will have high TTR as they do not have a large vocabulary. The TTRs will increase as lexicon of the learner grows.</p>
+<p>In the following example, we calculate the TTRs for the literary texts we have downloaded from Project Gutenberg. Ina first step, we tokenize the texts, i.e. we split the texts into individual words (tokens).</p>
+<pre class="r"><code>books_texts &lt;- books %&gt;%
   dplyr::group_by(book) %&gt;%
   dplyr::summarise(text = paste(text, collapse = &quot; &quot;))
-austen &lt;- austen_books %&gt;%
+texts &lt;- books_texts %&gt;%
   dplyr::pull(text)
-names(austen) &lt;- austen_books %&gt;%
+names(texts) &lt;- books_texts %&gt;%
   dplyr::pull(book)
-tokens_austen &lt;- austen %&gt;%
+tokens_texts &lt;- texts %&gt;%
   quanteda::corpus() %&gt;%
   quanteda::tokens()
 # inspect data
-head(tokens_austen)</code></pre>
+head(tokens_texts)</code></pre>
 <pre><code>## Tokens consisting of 6 documents.
-## Sense &amp; Sensibility :
-##  [1] &quot;SENSE&quot;       &quot;AND&quot;         &quot;SENSIBILITY&quot; &quot;by&quot;          &quot;Jane&quot;       
-##  [6] &quot;Austen&quot;      &quot;(&quot;           &quot;1811&quot;        &quot;)&quot;           &quot;CHAPTER&quot;    
-## [11] &quot;1&quot;           &quot;The&quot;        
-## [ ... and 141,483 more ]
+## Austen :
+##  [1] &quot;THERE&quot;       &quot;IS&quot;          &quot;AN&quot;          &quot;ILLUSTRATED&quot; &quot;EDITION&quot;    
+##  [6] &quot;OF&quot;          &quot;THIS&quot;        &quot;TITLE&quot;       &quot;WHICH&quot;       &quot;MAY&quot;        
+## [11] &quot;VIEWED&quot;      &quot;AT&quot;         
+## [ ... and 143,958 more ]
 ## 
-## Pride &amp; Prejudice :
-##  [1] &quot;PRIDE&quot;     &quot;AND&quot;       &quot;PREJUDICE&quot; &quot;By&quot;        &quot;Jane&quot;      &quot;Austen&quot;   
-##  [7] &quot;Chapter&quot;   &quot;1&quot;         &quot;It&quot;        &quot;is&quot;        &quot;a&quot;         &quot;truth&quot;    
-## [ ... and 143,845 more ]
+## Darwin :
+##  [1] &quot;Click&quot;       &quot;on&quot;          &quot;any&quot;         &quot;of&quot;          &quot;the&quot;        
+##  [6] &quot;filenumbers&quot; &quot;below&quot;       &quot;to&quot;          &quot;quickly&quot;     &quot;view&quot;       
+## [11] &quot;each&quot;        &quot;ebook&quot;      
+## [ ... and 177,217 more ]
 ## 
-## Mansfield Park :
-##  [1] &quot;MANSFIELD&quot; &quot;PARK&quot;      &quot;(&quot;         &quot;1814&quot;      &quot;)&quot;         &quot;By&quot;       
-##  [7] &quot;Jane&quot;      &quot;Austen&quot;    &quot;CHAPTER&quot;   &quot;I&quot;         &quot;About&quot;     &quot;thirty&quot;   
-## [ ... and 186,754 more ]
+## Doyle :
+##  [1] &quot;THE&quot;        &quot;ADVENTURES&quot; &quot;OF&quot;         &quot;SHERLOCK&quot;   &quot;HOLMES&quot;    
+##  [6] &quot;by&quot;         &quot;SIR&quot;        &quot;ARTHUR&quot;     &quot;CONAN&quot;      &quot;DOYLE&quot;     
+## [11] &quot;I&quot;          &quot;.&quot;         
+## [ ... and 126,069 more ]
 ## 
-## Emma :
-##  [1] &quot;EMMA&quot;      &quot;By&quot;        &quot;Jane&quot;      &quot;Austen&quot;    &quot;VOLUME&quot;    &quot;I&quot;        
-##  [7] &quot;CHAPTER&quot;   &quot;I&quot;         &quot;Emma&quot;      &quot;Woodhouse&quot; &quot;,&quot;         &quot;handsome&quot; 
-## [ ... and 193,269 more ]
+## Poe :
+##  [1] &quot;The&quot;      &quot;Raven&quot;    &quot;by&quot;       &quot;Edgar&quot;    &quot;Allan&quot;    &quot;Poe&quot;     
+##  [7] &quot;Once&quot;     &quot;upon&quot;     &quot;a&quot;        &quot;midnight&quot; &quot;dreary&quot;   &quot;,&quot;       
+## [ ... and 1,346 more ]
 ## 
-## Northanger Abbey :
-##  [1] &quot;NORTHANGER&quot;    &quot;ABBEY&quot;         &quot;by&quot;            &quot;Jane&quot;         
-##  [5] &quot;Austen&quot;        &quot;(&quot;             &quot;1803&quot;          &quot;)&quot;            
-##  [9] &quot;ADVERTISEMENT&quot; &quot;BY&quot;            &quot;THE&quot;           &quot;AUTHORESS&quot;    
-## [ ... and 91,497 more ]
+## Shakespeare :
+##  [1] &quot;THE&quot;         &quot;TRAGEDY&quot;     &quot;OF&quot;          &quot;ROMEO&quot;       &quot;AND&quot;        
+##  [6] &quot;JULIET&quot;      &quot;by&quot;          &quot;William&quot;     &quot;Shakespeare&quot; &quot;Contents&quot;   
+## [11] &quot;THE&quot;         &quot;PROLOGUE&quot;   
+## [ ... and 32,888 more ]
 ## 
-## Persuasion :
-##  [1] &quot;Persuasion&quot; &quot;by&quot;         &quot;Jane&quot;       &quot;Austen&quot;     &quot;(&quot;         
-##  [6] &quot;1818&quot;       &quot;)&quot;          &quot;Chapter&quot;    &quot;1&quot;          &quot;Sir&quot;       
-## [11] &quot;Walter&quot;     &quot;Elliot&quot;    
-## [ ... and 97,409 more ]</code></pre>
-<pre class="r"><code>dfm(tokens_austen, remove = stopwords(&quot;en&quot;)) %&gt;%
-  quanteda::textstat_lexdiv(measure = &quot;all&quot;) %&gt;%
-  tidyr::gather(Measure, Value, TTR:lgeV0) %&gt;%
-  dplyr::mutate(Measure = factor(Measure)) %&gt;%
-  dplyr::filter(Measure %in% c(&quot;TTR&quot;)) %&gt;%
-  ggplot(aes(x = Value, y = reorder(document, Value))) + 
+## Twain :
+##  [1] &quot;THE&quot;        &quot;ADVENTURES&quot; &quot;OF&quot;         &quot;TOM&quot;        &quot;SAWYER&quot;    
+##  [6] &quot;By&quot;         &quot;Mark&quot;       &quot;Twain&quot;      &quot;(&quot;          &quot;Samuel&quot;    
+## [11] &quot;Langhorne&quot;  &quot;Clemens&quot;   
+## [ ... and 86,823 more ]</code></pre>
+<p>Next, we calculate the TTR using the <code>textstat_lexdiv</code> function from the <code>quanteda</code> package and visualize the resulting TTRs for the literary texts thta we have downloaded from Project Gutenberg.</p>
+<pre class="r"><code>dfm(tokens_texts) %&gt;%
+  quanteda::textstat_lexdiv(measure = &quot;TTR&quot;) %&gt;%
+  ggplot(aes(x = TTR, y = reorder(document, TTR))) + 
   geom_point() +
   xlab(&quot;Type-Token-Ratio (TTR)&quot;) +
   ylab(&quot;&quot;)</code></pre>
-<p><img src="litsty_files/figure-html/unnamed-chunk-1-1.png" width="672" /></p>
+<p><img src="litsty_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<p>We can see that Darwin’s <em>On the Origin of Species</em> has the lowest lexical diversity while Edgar Allan Poe’s <em>The Raven</em> has the highest. This would suggest that the language in <em>The Raven</em> is more complex than the language of <em>On the Origin of Species</em>. However, this is too simplistic and shows that simple Type-Token Ratios are severely affected by text length (as well as orthographic errors) and should only be used to compare texts</p>
+<ul>
+<li>that are comparatively long (at least 200 words)</li>
+<li>that are approximately of the same length</li>
+<li>that were error corrected so that orthographic errors do not confound the ratios</li>
+</ul>
 <div id="average-sentence-length" class="section level3 unnumbered">
 <h3>Average Sentence Length</h3>
+<p>The average sentence length (ASL) is another measure of textual complexity with more sophisticated language use being associated with longer and more complex sentences. As such, we can use the ASL as an alternative measure of the linguistic complexity of a text or texts.</p>
 <pre class="r"><code>library(lexRankr)
-austen_sentences &lt;- austen_books() %&gt;%
+books_sentences &lt;- books %&gt;%
   dplyr::group_by(book) %&gt;%
   dplyr::summarise(text = paste(text, collapse = &quot; &quot;)) %&gt;%
   lexRankr::unnest_sentences(sentence, text)
 # inspect data
-head(austen_sentences)</code></pre>
-<pre><code>##                  book sent_id
-## 1 Sense &amp; Sensibility       1
-## 2 Sense &amp; Sensibility       2
-## 3 Sense &amp; Sensibility       3
-## 4 Sense &amp; Sensibility       4
-## 5 Sense &amp; Sensibility       5
-## 6 Sense &amp; Sensibility       6
-##                                                                                                                                                                                                                                                                                                      sentence
-## 1                                                                                                                                                                                       SENSE AND SENSIBILITY  by Jane Austen  (1811)     CHAPTER 1   The family of Dashwood had long been settled in Sussex.
-## 2                                                           Their estate was large, and their residence was at Norland Park, in the centre of their property, where, for many generations, they had lived in so respectable a manner as to engage the general good opinion of their surrounding acquaintance.
-## 3                                                                                                                               The late owner of this estate was a single man, who lived to a very advanced age, and who for many years of his life, had a constant companion and housekeeper in his sister.
-## 4  But her death, which happened ten years before his own, produced a great alteration in his home; for to supply her loss, he invited and received into his house the family of his nephew Mr. Henry Dashwood, the legal inheritor of the Norland estate, and the person to whom he intended to bequeath it.
-## 5                                                                                                                                                                                                In the society of his nephew and niece, and their children, the old Gentleman&#39;s days were comfortably spent.
-## 6                                                                                                                                                                                                                                                                       His attachment to them all increased.</code></pre>
-<pre class="r"><code>austen_sentences %&gt;%
+head(books_sentences)</code></pre>
+<pre><code>##     book sent_id
+## 1 Austen       1
+## 2 Austen       2
+## 3 Austen       3
+## 4 Austen       4
+## 5 Austen       5
+## 6 Austen       6
+##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                sentence
+## 1 THERE IS AN ILLUSTRATED EDITION OF THIS TITLE WHICH MAY VIEWED AT EBOOK [# 42671 ] cover       Pride and Prejudice       By Jane Austen         CONTENTS          Chapter 1          Chapter 2          Chapter 3          Chapter 4          Chapter 5          Chapter 6          Chapter 7          Chapter 8          Chapter 9          Chapter 10          Chapter 11          Chapter 12          Chapter 13          Chapter 14          Chapter 15          Chapter 16          Chapter 17          Chapter 18          Chapter 19          Chapter 20          Chapter 21          Chapter 22          Chapter 23          Chapter 24          Chapter 25          Chapter 26          Chapter 27          Chapter 28          Chapter 29          Chapter 30          Chapter 31          Chapter 32          Chapter 33          Chapter 34          Chapter 35          Chapter 36          Chapter 37          Chapter 38          Chapter 39          Chapter 40          Chapter 41          Chapter 42          Chapter 43          Chapter 44          Chapter 45          Chapter 46          Chapter 47          Chapter 48          Chapter 49          Chapter 50          Chapter 51          Chapter 52          Chapter 53          Chapter 54          Chapter 55          Chapter 56          Chapter 57          Chapter 58          Chapter 59          Chapter 60          Chapter 61       Chapter 1       It is a truth universally acknowledged, that a single man in       possession of a good fortune, must be in want of a wife.
+## 2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             However little known the feelings or views of such a man may be       on his first entering a neighbourhood, this truth is so well       fixed in the minds of the surrounding families, that he is       considered the rightful property of some one or other of their       daughters.
+## 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            “My dear Mr. Bennet,” said his lady to him one day, “have you       heard that Netherfield Park is let at last?”       Mr. Bennet replied that he had not.
+## 4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  “But it is,” returned she; “for Mrs.
+## 5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        Long has just been here, and       she told me all about it.”       Mr. Bennet made no answer.
+## 6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         “Do you not want to know who has taken it?” cried his wife       impatiently.</code></pre>
+<p>Let’s now visualize the results for potential differences or trends.</p>
+<pre class="r"><code>books_sentences %&gt;%
   dplyr::mutate(sentlength = stringr::str_count(sentence, &#39;\\w+&#39;)) %&gt;%
-  ggplot(aes(x = sentlength, y = book, group = book)) +
+  ggplot(aes(x = sentlength, y = reorder(book, sentlength, mean), group = book)) +
   stat_summary(fun = mean, geom = &quot;point&quot;)   +          
   stat_summary(fun.data = mean_cl_boot, geom = &quot;errorbar&quot;, width = 0.2) +
   xlab(&quot;Average Sentence Length (ASL)&quot;) +
   ylab(&quot;&quot;)</code></pre>
-<p><img src="litsty_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<p><img src="litsty_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p>We can see that that <em>The Raven</em> (which does not contain any punctuation) is (unsurprisingly) the text with the longest ASL while Shakespeare’s play <em>Romeo and Juliet</em> (which contains a lost of dialogues) is deemed the work with the shortest ASL. With the exception of Poe’s <em>The Raven</em>, the ALS results reflect text complexity with Darwin’s <em>On the Origin of Species</em> being more complex or written like than the other texts with <em>Romeo and Juliet</em> being the most similar to spoken dialogue.</p>
 </div>
 </div>
 <div id="similarity-among-literary-texts" class="section level2 unnumbered">
 <h2>Similarity among literary texts</h2>
-<pre class="r"><code>feature_mat &lt;- austen %&gt;%
-  quanteda::corpus() %&gt;%
-  quanteda::dfm(remove_punct = TRUE, remove_url = TRUE, remove_symbols = TRUE) %&gt;% 
+<p>We will now explore how similar the language of literary works is. This approach can, of course, be extended to syntactic features or, for instance, to determine if certain texts belong to a certain literary genre or were written by a certain author. When extending this approach to syntactic features, one would naturally use features like the ALS, TTRs, or the frequency of adjectives as the basis for determining similarity. Regarding authorship, things like bigrams, spacing or punctuation methods would be relevant features.</p>
+<p>To assess the similarity of literary works (based on the words that occur in the texts), we first create a feature list, i.e. a matrix with word frequencies. In teh present case, we remove stop words as well as symbols (it can be useful to retain thse but this is depends on the task at hand).</p>
+<pre class="r"><code>feature_mat &lt;- books %&gt;%
+  dplyr::group_by(book) %&gt;%
+  dplyr::sample_n(100) %&gt;%
+  dplyr::summarise(text = paste0(text, collapse = &quot; &quot;)) %&gt;%
+  dplyr::ungroup() %&gt;%
+  quanteda::corpus(text_field = &quot;text&quot;, docid_field = &quot;book&quot;) %&gt;%
+  quanteda::dfm(remove_punct = TRUE, remove_symbols = TRUE) %&gt;% 
   quanteda::dfm_remove(pattern = stopwords(&quot;en&quot;))
 # inspect data
-ndoc(feature_mat)</code></pre>
-<pre><code>## [1] 6</code></pre>
-<pre class="r"><code>topfeatures(feature_mat)</code></pre>
-<pre><code>##    mr   mrs  must  said  much  miss   one every think  well 
-##  3015  2446  2071  2041  1935  1855  1822  1455  1440  1420</code></pre>
-<pre class="r"><code>austen_dist &lt;- as.dist(textstat_dist(feature_mat))
-austen_clust &lt;- hclust(austen_dist)
-plot(austen_clust)</code></pre>
+feature_mat[1:6, 1:6]</code></pre>
+<pre><code>## Document-feature matrix of: 6 documents, 6 features (63.9% sparse).
+##              features
+## docs          ah said mrs bennet shaking head
+##   Austen       1    5   3      4       1    1
+##   Darwin       0    0   0      0       0    0
+##   Doyle        1    6   0      0       0    0
+##   Poe          1    6   0      0       0    1
+##   Shakespeare  0    0   0      0       0    0
+##   Twain        0    5   2      0       0    0</code></pre>
+<p>We see that the texts are represented as the row names and the terms the column names. The content of the matrix consists of the term frequencies.</p>
+<p>We can now perform agglomerative hierarchical clustering and visualize the results in a dendrogram to assess the similarity of texts.</p>
+<pre class="r"><code>books_dist &lt;- as.dist(textstat_dist(feature_mat))
+books_clust &lt;- hclust(books_dist)
+plot(books_clust)</code></pre>
 <p><img src="litsty_files/figure-html/sim03-1.png" width="672" /></p>
+<p>According to the dendrogram, Conan Doyle’s <em>The Adventures of Sherlock Holmes</em> and Shakespeare’s <em>Romeo and Juliet</em> are the most similar texts. Edgar Allen Poe’s <em>The Raven</em> is the most idiosyncratic texts as it is on a branch by its own and is amalgamated with the other texts only as a very last step at the root of the tree.</p>
 </div>
 <div id="networks-of-personas" class="section level2 unnumbered">
 <h2>Networks of Personas</h2>
+<p>A final procedure we will perform is a network analysis of the personas in Shakespeare’s <em>Romeo and Juliet</em>. We directly load a co-occurrence matrix which provides information about how often character’s in that play have been in the same scene (as the extraction of this information is a bit cumbersome, I have done that for you and you can simply load the matrix into R).</p>
 <pre class="r"><code># load data
 romeo &lt;- read.delim(&quot;https://slcladal.github.io/data/romeo.txt&quot;, sep = &quot;\t&quot;)
 # convert into feature co-occurrence matrix
@@ -908,13 +1036,16 @@ romeo_fcm</code></pre>
 ##   Romeo                    3             3    14       1
 ##   Sampson                  1             1     1       1
 ## [ reached max_feat ... 13 more features, reached max_nfeat ... 13 more features ]</code></pre>
+<p>As the <code>quanteda</code> package has a very neat and easy to use function (<code>textplot_network</code>) for generating network graphs, we make use this function and can directly generate the network.</p>
 <pre class="r"><code>textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)</code></pre>
 <p><img src="litsty_files/figure-html/net_05-1.png" width="672" /></p>
+<p>The thickness of the lines indicates how often characters have co-occurred. We could now generate different network graphs for the personas in different plays to see how these plays and personas differ or we could apply the network analysis to other types of information such as co-occurrences of words.</p>
+<p>We have reached the end of this tutorial. Please feel free to explore more of our content at <a href="https://slcladal.github.io/index.html" class="uri">https://slcladal.github.io/index.html</a> - for computational literary stylistics, especially the tutorials on <a href="https://slcladal.github.io/tagging.html">part-of-speech tagging and syntactic parsing</a> as well as on <a href="https://slcladal.github.io/lex.html">lexicography with R</a> provide relevant additional information.</p>
 </div>
 </div>
 <div id="citation-session-info" class="section level1 unnumbered">
 <h1>Citation &amp; Session Info</h1>
-<p>Majumdar, Dattatreya and Martin Schweinberger. 2021. <em>Literary Stylistics with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/litsty.html" class="uri">https://slcladal.github.io/litsty.html</a> (Version 2021.01.23).</p>
+<p>Majumdar, Dattatreya and Martin Schweinberger. 2021. <em>Literary Stylistics with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/litsty.html" class="uri">https://slcladal.github.io/litsty.html</a> (Version 2021.02.04).</p>
 <pre><code>@manual{Majumdar2021ta,
   author = {Majumdar, Dattatreya and Martin Schweinberger},
   title = {Literary Stylistics with R},
@@ -922,7 +1053,7 @@ romeo_fcm</code></pre>
   year = {2021},
   organization = &quot;The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2021.01.23}
+  edition = {2021.02.04}
 }</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.0.3 (2020-10-10)
@@ -940,41 +1071,41 @@ romeo_fcm</code></pre>
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] lexRankr_0.5.2    quanteda_2.1.2    tidytext_0.2.6    janeaustenr_0.1.5
-##  [5] forcats_0.5.0     stringr_1.4.0     dplyr_1.0.2       purrr_0.3.4      
-##  [9] readr_1.4.0       tidyr_1.1.2       tibble_3.0.4      ggplot2_3.3.2    
-## [13] tidyverse_1.3.0  
+##  [1] lexRankr_0.5.2    gutenbergr_0.2.0  quanteda_2.1.2    tidytext_0.2.6   
+##  [5] janeaustenr_0.1.5 forcats_0.5.0     stringr_1.4.0     dplyr_1.0.2      
+##  [9] purrr_0.3.4       readr_1.4.0       tidyr_1.1.2       tibble_3.0.4     
+## [13] ggplot2_3.3.2     tidyverse_1.3.0  
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] fs_1.5.0             usethis_1.6.3        lubridate_1.7.9     
 ##  [4] RColorBrewer_1.1-2   httr_1.4.2           SnowballC_0.7.0     
 ##  [7] tools_4.0.3          backports_1.1.10     utf8_1.1.4          
 ## [10] R6_2.5.0             rpart_4.1-15         Hmisc_4.4-1         
-## [13] DBI_1.1.0            colorspace_1.4-1     nnet_7.3-14         
-## [16] withr_2.3.0          tidyselect_1.1.0     gridExtra_2.3       
-## [19] proxyC_0.1.5         compiler_4.0.3       cli_2.1.0           
-## [22] rvest_0.3.6          htmlTable_2.1.0      network_1.16.1      
-## [25] xml2_1.3.2           labeling_0.4.2       scales_1.1.1        
-## [28] checkmate_2.0.0      digest_0.6.27        foreign_0.8-80      
-## [31] rmarkdown_2.5        base64enc_0.1-3      jpeg_0.1-8.1        
-## [34] pkgconfig_2.0.3      htmltools_0.5.0      dbplyr_2.0.0        
-## [37] highr_0.8            htmlwidgets_1.5.2    rlang_0.4.8         
-## [40] readxl_1.3.1         rstudioapi_0.11      farver_2.0.3        
-## [43] generics_0.1.0       jsonlite_1.7.1       statnet.common_4.4.1
-## [46] tokenizers_0.2.1     magrittr_1.5         Formula_1.2-4       
-## [49] Matrix_1.2-18        Rcpp_1.0.5           munsell_0.5.0       
-## [52] fansi_0.4.1          lifecycle_0.2.0      stringi_1.5.3       
-## [55] yaml_2.2.1           grid_4.0.3           ggrepel_0.8.2       
-## [58] crayon_1.3.4         lattice_0.20-41      haven_2.3.1         
-## [61] splines_4.0.3        hms_0.5.3            sna_2.6             
-## [64] knitr_1.30           pillar_1.4.6         stopwords_2.0       
-## [67] rle_0.9.2            fastmatch_1.1-0      reprex_0.3.0        
-## [70] glue_1.4.2           evaluate_0.14        latticeExtra_0.6-29 
-## [73] data.table_1.13.2    RcppParallel_5.0.2   modelr_0.1.8        
-## [76] vctrs_0.3.4          png_0.1-7            cellranger_1.1.0    
-## [79] gtable_0.3.0         assertthat_0.2.1     xfun_0.19           
-## [82] broom_0.7.2          coda_0.19-4          survival_3.2-7      
-## [85] cluster_2.1.0        ellipsis_0.3.1</code></pre>
+## [13] DBI_1.1.0            lazyeval_0.2.2       colorspace_1.4-1    
+## [16] nnet_7.3-14          withr_2.3.0          tidyselect_1.1.0    
+## [19] gridExtra_2.3        proxyC_0.1.5         compiler_4.0.3      
+## [22] cli_2.1.0            rvest_0.3.6          htmlTable_2.1.0     
+## [25] network_1.16.1       xml2_1.3.2           labeling_0.4.2      
+## [28] checkmate_2.0.0      scales_1.1.1         digest_0.6.27       
+## [31] foreign_0.8-80       rmarkdown_2.5        base64enc_0.1-3     
+## [34] jpeg_0.1-8.1         pkgconfig_2.0.3      htmltools_0.5.0     
+## [37] dbplyr_2.0.0         highr_0.8            htmlwidgets_1.5.2   
+## [40] rlang_0.4.8          readxl_1.3.1         rstudioapi_0.11     
+## [43] farver_2.0.3         generics_0.1.0       jsonlite_1.7.1      
+## [46] statnet.common_4.4.1 tokenizers_0.2.1     magrittr_1.5        
+## [49] Formula_1.2-4        Matrix_1.2-18        Rcpp_1.0.5          
+## [52] munsell_0.5.0        fansi_0.4.1          lifecycle_0.2.0     
+## [55] stringi_1.5.3        yaml_2.2.1           grid_4.0.3          
+## [58] ggrepel_0.8.2        crayon_1.3.4         lattice_0.20-41     
+## [61] haven_2.3.1          splines_4.0.3        hms_0.5.3           
+## [64] sna_2.6              knitr_1.30           pillar_1.4.6        
+## [67] stopwords_2.0        rle_0.9.2            fastmatch_1.1-0     
+## [70] reprex_0.3.0         glue_1.4.2           evaluate_0.14       
+## [73] latticeExtra_0.6-29  data.table_1.13.2    RcppParallel_5.0.2  
+## [76] modelr_0.1.8         vctrs_0.3.4          png_0.1-7           
+## [79] cellranger_1.1.0     gtable_0.3.0         assertthat_0.2.1    
+## [82] xfun_0.19            broom_0.7.2          coda_0.19-4         
+## [85] survival_3.2-7       cluster_2.1.0        ellipsis_0.3.1</code></pre>
 <hr />
 <p><a href="#introduction">Back to top</a></p>
 <p><a href="https://slcladal.github.io/index.html">Back to HOME</a></p>
