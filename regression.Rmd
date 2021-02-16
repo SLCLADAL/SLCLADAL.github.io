@@ -571,7 +571,7 @@ The histogram in the lower left panel shows that, although the mean amount of mo
 
 The boxplot in the lower right panel confirms the existence of an interaction (a non-additive term) as men only spend more money on single women if the men are interested in the women. If men are not interested in the women, then the relationship has no effect as they spend an equal amount of money on the women regardless of whether they are in a relationship or not.
 
-We will now start to implement the regression model. In a first step, we create two saturated base-line models that contain all possible predictors (main effects and interactions). The two models are identical but one is generated with the `lm` and the other with the `glm` function as these functions offer different model parameters in their output.
+We will now start to implement the regression model. In a first step, we create two saturated models that contain all possible predictors (main effects and interactions). The two models are identical but one is generated with the `lm` and the other with the `glm` function as these functions offer different model parameters in their output.
 
 ```{r mlr4}
 m1.mlr = lm(                      # generate lm regression object
@@ -583,11 +583,11 @@ m1.glm = glm(                     # generate glm regression object
   data = mlrdata)                 # def. data
 ```
 
-After generating the saturated base-line models we can now start with the model fitting. Model fitting refers to a process that aims at find the model that explains a maximum of variance with a minimum of predictors [see @field2012discovering 318]. Model fitting is therefore based on the *principle of parsimony* which is related to Occam's razor according to which explanations that require fewer assumptions are more likely to be true.
+After generating the saturated models we can now start with the model fitting. Model fitting refers to a process that aims at find the model that explains a maximum of variance with a minimum of predictors [see @field2012discovering 318]. Model fitting is therefore based on the *principle of parsimony* which is related to Occam's razor according to which explanations that require fewer assumptions are more likely to be true.
 
 ### Automatic Model Fitting and Why You Should Not Use It{-}
 
-In this section, we will use a step-wise step-down procedure that uses decreases in AIC (Akaike information criterion) as the criterion to minimize the model in a step-wise manner. This procedure aims at finding the model with the lowest AIC values by evaluating - step-by-step - whether the removal of a predictor (term) leads to a lower AIC value.
+In this section, we will use a step-wise step-down procedure that uses decreases in AIC (*Akaike Information Criterion*) as the criterion to minimize the model in a step-wise manner. This procedure aims at finding the model with the lowest AIC values by evaluating - step-by-step - whether the removal of a predictor (term) leads to a lower AIC value.
 
 We use this method here just so that you know it exists and how to implement it but you should rather avoid using automated model fitting. The reason for avoiding automated model fitting is that the algorithsm only checks if the AIC has decreased but not if the model is stable or reliable. Thus, automated model fitting has the problem that you can never be sure that the way that lead you to the final model is reliable and that all models were indeed stable. Imagine you want to climb down from a roof top and you have a ladder. The problem is that you do not know if and how many steps are broken. This is similar to using automated model fitting. In other sections, we will explore better methods to fit models (manual step-wise step-up and step-down procedures, for example).
 
@@ -995,7 +995,9 @@ blrdata <- blrdata %>%
 After preparing the data, we will now plot the data to get an overview of potential relationships between variables.
 
 ```{r blm6, message=FALSE, warning=FALSE}
-ggplot(blrdata, aes(Age, EH, color = Gender)) +
+blrdata %>%
+  dplyr::mutate(EH = ifelse(EH == "0", 0, 1)) %>%
+  ggplot(aes(Age, EH, color = Gender)) +
   facet_wrap(~Ethnicity) +
   stat_summary(fun = mean, geom = "point") +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
@@ -1011,7 +1013,7 @@ The plots in the lower panels do not indicate significant interactions between u
 
 ### Model Building{-}
 
-As a first step, we need to define contrasts and add a distance matrix to the options. Contrasts define what and how variable levels should be compared and therefore influences how the results of the regression analysis are presented.
+As a first step, we need to define contrasts and use the `datadist` function to store aspects of our variables that can be accessed later whn plotting and summarizing the model. Contrasts define what and how variable levels should be compared and therefore influences how the results of the regression analysis are presented.
 
 ```{r blm7}
 # set contrasts
@@ -1167,7 +1169,7 @@ A handier way to get thses statistics is by performing an ANOVA on the final min
 anova(m0.glm, lr.glm, test = "Chi") # Model Likelihood Ratio Test
 ```
 
-In a next step, we calculate pseudo-R^2^ values which represent the amount of residual variance that is explained by the final minimal adequate model. We cannot use the ordinary R^2^ because the model works on the logged likelihoods rather than the values of the dependent variable.
+In a next step, we calculate pseudo-R^2^ values which represent the amount of residual variance that is explained by the final minimal adequate model. We cannot use the ordinary R^2^ because the model works on the logged probabilities rather than the values of the dependent variable.
 
 
 ```{r blm23}
@@ -1193,7 +1195,7 @@ logisticPseudoR2s(lr.glm)
 
 ```
 
-The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the variance in the logged likelihoods (to get the percentages, you simply multiply the pseudo-R^2^ values by 100). Next, we extract the confidence intervals for the coefficients of the model.
+The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the deviance in the logged probabilities (to get the percentages, you simply multiply the pseudo-R^2^ values by 100). Next, we extract the confidence intervals for the coefficients of the model.
 
 ```{r blm24}
 # extract the confidence intervals for the coefficients
@@ -1442,13 +1444,13 @@ ci <- confint(m)
 exp(cbind(OR = coef(m), ci))
 ```
 
-The odds ratios show that internal students are 2.85 or 285 times as likely as non-internal students to receive positive evaluations and that a 1-point increase in the test score lead to a 1.85 or 185 percent increase in the chances of receiving a positive recommendation. The effect of an exchange is slightly negative but, as we have seen above, not significant.
+The odds ratios show that internal students are 2.85 times or 285 percent as likely as non-internal students to receive positive evaluations and that a 1-point increase in the test score lead to a 1.85 times or 185 percent increase in the chances of receiving a positive recommendation. The effect of an exchange is slightly negative but, as we have seen above, not significant.
 
 ## Poisson Regression
 
 Poisson regressions are used to analyse data where the dependent variable represents counts. In particular counts that are based on observations of something that is measured in set intervals. For instances the number of pauses in two-minute-long conversations. Poisson regressions are particularly appealing when dealing with rare events, i.e. when something only occurs very infrequently. In such cases, normal linear regressions do not work because the instances that do occur are automatically considered outliers. Therefore, it is useful to check if the data conform to a Poisson distribution.
 
-However, the tricky thing about Poisson regressions is that the data has to conform to the Poisson distribution which is, according to my experience, rarely the case, unfortunately. In contrast to the Gaussian Normal Distribution which is very flexible because it is defined by two parameters, the mean (mu, i.e. $\mu$) and the standard deviation (sigma, i.e. $\sigma$). This allows the normal distribution to take very different shapes (for example, very high and slim (compressed) or very wide and flat). In contrast, the Poisson is defined by only one parameter (lambda, i.e. $\lambda$) which mean that if we have a mean of 2, then the standard deviation is also 2 (actually we would have to say that the mean is $\lambda$ and the standard deviation is also  $\lambda$ or $\lambda$ = $\mu$ = $\sigma$). This is much trickier for natural data as this means that the Poisson distribution is very rigid.
+However, the tricky thing about Poisson regressions is that the data has to conform to the Poisson distribution which is, according to my experience, rarely the case, unfortunately. The Gaussian Normal Distribution is very flexible because it is defined by two parameters, the mean (mu, i.e. $\mu$) and the standard deviation (sigma, i.e. $\sigma$). This allows the normal distribution to take very different shapes (for example, very high and slim (compressed) or very wide and flat). In contrast, the Poisson is defined by only one parameter (lambda, i.e. $\lambda$) which mean that if we have a mean of 2, then the standard deviation is also 2 (actually we would have to say that the mean is $\lambda$ and the standard deviation is also  $\lambda$ or $\lambda$ = $\mu$ = $\sigma$). This is much trickier for natural data as this means that the Poisson distribution is very rigid.
 
 ```{r pr0, eval = T, echo=F, message=FALSE, warning=FALSE}
 # plot poisson
@@ -1625,7 +1627,7 @@ robustdata <- read.delim("https://slcladal.github.io/data/mlrdata.txt", sep = "\
 summary(robustdata)
 ```
 
-We now fit an ordinary linear model (and although we know from the section on multiple regression, that the interaction between status and attraction is significant, we will disregard this for now as this will help to explain the weighing procedure which is the focus of this section).
+We now fit an ordinary linear model (and although we know from the section on multiple regression that the interaction between status and attraction is significant, we will disregard this for now as this will help to explain the weighing procedure which is the focus of this section).
 
 ```{r rr2}
 # create model
@@ -1720,7 +1722,7 @@ Major disadvantages of mixed-effects regression modeling are that they are prone
 
 ### Introduction{-}
 
-So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common, that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker. 
+So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker. 
 
 ```{r lmm1, echo=F, eval = T, message=FALSE, warning=FALSE}
 # random intercepts and random slops
@@ -1774,7 +1776,7 @@ par(mfrow = c(1, 1))
 
 ### Random Effects{-}
 
-*Random Effects* can have two parameters: the intercept (the point where the regression line crosses the y-axis) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (left panel of the Figure above), mixed-effects models can therefore have various *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel in the Figure). 
+*Random Effects* can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x equals 0) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (left panel of the Figure above), mixed-effects models can therefore have various *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel in the Figure). 
 
 What features do distinguish random and fixed effects? 
 
@@ -1905,12 +1907,12 @@ lmmdata$Date <- scale(lmmdata$Date, scale = F)
 datatable(lmmdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
-We now set up a fixed-effects model with the "glm" function and a mixed-effects model using the "glmer" function with Genre as a random effect.
+We now set up a fixed-effects model with the `glm` function and a mixed-effects model using the `glmer` function with Genre as a random effect.
 
 ```{r lmm8, message=FALSE, warning=FALSE}
 # generate models
 m0.glm <- glm(Prepositions ~ 1, family = gaussian, data = lmmdata)
-m0.glmer = glmer(Prepositions ~ 1 + (1|Genre), data = lmmdata, family = "gaussian")
+m0.glmer = lmer(Prepositions ~ 1 + (1|Genre), data = lmmdata)
 ```
 
 Now that we have created the base-line models, we will test whether including a random effect structure is mathematically justified. It is important to note here that we are not going to test if including a random effect structure is theoretically motivated but simply if it causes a decrease in variance.
@@ -1918,19 +1920,15 @@ Now that we have created the base-line models, we will test whether including a 
 
 ### Testing Random Effects{-}
 
-As a first step in the modeling process, we now need to determine whether or not including a random effect structure is justified. We do so by comparing the base-line model without random intercepts to the model with random intercepts using a Likelihood Ratio Test. A short word of warning is in order here regarding the specific of the model: we need to set "REML = T" because Relative Estimate Maximum Likelihood (REML) provides better estimates for the random effects part of the model compared with the simpler Maximum Likelihood (ML) specification [@field2012discovering 879]. 
+As a first step in the modeling process, we now need to determine whether or not including a random effect structure is justified. We do so by comparing the AIC of the base-line model without random intercepts to the AIC of the model with random intercepts. 
 
 
 ```{r lmm9, message=TRUE, warning=TRUE}
-x2 = -2*logLik(m0.glm, REML = T)+2*logLik(m0.glmer, REML = T)
-x2 <- x2 <- x2[[1]]
-list(x2, pchisq(x2, df=2, lower.tail=F))
+AIC(logLik(m0.glm))
+AIC(logLik(m0.glmer))
 ```
 
-The inclusion of a random effect structure with random intercepts is justified based on the Likelihood Ratio Test. 
-
-As a note on model comparisons: when we compare mixed-effects models, the REML specification must be "FALSE" or set to "method = "ML" (Maximum Likelihood) [@field2012discovering 879]. This is because "ML" produces more accurate estimates of fixed regression parameters. In contrast, one should use "REML" when comparing fixed to mixed models as REML produces more accurate estimates of random variances [@twisk2006multilevel]. 
-
+The inclusion of a random effect structure with random intercepts is justified as the AIC of the model with random intercepts is substantially lower than the AIC of the model without random intercepts. 
 
 ### Model Fitting{-}
 
@@ -1940,14 +1938,14 @@ We begin fitting our model by adding Date as a fixed effect and compare this mod
 
 
 ```{r lmm10}
-m1.glmer <- glmer(Prepositions ~ (1|Genre) + Date, data = lmmdata)
+m1.glmer <- lmer(Prepositions ~ (1|Genre) + Date, data = lmmdata)
 anova(m1.glmer, m0.glmer, test = "Chi")
 ```
 
 
-The model with Date is the better model (significant p-value and lower AIC). The significant p-value shows that "Date" correlates significantly with "Prepositions" ($\chi$^2^(1) = 8.93, p = .0028). The $\chi$^2^ value here is labelled “L.Ratio" and the degrees of freedom are calculated by subtracting the smaller number of DFs from the larger number of DFs.
+The model with Date is the better model (significant p-value and lower AIC). The significant p-value shows that "Date" correlates significantly with "Prepositions" ($\chi$^2^(1) = 8.93, p = .0028). The $\chi$^2^ value here is labeled *Chisq* and the degrees of freedom are calculated by subtracting the smaller number of DFs from the larger number of DFs.
 
-We now test whether Region should also be part of the final minimal adequate model. The easiest way to add predictors is by using the "predict" function (it saves time and typing).
+We now test whether Region should also be part of the final minimal adequate model. The easiest way to add predictors is by using the `update` function (it saves time and typing).
 
 ```{r lmm11}
 # generate model
@@ -2000,7 +1998,7 @@ leveneTest(lmmdata$Prepositions, lmmdata$Genre, center = mean)
 
 The Levene's test shows that the variance is distributed unevenly across genres which means that we do not simply continue but should either remove problematic data points (outliers) or use a weighing method. 
 
-In this case, we create a new model which uses weights to compensate for heterogeneity of variance and thus the influence of outliers - which is an alternative to removing the data points and rerunning the analysis [@pinheiro2000mixedmodels 177]. However, to do so, we need to use a different function (the `lmer` function) which means that we have to create two models: the "old" minimal adequate model and the "new" minimal adequate model with added weights. After we have created these models, we will compare them to see if including weights has improved the fit.
+In this case, we create a new model which uses weights to compensate for heterogeneity of variance and thus the influence of outliers - which is an alternative to removing the data points and rerunning the analysis [@pinheiro2000mixedmodels 177]. However, to do so, we need to use a different function (the `lme` function) which means that we have to create two models: the *old* minimal adequate model and the *new* minimal adequate model with added weights. After we have created these models, we will compare them to see if including weights has improved the fit.
 
 ```{r lmm16, message=FALSE, warning=FALSE}
 m4.lme = lme(Prepositions ~ Date, random = ~1|Genre, data = lmmdata, method = "ML")
@@ -2100,7 +2098,7 @@ In contrast to the unweight model, no data points are named which indicates that
 qqnorm(m5.lme, pch = 20, col = "black")
 ```
 
-A beautiful, straight line! The qqplot does not indicate any problems. It is, unfortunately, rather common that the dots deviate from the straight line at the very bottom or the very tp which means that the model is good at estimating values around the middle of the dependent variable but rather bad at estimating lower or higher values. Next, we check the residuals by "Genre" [@pinheiro2000mixedmodels 179].
+A beautiful, straight line! The qqplot does not indicate any problems. It is, unfortunately, rather common that the dots deviate from the straight line at the very bottom or the very top which means that the model is good at estimating values around the middle of the dependent variable but rather bad at estimating lower or higher values. Next, we check the residuals by "Genre" [@pinheiro2000mixedmodels 179].
 
 ```{r lmm25}
 # residuals by genre
@@ -2140,7 +2138,7 @@ r.squaredGLMM(m5.lme)
 
 ***
 
-A mixed-effect linear regression model which contained the genre of texts as random effect was fit to the data in a step-wise-step up procedure. Due to the presence of outliers in the data, weights were included into the model which led to a significantly improved model fit compared to an un-weight model ($\chi$^2^(2): 39.17, p: 0.0006). The final minimal adequate model performed significantly better than an intercept-only base-line model ($\chi$^2^(1): 52.87, p <.0001) and showed that the frequency of prepositions increases significantly but only marginally with the date of composition ($\chi$^2^(2): 10.12, p: 0.0063, Pearson's $r$ =  0.172). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data. 
+A mixed-effect linear regression model which contained the genre of texts as random effect was fit to the data in a step-wise-step up procedure. Due to the presence of outliers in the data, weights were included into the model which led to a significantly improved model fit compared to an un-weight model ($\chi$^2^(2): 39.17, p: 0.0006). The final minimal adequate model performed significantly better than an intercept-only base-line model ($\chi$^2^(1): 52.87, p <.0001) and showed that the frequency of prepositions increases significantly but only marginally with the date of composition ($\chi$^2^(2): 10.12, p: 0.0063, marginal R^2^ =  0.0174, conditional R^2^ =  0.4324). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data. 
 
 ### Remarks on Prediction{-}
 
@@ -2179,9 +2177,9 @@ Major disadvantages of regression modeling are that they are prone to producing 
 
 ### Introduction {-}
 
-As is the case with linear mixed-effects models, binomial logistic mixed-effect models are multivariate analysis that treat data points as hierarchical or grouped in some way. In other words, they take into account that the data is nested in the sense that data points are produced by the same speaker or are grouped by some other characteristics. In mixed-models, hierarchical structures are modelled as *random effects*. If the random effect structure represents speakers then this means that a mixed-model would have a separate intercept and/or slope for each speaker. 
+As is the case with linear mixed-effects models, binomial logistic mixed-effect models are multivariate analyses that treat data points as hierarchical or grouped in some way. In other words, they take into account that the data is nested in the sense that data points are produced by the same speaker or are grouped by some other characteristics. In mixed-models, hierarchical structures are modelled as *random effects*. If the random effect structure represents speakers then this means that a mixed-model would have a separate intercept and/or slope for each speaker. 
 
-*Random Effects* in linear models two parameters: the intercept (the point where the regression line crosses the y-axis) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+*Random Effects* in linear models can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
 
 ```{r blmm1, eval = T, echo=F, message=FALSE, warning=FALSE}
 x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
@@ -2334,7 +2332,7 @@ The upper left panel in the Figure above indicates that men use discourse *like*
 
 ### Model Building{-}
 
-In a first step, we set the options and generate a distance matrix of the data.
+In a first step, we set the options.
 
 ```{r blmm9}
 # set options
@@ -2437,7 +2435,7 @@ ifelse(max(car::vif(m5.glmer)) <= 10,  "VIFs okay", "WARNING: high VIFs!")
 anova(m5.glmer, m4.glmer, test = "Chi") 
 ```
 
-The interaction between Priming and Age is not significant and will thus not be included.
+The interaction between Priming and Age is not significant and we thus not be included.
 
 ```{r blmm19}
 # add Priming*Gender
@@ -2576,7 +2574,7 @@ anova(mlr.glmer, m0.glmer, test = "Chi") # final model better than base-line mod
 print(mlr.glmer, corr = F) # inspect final minimal adequate model
 ```
 
-To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that effect so that we can ascertain how much variance that effect explains. In our case, this is purely to show how to do this because main effects are superseded by interactions in which they are involved and should therefore not be interpreted [@field2012discovering 622].
+To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that effect. This can be problematic when checking the effect of main effects that are involved in significant interactions though [@field2012discovering 622].
 
 ```{r blmm32}
 anova(m1.glmer, m0.glmer, test = "Chi") 
@@ -2620,7 +2618,9 @@ probs = binomial()$linkinv(fitted(mlr.glmer))
 somers2(probs, as.numeric(mblrdata$SUFlike))
 ```
 
-The model fit parameters indicate a suboptimal fit. Both the C-value and Somers's D~xy~ show poor fit between predicted and observed occurrences of SUFlike.  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204]. This a value of .2646 suggests that the model performs better than chance but not substantially so. We will now perform the model diagnostics.
+The two lines that start with `probs` are simply two different ways to do the same thing (you only need one of these).
+
+The model fit parameters indicate a suboptimal fit. Both the C-value and Somers's D~xy~ show poor fit between predicted and observed occurrences of SUFlike.  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204]. The value of .2646 suggests that the model has some predictive and explanatory power, but not a lot. We will now perform the model diagnostics.
 
 ### Model Diagnostics{-}
 
@@ -2632,7 +2632,7 @@ plot(mlr.glmer, pch = 20, col = "black", lty = "dotted")
 
 As a final step, we summarize our findings in tabulated form.
 
-```{r blmm41, eval = T, echo=F, message=FALSE, warning=FALSE}
+```{r blmm41, message=FALSE, warning=FALSE}
 # summarize final model
 sjPlot::tab_model(mlr.glmer)
 ```
@@ -2846,7 +2846,7 @@ The ANOVA confirms that Shots have a significant impact on the number of instanc
 summary(m1.glmer)
 ```
 
-The model summary does not provide AIC, BIC or logged likelihood values. The coefficient for "Shots" is highly significant (p <.001) and the data is notably over-dispersed (the Standardized Within-Group Residuals deviate substantially from a normal distribution with higher values having a thick tail). Also, in contrast to the Poisson model, Language does explain at least a minimal share of the variance now as the mean and standard deviation are no longer 0. Note also, that the coefficients are identical to the Poisson coefficients but the standard errors and p-values differ (the model provides t- rather than z-values).
+The model summary does not provide much information such as,e.g. AIC or BIC values. The coefficient for *Shots* is highly significant (p <.001) and the data is notably over-dispersed (the Standardized Within-Group Residuals deviate substantially from a normal distribution with higher values having a thick tail). Also, in contrast to the Poisson model, Language does explain at least a minimal share of the variance now as the mean and standard deviation are no longer 0. Note also, that the coefficients are identical to the Poisson coefficients but the standard errors and p-values differ (the model provides t- rather than z-values).
 
 In a next step, we will calculate the odds ratios of the coefficient (as we only have one). We will use the coefficients from the fixed-effects model as the coefficients for mixed- and fixed-effects models are identical (the random effect structure only affects the standard error and p-values but not the coefficients; you can check by uncommenting the summary command).
 
