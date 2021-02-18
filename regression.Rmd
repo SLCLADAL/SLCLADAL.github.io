@@ -165,10 +165,10 @@ In a first step, we load the libraries and functions.
 ```{r slr2, eval = T, echo=T, message=FALSE, warning=FALSE}
 # load libraries
 library(car)
-library(dplyr)
-library(ggplot2)
+library(tidyverse)
 library(knitr)         
-library(QuantPsyc)  
+library(QuantPsyc) 
+library(MuMIn)
 library(DT)
 # load functions
 source("https://slcladal.github.io/rscripts/multiplot.r")
@@ -236,7 +236,7 @@ The R^2^-values tell us how much variance is explained by our model. The baselin
 
 \begin{equation}
 
-$R^2 = R^2_{multiple} = 1 - \frac{\sum (y_i - \hat{y_i})^2}{\sum (y_i - \bar y)^2}$
+R^2 = R^2_{multiple} = 1 - \frac{\sum (y_i - \hat{y_i})^2}{\sum (y_i - \bar y)^2}
 
 \end{equation}
 
@@ -245,7 +245,7 @@ The adjusted R^2^-value takes the number of predictors into account and, thus, t
 
 \begin{equation}
 
-$R^2_{adjusted} = 1 - (\frac{(1 - R^2)(n - 1)}{n - k - 1})$
+R^2_{adjusted} = 1 - (\frac{(1 - R^2)(n - 1)}{n - k - 1})
 
 \end{equation}
 
@@ -480,7 +480,7 @@ library(caret)
 library(DT)
 library(effects)
 library(foreign)
-library(ggplot2)
+library(tidyverse)
 library(ggeffects)
 library(gridExtra)
 library(Hmisc)
@@ -498,7 +498,6 @@ library(rms)
 library(sandwich)
 library(sfsmisc)
 library(sjPlot)
-library(stringr)
 library(vcd)
 library(visreg)
 # load functions
@@ -838,7 +837,7 @@ The new diagnostic plots do not indicate outliers that require removal. With res
 
 6) There should not be (any) autocorrelation among predictors. This means that independent variables cannot be correlated with itself (for instance, because data points come from the same subject). If there is autocorrelation among predictors, then a Repeated Measures Design or a (hierarchical) mixed-effects model should be implemented instead.
 
-7) Predictors cannot substantially correlate with each other (multicollinearity). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is unreliable [@myers1990classical] and predictors causing such VIFs should be removed. Indeed, even VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215, @zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed! 
+7) Predictors cannot substantially correlate with each other (multicollinearity). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is unreliable [@myers1990classical] and predictors causing such VIFs should be removed. Indeed, even VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215; @zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed! 
 
 8) The mean value of VIFs should be $~$ 1 [@bowerman1990linear].
 
@@ -1195,9 +1194,11 @@ logisticPseudoR2s(lr.glm)
 
 ```
 
-The low pseudo-R^2^ values show that our model has very low explanatory power as it only accounts for approximately 2.6 to 4.6 percent of the deviance in the logged probabilities (to get the percentages, you simply multiply the pseudo-R^2^ values by 100). Next, we extract the confidence intervals for the coefficients of the model.
+The low pseudo-R^2^ values show that our model has very low explanatory power. For instance, the value of Hosmer and Lemeshow R^2 (0.026) "is the proportional reduction in the absolute value of the log-likelihood measure and as such it is a measure of how much the badness of fit improves as a result of the inclusion of the predictor variables" [@field2012discovering 317].
 
-```{r blm24}
+In essence, all the pseudo-R^2^ values are measures of how substantive the model is (how much better it is compared to a baseline model. Next, we extract the confidence intervals for the coefficients of the model.
+
+```{r blm24, message=F, warning=F}
 # extract the confidence intervals for the coefficients
 confint(lr.glm)
 ```
@@ -1235,8 +1236,10 @@ caret::confusionMatrix(blrdata$Prediction, blrdata$EH)
 We can use the `sjPlot` package to visualize the effects.
 
 ```{r blm32, eval = T, echo=T}
-efp1 <- plot_model(lr.glm, type = "pred", terms = c("Age"), axis.lim = c(0, 1)) # predicted probability
-efp2 <- plot_model(lr.glm, type = "pred", terms = c("Gender")) # predicted percentage
+# predicted probability
+efp1 <- plot_model(lr.glm, type = "pred", terms = c("Age"), axis.lim = c(0, 1)) 
+# predicted percentage
+efp2 <- plot_model(lr.glm, type = "pred", terms = c("Gender"), axis.lim = c(0, 100)) 
 grid.arrange(efp1, efp2, nrow = 1)
 ```
 
@@ -1686,9 +1689,9 @@ hweights2 <- hweights[order(rmodel$w), ]
 hweights2[1:15, ]
 ```
 
-The values of the weights support our assumption that those data points that were deemed too influential are made "lighter" as they now only have weights of .486 and .494 respectively. 
+The values of the weights support our assumption that those data points that were deemed too influential are made *lighter* as they now only have weights of .486 and .494 respectively. 
 
-After inspecting the weights, we also want to extract the p-values for the predictors. The p-values have to be calculated separately using the "f.robftest" fucntion from the "sfsmisc" library.
+After inspecting the weights, we also want to extract the p-values for the predictors. The p-values have to be calculated separately using the `f.robftest` function from the `sfsmisc` package.
 
 ```{r rr11}
 p_status <- f.robftest(rmodel, var = 2)
@@ -2045,16 +2048,43 @@ r = `sqrt(t^2^/(t^2^+df))`.
 
 A brief word of warning is in order here: only apply this function to main effects that are not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear [@field2012discovering 641].
 
-```{r lmm21}
+```{r lmm21a}
 # calculate effect size 
 ggeffect(m5.lme)
+```
+
+```{r lmm21g}
+sjPlot::tab_model(m5.lme)
+```
+
+***
+
+<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. 
+
+The *marginal R^2^* (marginal coefficient of determination) represents the variance explained by the fixed effects while the *conditional R^2^* is interpreted as a variance explained by the entire model, including both fixed and random effects [@barton2020mumin].
+
+The respective call for the model is:
+
+
+```{r lmm21c, warning = F, message=F}
+r.squaredGLMM(m1.glmer)
+```
+
+The effects can be visualized using the `plot_model` function from the `sjPlot` package.
+
+```{r lmm21d}
+sjPlot::plot_model(m5.lme, type = "pred", terms = c("Date")) +
+  # show uncentered date rather than centered date
+  scale_x_continuous(name = "Date", 
+                     breaks = seq(-500, 300, 100), 
+                     labels = seq(1150, 1950, 100))
 ```
 
 While we have already shown that the effect of Date is significant, it is small which means that the number of prepositions per text does not correlate very strongly with time. This suggests that other factors that are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too).
 
 Before turning to the diagnostics, we will use the fitted (or predicted) and the observed values with a regression line for the predicted values. This will not only show how good the model fit the data but also the direction and magnitude of the effect.
 
-```{r lmm21b}
+```{r lmm21b, message = F, warning=F}
 # extract predicted values
 lmmdata$Predicted <- predict(m5.lme, lmmdata)
 # plot predicted values
@@ -2129,10 +2159,10 @@ tab_model(m5.lme)
 
 ***
 
-<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+
 
 ```{r lmm28b}
-library(MuMIn)
 r.squaredGLMM(m5.lme)
 ```
 
@@ -2272,7 +2302,7 @@ The upper left panel merely shows the logistic curve representing the prediction
 
 After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
 
-In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted [@field2012discovering]. We test whether including random effects is warranted by comparing a model, that bases its estimates of the dependent variable solely on the base intercept, with a model that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the mixed-effects model explains significantly more variance than the fixed-effects model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified if they reduce residual deviance.
+In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted [@field2012discovering]. We test whether including random effects is warranted by comparing a model, that bases its estimates of the dependent variable solely on the base intercept, with a model that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the mixed-effects model explains significantly more variance than the fixed-effects model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified.
 
 ### Example: Discourse LIKE in Irish English{-}
 
@@ -2782,10 +2812,9 @@ The diagnostic plots show problems as the dots in the first two plots are not ra
 plot_model(m1.glmer, type = "pred", terms = c("Shots"))
 ```
 
-The model predicts that the instances of *uhm* increase with the number of shots. Note that the increase is not homogenous as the y-axis labels indicate! We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+The model predicts that the instances of *uhm* increase with the number of shots. Note that the increase is not homogeneous as the y-axis labels indicate! We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
 
 ```{r pmm11f, warning=F, message=F}
-library(tidyr)
 countdata %>%
   mutate(Predicted = predict(m1.glmer, type = "response")) %>%
   dplyr::rename(Observed = UHM) %>%
@@ -2814,7 +2843,7 @@ The R^2^ values of the summary table are incorrect (as indicated by the missing 
 ```
 
 ```{r pmm11cd, message=F, warning=F}
-library(MuMIn)
+
 r.squaredGLMM(m1.glmer)
 ```
 
@@ -2899,7 +2928,6 @@ plot_model(m1.glmer, type = "pred", terms = c("Shots"))
 The effects plot shows that the number of *uhms* increases exponentially with the number of shots a speaker has had. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
 
 ```{r qpmm11f, warning=F, message=F}
-library(tidyr)
 countdata %>%
   mutate(Predicted = predict(m1.glmer, type = "response")) %>%
   dplyr::rename(Observed = UHM) %>%
@@ -2926,7 +2954,6 @@ tab_model(m1.glmer)
 <span style="color: red;">Note</span>: The summary tables does not provide R^2^ values. The R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
 
 ```{r qpmm11d, message=F, warning=F}
-library(MuMIn)
 r.squaredGLMM(m1.glmer)
 ```
 
@@ -2992,7 +3019,6 @@ plot_model(m1.glmer, type = "pred", terms = c("Shots"))
 The effect plot shows that the predicted number of shots increases exponentially with each shot. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
 
 ```{r nbmm6f, warning=F, message=F}
-library(tidyr)
 countdata %>%
   mutate(Predicted = predict(m1.glmer, type = "response")) %>%
   dplyr::rename(Observed = UHM) %>%
@@ -3020,7 +3046,6 @@ tab_model(m1.glmer)
 <span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
 
 ```{r nbmm6d}
-library(MuMIn)
 r.squaredGLMM(m1.glmer)
 ```
 
@@ -3030,14 +3055,14 @@ A mixed-effect negative binomial regression model which contained the language i
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Fixed- and Mixed-Effects Regression Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/regression.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Schweinberger, Martin. 2021. *Fixed- and Mixed-Effects Regression Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/regression.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
-@manual{schweinberger2020regression,
+@manual{schweinberger2021regression,
   author = {Schweinberger, Martin},
   title = {Fixed- and Mixed-Effects Regression Models in R},
   note = {https://slcladal.github.io/regression.html},
-  year = {2020},
+  year = {2021},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
   edition = {`r format(Sys.time(), '%Y.%m.%d')`}
@@ -3047,8 +3072,6 @@ Schweinberger, Martin. 2020. *Fixed- and Mixed-Effects Regression Models in R*. 
 ```{r fin}
 sessionInfo()
 ```
-
-
 
 
 ***
