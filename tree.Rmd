@@ -33,8 +33,6 @@ This tutorial focuses on tree-based models and their implementation in R. The en
 This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
-# clean current workspace
-rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
@@ -42,14 +40,12 @@ options("scipen" = 100, "digits" = 4) # suppress math annotation
 install.packages(c("Boruta", "caret", "cowplot", "tidyverse", 
                    "ggparty",  "Gmisc", "grid", "Hmisc", 
                    "knitr", "party", "partykit", "randomForest", 
-                   "Rling"))
+                   "Rling", "pdp"))
 ```
 
 Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
 
 ```{r prep2, echo=F, eval = T, message=FALSE, warning=FALSE}
-# clean current workspace
-rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
@@ -62,7 +58,7 @@ library(DT)
 
 This section deals with tree-structure models which fall into the machine-learning rather than the inference statistics category as they are commonly used for classification and prediction tasks rather than explanation of relationships between variables. 
 
-The most basic type of tree-structure model is a decision tree or CART (classification and regression tree). A more optimized version of these simple decision trees are conditional inference trees (CITs) - although CART and CITs are commonly treated as one and the same thing although CITs differ from CARTs in that they provide more accurate variable importance measures. Like random forests, inference trees are non-parametric and thus do not rely on distributional requirements (or at least on fewer). The tree structure represents recursive partitioning of the data to minimize residual deviance. Several advantages have been associated with using tree-based models:
+The most basic type of tree-structure model is a decision tree or CART (classification and regression tree). A more optimized version of CARTs are conditional inference trees (CITs) - although CART and CITs are commonly treated as one and the same thing although CITs differ from CARTs in that they provide more accurate variable importance measures. Like random forests, inference trees are non-parametric and thus do not rely on distributional requirements (or at least on fewer). The tree structure represents recursive partitioning of the data to minimize residual deviance. Several advantages have been associated with using tree-based models:
 
 1. Tree-structure models are very useful because they can deal with different types of variables and provide a very good understanding of the structure in the data. 
 
@@ -89,12 +85,11 @@ Despite these potential advantages, a word of warning is in order: @gries2021sta
 
 Before we implement a conditional inference tree in R, we will have a look at how decision trees work. We will do this in more detail here as random forests and Boruta analyses are extensions of inference trees and are therefore based on the same concepts.
 
-# Decision Trees
+# Classification And Regression Trees
 
-The most basic type of tree-structure model is a decision tree. An extension of decision trees are so-called classification and regression trees (CARTs) or conditional inference trees (CITs). The difference between simple decision trees and CITs is that CITs use significance tests, e.g. the p-values, to select variables rather than some information measures like the Gini coefficient [@gries2021statistics].
+The most basic type of tree-structure model is a decision tree which is a type of classification and regression tree (CART). A more elaborate version of a CART is called a Conditional Inference Tree (CIT). The difference between a CART and a CIT is that CITs use significance tests, e.g. the p-values, to select and split variables rather than some information measures like the Gini coefficient [@gries2021statistics].
 
-
-Below is a decision tree which shows what what response to expect, in this case whether a speaker uses discourse *like* or not. Decision trees, like CARTs and CITs, answer a simple question, namely *How do we classify elements based on the given predictors?*. The answer that decision trees provide is the classification of the elements based on the levels of the predictors. In simple decision trees, all predictors, even those that are not significant are included in the decision tree. The decision tree shows that the best (or most important) predictor for the use of discourse *like* is age as it is the highest node. Among young speakers, those with high status use *like* more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
+Below is an example of a decision tree which shows what what response to expect - in this case whether a speaker uses discourse *like* or not. Decision trees, like all CARTs and CITs, answer a simple question, namely *How do we best classify elements based on the given predictors?*. The answer that decision trees provide is the classification of the elements based on the levels of the predictors. In simple decision trees, all predictors, even those that are not significant are included in the decision tree. The decision tree shows that the best (or most important) predictor for the use of discourse *like* is age as it is the highest node. Among young speakers, those with high status use *like* more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
 
 
 ```{r cit1a, echo = F, message=FALSE, warning=FALSE}
@@ -767,17 +762,51 @@ Unfortunately, we cannot easily compute robust variable importance for RF models
 
 ```{r rf15, message=FALSE, warning=FALSE}
 # plot variable importance
-varImpPlot(rfmodel3, main = "", pch = 20) 
+varImpPlot(rfmodel3, main = "", pch = 20)
 ```
 
-A second type of visualization that can provide insights in the `partialPlot` function which shows the effects of individual predictors - but remember that this still does not provide information about the way that the predictor interacts with other predictors.
+Here is an alternative way of plotting variable importance using the `vip` function from the `vip` package.
 
 ```{r rf16, message=FALSE, warning=FALSE}
-# extract importance of individual variables
-partialPlot(rfmodel3, rfdata, Age)
+# load package
+library(vip)
+# generate vip plot
+vip::vip(rfmodel3, geom = "point", horizontal = FALSE)
 ```
 
-Another common way to evaluate the performance of RFs and prune them is to split the data into a test and a training set. the model is then fit to the training set and, after that, applied to the test set. This allows us to evaluate how well the RF performs on data that it was not trained on. This approach is particularly common in machine learning contexts. 
+Using the `vip` package, you can also generate variable importnace barplots.
+
+```{r rf17, message=FALSE, warning=FALSE}
+# load package
+library(vip)
+# generate vip plot
+vip::vip(rfmodel3, horizontal = FALSE)
+```
+
+A second type of visualization that can provide insights in the `partial` function from the `pdp` package which shows the effects of individual predictors - but remember that this still does not provide information about the way that the predictor interacts with other predictors.
+
+```{r rf18, message=FALSE, warning=FALSE}
+# load pdp package
+library(pdp)
+library(ggplot2)
+# extract importance of individual variables
+rfmodel3 %>%  # the %>% operator is read as "and then"
+  partial(pred.var = "Age") %>%
+  autoplot(smooth = TRUE, ylab = expression(f(Age))) +
+  theme_light() +
+  ggtitle("Partial Depencence Plot: Age") + 
+  ylim(-20, 0)
+```
+
+You can however use the `partial` function to show how the effect of predictors interacts with other predictors (see below). 
+
+```{r rf19, message=F, warning=F}
+partial(rfmodel3, pred.var = c("Age", "Gender"), plot = TRUE, plot.engine = "ggplot2")
+```
+
+
+
+Another common way to evaluate the performance of RFs is to split the data into a test and a training set. the model is then fit to the training set and, after that, applied to the test set. This allows us to evaluate how well the RF performs on data that it was not trained on. This approach is particularly common in machine learning contexts. 
 
 # Boruta
 
@@ -887,14 +916,14 @@ Of the remaining variables, adjective frequency and adjective type have the stro
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2021. *Tree-Based Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/tree.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Schweinberger, Martin. `r format(Sys.time(), '%Y)`. *Tree-Based Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/tree.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
 @manual{schweinberger2021tree,
   author = {Schweinberger, Martin},
   title = {Tree-Based Models in R},
   note = {https://slcladal.github.io/tree.html},
-  year = {2020},
+  year = {`r format(Sys.time(), '%Y)`},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
   edition = {`r format(Sys.time(), '%Y.%m.%d')`}
