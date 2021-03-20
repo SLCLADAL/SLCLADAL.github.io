@@ -37,8 +37,6 @@ There are various options to generate interactive data visualizations in R. The 
 This tutorial is based on [R](@rcran). If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
-# clean current workspace
-rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
@@ -163,78 +161,128 @@ Normally, you would use the `plot` function to display the interactive chart but
 print(SC, 'chart')
 ```
 
-# Motion Charts
+# Animations
 
-Motion charts are dynamic charts that are used to explore changes in several variables across time. Motion charts are rendered within the browser using Flash which means that when you create a motion chart using the `plot` function, we new window in your browser will open and display the motion chart.
+Animations or GIFs (Graphics Interchange Format) can be generated using the `gganimate` package written by  Thomas Lin Pedersen and David Robinson. The `gganimate` package allows to track changes over time while simultaneously displaying several variables in one visualization. As we will create animations using the `ggplot2` package, we also load that package from the library. In this case, we use the gapminder data set which comes with the `gapminder` package and which contains information about different countries, such as the average life expectancy, the population, or the gross domestic product (GDP), across time.
 
-[Martin Hilpert](https://unine.academia.edu/MartinHilpert) has created a [very recommendable screen-cast tutorial](https://www.youtube.com/watch?v=Z6NYQdiwTrU) on how to create motion charts in R.
-
-We will continue by generating a motion chart using the `gvisMotionChart` function which takes a data set, an id-variable and a time-variables as its main arguments. In addition, the  `gvisMotionChart` function takes various additional arguments such as what should be shown on the x- and y-axes, if the color or the size of the dots in the motion chart should represent another feature of the data.
-
-```{r mc23, message=FALSE, warning=FALSE}
-# create motion chart
-MC <- gvisMotionChart(coocs, 
-                      idvar = "Adjective", 
-                      timevar = "Decade",
-                      xvar = "Percent_very",
-                      yvar = "Frequency_Adjective",
-                      size = "Frequency_Adjective")
+```{r an1, message=F, warning=F}
+# load packages
+library(ggplot2)
+library(gganimate)
+library(gapminder)
+# set options
+theme_set(theme_bw())
+# inspect data
+head(gapminder)
 ```
 
-After generating the motion chart, we can plot this map object using the `plot` function if we are in a Notebook environment..
+After loading the data, we create static plot so that we can check what the data looks like at one point in time.
 
-```{r mc25, eval = F, message=FALSE, warning=FALSE}
-plot(MC)
+```{r an2, message=F, warning=F}
+p <- ggplot(
+  gapminder, 
+  aes(x = gdpPercap, y=lifeExp, size = pop, colour = country)
+  ) +
+  geom_point(show.legend = FALSE, alpha = 0.7) +
+  scale_color_viridis_d() +
+  scale_size(range = c(2, 12)) +
+  scale_x_log10() +
+  labs(x = "GDP per capita", y = "Life expectancy")
+p
 ```
 
-If we want to generate interactive visualizations on websites (such as this website), we use the `print` fucntion rather than the `plot` function and sepcify that we want to print a `chart`.
+We can then turn static plot into animation by defining the content of the `transition_time` object.
 
-```{r mc27, results='asis'}
-print(MC, 'chart')
+```{r an3, eval = F, results = FALSE, message=F, warning=F}
+gif <- p + transition_time(year) +
+  labs(title = "Year: {frame_time}")
+# show gif
+gif
 ```
 
-A browser window should open and and if you accept and execute Adobe Flash, then an interactive motion chart, like the one above, should appear which shows the  frequencies of adjectives across time as well as the percentage with which these adjectives were modified by *very*. You should also be able to hoover over any dot and see which adjective it stands for.
+
+![](https://slcladal.github.io/images/gif.gif)
+
+
+Another way to generate animations is to use the `plotly` package as shown below. While I personally do not find the visualizations created by the `plot_ly` function as visually appealing, it has the advantage that it allows mouse-over effects.
+
+```{r an5, results='asis', message=F, warning=F}
+library(plotly)
+fig <- gapminder %>%
+  plot_ly(
+    x = ~gdpPercap, 
+    y = ~lifeExp, 
+    size = ~pop, 
+    color = ~continent, 
+    frame = ~year, 
+    text = ~country, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  )
+fig <- fig %>% layout(
+    xaxis = list(
+      type = "log"
+    )
+  )
+
+fig
+```
 
 # Interactive Maps
 
-You can also use the `googleVis` package to create interactive maps. In this example, we want to display the average life expectancy across the world for which we load a data set called *gapminder*. In addition, we reduce the data set by only selecting data from 2007 and only the average life expectancy as well as the country.
+You can also use the `leaflet` package to create interactive maps. In this example, we display the beautiful city of Brisbane and the visualization allows you to zoom in and out. 
 
-```{r imap1, message=FALSE, warning=FALSE}
-# load data 
-mapdata <- read.delim("https://slcladal.github.io/data/gapminder.txt",
-                      header = T, sep = "\t") %>%
-  dplyr::select(country, year, lifeExp) %>%
-  dplyr::filter(year == "2007") %>%
-  dplyr::rename(Country = country,
-                Year = year,
-                LifeExpectancy = lifeExp)
-# inspect data
-datatable(mapdata, rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+
+```{r int1, message=F, warning=F}
+# load package
+library(leaflet)
+# generate visulization
+m <- leaflet() %>% 
+  setView(lng = 153.05, lat = -27.45, zoom = 12)
+# display map
+m %>% addTiles()
 ```
 
-Now that we have data in a format that we can generate an interactive map, we use the `gvisGeoMap` function to create a map object.
+Another option is to display information about different countries. In this case, we can use the information provided in the `maptools` package which comes with a `SpatialPolygonsDataFrame` of the world and the population by country (in 2005).
 
-```{r imap3, message=FALSE, warning=FALSE}
-# create motion chart object
-Geo=gvisGeoMap(mapdata, locationvar = "Country", numvar = "LifeExpectancy", 
-               options = list(height = 350, dataMode = 'regions'))
+
+```{r int2, message=F, warning=F}
+# load package
+library(maptools)
+# load data
+data(wrld_simpl)
+# spdf is a sp::SpatialPolygonsDataFrame
+
+# define colors
+qpal <- colorQuantile(rev(viridis::viridis(12)),
+                      wrld_simpl$POP2005, n=12)
+# generate visualization
+l <- leaflet(wrld_simpl, options =
+               leafletOptions(attributionControl = FALSE, minzoom=1.5)) %>%
+  addPolygons(
+    label=~stringr::str_c(
+      NAME, ' ',
+      formatC(POP2005, big.mark = ',', format='d')),
+    labelOptions= labelOptions(direction = 'auto'),
+    weight=1, color='#333333', opacity=1,
+    fillColor = ~qpal(POP2005), fillOpacity = 1,
+    highlightOptions = highlightOptions(
+      color='#000000', weight = 2,
+      bringToFront = TRUE, sendToBack = TRUE)
+    ) %>%
+  addLegend(
+    "topright", pal = qpal, values = ~POP2005,
+    title = htmltools::HTML("Population (2005)"),
+    opacity = 1 )
+# display visualization
+l
 ```
 
-Now, we can then simply plot this map object using the `plot` function.
-
-```{r imap5, eval = F, message=FALSE, warning=FALSE}
-plot(Geo)
-```
-
-```{r results='asis'}
-print(Geo, 'chart')
-```
-
-A browser window should open and and if you accept and execute Adobe Flash, then an interactive motion chart, like the one above, should appear which shows the life expectancy by country. You should also be able to hoover over any country and see its available life expectancy. 
 
 ## Session Outro{-}
 
-When cerating interactive maps, it is importnat that you reset the default graphica parametsra s these had to be adapted in the sessions et-up. Therefore, in a final step, we restore the default graphics options.
+When generating interactive maps, it is important that you reset the default graphics parameters which had to be adapted in the session set-up. Therefore, in a final step, we restore the default graphics options.
 
 ```{r resetOptions}
 ## Set options back to original options
@@ -243,17 +291,17 @@ options(op)
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Creating Interactive Visualization in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/motion.html (Version 2020.12.03)
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Creating Interactive Visualization in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/motion.html (Version `r format(Sys.time(), '%Y.%m.%d')`)
 
 ```
-@manual{schweinberger2020motion,
+@manual{schweinberger2021motion,
   author = {Schweinberger, Martin},
   title = {Creating motion charts using R},
   note = {https://slcladal.github.io/motion.html},
-  year = {2020},
+  year = {`r format(Sys.time(), '%Y')`},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/12/03}
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
 }
 ```
 
@@ -267,7 +315,9 @@ sessionInfo()
 
 ***
 
-[Main page](https://slcladal.github.io/index.html)
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
 
 ***
 
