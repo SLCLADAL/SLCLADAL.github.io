@@ -244,36 +244,47 @@ m <- leaflet() %>%
 m %>% addTiles()
 ```
 
-Another option is to display information about different countries. In this case, we can use the information provided in the `maptools` package which comes with a `SpatialPolygonsDataFrame` of the world and the population by country (in 2005).
+Another option is to display information about different countries. In this case, we can use the information provided in the `maptools` package which comes with a `SpatialPolygonsDataFrame` of the world and the population by country (in 2005). To make the visualization a bit more appealing, we will calculate the population density, add this variable to the data which underlies the visualization, and then display the information interactively. In this case, this means that you can use *mouse-over* or *hoover* effects so that you see the population density in each country if you put the curser on that country (given the information is available for that country).
 
+We start by loading the required package from the library, adding population density to the data, and removing data points without meaningful information (e.g. we set values like Inf to NA).
 
 ```{r int2, message=F, warning=F}
 # load package
 library(maptools)
 # load data
 data(wrld_simpl)
-# spdf is a sp::SpatialPolygonsDataFrame
+# calculate population density and add it to the data 
+wrld_simpl@data$PopulationDensity <- round(wrld_simpl@data$POP2005/wrld_simpl@data$AREA,2)
+wrld_simpl@data$PopulationDensity <- ifelse(wrld_simpl@data$PopulationDensity == "Inf", NA, wrld_simpl@data$PopulationDensity)
+wrld_simpl@data$PopulationDensity <- ifelse(wrld_simpl@data$PopulationDensity == "NaN", NA, wrld_simpl@data$PopulationDensity)
+# inspect data
+head(wrld_simpl@data)
+```
 
+We can now display the data.
+
+
+```{r int3, message=F, warning=F}
 # define colors
-qpal <- colorQuantile(rev(viridis::viridis(12)),
-                      wrld_simpl$POP2005, n=12)
+qpal <- colorQuantile(rev(viridis::viridis(10)),
+                      wrld_simpl$PopulationDensity, n=10)
 # generate visualization
 l <- leaflet(wrld_simpl, options =
                leafletOptions(attributionControl = FALSE, minzoom=1.5)) %>%
   addPolygons(
     label=~stringr::str_c(
       NAME, ' ',
-      formatC(POP2005, big.mark = ',', format='d')),
+      formatC(PopulationDensity, big.mark = ',', format='d')),
     labelOptions= labelOptions(direction = 'auto'),
     weight=1, color='#333333', opacity=1,
-    fillColor = ~qpal(POP2005), fillOpacity = 1,
+    fillColor = ~qpal(PopulationDensity), fillOpacity = 1,
     highlightOptions = highlightOptions(
       color='#000000', weight = 2,
       bringToFront = TRUE, sendToBack = TRUE)
     ) %>%
   addLegend(
-    "topright", pal = qpal, values = ~POP2005,
-    title = htmltools::HTML("Population (2005)"),
+    "topright", pal = qpal, values = ~PopulationDensity,
+    title = htmltools::HTML("Population density <br> (2005)"),
     opacity = 1 )
 # display visualization
 l
