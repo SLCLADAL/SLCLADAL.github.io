@@ -28,110 +28,78 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces network analysis using R. Network analysis is a method for visualization that can be used to represent various types of data. In addition to being a visualization technique, networks have certain statistical properties that can be compared which makes network analysis a very useful procedure. To this end, this tutorial shows how to create and modify network graphs. The entire R-markdown document for the sections below can be downloaded [here](https://slcladal.github.io/net.Rmd).
+This tutorial introduces network analysis using R. Network analysis is a method for visualization that can be used to represent various types of data. In addition to being a visualization technique, networks have certain statistical properties that can be compared which makes network analysis a very useful procedure. To this end, this tutorial shows how to create and modify network graphs. The entire R markdown document for the sections below can be downloaded [here](https://slcladal.github.io/net.Rmd). This tutorial builds on [a tutorial on plotting collocation networks](https://corpling.hypotheses.org/3341) by [Guillaume Desagulier](http://www2.univ-paris8.fr/desagulier/home/), a tutorial on network analysis by offered by Alice Miller from the [Digital Observatory](https://www.qut.edu.au/institute-for-future-environments/facilities/digital-observatory/about-do) at the [Queensland University of Technology](https://www.qut.edu.au/), and [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) by [Andreas Niekler](http://asv.informatik.uni-leipzig.de/staff/Andreas_Niekler) and [Gregor Wiedemann](https://www.hans-bredow-institut.de/en/staff/gregor-wiedemann).   
 
-How can you display the relationship between different elements, be they authors, characters, or words?
+**How can you display the relationship between different elements, be they authors, characters, or words?**
 
 The most common way to visualize such relationships are networks [@silge2017text : 131-137]. Networks, also called graphs, consist of nodes (typically represented as dots) and edges (typically represented as lines) and they can be directed or undirected networks. 
 
 In directed networks, the direction of edges is captured. For instance, the exports of countries. In such cases the lines are directed and typically have arrows to indicate direction. The thinkness of lines can also be ustilized to encode information such as frequency of contact.
 
-Networks can have different layouts.
-
-The centrality of networks is measured as 
-
-* Node degree 
-
-* Node closeness (the closer two nodes are, the closer connected ethy are) 
-
-* Node betweeness 
-
-* Edge betweenness
-
-There are two ways to capture the basic structure of a network: 
-
-* Adjacency matrix (Matrix of 0s and 1s depending on whether the nodes are connected or not)
-
-```{r intro1, echo=F, eval = T, message=FALSE, warning=FALSE}
-mx <- matrix(c(0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0), byrow = T, nrow = 7)
-colnames(mx) <- c("A", "B", "C", "D", "E", "F", "G")
-rownames(mx) <- c("A", "B", "C", "D", "E", "F", "G")
-mx
-```
-
-* Edge list (Two column matrix to indicate which nodes are connected)
-
-```{r intro2, echo=F, eval = T, message=FALSE, warning=FALSE}
-V1 <- c("A", "A", "A", "A", "A", "E", "F")
-V2 <- c("B", "C", "D", "E", "F", "F", "G")
-data.frame(V1, V2)
-```
 
 The example that we will be concerned with focuses on the first type of data as it is by far the most common way in which relationships are coded.To show how to create a network, we will have a look at the network that the characters in William Shakespeare's *Romeo and Juliet* form.
 
 ## Preparation and session set up{-}
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
-# clean current workspace
-rm(list=ls(all=T))
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # supress math annotation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
 # install libraries
 install.packages(c("GGally", "network", "sna", "tidyverse", "knitr", 
                    "kableExtra", "gutenbergr", "tm", "Matrix"))
 ```
 
-Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
+```{r prep2, echo = F, message=FALSE, warning=FALSE}
+# activate packages
+library(knitr)
+library(kableExtra)
+library(DT)
+```
 
-# A network of *Romeo and Juliet*
+Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
 
-This section shows hw to create a network that shows which characters in William Shakespeare's *Romeo and Juliet* co-occurred in the play and how often they co-occurred. In a first step, we load the necessary packages from the library.
+# Network Networks
 
-```{r net1, echo=T, eval = T, message=FALSE, warning=FALSE}
+This section shows how to create a network visualization with the `network` and the `GGally` packages. The network we will generate shows how often characters in William Shakespeare's *Romeo and Juliet* occurred in the same scene. In a first step, we load the necessary packages from the library.
+
+```{r net1, message=FALSE, warning=FALSE}
 # activate packages
 library(GGally)
 library(network)
-library(tidyverse)
-library(sna)
-library(knitr)
-library(kableExtra)
-library(gutenbergr)
-library(tm)
-library(Matrix)
-library(tibble)
 ```
 
 
 The issue we want to investigate here relates to networks of personas in Shakespeare's *Romeo and Juliet* and we thus load this famous work of fiction. Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
 
+
 ```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load data
-romeo <- read.delim("https://slcladal.github.io/data/romeo.txt", sep = "\t")
-# inspect data
-romeo
+rom <- read.delim("https://slcladal.github.io/data/romeo_tidy.txt", sep = "\t")
+rome <- crossprod(table(rom[1:2]))
+diag(rome) <- 0
+romeo <- as.data.frame(rome)
+romeo[1:5, 1:5]
 ```
+
 
 The data shows how often a character has appeared with each other character in the play - only Friar Lawrence and Friar John were excluded because they only appear in one scene where they talk to each other. 
 
 In a next step, we create a network object from the matrix. In addition, we define vertex names as these will be used as labels in the network plot.
 
 ```{r net5}
-net = network(romeo,
-              directed = FALSE,
-              ignore.eval = FALSE,
-              names.eval = "weights"
-)
+net = network::network(romeo,
+                       directed = FALSE,
+                       ignore.eval = FALSE,
+                       names.eval = "weights")
 # vertex names
 network.vertex.names(net) = rownames(romeo)
 net
 ```
 
 Unfortunately, network object are somewhat obscure in that they can not be displayed as simple data frames. 
-
-## Creating basic networks{-}
 
 However, this does not matter at this point and we continue by visualizing the network in a simple network plot using the ggnet2 function.
 
@@ -147,22 +115,19 @@ ggnet2(net,
 
 The basic network shown above only shows who has co-occurred with whom but it is not really informative. Therefore, we add information to the network object. 
 
-## Modifying networks{-}
-
 To add information to a simple network graph, we create a new variable. This variable shows to which family each of the characters belong. To do this, we create a separate vector for each family which holds the characters that are members of this family. Then, we create a variable in the network object called "Family" which represents the family which the characters belong to. 
 
 ```{r net9}
-# create vectors with names of characters
-escalus <- c("Prince", "Paris", "Mercutio")
-capulet <- c("Capulet", "Ladycapulet", "Juliet", "Tybalt", "Nurse",
-             "Peter", "Gregory", "Sampson", "Anthony",  "Servant",
-             "Servant")
-montague <- c("Montague", "Ladymontague", "Romeo", "Benvolio",
-              "Balthasar", "Abraham")
+# define colors (by family)
+mon <- c("ABRAM", "BALTHASAR", "BENVOLIO", "LADY MONTAGUE", "MONTAGUE", "ROMEO")
+cap <- c("CAPULET", "CAPULET’S COUSIN", "FIRST SERVANT", "GREGORY", "JULIET", 
+         "LADY CAPULET", "NURSE", "PETER", "SAMPSON", "TYBALT")
+oth <- c("APOTHECARY", "CHORUS", "FIRST CITIZEN", "FIRST MUSICIAN", "FIRST WATCH", 
+         "FRIAR JOHN" , "FRIAR LAWRENCE", "MERCUTIO", "PAGE", "PARIS", "PRINCE", 
+         "SECOND MUSICIAN", "SECOND SERVANT", "SECOND WATCH", "SERVANT", "THIRD MUSICIAN")
 # add color by group
-net %v% "Family" = ifelse(network.vertex.names(net) %in% capulet, "Capulet", 
-                   ifelse(network.vertex.names(net) %in% montague, "Montague", 
-                   ifelse(network.vertex.names(net) %in% escalus, "Escalus", "other")))
+net %v% "Family" = ifelse(network.vertex.names(net) %in% cap, "Capulet", 
+                   ifelse(network.vertex.names(net) %in% mon, "Montague", "other"))
 ```
 
 We can now use the family variable to define a color so that each character can be associated with his or her family by coloring. In addition, we specify the edge attributes so that the thickness and the type of a line represent how often characters have co-occurred. Characters that co-occur frequently are connected by thick, straight, solid lines whereas characters that co-occurred together only infrequently are connected by thin, dotted lines.
@@ -170,8 +135,7 @@ We can now use the family variable to define a color so that each character can 
 ```{r net10}
 # modify color
 net %v% "color" = ifelse(net %v% "Family" == "Capulet", "goldenrod", 
-                  ifelse(net %v% "Family" == "Montague", "indianred4", 
-                  ifelse(net %v% "Family" == "Escalus", "burlywood", "gray60")))
+                  ifelse(net %v% "Family" == "Montague", "indianred4","gray60"))
 # rescale edge size
 network::set.edge.attribute(net, "weights", ifelse(net %e% "weights" <= 1, 0.25, 
                                    ifelse(net %e% "weights" <= 3, .5, 1)))
@@ -196,120 +160,179 @@ ggnet2(net,
   guides(color = FALSE, size = FALSE)
 ```
 
-We have now plotted the network of characters in Shakespeare's *Romeo and Juliet* and we have added additional information to this plot. The characters are shown by name and the color behind their name informs us about which family they belong to (Capulet = golden, Montague = red, Escalus = burlywood, other = gray). The linetype and line thickness both provide information on how frequently characters interacted: slim dotted gray lines indicate that the characters only co-occurred once, dashed gray lines indicate that the characters co-occured up to three times and thick solid gray lines show that the characters co-occured more than 3 times together. 
+We have now plotted the network of characters in Shakespeare's *Romeo and Juliet* and we have added additional information to this plot. The characters are shown by name and the color behind their name informs us about which family they belong to (Capulet = golden, Montague = red, other = gray). The linetype and line thickness both provide information on how frequently characters interacted: slim dotted gray lines indicate that the characters only co-occurred once, dashed gray lines indicate that the characters co-occurred up to three times and thick solid gray lines show that the characters co-occured more than 3 times together. 
 
-# Creating networks with quanteda
+# Quanteda Networks 
 
-The `quanteda` package contains many very useful functions for analyzing texts. Among these functions is the `textplot_network` function which provides a very handy way to display networks.
+The `quanteda` package contains many very useful functions for analyzing texts. Among these functions is the `textplot_network` function which provides a very handy way to display networks. The advantage of the network plots provided by or generated with the `quanteda` package is that you can create them with very little code. However, this comes at a cost as  these visualizations cannot be modified easily (which means that their design is not very flexible compared to other methods for generating network visualizations).    
 
-We could simply start with the romeo data that we have processed above. However, as the `quanteda` package offers useful text processing functions, we will start with the `personas` data set that we have created before so as to show how handy and easy to use the `quanteda` functions are. In a first step, we transform the text vectors of the `persons` data into a document-feature matrix using the `dfm ` function. 
+In a first step, we transform the text vectors of the `romeo` data into a document-feature matrix using the `dfm ` function. 
 
 
 ```{r qtda01, warning=F, message=F}
+# load package
 library(quanteda)
-romeo_dfm <- as.dfm(romeo)
-romeo_fcm <- fcm(romeo_dfm)
+# create a document feature matrix
+romeo_dfm <- quanteda::as.dfm(romeo)
+# create feature co-occurrence matrix
+romeo_fcm <- quanteda::fcm(romeo_dfm)
+# inspect data
 head(romeo_fcm)
 ```
 
-This feature-co-occurrence matrix can then serve as the input for the `textplot_network` function which already generates a nice network graph.
-
-```{r qtda03}
-textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)
-```
-
-The network graph can then be modified or customized easily by defining the arguments of the `textplot_network` fucntion. To see how and which aguments can be modified, you can use `?textplot_network`.
+This feature-co-occurrence matrix can then serve as the input for the `textplot_network` function which already generates a nice network graph. The network graph can then be modified or customized easily by defining the arguments of the `textplot_network` function. To see how and which arguments can be modified, you can use `?textplot_network`.
 
 ```{r qtda04}
-textplot_network(romeo_fcm, min_freq = 2, 
-                 edge_alpha = 0.2, 
-                 edge_color = "orange", 
-                 edge_size = 5)
+quanteda::textplot_network(romeo_fcm, 
+                           min_freq = 10, 
+                           edge_alpha = 0.2, 
+                           edge_color = "orange",
+                           edge_size = 5)
 ```
 
 
-# Creating networks with iGraph
+# Tidy Networks
 
-@WN17 have written a very recommendable tutorial on co-occurrence analysis and they propose an alternative, yet more complex network visualization for co-occurrences. Their approach is to create and customize a graph object based on the `iGraph` package. To see how to cerate sophisticated network graphs using the `iGraph` package, see [this tutorial](https://slcladal.github.io/collocations.html) on analyzing collocations or  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html). 
+A great way to generate network graphs is to combine functions from the `igraph`, the `ggraph`, and the `tidygraph` packages. The advantages are that the syntax of for creating the networks aligns with the tidyverse style of writing R and that the graphs can eb modified very easily.
 
+To generate network graphs in this way, we first load the required packages.
 
-# Creating two-layer networks 
-
-We will now create a different network - a network that links two types of entities, e.g. people to events or words to documents. In this example, we will link authors to journals. In contrast to the previous example, where we loaded already existing data, we create the data ourselves this time.
-
-In a first step, we create a data frame representing three journals (JPrag, ELL, and WE) and four authors (MS, MH, NM, LM) who have have published in these journals. 
-
-```{r net13}
-# weighted adjacency matrix
-authorjournal = data.frame(JPrag = c(1, 5, 1, 3),
-                 Language = c(0, 0, 3, 1),
-                 Lingua = c(1, 0, 1, 0),
-                 row.names = c("Martin", "Michael", "Felicity", "Ilana"))
-authorjournal
+```{r tidy3, message=F, warning=F}
+library(igraph)
+library(ggraph)
+library(tidygraph)
+library(tidyverse)
 ```
 
-Next, we create a network out of the data frame.
+In a next step, we define the *nodes* and we can also add information about the odes that we can use later on (suh as frequency information).
 
-```{r net15}
-# create network
-ajn = network(authorjournal,
-              matrix.type = "bipartite",
-              ignore.eval = FALSE,
-              names.eval = "weights")
+```{r tidy4, message=F, warning=F}
+va <- romeo %>%
+  dplyr::mutate(Persona = rownames(.),
+                Occurrences = rowSums(.)) %>%
+  dplyr::select(Persona, Occurrences) %>%
+  dplyr::filter(!str_detect(Persona, "SCENE"))
 ```
 
-Now that we have created a network object, we can visualize it. We will use colors and shapes to differentiate between authors and jorunals (or events).
-
-```{r net17}
-# set colors for each mode
-clrs = c("actor" = "orange", "event" = "lightblue")
-ggnet2(ajn, 
-       color = "mode", 
-       shape = "mode",
-       size = 7,
-       alpha = 0.7,
-       palette = clrs,
-       label.size = 5,
-       label.color = "black",
-       label = TRUE, 
-       edge.size = "weights",
-       edge.alpha = 0.3) +
-  theme(panel.background = element_rect(fill = "white"))
+```{r tidy4b, echo = F, message=F, warning=F}
+DT::datatable(va, rownames = F, filter="none", 
+              caption = "Personas and their frequencies of occurrence in Shakespeare's *Romeo and Juliet*.", 
+              options = list(pageLength = 10, scrollX=T))
 ```
 
-The colors and shapes indicate the type of element: red circles indicate authors while blue triangles indicate journals. The thickness of the lines indicate that and how often an author has published in one of the journals. As such the lines indicate journal preference and can serve as a proxy for scientific field. In our example, Michael has very strong ties to JPrag while Felicity has stronger ties to Language. This could be interpreted to indicate that Michael is more interested in pragmatics while Felicity is more interested in General Linguistics. Ilana has ties to both JPrag and Language but the thickness of the lines suggest that she too is more interested in Pragmatocs while also dealing with General Linguistics.  
+Now, we define the *edges*, i.e., the connections between nodes and, again, we can add information in separate variables that we can use later on. 
 
-Finally, you can inspect the data (which makes it easier to change, adapt, and modify) in the following way..
 
-```{r net19}
-ggnet2(ajn, 
-       color = "mode", 
-       shape = "mode",
-       size = 5,
-       alpha = 0.7,
-       palette = clrs,
-       label.size = 3,
-       label.color = "white",
-       label = TRUE, 
-       edge.size = "weights",
-       edge.alpha = 0.3)$data
+```{r tidy5, message=F, warning=F}
+ed <- romeo %>%
+  dplyr::mutate(from = rownames(.)) %>%
+  tidyr::gather(to, Frequency, BALTHASAR:TYBALT) %>%
+  dplyr::mutate(Frequency = ifelse(Frequency == 0, NA, Frequency))
 ```
+
+
+```{r tidy5b, echo = F, message=F, warning=F}
+DT::datatable(ed, rownames = F, filter="none", 
+              caption = "Edges between personasin Shakespeare's *Romeo and Juliet*.", 
+              options = list(pageLength = 10, scrollX=T))
+```
+
+Now that we have generated tables for the edges and the nodes, we can generate a graph object.
+
+```{r tidy6, message=F, warning=F}
+ig <- graph_from_data_frame(d=ed, vertices=va, directed = FALSE)
+```
+
+We will also add labels to the nodes as follows:
+
+```{r tidy7, message=F, warning=F}
+tg <- tidygraph::as_tbl_graph(ig) %>% 
+  activate(nodes) %>% 
+  mutate(label=name)
+```
+
+Now, we use the number of occurrences to define Vertice size (or node size)
+
+```{r tidy8, message=F, warning=F}
+v.size <- V(tg)$Occurrences
+# inspect
+v.size
+```
+
+We can also use the frequency information to define weights
+
+```{r tidy9, message=F, warning=F}
+E(tg)$weight <- E(tg)$Frequency
+# inspect weights
+head(E(tg)$weight, 10)
+```
+
+Finally, we define colors (by family).
+
+```{r tidy10, message=F, warning=F}
+# define colors (by family)
+mon <- c("ABRAM", "BALTHASAR", "BENVOLIO", "LADY MONTAGUE", "MONTAGUE", "ROMEO")
+cap <- c("CAPULET", "CAPULET’S COUSIN", "FIRST SERVANT", "GREGORY", "JULIET", "LADY CAPULET", "NURSE", "PETER", "SAMPSON", "TYBALT")
+oth <- c("APOTHECARY", "CHORUS", "FIRST CITIZEN", "FIRST MUSICIAN", "FIRST WATCH", "FRIAR JOHN" , "FRIAR LAWRENCE", "MERCUTIO", "PAGE", "PARIS", "PRINCE", "SECOND MUSICIAN", "SECOND SERVANT", "SECOND WATCH", "SERVANT", "THIRD MUSICIAN")
+# create color vectors
+Family <- dplyr::case_when(names(evcent(tg)$vector) %in% mon ~ "MONTAGUE",
+                              names(evcent(tg)$vector) %in% cap ~ "CAPULET",
+                              TRUE ~ "Other")
+# inspect colors
+Family
+```
+
+Now, that we c´have created the different objects and defined their properties, we visualize the network.
+
+
+```{r tidy11, message=F, warning=F}
+# set seed
+set.seed(12345)
+# edge size shows frequency of co-occurrence
+tg %>%
+   ggraph(layout = "fr") +
+   geom_edge_arc(colour= "gray50",
+                  lineend = "round",
+                 strength = .1,
+                 aes(edge_width = weight,
+                     alpha = weight)) +
+   geom_node_point(size=log(v.size)*2, 
+                   aes(color=Family)) +
+   geom_node_text(aes(label = name), 
+                  repel = TRUE, 
+                  point.padding = unit(0.2, "lines"), 
+                  size=sqrt(v.size), 
+                  colour="gray10") +
+  scale_edge_width(range = c(0, 2.5)) +
+  scale_edge_alpha(range = c(0, .3)) +
+  theme_graph(background = "white") +
+  theme(legend.position = "top") +
+  guides(edge_width = FALSE,
+         edge_alpha = FALSE)
+```
+
+
+# iGraph Networks 
+
+@WN17 have written a very recommendable tutorial on co-occurrence analysis and they propose an alternative for generating complex network visualization for co-occurrences. Their approach is to create and customize a graph object based on the `iGraph` package. To see how to create sophisticated network graphs using the `iGraph` package, see [this tutorial](https://slcladal.github.io/coll.html) on analyzing collocations or  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html). 
+
 
 We have reached the end of this tutorial and you now know how to create and modify networks in R and how you can highlight aspects of your data. 
 
+
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Network Analysis using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/net.html (Version 2020.09.29).
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Network Analysis using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/net.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
-@manual{schweinberger2020net,
+@manual{schweinberger`r format(Sys.time(), '%Y')`net,
   author = {Schweinberger, Martin},
   title = {Network Analysis using R},
   note = {https://slcladal.github.io/net.html},
-  year = {2020},
+  year = {`r format(Sys.time(), '%Y')`},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/09/28}
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
 }
 ```
 
@@ -319,11 +342,13 @@ sessionInfo()
 
 
 
+***
 
-# References{-}
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
 
 ***
 
-[Main page](https://slcladal.github.io/index.html)
+# References {-}
 
-***
