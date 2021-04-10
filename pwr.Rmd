@@ -30,7 +30,11 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 This tutorial introduces power analysis using R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/pwr.Rmd). The basis for the present tutorial is @green2016simr (which you can find [here](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.12504)). @green2016simr is a highly recommendable and thorough tutorial on performing power analysis in R. Recommendable literature on this topic are, e.g. @arnold2011simulation and @johnson2015power.  
 
-Power analysis is a method primarily used to determine the appropriate sample size for empirical studies. Power analysis have also been used post-hoc to test if the sample size of studies was sufficient to detect meaningful effects. 
+>
+> Power analysis is a method primarily used to determine the appropriate sample size for empirical studies. 
+>
+
+Power analysis have also been used post-hoc to test if the sample size of studies was sufficient to detect meaningful effects. However, such post-hoc power calculations where the target effect size comes from the data, give misleading results (@hoenig2001abuse) and should thus be treated with extreme care.
 
 ## Preparation and session set up{-}
 
@@ -52,34 +56,50 @@ library(flextable)
 
 Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
 
-# Power Analysis
+## Generating data{-}
 
-Generate data and load tidyverse package to process the data.
+In order to perform a  power analysis, we will start by loading the tidyverse package to process the data and by generating a data that we will use to determine the power of a regression model.
+
+This simulated data set has
+
+* 200 data points
+* 2 Conditions (Control, Test)
+* 10 Subjects
+* 10 Items
 
 ```{r pwr1, message=F, warning=F}
 # load package
 library(tidyverse)
 # generate data
 simdat <- data.frame(
-  sub <- rep(paste0("Sub", 1:20), each = 50),
+  sub <- rep(paste0("Sub", 1:10), each = 20),
   cond <- rep(c(
-    rep("Cond1", 10),
-    rep("Cond2", 10),
-    rep("Cond3", 10),
-    rep("Cond4", 10),
-    rep("Cond5", 10)
-  ), 20),
-  itm <- as.character(rep(1:10, 100)),
-  dep <- sample(c("AOI", "NotAOI"), 500, replace = T)
+    rep("Control", 10),
+    rep("Test", 10))
+    , 10),
+  itm <- as.character(rep(1:10, 20))
 ) %>%
   dplyr::rename(Subject = 1,
                 Condition = 2,
-                Item = 3,
-                AOI = 4) %>%
+                Item = 3) %>%
   dplyr::mutate_if(is.character, factor)
 ```
 
-The data looks like this. Each sentence (item) 
+We add a dependent variable (AOI) which represents the dependent variable in the study. In our case, we determine that Condition has a relatively weak effect (the probability of gazing into the area of interest (AOI) is .3 in the test condition compared to .2 in the control condition).
+
+```{r}
+simdat <- simdat %>%
+  dplyr::arrange(Condition) %>%
+  dplyr::mutate(
+  dep <- c(sample(c("AOI", "NotAOI"), 100, replace = T, prob = c(.2, .8)),
+           sample(c("AOI", "NotAOI"), 100, replace = T, prob = c(.3, .7)))
+  ) %>%
+  dplyr::mutate_if(is.character, factor) %>%
+  dplyr::rename(AOI = 4)
+```
+
+
+The data looks like this. 
 
 ```{r pwr3, echo = F}
 DT::datatable(simdat, rownames = FALSE, filter="none", caption = "Overview of the data set.", 
@@ -87,9 +107,17 @@ DT::datatable(simdat, rownames = FALSE, filter="none", caption = "Overview of th
 ```
 
 
-Fit model
+# Post-Hoc Power Analysis
 
-```{r pwr4}
+Now that we have generated some data, we will fit a model to it and perform a power analysis on the observed effects. 
+
+>
+> Post-hoc power calculations (where the target effect size comes from the data) give misleading results (@hoenig2001abuse) and should thus be treated with extreme care!
+>
+
+We will fit a first model to the data. Thus, in a first step, we load the `lme4` package to create a model, set a seed (to save the results and so that the results can be replicated), and then create an initial mixed-effects model.
+
+```{r pwr4, message=F, warning=F}
 # load package
 library(lme4)
 # set seed for replicability
@@ -100,10 +128,8 @@ m1 <- glmer(AOI ~ (1|Subject) +(1|Item) + Condition, family="binomial", data=sim
 summary(m1)
 ```
 
+We now check the effect sizes of the predictors in the model. We can do this by displaying the results of the model using the `tab_model` function from the `sjPlot` package.
 
-Check effects of model
-
-Tabulate results
 
 ```{r pwr5, message=F, warning=F}
 # load package
@@ -112,59 +138,159 @@ library(sjPlot)
 sjPlot::tab_model(m1)
 ```
 
-Visualize results
 
-```{r pwr6}
-# visualize effects
-sjPlot::plot_model(m1)
-```
+Now, we perform power analysis on an observed effect. This analysis tells us how likely the model is to find an observed effect given the data.
 
-Perform power analysis on observed effect
+>
+> We use a very low number of simulations (100) and we use the default z-test which is suboptimal for small samples (@bolker2009generalized). In a proper study, you shuld incerase the number of simulations (to at least 1000) and you should use a bootstrapping rather than a z-test (see @halekoh2014kenward).
+>
 
-```{r pwr7, message=F}
+```{r pwr7, results='hide', fig.keep='all', message = FALSE, include = FALSE}
 # load package
 library(simr)
 # set seed for replicability
 set.seed(12345)
 # perform power analysis for present model
-powerSim(m1, fixed("ConditionCond2", "z"), nsim=100)
+rsim0 <- powerSim(m1, fixed("ConditionTest", "z"), nsim=100)
+```
+
+Now we can inspect the results. 
+
+```{r pwr8, message = FALSE, warning = FALSE}
+# inspect results
+rsim0
 ```
 
 
-The power analysis confirms that the sample size is insufficient given the observed effect. Given the data, we can only detect the effect of Conidition:Cond2 with an accuracy of 13% (lower ci 7.11, higher ci 21.20). The target is a standard of 80 percent accuracy!
+The results of the power analysis show that, given the data at hand, the model would have detected the effect of Conidition:Test with a probability of `r rsim0$x` percent. However, and as stated above, the results of such post-hoc power calculations (where the target effect size comes from the data) give misleading results (@hoenig2001abuse) and should thus be treated with extreme care!
+
+# Power Analysis of Set Effects
+
+While the effect of Condidition:Test is rather small (given the small number of subjects and items and given the small effect size, we would thus not be surprised that out model is not very accurate in detecting this effect), the target accuracy of finding an effect that one is interested in is commonly 80 percent (see @field2012discovering, @green2016simr). The accuracy (i.e., the probability of finding an effect) depends on three main factors:
+
+* the size of the effect (bigger effects are easier to detect)
+* the variability of the effect (less variability makes it easier to detect an effect), and 
+* the sample size (the bigger the sample size, the easier it is to detect an effect). 
 
 We will now check if the sample size is sufficient to detect a small effect (Cohen's d 0.2). According to @chen2010big odds ratios of 1.68, 3.47, and 6.71 are equivalent to Cohen's d = 0.2 (small), 0.5 (medium), and 0.8 (large) - the traditional scale is 0.2 for a small, 0.5 for medium sized, and 0.8 for a large or strong effect. We need to determine the odds ratios of the fixed effects and then convert them into Cohen's d values for which we have associations between traditional denominations (small, medium, and large) and effect sife values. 
 
 
-```{r pwr8, message=FALSE, warning=FALSE}
-estimatesfixedeffects <- fixef(m1)
-exp(estimatesfixedeffects)
-```
-
-We will now change the size of the effect of ConditionCond2 to make it *small*, i.e. on the brink of being noise but being just strong enough to be considered small. In other words, we will set the effect so that its odds ratio is exactly 1.68.  
-
-
 ```{r pwr9, message=FALSE, warning=FALSE}
-# set seed for replicability
-set.seed(12345)
-# perform power analysis for small effect
-fixef(m1)["ConditionCond2"] <- 0.519
 estimatesfixedeffects <- fixef(m1)
 exp(estimatesfixedeffects)
 ```
 
+We can see that the effect is rather small which makes it very hard to detect an effect. We will now change the size of the effect of ConditionTest to represent a truly *small* effect, i.e. on the brink of being noise but being just strong enough to be considered small. In other words, we will set the effect so that its odds ratio is exactly 1.68.  
 
-
-Now we can test if the sample size of the model is sufficient to find a small effect. 
 
 ```{r pwr10, message=FALSE, warning=FALSE}
 # set seed for replicability
 set.seed(12345)
-# perform power analysis for present model
-powerSim(m1, fixed("ConditionCond2", "z"), nsim=100)
+# perform power analysis for small effect
+fixef(m1)["ConditionTest"] <- 0.519
+estimatesfixedeffects <- fixef(m1)
+exp(estimatesfixedeffects)
 ```
 
-The power analysis shows that the data is sufficient to detect a small effect for Condition:Cond2 with 79% accuracy.
+Now we can test if the sample size of the model is sufficient to find a small effect. 
+
+```{r pwr11, results='hide', fig.keep='all', message = FALSE, include = FALSE}
+# set seed for replicability
+set.seed(12345)
+# perform power analysis for present model
+rsim1 <- powerSim(m1, fixed("ConditionTest", "z"), nsim=100)
+```
+
+The results are shown below. 
+
+```{r pwr12, message = FALSE, warning=F}
+# show results
+rsim1
+```
+
+The power analysis shows that the data is sufficient to detect a small effect for Condition:Test with `r rsim1$x` percent accuracy.
+
+# Power Analysis of Extending Data
+
+We will now extend the data to see what sample size is needed to get to the 80 percent accuracy threshold. We begin by increasing the number of items from 10 to 30 to see if this would lead to a sufficient sample size.
+
+
+```{r pwr13, results='hide', fig.keep='all', message = FALSE, include = FALSE}
+# increase sample size
+m2 <- extend(m1, along="Item", n=30)
+# perform power simulation
+rsim2 <- powerSim(m2, fixed("ConditionTest", "z"), nsim=100)
+```
+
+The results are shown below. 
+
+```{r pwr14, message = FALSE, warning=F}
+# show results
+rsim2
+```
+
+By increasing the number of items to 30, we would now be able to detect a small effect (d=.2) with an accuracy of `r rsim2$x` percent. This means that we would have to add more items as 30 is not yet sufficient.
+
+# Power Analysis for Ranges
+
+We can also check the accuracy for a range of values as shown below. We begin by extending the number of Items.
+
+```{r pwr15, results='hide', fig.keep='all', message = FALSE, include = FALSE}
+pc2 <- powerCurve(m2, fixed("ConditionTest", "z"), along = "Item")
+```
+
+The results are shown below. 
+
+```{r pwr16, message = FALSE, warning=F}
+# show results
+print(pc2)
+```
+
+In addition, we can plot the results as follows:
+
+
+```{r pwr17, message = FALSE, warning=F}
+plot(pc2)
+```
+
+Instead of increasing the number of Items, we could also increase the number of Subjects. So below, we test check the accuracy for up to 30 subjects.
+
+```{r pwr18, results='hide', fig.keep='all', message = FALSE, include = FALSE}
+m3 <- extend(m1, along="Subject", n=30)
+# perform power calculation
+pc3 <- powerCurve(m3, fixed("ConditionTest", "z"), along="Subject")
+```
+
+The results are shown below. 
+
+```{r pwr19, message = FALSE, warning=F}
+# print results
+print(pc3)
+```
+
+Again, we can also visualize the results.
+
+```{r pwr20, warning = F, message = FALSE}
+# visualize results
+plot(pc3) 
+```
+
+Finally, it may be an option to increase the number of data points within subjects and items (while the number of items and subjects remain constant). 
+
+```{r pwr21, , results='hide', fig.keep='all', message = FALSE, include = FALSE}
+m4 <- extend(m1, within="Item+Subject", n=15)
+# perform power calculation
+pc4 <- powerCurve(m4, fixed("ConditionTest", "z"), within="Item+Subject", breaks=c(10, 12, 14))
+```
+
+The results are shown below. 
+
+```{r pwr22, message = FALSE, warning=F}
+# show results
+print(pc4)
+```
+
+The results show that we would have a sufficient data set if we had 14 observations per Subject in each Item because with 14 observations, the accuracy breaches the 80 percent level.
 
 # Citation & Session Info {-}
 
