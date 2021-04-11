@@ -34,8 +34,8 @@ Since Text Analysis extracts and analyses information from language data, it can
 
 The advantage of Text Analysis over manual or traditional techniques (close reading) lies in the fact that Text Analysis allows the extraction of information from large sets of textual data and in a replicable manner. Other terms that are more or less synonymous with Text Analysis are Text Mining, Text Analytics, and Distant Reading. In some cases, Text Analysis is considered more qualitative while Text Analytics is considered to be quantitative. This distinction is not taken up here as Text Analysis, while allowing for qualitative analysis, builds upon quantitative information, i.e. information about frequencies or conditional probabilities. 
 
-```{r ngram, echo=FALSE, out.width= "35%", out.extra='style="float:right; padding:10px"'}
-knitr::include_graphics("https://slcladal.github.io/images/speciescloud.png")
+```{r ngram, echo=FALSE, out.width= "60%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/GoogleNgram.png")
 ```
 
 Distant Reading is a cover term for applications of Text Analysis that allow to investigate literary and cultural trends using text data. Distant Reading contrasts with close reading, i.e. reading texts in the traditional sense whereas Distant Reading refers to the analysis of large amounts of text. Text Analysis and distant reading are similar with respect to the methods that are used but different with respect to their outlook. The outlook of distant reading is to extract information from text without close reading, i.e. reading the document(s) itself but rather focusing on emerging patterns in the language that is used. 
@@ -106,47 +106,45 @@ knitr::include_graphics("images/AntConcConcordance.png")
 
 Concordancing is helpful for inspecting how often a given word occurs in a text or a collection of texts, for seeing how the term is used in the data, for extracting examples, and it also represents a basic procedure and often the first step in more sophisticated analyses of language data. 
 
-In the following, we will use R to create a KWIC display. More precisely, we will load Charles Darwin's *On the origin of species by means of natural selection* and investigate his use of the phrase *natural selection* in across chapters. 
+In the following, we will use R to create KWICs display. More precisely, we will load Charles Darwin's *On the origin of species by means of natural selection* and investigate his use of the phrase *natural selection*. 
 
-```{r conc1, echo=T, eval = T, message=FALSE, warning=FALSE}
+We begin by loading the packages that we need and the text (Darwin's *On the Origin of Species*).
+
+```{r conc1, message=FALSE, warning=FALSE}
 # load package
+library(quanteda)
 library(tidyverse)
-# read in text
-darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
-  paste(sep = " ", collapse = " ") %>%
+# load text
+darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt")
+# inspect
+head(darwin)
+```
+
+The data still consists of short text snippets which is why we collapse these snippets and then split the collapsed data into chapters. Once we have split the data into chapters, we perform the concordancing and extract the KWICs. To cerate these kwics, we use the `kwic` function from the `quanteda` package. This function takes the data (x), the search pattern (pattern), and the window size as its main arguments. Because we are looking for a phrase that consists out of two words (*natural selection*), we also need to specify that we are looking for a phrase in the pattern argument. 
+
+```{r conc2, message=FALSE, warning=FALSE}
+# combine and split into chapters
+darwin_chapters <- darwin %>%
+  paste0(collapse = " ") %>%
   stringr::str_replace_all("(CHAPTER [XVI]{1,7}\\.{0,1}) ", "qwertz\\1") %>%
   tolower() %>%  
   stringr::str_split("qwertz") %>%
   unlist()
-# inspect data
-nchar(darwin)
+# create kwic
+kwic_ns <- quanteda::kwic(x = darwin_chapters, 
+                          pattern = phrase("natural selection"),
+                          window = 5) %>%
+  as.data.frame()
 ```
 
-Now that we have the subsections of the data that we aim to investigate, we can perform the concordancing. To create a KWIC display, we load the function `ConcR` from a script called `ConcR_2.3_loadedfiles.R`. Then we define a pattern that we want to look for (the pattern can be a simple word or it contain regular expressions). Then, we define the amount of context that we want to have displayed (in our case 50 characters). Finally, we run the concordance function `ConcR` with the arguments `darwin` (the text elements that we want to inspect), the `search pattern`, and the `context`.
 
-```{r conc3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# load function for concordancing
-source("https://slcladal.github.io/rscripts/ConcR_2.5_LoadedFiles.R")
-# start concordancing
-darwinorganism <- ConcR(darwin, "organism[s]{0,1}", 50)
+```{r conc3, message=FALSE, warning=FALSE}
 # inspect data
-darwinorganism[1:5, 2:ncol(darwinorganism)]
+DT::datatable(kwic_ns, rownames = FALSE, filter = "none")
 ```
 
-We now want to extract the chapter in which the instance has occurred.
 
-```{r conc4, echo=T, eval = T, message=FALSE, warning=FALSE}
-# clean data
-darwinorganism <- darwinorganism[complete.cases(darwinorganism),]
-# determine chapter
-darwinorganism$Chapter <- ifelse(grepl("chapter [xvi]{1,7}\\.{0,1} .*", darwinorganism$OriginalString) == T, gsub("(chapter [xvi]{1,7})\\.{0,1} .*", "\\1", darwinorganism$OriginalString), darwinorganism$OriginalString)
-# remove OriginalString column 
-darwinorganism$OriginalString <- NULL
-# inspect data
-head(darwinorganism)
-```
-
-Now, the KWIC display is finished and we could go about investigating how Darwin has used the term *organism*.
+We could now continue and analyze how Darwin used the phrase *natural selection* or we could go about investigating how Darwin has used the term *organism*.
 
 # Word Frequency
 
@@ -160,28 +158,29 @@ In a first step, we load a corpus, convert everything to lower case, remove non-
 # load package
 library(tm)
 # load and process corpus
-corpuswords <- readLines("https://slcladal.github.io/data/origindarwin.txt")  %>%
+darwin_words <- darwin  %>%
   # convert everything to lower case
   tolower() %>%
   # remove non-word characters
   str_replace_all("[^[:alpha:][:space:]]*", "")  %>%
+  tm::removePunctuation() %>%
   stringr::str_squish() %>%
   stringr::str_split(" ") %>%
   unlist()
 # inspect result
-head(corpuswords, 20)
+head(darwin_words, 20)
 ```
 
 Now that we have a vector of words, we can easily create a table representing a word frequency list (as shown below).
 
 ```{r wf2, message=FALSE, warning=FALSE}
 # create table
-wfreq <- corpuswords %>%
+wfreq <- darwin_words %>%
   table() %>%
   as.data.frame() %>%
   arrange(desc(Freq)) %>%
-  dplyr::rename(Word = 1,
-                Frequency = 2)
+  dplyr::rename(word = 1,
+                frequency = 2)
 ```
 
 ```{r wf3, echo = F, message=FALSE, warning=FALSE}
@@ -192,15 +191,12 @@ DT::datatable(wfreq, rownames = FALSE, filter = "none")
 The most frequent words are all function words which are often not meaningful or useful for an analysis. Thus, we now remove these function words (also called *stopwords*) from the frequency list and inspect the list without stopwords.
 
 ```{r wf4, message=FALSE, warning=FALSE}
+# load package
+library(tidytext)
 # create table wo stopwords
-wfreq_wostop <- corpuswords %>%
-  removeWords(stopwords("english")) %>%
-  table() %>%
-  as.data.frame() %>%
-  dplyr::filter(. != "") %>%
-  arrange(desc(Freq)) %>%
-  dplyr::rename(Word = 1,
-                Frequency = 2)
+wfreq_wostop <- wfreq %>%
+  anti_join(stop_words, by = "word") %>%
+  dplyr::filter(word != "")
 ```
 
 
@@ -214,22 +210,24 @@ Such word frequency lists can be visualized in various ways. The most common way
 ```{r wf6, message=FALSE, warning=FALSE}
 wfreq_wostop %>%
   head(10) %>%
-  ggplot(aes(x = reorder(Word, -Frequency, mean), y = Frequency)) +
+  ggplot(aes(x = reorder(word, -frequency, mean), y = frequency)) +
   geom_bar(stat = "identity") +
   labs(title = "10 most frequent non-stop words in \nCharles Darwin's *Origin of Species*",
        x = "") +
-  theme(axis.text.x = element_text(angle = 45))
+  theme(axis.text.x = element_text(angle = 45, size = 12, hjust = 1))
 ```
 
 Alternatively, word frequency lists can be visualized, although less informative, as word clouds. 
 
 ```{r wf7, message=FALSE, warning=FALSE}
-# load package
-library("wordcloud")
+# load packages
+library(wordcloud2)
+library(scales)
 # create wordcloud
-wordcloud(words = wfreq_wostop$Word, freq = wfreq_wostop$Frequency, 
-          max.words=100, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "BrBG"))
+wordcloud2(wfreq_wostop[1:100,],
+           shape = "square",
+           color = scales::viridis_pal()(8)
+          )
 ```
 
 
@@ -241,9 +239,10 @@ In a first step, we extract the number of words in each chapter.
 
 ```{r wf8, message=FALSE, warning=FALSE}
 # extract number of words per chapter
-darwinchapters <- darwin %>%
-  strsplit(" ")
-words <- sapply(darwinchapters, function(x) length(x))
+words <- as.vector(sapply(darwin_chapters, function(x) {
+  x <- unlist(str_split(x, " "))
+  x <- length(x)
+  }))
 # inspect data
 words
 ```
@@ -252,7 +251,7 @@ Next, we extract the number of matches in each chapter.
 
 ```{r wf9, message=FALSE, warning=FALSE}
 # extract number of matches per chapter
-matcheschapters <- darwin %>%
+matcheschapters <- darwin_chapters %>%
   str_extract_all(., "organism[s]{0,1}") 
 matches <- sapply(matcheschapters, function(x) length(x))
 # inspect data
@@ -263,7 +262,7 @@ Now, we extract the names of the chapters and create a table with the chapter na
 
 ```{r wf10, echo=T, eval = T, message=FALSE, warning=FALSE}
 # extract chapters
-Chapters <- as.vector(unlist(sapply(darwin, function(x){
+Chapters <- as.vector(unlist(sapply(darwin_chapters, function(x){
   x <- gsub("(chapter [xvi]{1,7})\\.{0,1} .*", "\\1", x)
   x <- ifelse(nchar(x) > 50, "chapter 0", x)
 })))
@@ -279,10 +278,11 @@ We can now visualize the relative frequencies of our search word per chapter.
 
 ```{r wf11, echo=T, eval = T, message=FALSE, warning=FALSE}
 # create plot
-ggplot(tb, aes(x=Chapters, y=Frequency, group =1)) + 
-  geom_smooth(aes(y = Frequency, x = Chapters), color = "goldenrod2")+
-  geom_line(aes(y = Frequency, x = Chapters), color = "indianred4") +         
+ggplot(tb, aes(x = Chapters, y = Frequency, group = 1)) + 
+  geom_smooth(color = "goldenrod2") +
+  geom_line(color = "indianred4") +         
   guides(color=guide_legend(override.aes=list(fill=NA))) +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   scale_y_continuous(name ="Relative Frequency (per 1,000 words)")
 ```
@@ -299,7 +299,7 @@ orwell <- paste(as.vector(unlist(orwell)), sep = " ", collapse = " ")
 melville <- paste(as.vector(unlist(melville)), sep = " ", collapse = " ")
 # load libraries
 library(tm)
-library(dplyr)
+library(wordcloud)
 library(xtable)
 # clean texts
 docs <- Corpus(VectorSource(c(orwell, melville))) %>%
@@ -322,22 +322,15 @@ comparison.cloud(tdm, random.order=FALSE,
 
 Frequency information can also tell us something about the nature of a text. For instance, private dialogues will typically contain higher rates of second person pronouns compared with more format text types, such as, for instance, scripted monologues like speeches. For this reason, word frequency lists can be used in text classification and to determine the formality of texts.
 
-As an example, below you find the number of the second person pronouns “you” and “your” and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the International corpus of English (ICE).
-
-```{r wf13, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
-numbers <- matrix(c("you, your", "6761", "659", 
-"Other words",	"259625",	"105295"), byrow = T, nrow = 2)
-colnames(numbers) <- c("", "Private dialogues", "Scripted monologues")
-kable(numbers, caption = "", align=c(rep('c',times=2)))
-```
-
-If we calculate the percentage of second person pronouns in both text types and see whether private dialogues contain more of these second person pronouns than scripted monologues (i.e. speeches).
+As an example, below you find the number of the second person pronouns *you* and *your* and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the *International Corpus of English* (ICE). In addition, the tables shows  the percentage of second person pronouns in both text types to enable seeing  whether private dialogues contain more of these second person pronouns than scripted monologues (i.e. speeches).
 
 ```{r wf14, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
 numbers <- matrix(c("you, your", "6761", "659", 
 "Other words",	"259625",	"105295", "Percent",	"2.60",	"0.63"), byrow = T, nrow = 3)
 colnames(numbers) <- c("", "Private dialogues", "Scripted monologues")
-kable(numbers, caption = "", align=c(rep('c',times=2)))
+numbers %>%
+  kable(caption = "Use of 2nd person pronouns (and all other words) in ICE Ireland") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
 ```
 
 This simple example shows that second person pronouns make up 2.6 percent of all words that are used in private dialogues while they only amount to 0.63 percent in scripted speeches. A handy way to present such differences visually are association and mosaic plots.
@@ -349,54 +342,26 @@ rownames(d) <- c("you, your", "Other words")
 assocplot(d)
 ```
 
-Bars above the dashed line indicate relative overuse while bars below the line suggest relative underuse. Therefore, the association plot indicates underuse of "you/your" and overuse of "other words" in monologues while the opposite trends holds true for dialogues, i.e. overuse of "you/your" and underuse of "Other words". 
+Bars above the dashed line indicate relative overuse while bars below the line suggest relative under-use. Therefore, the association plot indicates under-use of *you* and *your* and overuse of *other words* in monologues while the opposite trends holds true for dialogues, i.e. overuse of *you* and *your* and under-use of *Other words*. 
 
 # Collocations and N-grams
 
-Collocation refers to the co-occurrence of words. A typical example of a collocation is “Merry Christmas” because the words merry and Christmas occur together more frequently together than would be expected by chance, if words were just randomly stringed together.  
+Collocation refers to the co-occurrence of words. A typical example of a collocation is *Merry Christmas* because the words merry and Christmas occur together more frequently together than would be expected by chance, if words were just randomly stringed together.  
 
-N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the "Origin" to create a bi-gram list. As a first step, we load the data and split it into individual words.
-
-```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# load libraries
-library(dplyr)
-library(stringr)
-library(tm)
-# read in text
-darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt") %>%
-  paste(sep = " ", collapse = " ") %>%
-  removePunctuation() %>%
-  str_replace_all(" {2,}", " ") %>% 
-  tolower() %>%
-  strsplit(" ") %>%
-  unlist()
-# inspect data
-head(darwin)
-```
+N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the *Origin* to create a bi-gram list. We can simply take each word and combine it with the following word.
 
 ```{r coll2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # create data frame
-darwindf <- data.frame(darwin[1:length(darwin)-1], 
-                       darwin[2:length(darwin)])
-# add column names
-colnames(darwindf) <- c("Word1", "Word2")
+darwin_bigrams <- data.frame(darwin_words[1:length(darwin_words)-1], 
+                       darwin_words[2:length(darwin_words)]) %>%
+  dplyr::rename(Word1 = 1,
+                Word2 = 2) %>%
+  dplyr::mutate(Bigram = paste0(Word1, " ", Word2)) %>%
+  dplyr::group_by(Bigram) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  dplyr::arrange(-Frequency)
 # inspect data
-head(darwindf)
-```
-
-```{r coll3, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# create data frame
-darwin2grams <- paste(darwindf$Word1, darwindf$Word2, sep = " ")
-# tabulate results
-darwin2gramstb <- table(darwin2grams)
-# create data frame
-darwin2gramsdf <- data.frame(darwin2gramstb)
-# order data frame
-darwin2gramsdf <- darwin2gramsdf[order(darwin2gramsdf$Freq, decreasing = T),]
-# simplify column names
-colnames(darwin2gramsdf) <- c("Bigram", "Frequency")
-# inspect data
-head(darwin2gramsdf)
+head(darwin_bigrams)
 ```
 
 Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
@@ -413,8 +378,8 @@ In the following, we will use the frequency of phonemes to classify a text. In a
 ```{r tc1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # read in German text
 German <- readLines("https://slcladal.github.io/data/phonemictext1.txt") %>%
-  str_replace_all(" ", "") %>%
-  str_split("") %>%
+  stringr::str_replace_all(" ", "") %>%
+  stringr::str_split("") %>%
   unlist() %>%
   as.vector()
 # inspect data
@@ -509,19 +474,12 @@ According to the cluster analysis, the unknown text clusters together with the E
 Before we begin with the actual classification, we will split the data so that we have one data set without "Unknown" (this is our training set) and one data set with only "Unknown" (this is our test set).
 
 ```{r echo=T, eval = T, message=FALSE, warning=FALSE}
-#load library
-library(dplyr)
 # create training set
 train <- classdw %>%
   filter(Language != "Unknown")
-# increase training set size
-#train <- rbind(train, train, train, train, train, train, train, train)
 # create test set
 test <- classdw %>%
   filter(Language == "Unknown")
-# convert variables
-#train$Language <- as.factor(train$Language)
-#train$Language <- as.factor(train$Language)
 # inspect data
 train
 ```
@@ -529,7 +487,7 @@ train
 Finally, we can apply our classifier to our data. The classifier we use is a k-nearest neighbour classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
 
 ```{r message=FALSE, warning=FALSE}
-# activate library
+# load package
 library("class")
 # apply k-nearest-neighbor (knn) classifier
 prediction <- class::knn(train[,2:ncol(train)], test[,2:ncol(test)], cl = train[, 1], k = 3)
