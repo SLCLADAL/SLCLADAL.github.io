@@ -516,7 +516,7 @@ DT::datatable(mlrdata, rownames = FALSE, options = list(pageLength = 5, scrollX=
 
 The data set consist of three variables stored in three columns. The first column contains the relationship status of the women, the second whether the man is interested in the woman, and the third column represents the money spend on the present. The data set represents 100 cases and the mean amount of money spend on a present is 88.38 dollars. In a next step, we visualize the data to get a more detailed impression of the relationships between variables.
 
-```{r mlr3}
+```{r mlr3, message=F, warning=F}
 # load packages
 library(vip)
 # create plots
@@ -773,8 +773,7 @@ cutoff <- 4/((nrow(mlrdata)-length(m2.mlr$coefficients)-2))
 # start plotting
 par(mfrow = c(1, 2))           # display plots in 1 row/2 columns
 qqPlot(m2.mlr, main="QQ Plot") # create qq-plot
-plot(m2.mlr, which=4, cook.levels = cutoff) # plot cook*s distance
-par(mfrow = c(1, 1))           # restore original settings
+plot(m2.mlr, which=4, cook.levels = cutoff); par(mfrow = c(1, 1))
 ```
 
 Although the diagnostic plots indicate that additional points may be problematic, but these data points deviate substantially less from the trend than was the case with the data points that have already been removed. To make sure that retaining the data points that are deemed potentially problematic by the diagnostic plots, is acceptable, we extract diagnostic statistics and add them to the data.
@@ -1808,91 +1807,58 @@ Major disadvantages of mixed-effects regression modeling are that they are prone
 
 ### Introduction{-}
 
-So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker. 
+So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker (in addition to the overall intercept that is not shown in the center and the right panel of the figure below). 
 
 ```{r lmm1, echo=F, eval = T, message=FALSE, warning=FALSE}
-# random intercepts and random slops
-x <- 0:10
-y = 0:10
-# start plot
-par(mfrow = c(1, 4))
-# intercepts
-plot(x, y, type = "n", xaxt='n', yaxt='n', ylab='Weight', xlab = "Height", xlim = c(0, 10), ylim = c(-5, 10))
-axis(2, seq(-5,10, 5), seq(50, 110, 20))
-abline(0, 1, lty = 1, col ="black")
-mtext("Fixed-Effects Model:\n1 Intercept + 1 Slope", 1, 2, cex = .6)
-box()
-# random intercepts
-plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
-abline(4, 1, col ="black")
-abline(2, 1, col ="black")
-abline(2, 1, col ="black")
-abline(0, 1, col ="black")
-abline(-1, 1, col ="black")
-abline(-2, 1, col ="black")
-abline(-4, 1, col ="black")
-mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope", 1, 3, cex = .6)
-box()
-# random slopes
-plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
-abline(0, 1.75, col ="black")
-abline(0, 1.5, col ="black")
-abline(0, 1.25, col ="black")
-abline(0, 0, col ="black")
-abline(0, -.25, col ="black")
-abline(0, -.5, col ="black")
-abline(0, -.75, col ="black")
-mtext("Mixed-Effects Model:\n1 Intercept\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
-box()
-# random slopesund random intercepts
-plot(x, y, type = "n", xaxt='n', yaxt='n', ann=FALSE, xlim = c(0, 10), ylim = c(-5, 10))
-abline(2, 1.75, col ="black")
-abline(-1, 1.5, col ="black")
-abline(1, 1.25, col ="black")
-abline(4, 0, col ="black")
-abline(-4, -.25, col ="black")
-abline(0, -.5, col ="black")
-abline(-1, -.75, col ="black")
-mtext("Mixed-Effects Model:\n1 Intercept per Random Effect Level\n+ 1 Slope per Random Effect Level", 1, 3, cex = .6)
-box()
-# restore original graphic's parameters
-par(mfrow = c(1, 1))
+Height <- c(169, 171, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
+Weight <- c(68, 67, 65, 66, 64, 80, 75, 70, 85, 92, 86, 87, 85, 82, 80) 
+Group <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
+# create data sets
+tb <- data.frame(Height,Weight, Group)
+m1 <- lm(Weight ~ Height + Group, data = tb)
+tb <- tb %>%
+  dplyr::mutate(PWeight = predict(m1, tb))
+# plot
+p1 <- ggplot(tb, aes(Height, Weight)) +
+  geom_point(size = 2)
+p2 <- ggplot(tb, aes(Height, Weight)) +
+  geom_smooth(se = F, method = "lm", aes(x = Height, y = PWeight), color = "orange", size = .5) +
+  geom_point(size = 2) +
+  ggtitle("Fixed-effects model \n(with fixed intercept)")
+
+p3 <- ggplot(tb, aes(Height, Weight)) +
+  geom_point(size = 2, aes(shape = Group, color = Group)) +
+  #geom_smooth(se = F, method = "lm", aes(x = Height, y = PWeight), color = "orange", size = .5) +
+  geom_smooth(method = "lm", se = F, aes(x = Height, y = PWeight, color = Group), size = .5) +
+  theme(legend.position = "none") +
+  ggtitle("Mixed-effects model \n (with random intercepts)")
+
+p4 <- ggplot(tb, aes(Height, Weight)) +
+  geom_smooth(se = F, method = "lm", size = .5, aes(shape = Group, color = Group), linetype = "dashed")  +
+  #geom_smooth(se = F, method = "lm", aes(x = Height, y = PWeight),color = "orange", size = .5) +
+  geom_point(size = 2, aes(shape = Group, color = Group)) + 
+  theme(legend.position = "none") +
+  ggtitle("Mixed-effects model \n(with random intercepts + \nrandom slops)")
+# show plot
+ggpubr::ggarrange(p2, p3, p4, ncol = 3)
 ```
 
 
 ### Random Effects{-}
 
-*Random Effects* can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x equals 0) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (left panel of the Figure above), mixed-effects models can therefore have various *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel in the Figure). 
+*Random Effects* can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x equals 0) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (left panel in the figure above), mixed-effects models can therefore have various *random intercepts* (center panel) or various *random slopes*, or both, various *random intercepts* and various *random slopes* (right panel). 
 
 What features do distinguish random and fixed effects? 
 
-1) Random effects represent a higher level variable under which data points are grouped.
+1) Random effects represent a higher level variable under which data points are grouped. This implies that random effects must be categorical (or nominal but *they a´cannot be continuous*!) [see @winter2019statistics, p. 236].
 
-2) Random effects represent a sample of an infinite number of possible levels. For instance, speakers represent a potentially infinite pool of elements from which a many different samples can be drawn. Thus, random effects represent a random sample sample. Fixed effects, on the other hand, typically do not represent a random sample but a fixed set of variable levels (e.g. Age groups, or parts-of-speech).
+2) Random effects represent a sample of an infinite number of possible levels. For instance, speakers, trials, items, subjects, or words represent a potentially infinite pool of elements from which many different samples can be drawn. Thus, random effects represent a random sample sample. Fixed effects, on the other hand, typically do not represent a random sample but a fixed set of variable levels (e.g. Age groups, or parts-of-speech).
 
 3) Random effects typically represent many different levels while fixed effects typically have only a few. @zuur2013beginner propose that a variable may be used as a fixed effect if it has less than 5 levels while it should be treated as a random effect if it has more than 10 levels. Variables with 5 to 10 levels can be used as both. However, this is a rule of thumb and ignores the theoretical reasons (random sample and nestedness) for considering something as a random effect and it also is at odds with the way that repeated measures are models (namely as mixed effects) although they typically only have very few levels.  
 
-In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires large data sets. Consider the Figure below to understand what is meant by *random intercepts*.
+4) Fixed effects represent an effect that if we draw many samples, the effect would be consistent across samples [@winter2019statistics] while random effects should vary for each new sample that is drawn.
 
-```{r lmm2, eval=T, echo=F, message=FALSE, warning=FALSE}
-Height <- c(169, 171, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
-Weight <- c(68, 67, 65, 66, 64, 80, 75, 70, 85, 92, 86, 87, 85, 82, 80) # plot scatterplot and the regression line
-Group <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
-tb <- data.frame(Height,Weight, Group)
-# plot
-p1 <- ggplot(tb, aes(Height, Weight)) +
-  geom_point(size = 2)
-p2 <- ggplot(tb, aes(Height, Weight)) +
-  geom_smooth(se = F, method = "lm", color = "orange", linetype = "dashed") +
-  geom_point(size = 2)
-p3 <- ggplot(tb, aes(Height, Weight)) +
-  geom_smooth(se = F, method = "lm", size = .5, aes(shape = Group, color = Group))  +
-  geom_smooth(se = F, method = "lm", color = "orange", linetype = "dashed") +
-  geom_point(size = 2, aes(shape = Group, color = Group))
-ggpubr::ggarrange(p1, p2, p3, ncol = 3)
-```
-
-The left panel merely shows the data while the center panel includes a simple regression line for a linear model that estimates Weight based on Height. The right panel shows the regression line and, in addition, random intercepts each of the three groups which were sampled in the data.
+In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires larger data sets (but have a better fit because intercepts are not forced to be parallel and the lines therefore have a better fit). Consider the center and the right plots above to understand what is meant by *random intercepts* and *random slopes*.
 
 After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
 
@@ -1915,7 +1881,10 @@ lmmdata <- read.delim("https://slcladal.github.io/data/lmmdata.txt", header = TR
 
 ```{r lmm3b, echo = F}
 # inspect data
-DT::datatable(lmmdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
+lmmdata %>%
+  head(20) %>%
+  kable(caption = "First 20 rows of lmmdata.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
 ```
 
 The data set contains the date when the text was written (Date), the genre of the text (Genre), the name of the text (Text), the relative frequency of prepositions in the text (Prepositions), and the region in which the text was written (Region). We now plot the data to get a first impression of its structure.
@@ -2251,20 +2220,24 @@ tab_model(m5.lme)
 
 ***
 
-<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+> 
+> The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. 
+>
 
+***
+
+The respective call for the model is:
 
 ```{r lmm28b}
 r.squaredGLMM(m5.lme)
 ```
 
-***
 
 A mixed-effect linear regression model which contained the genre of texts as random effect was fit to the data in a step-wise-step up procedure. Due to the presence of outliers in the data, weights were included into the model which led to a significantly improved model fit compared to an un-weight model ($\chi$^2^(2): 39.17, p: 0.0006). The final minimal adequate model performed significantly better than an intercept-only base-line model ($\chi$^2^(1): 12.44, p =.0004) and showed that the frequency of prepositions increases significantly but only marginally with the date of composition (Estimate: 0.02, CI: 0.01-0.03, p < .001, marginal R^2^ =  0.0174, conditional R^2^ =  0.4324). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data. 
 
 ### Remarks on Prediction{-}
 
-While the number of intercepts, the model-reports, and the way how mixed- and fixed-effects arrive at predictions differ, their predictions are extremely similar and almost identical (at least when dealing with a simple random effect structure). Consider the following example where we create analogous fixed and mixed effect models and plot their predicted frequencies of prepositions per genre across the un-centered date of composition. The predictions of the mixed-effects model are plotted as a solid red line, while the predictions of the fixed-effects model are plotted as dashed blue lines.  
+While the number of intercepts, the model reports, and the way how mixed- and fixed-effects arrive at predictions differ, their predictions are extremely similar and almost identical (at least when dealing with a simple random effect structure). Consider the following example where we create analogous fixed and mixed effect models and plot their predicted frequencies of prepositions per genre across the un-centered date of composition. The predictions of the mixed-effects model are plotted as a solid red line, while the predictions of the fixed-effects model are plotted as dashed blue lines.  
 
 ```{r lmm29, message=FALSE, warning=FALSE}
 # creat lm model
@@ -2283,7 +2256,7 @@ ggplot(lmmdata, aes(x = DateUnscaled, y = lmePredictions, group = Genre)) +
   coord_cartesian(ylim = c(0, 220))
 ```
 
-The predictions overlap perfectly which means that the predictions of both are identical - irrespective of whether genre is part of the mixed or the fixed effects structure. 
+The predictions overlap almost perfectly which means that the predictions of both are almost identical - irrespective of whether genre is part of the mixed or the fixed effects structure. 
 
 ## Mixed-Effects Binomial Logistic Regression
 
@@ -2301,9 +2274,9 @@ Major disadvantages of regression modeling are that they are prone to producing 
 
 As is the case with linear mixed-effects models, binomial logistic mixed-effect models are multivariate analyses that treat data points as hierarchical or grouped in some way. In other words, they take into account that the data is nested in the sense that data points are produced by the same speaker or are grouped by some other characteristics. In mixed-models, hierarchical structures are modelled as *random effects*. If the random effect structure represents speakers then this means that a mixed-model would have a separate intercept and/or slope for each speaker. 
 
-*Random Effects* in linear models can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (centre left panel \ref{fig:mem02}) or various *random slopes* (centre right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+*Random Effects* in linear models can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (center left panel \ref{fig:mem02}) or various *random slopes* (center right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
 
-```{r blmm1, eval = T, echo=F, message=FALSE, warning=FALSE}
+```{r blmm1, echo=F, message=FALSE, warning=FALSE}
 x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
 x2 <- x1-2
 x3 <- x2-2
@@ -2944,17 +2917,19 @@ tab_model(m1.glmer)
 ```
 
 
-<span style="color: red;">NOTE</span>
-```
-The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
-```
+***
+
+> 
+> The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+>
+
+***
 
 ```{r pmm11cd, message=F, warning=F}
 
 r.squaredGLMM(m1.glmer)
 ```
 
-***
 
 Also note that our model suffers from a serious problem (near singular fit). If this were not just an example, you should not(!) report this model!
 
@@ -3151,7 +3126,10 @@ tab_model(m1.glmer)
 
 ***
 
-<span style="color: red;">Note</span>: The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+>
+> The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The correct R^2^ values can be extracted using the `r.squaredGLMM` function from the `MuMIn` package. The respective call for the model is:
+>
+
 
 ```{r nbmm6d}
 r.squaredGLMM(m1.glmer)
