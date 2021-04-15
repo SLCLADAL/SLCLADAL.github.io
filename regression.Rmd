@@ -65,13 +65,20 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 ```{r prep0, echo=T, eval = F}
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # suppress math annotation
+options("scipen" = 100, "digits" = 10) # suppress math annotation
 # install packages
 install.packages(c("boot", "car", "caret", "tidyverse",  "effects", "foreign", 
                    "Hmisc", "DT", "knitr", "lme4", "MASS", "mlogit", "msm", 
                    "QuantPsyc", "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", 
                    "vcd", "visreg", "MuMIn"))
 ```
+
+```{rprep1, echo=F, eval=T}
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+```
+
 
 Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
 
@@ -938,7 +945,11 @@ Furthermore, the final minimal adequate regression model reports a highly signif
 
 ## Multiple Binomial Logistic Regression
 
-Logistic regression is a multivariate analysis technique that builds on and is very similar in terms of its implementation to linear regression but logistic regressions take dependent variables that represent nominal rather than numeric scaling [@harrell2015regression]. The difference requires that the linear regression must be modified in certain ways to avoid producing non-sensical outcomes. The most fundamental difference between logistic and linear regressions is that logistic regression work on the probabilities of an outcome (the likelihood), rather than the outcome itself. In addition, the likelihoods on which the logistic regression works must be logged (logarithmized) in order to avoid produce predictions that produce values greater than 1 (instance occurs) and 0 (instance does not occur).
+Logistic regression is a multivariate analysis technique that builds on and is very similar in terms of its implementation to linear regression but logistic regressions take dependent variables that represent nominal rather than numeric scaling [@harrell2015regression]. The difference requires that the linear regression must be modified in certain ways to avoid producing non-sensical outcomes. The most fundamental difference between logistic and linear regressions is that logistic regression work on the probabilities of an outcome (the likelihood), rather than the outcome itself. In addition, the likelihoods on which the logistic regression works must be logged (logarithmized) in order to avoid produce predictions that produce values greater than 1 (instance occurs) and 0 (instance does not occur). You can check this by logging the values from -10 to 10 using the `plogis` function as shown below.
+
+```{r blm0, message=FALSE, warning=FALSE}
+plogis(-10:10)
+```
 
 To understand what this mean, we will use a very simple example. In this example, we want to see whether the height of men affect their likelihood of being in a relationship. The data we use represents a data set consisting of two variables: height and relationship.
 
@@ -978,7 +989,7 @@ p2 <- ggplot(blrex, aes(x=bodyheight, y=relationship)) +
 ggpubr::ggarrange(p1, p2, ncol = 2)
 ```
 
-The left panel of the Figure above shows that a linear model would predict values for the relationship status, which represents a factor (0 = Not in Relationship and 1 = In Relationship), that are non-sensical because 1.1 does not make sense if the only options are 0 OR 1. The logistic function shown in the right panel of the Figure above solves this problem by working on the logged probabilities of an outcome rather than on the actual outcome.
+The left panel of the Figure above shows that a linear model would predict values for the relationship status, which represents a factor (0 = Not in Relationship and 1 = In Relationship), that are nonsensical because values above or below 1 do not make sense if the only options are 0 OR 1. The logistic function shown in the right panel of the Figure above solves this problem by working on the logged probabilities of an outcome rather than on the actual outcome.
 
 ### Example 1: EH in Kiwi English{-}
 
@@ -1224,9 +1235,7 @@ logisticPseudoR2s(lr.glm)
 
 ```
 
-The low pseudo-R^2^ values show that our model has very low explanatory power. For instance, the value of Hosmer and Lemeshow R^2^ (0.026) "is the proportional reduction in the absolute value of the log-likelihood measure and as such it is a measure of how much the badness of fit improves as a result of the inclusion of the predictor variables" [@field2012discovering 317].
-
-In essence, all the pseudo-R^2^ values are measures of how substantive the model is (how much better it is compared to a baseline model. Next, we extract the confidence intervals for the coefficients of the model.
+The low pseudo-R^2^ values show that our model has very low explanatory power. For instance, the value of Hosmer and Lemeshow R^2^ (0.026) "is the proportional reduction in the absolute value of the log-likelihood measure and as such it is a measure of how much the badness of fit improves as a result of the inclusion of the predictor variables" [@field2012discovering 317]. In essence, all the pseudo-R^2^ values are measures of how substantive the model is (how much better it is compared to a baseline model). Next, we extract the confidence intervals for the coefficients of the model.
 
 ```{r blm24, message=F, warning=F}
 # extract the confidence intervals for the coefficients
@@ -1262,10 +1271,11 @@ blrdata <- blrdata %>%
 caret::confusionMatrix(blrdata$Prediction, blrdata$EH)
 ```
 
+We can see that out model has never predicted the use of *eh* which is common when dealing with rare phenomena. This is expected as the event s so rare that the probability of it not occurring substantively outweighs the probability of it occurring. As such, the prediction accuracy of our model is not significantly better compared to the prediction accuracy of the baseline model which is the no-information rate (NIR)) (p = 0.5029).
 
 We can use the `plot_model` function from the `sjPlot` package to visualize the effects.
 
-```{r blm27}
+```{r blm27, warning=F, message=F}
 # predicted probability
 efp1 <- plot_model(lr.glm, type = "pred", terms = c("Age"), axis.lim = c(0, 1)) 
 # predicted percentage
@@ -1273,19 +1283,12 @@ efp2 <- plot_model(lr.glm, type = "pred", terms = c("Gender"), axis.lim = c(0, 1
 grid.arrange(efp1, efp2, nrow = 1)
 ```
 
-A more intuitive way to visualize results is to plot the predicted values against the observed values.
+And we can also combine the visualization of the effects in a single plot as shown below.
 
-```{r blm28}
-# extract predicted probabilities
-blrdata$Predicted <- predict(lr.glm, blrdata, type = "response")
-# plot
-ggplot(blrdata, aes(Age, Predicted, color = Gender)) +
-  stat_summary(fun = mean, geom = "point") +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  theme_set(theme_bw(base_size = 10)) +
+```{r blm28, message=F, warning=F}
+sjPlot::plot_model(lr.glm, type = "pred", terms = c("Age", "Gender"), axis.lim = c(0, 1)) +
   theme(legend.position = "top") +
-    ylim(0, .75) +
-  labs(x = "", y = "Predicted Probabilty of eh") +
+  labs(x = "", y = "Predicted Probabilty of eh", title = "") +
   scale_color_manual(values = c("gray20", "gray70"))
 ```
 
@@ -1843,35 +1846,41 @@ Major disadvantages of mixed-effects regression modeling are that they are prone
 
 ### Introduction{-}
 
-So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker (in addition to the overall intercept that is not shown in the center and the right panel of the figure below). 
+So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker (in addition to the overall intercept that is shown as an orange line in the figure below). 
 
 ```{r lmm1, echo=F, eval = T, message=FALSE, warning=FALSE}
+library(lme4)
 Height <- c(169, 171, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
 Weight <- c(68, 67, 65, 66, 64, 80, 75, 70, 85, 92, 86, 87, 85, 82, 80) 
 Group <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
 # create data sets
 tb <- data.frame(Height,Weight, Group)
 m1 <- lm(Weight ~ Height + Group, data = tb)
+m2 <- lmer(Weight ~ Height + (1|Group), data = tb)
 tb <- tb %>%
-  dplyr::mutate(PWeight = predict(m1, tb))
+  dplyr::mutate(PWeight = predict(m1, tb),
+                PWeight_lme = predict(m2, tb))
 # plot
 p1 <- ggplot(tb, aes(Height, Weight)) +
   geom_point(size = 2)
 p2 <- ggplot(tb, aes(Height, Weight)) +
-  geom_smooth(se = F, method = "lm", aes(x = Height, y = PWeight), color = "orange", size = .5) +
+  geom_abline(intercept = summary(m2)$coefficients[1], slope = summary(m2)$coefficients[2], 
+              color="orange", size = .75) +
   geom_point(size = 2) +
   ggtitle("Fixed-effects model \n(with fixed intercept)")
 
 p3 <- ggplot(tb, aes(Height, Weight)) +
   geom_point(size = 2, aes(shape = Group, color = Group)) +
-  #geom_smooth(se = F, method = "lm", aes(x = Height, y = PWeight), color = "orange", size = .5) +
+  geom_abline(intercept = summary(m2)$coefficients[1], slope = summary(m2)$coefficients[2], 
+              color="orange", size = .75) +
   geom_smooth(method = "lm", se = F, aes(x = Height, y = PWeight, color = Group), size = .5) +
   theme(legend.position = "none") +
   ggtitle("Mixed-effects model \n (with random intercepts)")
 
 p4 <- ggplot(tb, aes(Height, Weight)) +
-  geom_smooth(se = F, method = "lm", size = .5, aes(shape = Group, color = Group), linetype = "dashed")  +
-  #geom_smooth(se = F, method = "lm", aes(x = Height, y = PWeight),color = "orange", size = .5) +
+  geom_smooth(se = F, method = "lm", size = .5, aes(shape = Group, color = Group))  +
+  geom_abline(intercept = summary(m2)$coefficients[1], slope = summary(m2)$coefficients[2], 
+              color="orange", size = .75) +
   geom_point(size = 2, aes(shape = Group, color = Group)) + 
   theme(legend.position = "none") +
   ggtitle("Mixed-effects model \n(with random intercepts + \nrandom slops)")
@@ -1894,7 +1903,7 @@ What features do distinguish random and fixed effects?
 
 4) Fixed effects represent an effect that if we draw many samples, the effect would be consistent across samples [@winter2019statistics] while random effects should vary for each new sample that is drawn.
 
-In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires larger data sets (but have a better fit because intercepts are not forced to be parallel and the lines therefore have a better fit). Consider the center and the right plots above to understand what is meant by *random intercepts* and *random slopes*.
+In the following, we will only focus on models with random intercepts because this is the more common method and because including both random intercepts and random slopes requires larger data sets (but have a better fit because intercepts are not forced to be parallel and the lines therefore have a better fit). You should, however, always think about what random effects structure is appropriate for your model - a very recommendable explanation of how to chose which random effects structure is best (and about what the determining factors for this decision are) is give in @winter2019statistics[241-244]. Also, consider the center and the right plots above to understand what is meant by *random intercepts* and *random slopes*.
 
 After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
 
@@ -2135,17 +2144,24 @@ The random effect estimates do not show any outliers or drastically increased or
 
 ### Effect Sizes{-}
 
-We will now extract effect sizes (in the example: the effect size of date) and calculate normalized effect size measures (this effect size measure works for all fixed effects). To calculate the effect size, take the square root of the squared t-value divided by the t-value squared plus the degrees of freedom: 
+We will now extract effect sizes (in the example: the effect size of `Date`) and calculate normalized effect size measures (this effect size measure works for all fixed effects). When you have factorial design, you can take the square root of the squared t-value divided by the t-value squared plus the degrees of freedom to calculate the effect size: 
 
-r = `sqrt(t^2^/(t^2^+df))`.
+r = $\sqrt{ \frac{ t^2}{(t^2 + df) } }$ = $\sqrt{ \frac{ 3.99^2}{(3.99^2 + 520) } }$ = `r round(sqrt(3.99^2/(3.99^2+520)), 3)`
 
-A brief word of warning is in order here: only apply this function to main effects that are not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear [@field2012discovering 641].
+***
+> 
+> Two words of warning though: 
+> 1. In our case, the effect we are interested in is not factorial but continuous which means that we should not use this effect size measure. We only show this here as an exeample for how you can calculate the ffect size measure r.
+> 2. Only apply this function to main effects that are not involved in interactions as they are meaningless because the amount of variance explained by main effects involved in interactions is unclear [@field2012discovering 641].
+>
+
+***
 
 ```{r lmm21a, echo = F, eval = F, message=F, warning=F}
 # WARNING: disfunct!
-
 # calculate effect size 
-ggeffects::ggpredict(m5.lme, terms = "Date")
+#ggeffects::ggpredict(m5.lme, terms = "Date")
+effects::predictorEffects(m5.lme)
 ```
 
 ```{r lmm21g}
@@ -2209,8 +2225,7 @@ We now create diagnostic plots. What we wish to see in the diagnostic plots is a
 ```{r lmm22}
 # start plotting
 par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
-plot(m5.lme, pch = 20, col = "black", lty = "dotted")
-par(mfrow = c(1, 1))
+plot(m5.lme, pch = 20, col = "black", lty = "dotted"); par(mfrow = c(1, 1))
 ```
 
 What a wonderful unstructured cloud - the lack of structure tells us that the model is "healthy" and does not suffer from heteroscedasticity. We will now create more diagnostic plots to find potential problems [@pinheiro2000mixedmodels 21].
@@ -2219,7 +2234,6 @@ What a wonderful unstructured cloud - the lack of structure tells us that the mo
 # fitted values by Genre
 plot(m5.lme, form = resid(., type = "p") ~ fitted(.) | Genre, abline = 0, 
      cex = .5, pch = 20, col = "black")
-
 ```
 
 In contrast to the unweight model, no data points are named which indicates that the outliers do no longer have unwarranted influence on the model. Now, we check the residuals of fitted values against observed values [@pinheiro2000mixedmodels 179]. What we would like to see is a straight, upwards going line.
