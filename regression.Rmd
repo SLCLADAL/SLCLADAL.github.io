@@ -2668,31 +2668,27 @@ The interaction between Priming, Age and ConversationType is not significant and
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
 m13.glmer <- update(m6.glmer, .~.+Priming*Gender*ConversationType)
 ifelse(max(car::vif(m13.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-anova(m13.glmer, m6.glmer, test = "Chi")
-Anova(m13.glmer, test = "Chi")
+car::vif(m13.glmer)
 ```
 
-Although the VIFs are higher than 20, the maximum value is 25.868 and thus not excessive. And since the three-way interaction between Priming, Gender, and ConversationType is not only significantly correlated with the dependent variable but also decreases AIC, we will include it in the model. However, it should be noted that there is a BIC increase(!) - it could be argued that this argues against including this three-way interaction. This is a judgement-call and depends on whether significance, AIC, or BIC is the main criterion for including predictors. Since we chose a p-value based approach here and have so far focused more on the AIC, we decide to disregard the BIC increase (it would be good practice to state that a BIC increase had taken place in a footnote though).
+The VIFs are excessive with a maximum value is `r max(car::vif(m13.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
 
 ```{r blmm27}
 # add Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m14.glmer <- update(m13.glmer, .~.+Age*Gender*ConversationType)
+m14.glmer <- update(m6.glmer, .~.+Age*Gender*ConversationType)
 ifelse(max(car::vif(m14.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
 car::vif(m14.glmer)
 ```
 
-In this case, the VIFs are excessive and have values higher than 30 which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
+Again, the VIFs are excessive with a maximum values of `r max(car::vif(m14.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
 
 ```{r blmm28, message=FALSE, warning=FALSE}
 # add Priming*Age*Gender*ConversationType
 ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m15.glmer <- update(m13.glmer, .~.+Priming*Age*Gender*ConversationType)
-ifelse(max(car::vif(m15.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-car::vif(m15.glmer)
 ```
 
-Again, the VIFs are excessive! As this was the last possible model, we have found our final minimal adequate model in m13.glmer.
+The model suffers from incomplete information! As this was the last possible model, we have found our final minimal adequate model in m6.glmer.
 
 In a next step, we create an overview of model comparisons which serves as a summary for the model fitting process and provides AIC, BIC, and $\chi$^2^ values.
 
@@ -2731,7 +2727,7 @@ mdlft %>%
 We now rename our final minimal adequate model, test whether it performs significantly better than the minimal base-line model, and print the regression summary.
 
 ```{r blmm30}
-mlr.glmer <- m13.glmer # rename final minimal adequate model
+mlr.glmer <- m6.glmer # rename final minimal adequate model
 anova(mlr.glmer, m0.glmer, test = "Chi") # final model better than base-line model
 print(mlr.glmer, corr = F) # inspect final minimal adequate model
 ```
@@ -2744,14 +2740,13 @@ anova(m1.glmer, m0.glmer, test = "Chi")
 
 ### Visualizing Effects{-}
 
-As we will see the effects in the final summary, we visualize the effects here by showing the probability of discourse like based on the predicted values.
+As we will see the effects in the final summary, we visualize the effects here by showing the probability of discourse *like* based on the predicted values.
 
 ```{r blmm33}
 # extract predicted values
-mblrdata$Predicted <- predict(m13.glmer, mblrdata, type = "response")
+mblrdata$Predicted <- predict(m6.glmer, mblrdata, type = "response")
 # plot
-ggplot(mblrdata, aes(Gender, Predicted, color = Priming)) +
-  facet_wrap(~ConversationType) +
+ggplot(mblrdata, aes(ConversationType, Predicted)) +
   stat_summary(fun = mean, geom = "point") +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
   theme_set(theme_bw(base_size = 10)) +
@@ -2761,12 +2756,11 @@ ggplot(mblrdata, aes(Gender, Predicted, color = Priming)) +
   scale_color_manual(values = c("gray20", "gray70"))
 ```
 
-A proper visualization of the marginal effects can be extracted using the sjPlot package.
+A proper visualization of the marginal effects can be extracted using the `sjPlot` package.
 
 ```{r blmm33b}
-plot_model(m13.glmer, type = "pred", terms = c("ConversationType", "Priming", "Gender"))
+plot_model(m6.glmer, type = "pred", terms = c("Priming", "Gender"))
 ```
-
 
 We can see that discourse like is more likely to surface in primed contexts but that in contrast to women and men in same-gender conversations as well as women in mixed-gender conversations, priming appears to affect the use of discourse like by men in mixed-gender conversations only very little. 
 
@@ -2802,11 +2796,11 @@ sjPlot::tab_model(mlr.glmer)
 
 *** 
 
-A mixed-effect binomial logistic regression model which contained speaker as random effect was fit to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model ($\chi$^2^(8): 842.06, p <.0001) but has a suboptimal fit (C: 0.765, Somers' D~xy~: .529). The final minimal adequate model reported a significant interaction between the gender of speakers, the type of conversation and priming ($\chi$^2^(3): 9.66, p = .022). The model showed that discourse *like* is more likely to surface in primed contexts but that in contrast to women and men in same-gender conversations as well as women in mixed-gender conversations, priming appears to affect the use of discourse *like* by men in mixed-gender conversations only to a marginal extent. 
+A mixed-effect binomial logistic regression model with random intercepts for speakers was fit to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model ($\chi$^2^(4): 173, p <.0001) and a good but not optimal fit (C: `r somers2(probs, as.numeric(mblrdata$SUFlike))[1]`, Somers' D~xy~: `r somers2(probs, as.numeric(mblrdata$SUFlike))[2]`). The final minimal adequate model reported that speakers use more discourse *like* in mixed-gender conversations compared to same-gender conversations ($\chi$^2^(1): 12.81, p = .00034) and that there is an interaction between priming and gender with men using more discourse *like* in un-primed contexts while this gender difference is not present in primed contexts where speakers more more likely to use discourse *like* regardless of gender ($\chi$^2^(1): 7.42, p = .00645). 
 
 ## Mixed-Effects (Quasi-)Poisson and Negative-Binomial Regression
 
-Like fixed-effects Poisson models, mixed-effects Poisson models take counts as dependent variables. The data for this analysis was collected on three separate evenings (Trial). The number of the filler "uhm" (UHM) was counted in two-minute conversations that were either in English, German, Russian, or Mandarin (Language). In addition, the number of shots that speakers drank before they talked was recorded (Shots).
+Like fixed-effects Poisson models, mixed-effects Poisson models take counts as dependent variables. The data for this analysis was collected on three separate evenings (Trial). The number of the filler *uhm* (UHM) was counted in two-minute conversations that were either in English, German, Russian, or Mandarin (Language). In addition, the number of shots that speakers drank before they talked was recorded (Shots).
 
 ```{r pmm1}
 # load data
@@ -2830,7 +2824,7 @@ str(countdata); head(countdata)
 
 After the data is factorized, we can visualize the data.
 
-```{r pmm3}
+```{r pmm3, message=F, warning=F}
 countdata %>%
   # prepare data
   dplyr::select(Language, Shots) %>%
@@ -2908,7 +2902,7 @@ summary(m1.glmer)
 
 The model summary confirms that the number of shots does have a significantly positive effect on the number of occurrences of *uhm*. Furthermore, the scaled residuals are distributed very unevenly which suggests overdispersion. Including Language as a random effect is not justified given that they have 0 variance and a standard deviation of 0 (which means that Language does not account for or explain any additional variance). 
 
-We now check if the model suffers from overdispersion following (@zuur2013beginner 138).
+We now check if the model suffers from overdispersion following @zuur2013beginner[138].
 
 ```{r pmm9}
 # extract pearson residuals
