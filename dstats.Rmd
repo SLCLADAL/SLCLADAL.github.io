@@ -512,7 +512,8 @@ For our example, the first equation shown above provides a standard deviation of
 In R, the *standard deviation* is calculated as shown below.
 
 ```{r ds28, message=FALSE, warning=FALSE}
-sd(Moscow) # calculate standard deviation
+# calculate standard deviation
+sd(Moscow) 
 ```
 
 The standard deviation of temperature values of Moscow is 11.12.
@@ -539,31 +540,19 @@ B: 3, 2, 5, 1, 1, 4, 0, 0, 2, 3, 0, 3, 0, 5, 4, 5, 3, 3, 4
 
 ## Standard Error
 
-The standard error is a measure of variability in the sense that it reports the average distance from some parameters (most often from the mean). It is calculated as the standard deviation of the residuals of the parameter in question. To exemplify the standard error, we will extract and tabulate the most frequent 20 words in the Irish component of the *International Corpus of English* (ICE Ireland 1.2.2)
+The standard error is a measure of variability and it reports the average distance from some parameters (most often from the mean). It is calculated as the standard deviation of the residuals of the parameter in question. To exemplify the standard error, we will have a look at reaction times which show how fast participants realized that a sequence of letters were either existing words or just a sequence of letters. 
 
 ```{r ds30, echo = F, message=FALSE, warning=FALSE}
-# define path to corpus
-corpusfiles = list.files(path = "data/ICEIrelandSample", pattern = NULL, all.files = T, full.names = T, recursive = T, ignore.case = T, include.dirs = T)
-# load and clean corpus
-corpus <- lapply(corpusfiles, function(x) {
-  scan(x, what = "char", sep = "", quote = "", quiet = T, skipNul = T)})
-corpus <- unlist(corpus)                  # unlist corpus
-corpus <- paste(corpus, sep = " ", collapse = " ")    # paste corpus together in one element
-corpus <- gsub(" {2,}", " ", corpus)      # remove superfluous white spaces
-corpus <- str_replace_all(corpus, ">.{1,20}</", "><") # clean corpus
-corpus <- str_replace_all(corpus, "<.{1,50}>", "")    # clean corpus
-corpus <- gsub(" {2,}", " ", corpus)      # remove superfluous white spaces
-corpus <- str_trim(corpus, side = "both") # remove superfluous white spaces at string margins
-corpus <- tolower(corpus)                 # convert to lower case
-corpuswords <- strsplit(corpus, " ")      # split corpus into words
-words <- table(corpuswords)[order(table(corpuswords), decreasing = T)][1:20]  # inspect frequency of first 20 elements
-pos <- c("PPR", "ART", "PPR", "CON", "OTH", "PPR", "OTH", "ART", "V", "DPR", "PRP", "PRP", "PPR", "V", "V", "PPR", "PPR", "CON", "DPR", "ART")
-wordstb <- data.frame(names(words), pos, as.vector(words))
-colnames(wordstb) <- c("WordType", "POS", "Frequency")
+set.seed(12345)
+RT = c(rnorm(5, 400, 50), rnorm(5, 380, 50), rnorm(5, 450, 50), rnorm(5, 480, 50))
+State = c(rep("Sober", 10), rep("Drunk", 10))
+Gender = rep(c(rep("Male", 5), rep("Female", 5)), 2)
+rts <- data.frame(RT, State, Gender) %>%
+  dplyr::mutate(RT = round(RT, 3))
 # show data
-wordstb %>%
+rts %>%
   head(20) %>%
-  kable(caption = "20 most frequent words in the sample corpus of ICE Ireland.") %>%
+  kable(caption = "Reaction times while sober and drunk.") %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
 ```
 
@@ -576,104 +565,72 @@ The standard error of the mean is calculated using the equation below.
 The standard error can be calculated manually (see below) by implementing the equation from above.
 
 ```{r ds31, message=FALSE, warning=FALSE}
-sd(wordstb$Frequency, na.rm=TRUE) /  
-   sqrt(length(wordstb$Frequency[!is.na(wordstb$Frequency)]))  
+sd(rts$RT, na.rm=TRUE) /  
+   sqrt(length(rts$RT[!is.na(rts$RT)]))  
 ```
 
 An easier way to extract standard errors is to use the `describe` function from the `psych` package (see below)
 
 ```{r ds32, message=FALSE, warning=FALSE}
-# decsribe data
-describe(wordstb$Frequency,  # vector to be described
-               type=2)       # determine of skew and kurtosis
+# describe data
+psych::describe(rts$RT, type=2)
 ```
 
 # Confidence Intervals
 
-Confidence intervals provide an estimation of in-between which values the reported value would lie in the population with a confidence of 95 percent. There are several ways to extract that information and to exemplify how to extract confidence intervals for values, we will look at the frequency of the 20 most frequent words in a sample of the Irish component of the *International Corpus of English* (ICE Ireland 1.2.2). Below you see a table showing the data we will be working with here.
+Confidence intervals provide an estimation of in-between which values the reported value would lie in the population with a confidence of 95 percent. There are several ways to extract that information and to exemplify how to extract confidence intervals for values, we will continue to work with the reaction times data.
 
 ## Confidence Intervals for Simple Vectors
 
-```{r ds33, echo = F, message=FALSE, warning=FALSE}
-# define path to corpus
-corpusfiles = list.files(path = "data/ICEIrelandSample", pattern = NULL, all.files = T, full.names = T, recursive = T, ignore.case = T, include.dirs = T)
-# load and clean corpus
-corpus <- lapply(corpusfiles, function(x) {
-  scan(x, what = "char", sep = "", quote = "", quiet = T, skipNul = T)})
-corpus <- unlist(corpus)                  # unlist corpus
-corpus <- paste(corpus, sep = " ", collapse = " ")    # paste corpus together in one element
-corpus <- gsub(" {2,}", " ", corpus)      # remove superfluous white spaces
-corpus <- str_replace_all(corpus, ">.{1,20}</", "><") # clean corpus
-corpus <- str_replace_all(corpus, "<.{1,50}>", "")    # clean corpus
-corpus <- gsub(" {2,}", " ", corpus)      # remove superfluous white spaces
-corpus <- str_trim(corpus, side = "both") # remove superfluous white spaces at string margins
-corpus <- tolower(corpus)                 # convert to lower case
-corpuswords <- strsplit(corpus, " ")      # split corpus into words
-words <- table(corpuswords)[order(table(corpuswords), decreasing = T)][1:20]  # inspect frequency of first 20 elements
-pos <- c("PPR", "ART", "PPR", "CON", "OTH", "PPR", "OTH", "ART", "V", "DPR", "PRP", "PRP", "PPR", "V", "V", "PPR", "PPR", "CON", "DPR", "ART")
-wordstb <- data.frame(names(words), pos, as.vector(words))
-colnames(wordstb) <- c("WordType", "POS", "Frequency")
-# show data
-wordstb %>%
-  head(20) %>%
-  kable(caption = "20 most frequent words in the sample corpus of ICE Ireland.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
-```
+Confidence intervals (CIs) give a range that’s likely to include a population value with a certain degree of confidence. As such, CIs tell us how likely it is to get a value within a certain range if we drew another sample from the same population. 
 
-One easy method for extracting confidence intervals is to apply the `t.test` function.  
-
-```{r ds34,  message=FALSE, warning=FALSE}
-t.test(wordstb$Frequency, conf.level=0.95)  # extract mean and confidence intervals
-```
- 
-The `t.test` function provides the mean frequency of the 20 most frequent words in the corpus (521.55) and the 95 percent confidence band: With 95 percent confidence, the mean frequency of the top twenty word types across corpora of the same size and similar register will have a mean between 391.4 and 651.7 words.
-
-Another way to extract the mean and its confidence intervals is by using the `CI` function from the `Rmisc` package.
+One easy method for extracting confidence intervals is to apply the `CI` function from the `Rmisc` package.
 
 ```{r ds36, message=FALSE, warning=FALSE}
 # extract mean and confidence intervals
-CI(wordstb$Frequency, ci=0.95)   
+Rmisc::CI(rts$RT, ci=0.95)   
 ``` 
 
-The next way to extract the mean and its confidence intervals we will exemplify here is by using the `MeanCI` function from the `DescTools` package.
+
+```{r ds34b, echo = F,  message=FALSE, warning=FALSE}
+# extract mean and confidence intervals
+tt <- Rmisc::CI(rts$RT, ci=0.95)  
+```
+
+
+The ´CI´ function provides the mean reaction time (`r tt[2]`) and the 95 percent confidence band. With 95 percent confidence, the mean reaction time will have a mean between `r round(tt[3], 2)`  and `r round(tt[1], 2)` miliseconds (ms).
+
+Another way to extract the mean and its confidence intervals is by using  `t.test` function.  
+
+```{r ds34,  message=FALSE, warning=FALSE}
+# extract mean and confidence intervals
+stats::t.test(rts$RT, conf.level=0.95)  
+```
+
+
+Another alternative to extract the man ans the confidence interval from a range of values is to use the `MeanCI` function from the `DescTools` package.
 
 ```{r ds37, message=FALSE, warning=FALSE}
 # extract mean and confidence intervals
-MeanCI(wordstb$Frequency, conf.level=0.95)   
+DescTools::MeanCI(rts$RT, conf.level=0.95)   
 ``` 
 
-The last way to calculate the mean and its confidence intervals is by bootstrapping or resampling the data and calculating confidence intervals based on the distribution of the resamples data. This is also done via the `MeanCI` function from the `DescTools` package.
+A very interesting alternative to extract the mean and the confidence intervals from a range of values is to apply the `MeanCI` function from the `DescTools` package. This method is particularly interesting because it uses bootstrapping or resampling the data. As such, it is an empirical method to extract the mean and the confidence intervals. The values will differ given how many samples are drawn and we can get very precise estimates using this method.
+
 
 ```{r ds38, message=FALSE, warning=FALSE}
 # extract mean CIs
-MeanCI(wordstb$Frequency, method="boot", type="norm", R=1000)
+DescTools::MeanCI(rts$RT, method="boot", type="norm", R=1000)
 ``` 
 
 Because this is a data-driven approach, the results will vary, depending on the characteristics of the resampled data. To illustrate, compare the values provided above to the values generated below.
 
 ```{r ds40,  message=FALSE, warning=FALSE}
 # extract mean CIs
-MeanCI(wordstb$Frequency, method="boot", type="norm", R=1000)
+DescTools::MeanCI(rts$RT, method="boot", type="norm", R=1000)
 ```
 
-## Confidence Intervals for Grouped Data
-
-To extract the confidence intervals for grouped data, we can sue the `summarySE` function from the `Rmisc` package.
-
-```{r ds41,  message=FALSE, warning=FALSE}
-# apply summarySE function to data
-summarySE(data=wordstb,           
-          # define variable representing frequencies
-          measurevar="Frequency", 
-          # define grouping variabel
-          groupvars="POS",        
-          # extract standard deviation, standard error, 
-          # and confidence intervals
-          conf.interval = 0.95)   
-```  
-
-
-Confidence intervals for mean by bootstrap with `boot` package.
+Another method for extracting the mean and the confidence intervals from a range of values using bootstrapping is to use the `boot` function from the `boot` package.
 
 ```{r ds42, message=FALSE, warning=FALSE}
 # function to extract values
@@ -682,16 +639,32 @@ BootFunction = function(x, index) {
                            var(x[index]) / length(index)))
 }
 # apply function to data
-Bootstrapped = boot(data=wordstb$Frequency,                
-            statistic=BootFunction,
-            R=1000)
+Bootstrapped = boot(data=rts$RT,     
+                    statistic=BootFunction,
+                    R=1000)
 # extract values
 mean(Bootstrapped$t[,1])                                   
 # alternative to extract values
 boot.ci(Bootstrapped, conf=0.95)                           
 ```  
 
-The advantage of using bootstrapping method lies in the fact that the data is (frequently) not distributed normally which is not an issue for the bootstrapping and it will thus provide more reliable results as it does not rely on distributional assumptions about the data. 
+
+The advantage of using bootstrapping methods lies in the fact that the data is (frequently) not distributed normally which is not an issue for the bootstrapping and it will thus provide more reliable results as it does not rely on distributional assumptions about the data. 
+
+## Confidence Intervals for Grouped Data
+
+To extract the confidence intervals for grouped data, we can sue the `summarySE` function from the `Rmisc` package.
+
+```{r ds41,  message=FALSE, warning=FALSE}
+# apply summarySE function to data
+Rmisc::summarySE(data=rts,   
+                 # define variable representing frequencies
+                 measurevar="RT", 
+                 # define grouping variabel
+                 groupvars="Gender",
+                 # extract standard deviation, standard error, and confidence intervals
+                 conf.interval = 0.95)   
+```  
 
 
 ## Confidence Intervals for Nominal Data
@@ -699,44 +672,12 @@ The advantage of using bootstrapping method lies in the fact that the data is (f
 We now turn to confidence intervals for nominal data [see also @thomas1975confidence]. When dealing with nominal data, confidence intervals can be determined with the `binom.test` function in the in-built `stats` package. Alternative methods are available via the `BinomCI` and `MultinomCI` functions from the `DescTools` package.  More advanced techniques for confidence intervals on nominal data are available via the `PropCIs` package.
 
 ```{r ds44, message=FALSE, warning=FALSE}
-binom.test(2, 20, 0.5,              # binom.test(x, n, p = 0.5, ...)
-           alternative="two.sided", # define sidedness
-           conf.level=0.95)         # define confidence level
+stats::binom.test(2, 20, 0.5,              # binom.test(x, n, p = 0.5, ...)
+                  alternative="two.sided", # define sidedness
+                  conf.level=0.95)         # define confidence level
 ```  
 
-Another way to use the `binom.test` function is shown below.
-
-```{r ds45, message=FALSE, warning=FALSE}
-Input =("
- Paw
- right
- left
- right
- right
- right
- right
- left
- right
- right
- right  
-")
-
-Gus = read.table(textConnection(Input),header=TRUE)
-
-Successes = sum(Gus$ Paw == "left")      # Note the == operator
-Failures  = sum(Gus$ Paw == "right")
-
-Total = Successes + Failures
-
-Expected = 0.5
-
-binom.test(Successes, Total, Expected,
-           alternative="two.sided",
-           conf.level=0.95)
-
-```  
- 
- 
+Another way to use the `BinomCI` function is shown below.
  
 ```{r ds48,  message=FALSE, warning=FALSE}
 # extract CIs                  
@@ -744,8 +685,6 @@ BinomCI(2, 20,                        # apply BinomCI function
         conf.level = 0.95,            # define ci
         method = "modified wilson")   # define method for ci extraction
 ```  
-
-Other methods: `wilson`, `wald`, `agresti-coull`, `jeffreys`, `modified wilson`, `modified jeffreys`, `clopper-pearson`, `arcsine`, `logit`, `witting`. 
 
 ## Confidence Intervals for Multinomial Data
 
