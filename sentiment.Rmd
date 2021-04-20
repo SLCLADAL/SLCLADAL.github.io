@@ -28,28 +28,38 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces sentiment analysis (SA) and show how to petrform a SA in R. The entire R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/rscripts/sentiment.Rmd).  
+This tutorial introduces sentiment analysis (SA) and show how to perform a SA in R. The entire R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/rscripts/sentiment.Rmd). SA is a cover term for approaches which extract information on emotion or opinion from natural language [@silge2017text]. SA have been successfully applied to analysis of language data in a wide range of disciplines such as psychology, economics, education, as well as political and social sciences. Commonly SA are used to determine the stance of a larger group of speakers towards a given phenomenon such as political candidates or parties, product lines or situations. Crucially, SA are employed in these domains because they have advantages compared to alternative methods investigating the verbal expression of emotion. One advantage of SA is that the emotion coding of SA is fully replicable.
 
 ## Preparation and session set up{-}
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F}
-# install libraries
-install.packages(c("Hmisc", "tidyverse", "zoo", "sentimentr"))
+# install packages
+install.packages(c("tidyverse", "readr", "tidytext", "zoo", "Hmisc", "sentimentr"))
 ```
 
-Once you have installed R-Studio and initiated the session by executing the code shown above, you are good to go.
+```{r prep2, echo=F, eval = F, message=FALSE, warning=FALSE}
+install.packages(c("knitr", "kableExtra", "DT"))
+```
+
+```{r prep3, echo=F, message=FALSE, warning=FALSE}
+# load packages for website
+library(knitr) 
+library(kableExtra) 
+library(DT)
+```
+
+Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
 
 # Sentiment Analysis
 
-Sentiment Analysis is a cover term for approaches which extract information on emotion or opinion from natural language [@silge2017text]. Sentiment analyses have been successfully applied to analysis of language data in a wide range of disciplines such as psychology, economics, education, as well as political and social sciences. Commonly sentiment analyses are used to determine the stance of a larger group of speakers towards a given phenomenon such as political candidates or parties, product lines or situations. Crucially, sentiment analyses are employed in these domains because they have advantages compared to alternative methods investigating the verbal expression of emotion. One advantage of sentiment analyses is that the emotion coding of sentiment analysis is fully replicable. 
 
-Typically, Sentiment Analysis represents a type of classifier only provide information about positive or negative polarity, e.g. whether a tweet is "positive" or "negative". Therefore, Sentiment Analysis is often regarded as rather coarse-grained and, thus, rather irrelevant for the types of research questions in linguistics. 
+Sentiment Analysis (SA) extracts information on emotion or opinion from natural language [@silge2017text]. Most forms of SA provides information about positive or negative polarity, e.g. whether a tweet is *positive* or *negative*. As such, SA represents a type of classifier that assigns values to texts. As most SA only provide informarion about polarity, SA is often regarded as rather coarse-grained and, thus, rather irrelevant for the types of research questions in linguistics. 
 
-In the language sciences, Sentiment Analysis can also be a very helpful tool if the type of Sentiment Analysis provides more fine-grained information. In the following, we will perform such a information-rich Sentiment Analysis. The Sentiment Analysis used here does not only provide information about polarity but it will also provide association values for eight core emotions. 
+In the language sciences, SA can also be a very helpful tool if the type of SA provides more fine-grained information. In the following, we will perform such a information-rich SA. The SA used here does not only provide information about polarity but it will also provide association values for eight core emotions. 
 
-The more fine-grained output is made possible by relying on the Word-Emotion Association Lexicon [@mohammad2013crowdsourcing], which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (see @mohammad2013crowdsourcing). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word *cry* or *tragedy* are more readily associated with SADNESS while words such as *happy* or *beautiful* are indicative of JOY and words like *fit* or *burst* may indicate ANGER. This means that the sentiment analysis here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction. 
+The more fine-grained output is made possible by relying on the Word-Emotion Association Lexicon [@mohammad2013crowdsourcing], which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (see @mohammad2013crowdsourcing). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word *cry* or *tragedy* are more readily associated with SADNESS while words such as *happy* or *beautiful* are indicative of JOY and words like *fit* or *burst* may indicate ANGER. This means that the SA here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction. 
 
 ## Getting started{-}
 
@@ -65,7 +75,7 @@ library(Hmisc)
 library(sentimentr)
 ```
 
-In the following, we will perform a sentiment analysis to investigate the emotionality of five different novels. We will start with the first example and load five pieces of literature. 
+In the following, we will perform a SA to investigate the emotionality of five different novels. We will start with the first example and load five pieces of literature. 
 
 ```{r sa3, message=FALSE, warning=FALSE}
 darwin <- read_lines("https://slcladal.github.io/data/origindarwin.txt", skip = 0)
@@ -104,9 +114,16 @@ darwin_clean <- txtclean(darwin, "darwin")
 lovecraft_clean <- txtclean(lovecraft, "lovecraft")
 orwell_clean <- txtclean(orwell, "orwell")
 twain_clean <- txtclean(twain, "twain")
-# inspect results
-head(darwin_clean)
 ```
+
+```{r sa7b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+darwin_clean %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of darwin_clean.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
 
 # Basic Sentiment Analysis
 
@@ -119,11 +136,19 @@ novels_anno <- rbind(darwin_clean, twain_clean, orwell_clean, lovecraft_clean) %
   dplyr::left_join(get_sentiments("nrc")) %>%
   dplyr::mutate(novel = factor(novel),
          sentiment = factor(sentiment))
-# inspect results
-head(novels_anno, 15)
 ```
 
-We will now summarize the results of the sentiment analysis and calculate the percentages of the prevalence of emotions across the books.
+```{r bsa1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_anno %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_anno.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+We will now summarize the results of the SA and calculate the percentages of the prevalence of emotions across the books.
 
 ```{r bsa3, message=FALSE, warning=FALSE}
 novels <- novels_anno %>%
@@ -134,11 +159,19 @@ novels <- novels_anno %>%
                    words = unique(words)) %>%
   dplyr::filter(is.na(sentiment) == F) %>%
   dplyr::mutate(percentage = round(sentiment_freq/words*100, 1))
-# inspect data
-head(novels, 15)
 ```
 
-After performing the Sentiment Analysis, visualize the results and show the scores fro each core emotion by book.
+```{r bsa3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+After performing the SA, visualize the results and show the scores fro each core emotion by book.
 
 ```{r bsa5, message=FALSE, warning=FALSE}
 novels %>%
@@ -189,9 +222,17 @@ novels_impw <- novels_anno %>%
   dplyr::group_by(novel, sentiment) %>%
   dplyr::top_n(3) %>%
   dplyr::mutate(score = n/sum(n))
-# inspect results
-head(novels_impw, 15)
 ```
+
+```{r contribsa1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_impw %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_impw.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
 We can now visualize the top three words for the remaining core emotion categories. 
 
 ```{r contribsa2, message=FALSE, warning=FALSE}
@@ -248,9 +289,16 @@ novels_bin <- novels_anno %>%
   dplyr::group_by(novel, index) %>%
   dplyr::summarize(index = unique(index),
             polarity = mean(sentiment))
-# inspect results
-head(novels_bin)
 ```
+
+```{r bin1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_bin %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_bin.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
 
 We now have an average polarity for each bin and can plot this polarity over the development of the story.
 
@@ -289,6 +337,14 @@ novels_change <- novels_anno %>%
 head(novels_change)
 ```
 
+```{r ma1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_change %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_change.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
 We will now display the values of the rolling mean to check if three are notable trends in how the polarity shifts over the course of the unfolding of the story within George Orwell's *Nineteen Eighty-Four*.
 
 
@@ -307,7 +363,7 @@ The difference between the rolling mean and the binning is quite notable and res
 
 So far we have ignored that negation affects the meaning and also the sentiment that is expressed by words. In practice, this means that the sentence *you are a good boy* and *You are not a good boy* would receive the same scores as we strictly focused on the use of emotive but ignored how words interact and how the context affects word meaning.
 
-In fact, we removed *not* and other such negators when we removed stop words. In this section, we want to discover how we can incorporate context in our sentiment analysis. Unfortunately, we have to restrict this example to an anlysis of polarity as performing a context-sensitive sentiment analysis that would extend the *Word-Emotion Association Lexicon* would be quite complex and require cerating our own sentiment dictionary.
+In fact, we removed *not* and other such negators (e.g. *none*, *never*, or *neither*) when we removed stop words. In this section, we want to discover how we can incorporate context in our SA. Unfortunately, we have to restrict this example to an analysis of polarity as performing a context-sensitive sentiment analysis that would extend the *Word-Emotion Association Lexicon* would be quite complex and require generating our own sentiment dictionary.
 
 We begin by cleaning George Orwell's *Nineteen Eighty-Four*, then splitting it into sentences, and selecting the first 50 sentences as the sample that we will be working with.
 
@@ -322,34 +378,50 @@ orwell_sent <- orwell %>%
   dplyr::select(text = 1, everything()) %>%
   tidytext::unnest_tokens(sentence, text, token = "sentences") %>%
   dplyr::top_n(50)
-# inspect results
-head(orwell_sent, 10)
 ```
 
-In a next step, we load the `sentimentr` package which allows us to extract negation-sensitive polarity scores for each sentences. In addition, we apply the `sentimentr` fuction to each sentence and extract their polarity scores.
+```{r neg1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_sent %>%
+  head(10) %>%
+  kable(caption = "First 10 sentences of orwell_sent.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+In a next step, we load the `sentimentr` package which allows us to extract negation-sensitive polarity scores for each sentences. In addition, we apply the `sentimentr` function to each sentence and extract their polarity scores.
 
 ```{r neg3, message=FALSE, warning=FALSE}
 orwell_sent_class <- orwell_sent %>%
   dplyr::mutate(ressent = sentiment(sentence)$sentiment)
-# inspect results
-head(orwell_sent_class)
 ```
 
-If you are interested in learning more about sentiment analysis in R, @silge2017text is highly recommended as it goes more into detail and offers additional information.
+
+```{r neg3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_sent_class %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of orwell_sent_class.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+If you are interested in learning more about SA in R, @silge2017text is highly recommended as it goes more into detail and offers additional information.
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2020. *Sentiment Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/sentiment.html (Version 2020.12.03).
+Schweinberger, Martin. `r format(Sys.time(), '%Y.')` *Sentiment Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/sentiment.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
-@manual{schweinberger2020sentiment,
+@manual{schweinberger`r format(Sys.time(), '%Y')`sentiment,
   author = {Schweinberger, Martin},
   title = {Sentiment Analysis in R},
   note = {https://slcladal.github.io/sentiment.html},
-  year = {2020},
+  year = {`r format(Sys.time(), '%Y')`},
   organization = {The University of Queensland, School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2020/12/03}
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
 }
 ```
 
@@ -358,12 +430,16 @@ sessionInfo()
 ```
 
 
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
 
 ***
 
-[Main page](https://slcladal.github.io/index.html)
 
-***
+# References{-}
 
-# References {-}
+
 
