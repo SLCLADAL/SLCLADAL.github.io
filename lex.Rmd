@@ -36,19 +36,26 @@ Similarly, in computational linguistics, dictionaries represent a specific forma
 
 ## Preparation and session set up{-}
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/Intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/Intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
-# install libraries
+# install packages
 install.packages(c("tidyverse", "tidytext", "textdata", "quanteda", "koRpus", 
                    "koRpus.lang.en",  "hunspell", "coop", "tm", "cluster",
                    "tidyr"))
 ```
 
-Once you have installed R Studio and initiated the session by executing the code shown above, you are good to go.
+```{r prep2, echo=F, message=FALSE, warning=FALSE}
+# load packages for website
+library(knitr) 
+library(kableExtra) 
+library(DT)
+```
+
+Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
 
 # Creating dictionaries
 
@@ -94,18 +101,32 @@ In a next step, we load and process the data which in this tutorial represents t
 orwell_pos <- treetag("https://slcladal.github.io/data/orwell.txt")
 # select data frame
 orwell_pos <- orwell_pos@tokens
-# inspect  results
-datatable(head(orwell_pos, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
-
+```{r lex3b, echo = F, message=FALSE, warning=FALSE}
+orwell_pos <- base::readRDS(url("https://slcladal.github.io/data/orwell_pos.rda", "rb"))
+#orwell_pos <- orwell_pos$tokens
+# inspect data
+orwell_pos %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of orwell_pos.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
 If you could not pos-tag the text, you can simply execute the following code chunk which loads the pos-tagged text from the LADAL repository.
 
-```{r lex5, echo = T, eval = T, message=FALSE, warning=FALSE}
+```{r lex5, message=FALSE, warning=FALSE}
 # load pos-taged data
-orwell_pos <- read.delim("https://slcladal.github.io/data/orwell_pos.txt", sep = "\t", header = T)
-# inspect  results
-datatable(head(orwell_pos, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+orwell_pos <- base::readRDS(url("https://slcladal.github.io/data/orwell_pos.rda", "rb"))
+```
+
+```{r lex5b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_pos %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of orwell_pos.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 We can now use the resulting table to generate a first, basic dictionary that holds information about the word form (*token*), the part-of speech tag (*tag*), the lemmatized word type (*lemma*), the general word category (*wclass*), and the frequency with which the word form is used as that part-of speech.
@@ -117,8 +138,15 @@ orwell_dic_raw <- orwell_pos %>%
   dplyr::group_by(token, tag, lemma, wclass) %>%
   dplyr::summarise(frequency = dplyr::n()) %>%
   dplyr::arrange(lemma)
-# inspect  results
-datatable(head(orwell_dic_raw, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+```{r lex7b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_dic_raw %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of orwell_dic_raw.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 ## Cleaning dictionary entries{-}
@@ -131,8 +159,15 @@ However, as the resulting table shows, the data is still very noisy, i.e. it con
 orwell_dic_clean <- orwell_dic_raw %>%
   dplyr::filter(hunspell_check(lemma)) %>%
   dplyr::filter(!stringr::str_detect(lemma, "\\W\\w{1,}"))
-# inspect  results
-datatable(head(orwell_dic_clean, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+```{r lex11b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_dic_clean %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of orwell_dic_clean.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 
@@ -152,10 +187,16 @@ orwell_dic_ext <- orwell_dic_clean %>%
   dplyr::mutate(annotation = NA) %>%
   dplyr::mutate(annotation = ifelse(token == "3rd", "also 3.",
                                     ifelse(token == "4th", "also 4.", annotation)))
-# inspect  results
-datatable(head(orwell_dic_ext, 10), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
+```{r ext1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_dic_ext %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of orwell_dic_ext.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
 
 To make it a bit more interesting but also keep this tutorial simple and straight-forward, we will add information about the polarity and emotionally of the words in our dictionary. We can do this by performing a sentiment analysis on the lemmas using the `tidytext` package.
 
@@ -170,8 +211,16 @@ orwell_dic_ext <- orwell_dic_ext %>%
   dplyr::mutate(word = lemma) %>%
   dplyr::left_join(get_sentiments("nrc")) %>%
   tidyr::spread(sentiment, sentiment)
-# inspect  results
-datatable(head(orwell_dic_ext, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+
+```{r ext3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_dic_ext %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of orwell_dic_ext.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 The resulting extended dictionary now contains not only the token, the pos-tag, the lemma, and the generalized word class, but also the emotional and polarity scores from the Word-Emotion Association Lexicon.
@@ -193,7 +242,7 @@ grimm <- readLines("data/GrimmsFairytales.txt")# %>%
 #  str_remove(".*Freimund. Vorrede. ")
 str(grimm)
 
-writeLines(grimm, "data/grimm.txt")
+writeLines(grimm, here::here("data", "grimm.txt"))
 ```
 ```{r none3, message=FALSE, warning=FALSE}
 # install german language package
@@ -206,10 +255,9 @@ set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-german.bat", lang="de")
 
 
 ***
-
-NOTE
-
-You would need to adapt the path to the TreeTagger engine (see previous code chunk) as well as the path to the data (see follwoing code chunk)! The paths below are specified to my computer.
+>
+>**NOTE**: You would need to adapt the path to the TreeTagger engine (see previous code chunk) as well as the path to the data (see follwoing code chunk)! The paths below are specified to my computer.
+> 
 
 ***
 
@@ -260,8 +308,6 @@ library(koRpus.lang.nl)
 set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-dutch.bat", lang="nl") 
 # pos-tag data
 text_pos <- treetag("PathToDutchText.txt")
-
-
 ```
 
 
@@ -283,10 +329,17 @@ grimm_dic_clean <- grimm_dic_raw %>%
   dplyr::filter(!stringr::str_detect(lemma, "\\W{1,}")) %>%
   dplyr::filter(!stringr::str_detect(lemma, "[:digit:]{1,}")) %>%
   dplyr::filter(nchar(token) > 1)
-# inspect  results
-datatable(head(grimm_dic_clean, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
 ```
 
+
+```{r none9b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+grimm_dic_clean %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of grimm_dic_clean.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
 As with the English dictionary, we have created a customized German dictionary based of a subsample of the brothers' Grimm fairy tales holding the word form(*token*), the part-of-speech tag (*tag*), the lemmatized word type (*lemma*), the general word class (*wclass*), ad the frequency with which a word form occurs as a part-of-speech in the data (*frequency*).
 
 # Finding synonyms: creating a thesaurus
@@ -322,8 +375,15 @@ degree_adverbs <- read.delim("https://slcladal.github.io/data/data04.txt", sep =
                 adjective = adjs) %>%
   dplyr::filter(degree_adverb != "0",
                 degree_adverb != "well")
-# inspect  results
-datatable(head(degree_adverbs, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+```{r syn1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+degree_adverbs %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of degree_adverbs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 
@@ -398,9 +458,8 @@ syntb
 
 ***
 
-NOTE
-
-Remember that this is only a tutorial! A proper study would have to take the syntactic context into account because, while we can say *This really great tutorial helped me a lot*. we probably would not say *This so great tutorial helped me a lot*. This is because so syntactically more restricted and is strongly disfavored in attributive contexts. Therefore, the syntactic context would have to be considered in a more thorough study.
+>**NOTE**: Remember that this is only a tutorial! A proper study would have to take the syntactic context into account because, while we can say *This really great tutorial helped me a lot*. we probably would not say *This so great tutorial helped me a lot*. This is because so syntactically more restricted and is strongly disfavored in attributive contexts. Therefore, the syntactic context would have to be considered in a more thorough study.
+>
 
 ***
 
@@ -440,8 +499,15 @@ germantb <- data.frame(sentence, german)
 sentence <- 1:length(english)
 # combine into table
 englishtb <- data.frame(sentence, english)
-# inspect table
-head(germantb, 10)
+```
+
+```{r trans2b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+germantb %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of germantb.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 We now unnest the tokens (split the sentences into words) and subsequently add the translations which we again unnest. The resulting table consists of two columns holding German and English words. The relevant point here is that each German word is linked with each English word that occurs in the translated sentence.
@@ -460,8 +526,15 @@ transtb <- germantb %>%
   dplyr::select(german, english) %>%
   dplyr::mutate(german = factor(german),
                 english = factor(english))
+```
+
+```{r trans3b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-head(transtb)
+transtb %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of transtb.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 Based on this table, we can now generate a term-document matrix which shows how frequently each word co-occurred in the translation of any of the sentences. For instance, the German word *alles* occurred one time in a translation of a sentence which contained the English word *all*.
@@ -503,8 +576,16 @@ cooctb <- coocdf %>%
                 d = AllFreq - (a + b + c)) %>%
   dplyr::mutate(NRows = nrow(coocdf))%>%
   dplyr::filter(TermCoocFreq > 0)
-# inspect results
-head(cooctb, 10)
+```
+
+
+```{r trans5b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+cooctb %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of cooctb.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 In a final step, we extract those potential translations that correlate most strongly with each given term. The results then form a list of words and their most likely translation. 
@@ -519,8 +600,15 @@ translationtb <- cooctb  %>%
   dplyr::filter(TermCoocFreq > expected) %>%
   dplyr::arrange(-phi) %>%
   dplyr::select(-AllFreq, -a, -b, -c, -d, -NRows, -expected)
-# inspect results
-datatable(head(translationtb, 100), rownames = FALSE, options = list(pageLength = 10, scrollX=T), filter = "none")
+```
+
+```{r trans6b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+translationtb %>%
+  head(15) %>%
+  kable(caption = "First 15 rows of translationtb.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 The results show that even using the very limited data base can produce some very reasonable results. In fact, based on the data that we used here, the first translations appear to be very sensible, but the mismatches also show that more data is required to disambiguate potential translations.
@@ -530,11 +618,13 @@ While this method still requires manual correction, it is a very handy and usefu
 
 # Going further: crowd-sourced dictionaries with R and Git
 
-While it would go beyond the scope of this tutorial, it should be noted that the approach for creating dictionaries can be applied to crowed-sourced dictionaries. To do this, you could, e.g. upload your dictionary to a Git repository such as [GitHub](https://github.com/) or [GitLab](https://about.gitlab.com/) which would then allow everybody with an account on either of these platforms to add content to the dictionary. To add to the dictionary, contributors would simply have to fork the repository of the dictionary and then merge with the existing, original dictionary repository. The quality of the data would meanwhile remain under control of the owner of the original repository he they can decide on a case-by-case basis which change they would like to accept. In addition, and because Git is a version control environment, the owner could also go back to previous versions, if they think they erroneously accepted a change (merge).
+While it would go beyond the scope of this tutorial, it should be noted that the approach for creating dictionaries can be applied to crowed-sourced dictionaries. To do this, you could, e.g. upload your dictionary to a Git repository such as [GitHub](https://github.com/) or [GitLab](https://about.gitlab.com/) which would then allow everybody with an account on either of these platforms to add content to the dictionary. 
 
-```{r git1, echo=FALSE, out.width= "30%", out.extra='style="float:right; padding:15px"'}
+```{r git1, echo=FALSE, out.width= "50%", out.extra='style="float:right; padding:15px"'}
 knitr::include_graphics("https://slcladal.github.io/images/git.png")
 ```
+
+To add to the dictionary, contributors would simply have to fork the repository of the dictionary and then merge with the existing, original dictionary repository. The quality of the data would meanwhile remain under control of the owner of the original repository he they can decide on a case-by-case basis which change they would like to accept. In addition, and because Git is a version control environment, the owner could also go back to previous versions, if they think they erroneously accepted a change (merge).
 
 This option is particularly interesting for the approach to creating dictionaries presented here because R Studio has an integrated and very easy to use pipeline to Git (see, e.g.,  [here](https://support.rstudio.com/hc/en-us/articles/200532077-Version-Control-with-Git-and-SVN) and [here](https://happygitwithr.com/rstudio-git-github.html))
 
