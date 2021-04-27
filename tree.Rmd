@@ -51,6 +51,8 @@ options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
 # load packages relevant for the Markdown document but not the stats and vis
 library(flextable)
+library(knitr) 
+library(kableExtra) 
 library(DT)
 ```
 
@@ -141,9 +143,7 @@ options(max.print=10000)
 
 *** 
 
-NOTE
-
-In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.
+>NOTE: In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.
 
 ```{r cit4a, eval = F, message=F, warning=F}
 # install caret library
@@ -154,7 +154,7 @@ install.packages("dimRed", dependencies = TRUE)
 install.packages('caret', dependencies = TRUE)
 ```
 
-```{r cit4b, echo = F}
+```{r cit4b, echo = T}
 # activate caret library
 library(caret)
 ```
@@ -166,22 +166,20 @@ We can now load and inspect the data that we will use in this tutorial.
 ```{r cit4c,  message=FALSE, warning=FALSE}
 # load data
 citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
-# inspect data
-ft <- flextable(head(citdata,10)) %>%
-  set_caption("First 10 rows of the citdata data set.")
-ft
 ```
-
-An interactive display of the data is provided below.
-
-```{r cit4d, echo=F, message=FALSE, warning=FALSE}
-datatable(citdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
+```{r cit4d,  message=FALSE, warning=FALSE}
+# inspect data
+citdata %>%
+  head(20) %>%
+  kable(caption = "First 20 rows of citdata.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
 ```
 
 
 As tree-based models require either numeric or factorized data, we factorize the "character" variables in our data.
 
-```{r cit4e, echo=T, message=FALSE, warning=FALSE}
+```{r cit4f, echo=T, message=FALSE, warning=FALSE}
 # factorize variables (cit require factors instead of character vectors)
 fcts <- c("Age", "Gender", "Status", "LikeUser")
 citdata[fcts] <- lapply(citdata[fcts], factor)
@@ -476,7 +474,7 @@ When dealing with categorical variables with more than two levels, the situation
 
 # Conditional Inference Trees
 
-As CITs are much better at determining the *true* effect of a predictor, i.e. the effect of a predictor if all other effects are simultaneously considered, we will focus on CITs in the following. In contrast to simple decision trees, CITs or CARTs use p-values to determine splits in the data. Below is a conditional inference tree which shows how and what factors contribute to the use of discourse *like*. In conditional inference trees predictors are only included if the predictor is significant (i.e. if these predictors are necessary). 
+Conditional Inference Trees (CITs) are much better at determining the *true* effect of a predictor, i.e. the effect of a predictor if all other effects are simultaneously considered. In contrast to CARTs, CITs use p-values to determine splits in the data. Below is a conditional inference tree which shows how and what factors contribute to the use of discourse *like*. In conditional inference trees predictors are only included if the predictor is significant (i.e. if these predictors are necessary). 
 
 ```{r cit1b, message=FALSE, warning=FALSE}
 library(partykit)              # activate partykit library
@@ -596,9 +594,17 @@ citdata <- head(citdata)
 citdata$ID <- 1:nrow(citdata)
 citdata <- citdata %>%
   dplyr::select(ID, Age, Gender, Status, LikeUser)
-# inspect data
-datatable(citdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
+
+```{r rf1b,  message=FALSE, warning=FALSE}
+# inspect data
+citdata %>%
+  head(20) %>%
+  kable(caption = "First 20 rows of citdata.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
 
 We now draw a sample from this data set and receive the following data set.
 
@@ -626,20 +632,27 @@ This section shows how a Random Forest Analysis can be implemented in R. Ina fir
 ```{r rf3, echo=T, message=FALSE, warning=FALSE}
 # load random forest data
 rfdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/rfdata.txt", header = T, sep = "\t")
-# inspect data
-datatable(rfdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
-The data consists of four categorical variables (*Gender*, *Age*, *ConversationType*, and *SUFLike*). Our dependent variable is SUFLike which stands for speech-unit final like (a pragmatic marker that is common in Irish English and is used as in *A wee girl of her age, like*). While Age and Gender are pretty straight forward what they are called, *ConversationType* encodes whether a conversation has taken place between interlocutors of the same or of different genders.
+```{r rf3b,  message=FALSE, warning=FALSE}
+# inspect data
+rfdata %>%
+  head(20) %>%
+  kable(caption = "First 20 rows of rfdata.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
 
-Before going any further, we need to factorize the variables as tree-based models require factors instead of character variables (but they can, of course, handle numeric and ordinal variables). In addition, we will check if the data contains missing values (NAs).
+The data consists of four categorical variables (`Gender`, `Age`, `ConversationType`, and `SUFLike`). Our dependent variable is `SUFLike` which stands for speech-unit final *like* (a pragmatic marker that is common in Irish English and is used as in *A wee girl of her age, like*). While Age and Gender are pretty straight forward what they are called, *ConversationType* encodes whether a conversation has taken place between interlocutors of the same or of different genders.
+
+Before going any further, we need to factorize the variables as tree-based models require factors instead of character variables (but they can, of course, handle numeric and ordinal variables). In addition, we will check if the data contains missing values (NAs; NA stands for *not available*).
 
 ```{r rf4a, echo=T, message=FALSE, warning=FALSE}
 # factorize variables (rf require factors instead of character vectors)
 fcts <- c("Gender", "Age", "ConversationType", "Priming", "SUFLike")
 rfdata[fcts] <- lapply(rfdata[fcts], factor)
 # inspect data
-head(rfdata, 10)
+head(rfdata, 7)
 ```
 
 We now check if the data contains missing values and remove those (if necessary).
@@ -774,7 +787,7 @@ library(vip)
 vip::vip(rfmodel3, geom = "point", horizontal = FALSE)
 ```
 
-Using the `vip` package, you can also generate variable importnace barplots.
+Using the `vip` package, you can also generate variable importance barplots.
 
 ```{r rf17, message=FALSE, warning=FALSE}
 # load package
@@ -837,17 +850,24 @@ We begin by loading and inspecting the data.
 ```{r bo1, message=FALSE, warning=FALSE}
 # load data
 borutadata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/borutadata.txt", header = T, sep = "\t")
-# inspect data
-datatable(borutadata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
+
+```{r bo1b,  message=FALSE, warning=FALSE}
+# inspect data
+borutadata %>%
+  head(20) %>%
+  kable(caption = "First 20 rows of borutadata.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
 
 As the data contains non-factorized character variables, we convert those into factors.
 
 ```{r bo2, message=FALSE, warning=FALSE}
 # factorize variables (boruta - like rf - require factors instead of character vectors)
-fcts <- c("Age", "Adjective", "Function", "Priming", "Gender", "Occupation", 
-          "ConversationType", "AudienceSize", "really", "Gradabilty", "SemanticCategory")
-borutadata[fcts] <- lapply(borutadata[fcts], factor)
+borutadata <- borutadata %>%
+  dplyr::mutate_if(is.character, factor)
 # inspect data
 head(borutadata, 10)
 ```
