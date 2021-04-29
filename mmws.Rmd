@@ -6,10 +6,21 @@ output:
   html_document:
     theme: cosmo
     highlight: tango
-    css: styles_old2.css
 bibliography: bibliography.bib
 link-citations: yes
 ---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
 
 ```{r acqva1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("https://slcladal.github.io/images/acqva.jpg")
@@ -17,7 +28,7 @@ knitr::include_graphics("https://slcladal.github.io/images/acqva.jpg")
 
 # Introduction{-}
 
-This workshop introduces mixed-effects regression modeling using R. The R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/mmws.Rmd). You will find more elaborate explanations and additional examples [here](https://slcladal.github.io/regression.html).
+This workshop introduces mixed-effects regression modeling using R. The RMarkdown document for the tutorial can be downloaded [here](https://slcladal.github.io/mmws.Rmd) and the bib library [here](https://slcladal.github.io/bibliography.bib). You will find more elaborate explanations and additional examples [here](https://slcladal.github.io/regression.html).
 
 The workshop consists of 2 parts:
 
@@ -35,7 +46,7 @@ options("scipen" = 100, "digits" = 10) # suppress math annotation
 install.packages(c("boot", "car", "caret", "tidyverse",  "effects", "foreign", 
                    "Hmisc", "DT", "knitr", "lme4", "MASS", "mlogit", "msm", 
                    "QuantPsyc", "reshape2", "rms", "sandwich", "sfsmisc", "sjPlot", 
-                   "vcd", "visreg", "MuMIn"))
+                   "vcd", "visreg", "MuMIn", "lmerTest"))
 ```
 
 ```{r prep1, echo=F}
@@ -69,7 +80,9 @@ The idea behind regression analysis is expressed formally in the equation below 
 
 $f_{(x)} = \alpha + \beta_{i}x + \epsilon$
 
-In other words, to estimate how much some weights who is 180cm tall, we would multiply the coefficent (slope of the line) with 180 ($x$) and add the value of the intercept (point where line crosses the $y$-axis). 
+In other words, to estimate how much some weights who is 180cm tall, we would multiply the coefficent (slope of the line) with 180 ($x$) and add the value of the intercept (point where line crosses the $y$-axis). If we plug in the numbers from the regression model below, we get
+
+-93.77 + 0.98 ∗ 180 = 83.33 (kg)
 
 Residuals are the distance between the line and the points (the red lines) and it is also called *variance*. Regression lines are those lines where the sum of the red lines should be minimal. The slope of the regression line is called *coefficient* and the point where the regression line crosses the y-axis is called the *intercept*.
 
@@ -194,6 +207,7 @@ Extending the basic principle to mixed effects models.
 
 ```{r intro02, echo=F, message=FALSE, warning=FALSE, results='hide'}
 library(lme4)
+library(lmerTest)
 Height <- c(169, 171, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
 Weight <- c(68, 67, 65, 66, 64, 80, 75, 70, 85, 92, 86, 87, 85, 82, 80) 
 Group <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
@@ -311,7 +325,10 @@ m1.lm <- lm(Prepositions ~ Date, data = slrdata)
 summary(m1.lm)
 ```
 
-The Estimate for the intercept is the value of y at x = 0 (or, if the y-axis is located at x = 0, the value of y where the regression line crosses the y-axis). The estimate for Date represents the slope of the regression line and tells us that with each year, the predicted frequency of prepositions increase by .01732 prepositions. The t-value is the Estimate divided by the standard error (Std. Error). Based on the t-value, the p-value can be calculated manually as shown below.
+The Estimate for the intercept is the value of y at x = 0 (or, if the y-axis is located at x = 0, the value of y where the regression line crosses the y-axis). 
+
+
+The estimate for Date represents the slope of the regression line and tells us that with each year, the predicted frequency of prepositions increase by .01732 prepositions. The t-value is the Estimate divided by the standard error (Std. Error). Based on the t-value, the p-value can be calculated manually as shown below.
 
 ```{r intro10, message=FALSE, warning=FALSE}
 # use pt function (which uses t-values and the degrees of freedom)
@@ -320,20 +337,16 @@ The Estimate for the intercept is the value of y at x = 0 (or, if the y-axis is 
 
 The R^2^-values tell us how much variance is explained by our model. The baseline value represents a model that uses merely the mean. 0.0105 means that our model explains only 1.05 percent of the variance (0.010 x 100) - which is a tiny amount. The problem of the multiple R^2^ is that it will increase even if we add variables that explain almost no variance. Hence, multiple R^2^ encourages the inclusion of *junk* variables.
 
-\begin{equation}
 
-R^2_{multiple} = \frac{Null Deviance - Residual Deviance}{Null Deviance} = 1 - \frac{\sum (y_i - \hat{y_i})^2}{\sum (y_i - \bar y)^2}
+ multiple R^2^ = $\frac{Null Deviance - Residual Deviance}{Null Deviance} = 1 - \frac{\sum (y_i - \hat{y_i})^2}{\sum (y_i - \bar y)^2}$
 
-\end{equation}
 
 The adjusted R^2^-value takes the number of predictors into account and, thus, the adjusted R^2^ will always be lower than the multiple R^2^. This is so because the adjusted R^2^ penalizes models for having predictors. The equation for the adjusted R^2^ below shows that the amount of variance that is explained by all the variables in the model (the top part of the fraction) must outweigh the inclusion of the number of variables (k) and the number of observations (N). Thus, the  adjusted R^2^ will decrease when variables are added that explain little or even no variance while it will increase if variables are added that explain a lot of variance.
 
 
-\begin{equation}
 
-R^2_{adjusted} = 1 - (\frac{(1 - R^2)(N - 1)}{N - k - 1})
+adjusted R^2^ = $1 - (\frac{(1 - R^2)(N - 1)}{N - k - 1})$
 
-\end{equation}
 
 
 If there is a big difference between the two R^2^-values, then the model contains (many) predictors that do not explain much variance which is not good. The F-statistic and the associated p-value tell us that the model, despite explaining almost no variance, is still significantly better than an intercept-only base-line model (or using the overall mean to predict the frequency of prepositions per text).
@@ -462,6 +475,20 @@ The results of simple linear regressions can be written up is provided below.
 
 A simple linear regression has been fitted to the data. A visual assessment of the model diagnostic graphics did not indicate any problematic or disproportionately influential data points (outliers) and performed significantly better compared to an intercept-only base line model but only explained .87 percent of the variance (adjusted R^2^: .0087, F-statistic (1, 535): 5,68, p-value: 0.0175\*). The final minimal adequate linear regression model is based on 537 data points and confirms a significant and positive correlation between the year in which the text was written and the relative frequency of prepositions (coefficient estimate (logged odds): .02, SE: 0.01, t-value: 2.38, p-value: .0175\*).
 
+***
+>Question Time!
+>What frequency of prepositions does the model predict for the year 0 and does it make sense to have a value predicted for the year 0 when English only started with the first Germanic invasion of Britannia in app. 450?
+
+<details>
+<summary>Answer</summary>
+
+The model predicts that a text written in the year zero would contain 104.02 prepositions per 1,000 words (the intercept) and, clearly, this does not make sense. In fact, when you think of the example with Height and Weight, the model would predict that a person that is 0(!) cm tall would weigh negative 93.77 kg and that with every centimeter, that person would increase by 0.98 kg in weight - so any baby or child under app. 95 centimeters would be lighter than air. This clearly does not make sense, which shows that you always have to perform a sanity check on what you model reports and in which conditions (and ranges) your model makes sense and where not! 
+
+</details>
+
+***
+
+
 # Practical Examples
 
 In contrast to fixed-effects regression models, mixed-effects models assume a hierarchical data structure in which data points are grouped or nested in higher order categories (e.g. students within classes). Mixed-effects models are rapidly increasing in use in data analysis because they allow us to incorporate hierarchical or nested data structures. Mixed-effects models are, of course, an extension of fixed-effects regression models and also multivariate and come in different types. 
@@ -479,7 +506,7 @@ The following focuses on an extension of ordinary multiple linear regressions: m
 
 * Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical or nested data structures. This applies if several observations are produced by an individual speaker, for instance.
 
-* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. (multi-)collinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+* Mixed-models provide useful diagnostic statistics which enables us to control e.g. (multi-)collinearity, i.e. predictability of predictors by other predictors (see [here](https://slcladal.github.io/,col.html) for an explanation of (multi-)collinearity), and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
 
 Major disadvantages of mixed-effects regression modeling are that they are prone to producing high $\beta$-errors [see @johnson2009getting] and that they require rather large data sets. 
 
@@ -490,6 +517,7 @@ So far, the regression models that we have used only had fixed-effects. Having o
 
 ```{r lmer01, echo = F, message=F, warning=F}
 library(lme4)
+library(lmerTest)
 lmedata  <- base::readRDS(url("https://slcladal.github.io/data/lmm.rda", "rb")) %>%
   dplyr::mutate(GenreRedux = case_when(str_detect(.$Genre, "Letter") ~ "Conversational",
                                 Genre == "Diary" ~ "Conversational",
@@ -514,10 +542,10 @@ lmedata <- lmedata %>%
 ```{r lmer02, echo = F, message=F, warning=F}
 # plot predictions + intercept
 ggplot(lmedata, aes(y = Prepositions, x = Date)) +
-  facet_grid(~GenreRedux) +
   geom_point(size = 2, aes(color = GenreRedux), alpha= .2) +
   geom_abline(intercept = coef(m1)[1], slope = coef(m1)[2], size = .75) +
   geom_line(aes(y = Pred_lm, color = GenreRedux), size = 1) +
+  facet_grid(~GenreRedux) +
   theme(legend.position = "none") +
   ggtitle("Predictions of a fixed-effects model with model intercept") +
   theme_bw(base_size = 9)
@@ -526,10 +554,10 @@ ggplot(lmedata, aes(y = Prepositions, x = Date)) +
 ```{r lmer03, echo = F, message=F, warning=F}
 # plot predictions + intercept
 ggplot(lmedata, aes(y = Prepositions, x = Date)) +
-  facet_grid(~GenreRedux) +
+  geom_point(size = 2, aes(color = GenreRedux), alpha= .2) +
   geom_abline(intercept = fixef(m2)[1], slope = fixef(m2)[2], size = .75) +
   geom_line(aes(y = Pred_lme, color = GenreRedux), size = 1) +
-  geom_point(size = 2, aes(color = GenreRedux), alpha= .2) +
+  facet_grid(~GenreRedux) +
   theme(legend.position = "none") +
   ggtitle("Predictions of a mixed-effects model with random intercepts but not random slopes \n(with model intercept)") +
   theme_bw(base_size = 9)
@@ -539,10 +567,10 @@ ggplot(lmedata, aes(y = Prepositions, x = Date)) +
 ```{r lmer04, echo = F, message=F, warning=F}
 # plot predictions + intercept
 ggplot(lmedata, aes(y = Prepositions, x = Date)) +
-  facet_grid(~GenreRedux) +
   geom_point(size = 2, aes(color = GenreRedux), alpha= .2) +
   geom_abline(intercept = fixef(m3)[1], slope = fixef(m3)[2], size = .75) +
   geom_line(aes(y = Pred_lme2, color = GenreRedux), size = 1) +
+  facet_grid(~GenreRedux) +
   theme(legend.position = "none") +
   ggtitle("Predictions of a mixed-effects model with random intercepts and random slopes \n(with model intercept)") +
   theme_bw(base_size = 9)
@@ -550,22 +578,19 @@ ggplot(lmedata, aes(y = Prepositions, x = Date)) +
 
 ### Random Effects{-}
 
-*Random Effects* can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x equals 0) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (left panel in the figure above), mixed-effects models can therefore have various *random intercepts* (center panel) or various *random slopes*, or both, various *random intercepts* and various *random slopes* (right panel). 
+*Random Effects* can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x equals 0) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (top figure), mixed-effects models can therefore have various *random intercepts* (middle figure) or various *random slopes*, or both, various *random intercepts* and various *random slopes* (bottom figure). 
 
 What features do distinguish random and fixed effects? 
 
-1) Random effects represent a higher level variable under which data points are grouped. This implies that random effects must be categorical (or nominal but *they a´cannot be continuous*!) [see @winter2019statistics, p. 236].
+1) Random effects represent a higher level variable under which data points are *grouped*(!). This implies that random effects must be categorical (or nominal but *they cannot be continuous*!) [see @winter2019statistics, p. 236].
 
-2) Random effects represent a sample of an infinite number of possible levels. For instance, speakers, trials, items, subjects, or words represent a potentially infinite pool of elements from which many different samples can be drawn. Thus, random effects represent a random sample sample. Fixed effects, on the other hand, typically do not represent a random sample but a fixed set of variable levels (e.g. Age groups, or parts-of-speech).
+2) Random effects represent a sample of an infinite number of possible levels. For instance, speakers, trials, items, subjects, or words represent a potentially infinite pool of elements from which many different samples can be drawn. Thus, random effects represent a random sample. Fixed effects, on the other hand, typically do not represent a random sample but a fixed set of variable levels (e.g. Age groups, or parts-of-speech).
 
 3) Random effects typically represent many different levels while fixed effects typically have only a few. @zuur2013beginner propose that a variable may be used as a fixed effect if it has less than 5 levels while it should be treated as a random effect if it has more than 10 levels. Variables with 5 to 10 levels can be used as both. However, this is a rule of thumb and ignores the theoretical reasons (random sample and nestedness) for considering something as a random effect and it also is at odds with the way that repeated measures are models (namely as mixed effects) although they typically only have very few levels.  
 
 4) Fixed effects represent an effect that if we draw many samples, the effect would be consistent across samples [@winter2019statistics] while random effects should vary for each new sample that is drawn.
 
-Models with only random intercepts are more common because including both random intercepts and random slopes requires larger data sets (but have a better fit because intercepts are not forced to be parallel and the lines therefore have a better fit). Always think about what random effects structure is appropriate for your model [see @winter2019statistics, 241-244]. 
-Mixed-effects are called mixed-effects because they contain both random and fixed effects.
-
-Random effects are added first.
+Models with only random intercepts are more common because including both random intercepts and random slopes requires larger data sets (but have a better fit because intercepts are not forced to be parallel and the lines therefore have a better fit). Always think about what random effects structure is appropriate for your model [see @winter2019statistics, 241-244]. Mixed-effects are called mixed-effects because they contain both random and fixed effects and during model fitting, random effects are added first.
 
 ### Example: Preposition Use across Time by Genre{-}
 
@@ -575,7 +600,10 @@ To explore how to implement a mixed-effects model in R we revisit the prepositio
 # suppress scientific notation
 options("scipen" = 100, "digits" = 4)      
 # do not convert strings into factors
-options(stringsAsFactors = F)              
+options(stringsAsFactors = F) 
+# load packages
+library(lme4)
+library(lmerTest)
 # read in data
 lmmdata  <- base::readRDS(url("https://slcladal.github.io/data/lmm.rda", "rb")) %>%
 # convert date into a numeric variable
@@ -609,8 +637,6 @@ p3 <- ggplot(lmmdata, aes(Prepositions)) +
   labs(y = "Count", x = "Frequency (Prepositions)")
 grid.arrange(grobs = list(p1, p2, p3), widths = c(1, 1), layout_matrix = rbind(c(1, 1), c(2, 3)))
 ```
-
-
 
 
 The scatter plot in the upper panel indicates that the use of prepositions has moderately increased over time while the boxplots in the lower left panel show that the genres differ quite substantially with respect to their median frequencies of prepositions per text. Finally, the histogram in the lower right panel show that preposition use is distributed normally with a mean of 132.2 prepositions per text. 
@@ -667,12 +693,12 @@ mb.lmer = lmer(Prepositions ~ Date + (1 + Date | Genre), REML = T, data = lmmdat
 anova(ma.lmer, mb.lmer, test = "Chisq", refit = F)
 ```
 
-The model comparison shows that the model with the more complex random effect structure has a significantly better fit to the data compared with the model with the simpler random effect structure. However, we will continue with the model with the simpler structure because this is just an example. 
+The model comparison shows that the model with the more complex random effect structure has a significantly better fit to the data compared with the model with the simpler random effect structure but the more complex model fails to converge. In this case, we would test if scaling numeric variables and another optimizer would remedy this issue. However, if this issue cannot be resolved, we would have to stick to the model with the random effect structure that does not cause issues. In this example, we will not try to solve the issues with the complex random effect structure and simply continue with the model with the simpler structure. 
 
->
-> In a real analysis, we would switch to a model with random intercepts and random slopes for Genre because it has a significantly better fit to the data. 
->
+***
+> Note: the model with the random slopes causes a warning (not shown here) informing us that the model failed to converge. If this happens, the results of this model cannot be trusted. While we would switch to a model with a significantly better fit to the data, we would only do so if the model is reliable (which is not the case with the random slope model). 
 
+***
 
 ### Model Fitting{-}
 
@@ -719,11 +745,31 @@ Again, the high p-value and the increase in AIC and BIC show that we have found 
 summary(m1.lmer)
 ```
 
+And for comparison, the results of a fixed-effects a generalized linear model that was fit to the same data.
+
+```{r lmm13b}
+# inspect results
+summary(glm(Prepositions ~ Date + Genre, data = lmmdata))
+```
+
+As well as the results of a mixed-effects model with random intercepts and random slopes.
+
+```{r lmm13c, message=F, warning = F}
+# inspect results
+summary(lmer(Prepositions ~ (1 + Date | Genre ) + Date, data = lmmdata))
+```
+***
+> Note: this model causes a warning (not shown here) informing us that the model failed to converge. If this happens, the results of this model cannot be trusted.
+
+***
+
+While the estimates for the mixed model with random intercepts and the estimates of the fixed effects model are identical (there is only a small difference in the standard error which causes the p-values of the mixed model to be higher), the estimates for date provided by the mixed-effects model with random intercepts and random slopes differ quite substantially (both from the mixed and the fixed effects model). However, the results of the mixed-effects model with random slopes have to be rejected due to it failure to converge. Let us now return to the results of the random intercept mixed-effects model.
+
 The summary output starts by informing us that the model used a *RE*stricted *M*aximum *L*ikelihood (REML) criterion rather than the *M*aximum *L*ikelihood (ML) or the *L*og-*L*ikelihood (LL) criterion for optimization of parameter estimates (see [here](https://towardsdatascience.com/maximum-likelihood-ml-vs-reml-78cf79bef2cf) for an explanations of REML and ML, what the difference between REML and ML is, and why we use REML here). The output then states the model formula (see [here](https://it.unt.edu/sites/default/files/linearmixedmodels_jds_dec2010.pdf) for an elaborate explanation of the output of mixed-effects linear regressions). Then, the output provides us with a value for the REML criterion when the model converged. We then get an overview of the distribution of scaled residuals. This should be symmetric(!) - if the values are not symmetric, then the model contains outliers or the data violate model assumptions. Next, we get an overview of the random effects that the model contained and their variances, followed by an overview of the estimates of the fixed effects. We will now focus a bit more thoroughly on what these values - especially the variances for the random effects mean (what the estimates of the fixed-effects means should be clear from what we have discussed above - the intercept represents the y-axis point at x=0 and the estimates represent the slopes for the fixed effects). 
 
 But given that we are dealing with a mixed-effects model that uses many intercepts (rather than juts 1): what are the intercepts and the slope for the different genres?
 
-```{r lmm13b, message = F, warning=F}
+```{r lmm13d, message = F, warning=F}
 coef(m1.lmer)
 ```
 
@@ -733,14 +779,14 @@ Now, what does the Variance for *Genre (Intercept)* (159) in the Random Effects 
 
 Does it refer to the mean of the coefficients?
 
-```{r lmm13c, message = F, warning=F}
+```{r lmm13e, message = F, warning=F}
 mean(coef(m1.lmer)$Genre[,1])
 ```
 
 No, this gives us the model intercept. So what do these variance values mean? Well, they represent the amount of variance that is explained by a random effect. Thus, *Genre* explains 159 of the total variance of the random effects ($\hat{\sigma}^2$_total_ =  159 + 229 = `r 159+229`). This also means that the residual deviance is still larger than the variance accounted for by *Genre* which means that *Genre* does not explain the entire variance. But how much explanatory power does *Genre* have? We can calculate the amount of the total variance of the random effects that is explained by a random effect by dividing the variance of a random effect by the total variance:
 
 
-```{r lmm13e, message = F, warning=F}
+```{r lmm13f, message = F, warning=F}
 159/(159+229)
 ```
 
@@ -805,11 +851,12 @@ Below is a list of criteria that should be considered when diagnosing regression
 
 6) There should not be (any) autocorrelation among predictors. This means that independent variables cannot be correlated with itself (for instance, because data points come from the same subject). If there is autocorrelation among predictors, then a Repeated Measures Design or a (hierarchical) mixed-effects model should be implemented instead.
 
-7) Predictors cannot substantially correlate with each other (multicollinearity). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is unreliable [@myers1990classical] and predictors causing such VIFs should be removed. Indeed, even VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215; @zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed! 
+7) Predictors cannot substantially correlate with each other (multicollinearity) (see [here](https://slcladal.github.io/,col.html) for an explanation of (multi-)collinearity). If a model contains predictors that have variance inflation factors (VIF) > 10 the model is unreliable [@myers1990classical] and predictors causing such VIFs should be removed. Indeed, even VIFs of 2.5 can be problematic [@szmrecsanyi2006morphosyntactic 215; @zuur2010protocol] proposes that variables with VIFs exceeding 3 should be removed! 
 
->
-> However, (multi-)collinearity is only an issue if one is interested in interpreting regression results!  If the interpretation is irrelevant because what is relevant is prediction(!), then it does not matter if the model contains collinear predictors! See @gries2021statistics for a more elaborate explanation.
->
+***
+> Note: however, (multi-)collinearity is only an issue if one is interested in interpreting regression results!  If the interpretation is irrelevant because what is relevant is prediction(!), then it does not matter if the model contains collinear predictors! See @gries2021statistics for a more elaborate explanation.
+
+***
 
 8) The mean value of VIFs should be $~$ 1 [@bowerman1990linear].
 
@@ -839,9 +886,7 @@ plot(m1.lmer, resid(., type = "pearson") ~ fitted(.) | Genre, id = 0.05,
 The plot shows the standardized residuals (or Pearson's residuals) versus fitted values and suggests that there are outliers in the data (the names elements in the plots). To check if these outliers are a cause for concern, we will now use a Levene's test to check if the variance is distributed homogeneously (homoscedasticity) or whether the assumption of variance homogeneity is violated (due to the outliers).
 
 *** 
->
-> The use of Levene's test to check if the model is heteroscedastic is generally not recommended as it is too lax when dealing with few observations (because in such cases it does not have the power to identify heteroscedasticity) while it is too harsh when dealing with many observations (when heteroscedasticity typically is not a severe problem). 
->
+> Note: the use of Levene's test to check if the model is heteroscedastic is generally not recommended as it is too lax when dealing with few observations (because in such cases it does not have the power to identify heteroscedasticity) while it is too harsh when dealing with many observations (when heteroscedasticity typically is not a severe problem). 
 
 ***
 
@@ -926,7 +971,7 @@ We now turn to an extension of binomial logistic regression: mixed-effects binom
 
 * Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical or nested data structures. This applies if several observations are produced by an individual speaker, for instance.
 
-* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity (see [here](https://slcladal.github.io/,col.html) for an explanation of (multi-)collinearity) and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
 
 Major disadvantages of regression modeling are that they are prone to producing high $\beta$-errors [see @johnson2009getting] and that they require rather large data sets. 
 
@@ -1071,11 +1116,18 @@ mblrdata <- mblrdata %>%
 DT::datatable(mblrdata, rownames = FALSE, options = list(pageLength = 5, scrollX=T), filter = "none")
 ```
 
+
+*** 
+
+**Number of levels per random effect**
+
 Before continuing, a few words about the minimum number of random effect levels and the minimum number of observations per random effect level are in order.
 
 While many data points per random variable level increases statistical power and thus to more robust estimates of the random effects [@austin2018multilevel], it has been shown that small numbers of observations per random effect variable level do not cause serious bias and it does not negatively affect the estimates of the fixed-effects coefficients  [@bell2008multilevel; @clarke2008can; @clarke2007addressing; @maas2005sufficient]. The minimum number of observations per random effect variable level is therefore 1.
 
 In simulation study, [@bell2008multilevel] tested the impact of random variable levels with only a single observation ranging from 0 to 70 percent. As long as there was a relatively high number of random effect variable levels (500 or more), small numbers of observations had almost no impact on bias and Type 1 error control.
+
+*** 
 
 We now plot the data to inspect the relationships within the data set. 
 
@@ -1084,7 +1136,7 @@ ggplot(mblrdata, aes(Gender, SUFlike, color = Priming)) +
   facet_wrap(Age~ConversationType) +
   stat_summary(fun = mean, geom = "point") +
   stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  theme_set(theme_bw(base_size = 10)) +
+  theme_bw(base_size = 10) +
   theme(legend.position = "top") +
   labs(x = "", y = "Observed Probabilty of discourse like") +
   scale_color_manual(values = c("gray20", "gray70"))
@@ -1092,17 +1144,28 @@ ggplot(mblrdata, aes(Gender, SUFlike, color = Priming)) +
 
 ### Model Building{-}
 
-In a first step, we set the options.
+In a first step, we load  packages and set the options. Here, we load the `rms` package, we set contrasts and we define a `datadist` object which stores information about the data set that we will need when we display the data and the visualize the effects in the model. 
+
+
+***
+
+**Contrasts**
+
+A short note on contrasts is warranted here. Contrasts define how the data is partitioned which affects how the model in interpreted. In this example, we use *treatment* contrast for categorical predictors (`contr.treatment`) and *polynomial* contrasts for numeric predictors (`contr.poly`). thus means that we compare levels of a categorical predictors against a reference variable (which in clinical trials would typically be the control group which receives no or a placebo treatment). This reference variable is the alphabetically first level by default but can be changed by using, e.g., `factor(x, ref = a)` or `relevel(x, ref = )`. The polynomial coding for numeric variables means that the effect of numeric variables is estimated for 0 by default (e.g. Date = 0 in the case of the linear model that we fit above). 
+
+There are other contrasts available, e.g. `contr.sum` (sum contrasts which compare the levels of a variable to the overall mean) which are akin to the typical ANOVA output. Also, contrasts can be specified manually which allows us to test specific hypotheses without the need of post-hoc tests (such as Turkey tests). A very(!) recommendable discussion and explanation of contrasts and how to specify them manually is provided by @gries2021statistics.
+
+***
 
 ```{r blmm9, message=F, warning=F}
 library(rms)
 # set options
-options(contrasts  =c("contr.treatment", "contr.poly"))
+options(contrasts  = c("contr.treatment", "contr.poly"))
 mblrdata.dist <- datadist(mblrdata)
 options(datadist = "mblrdata.dist")
 ```
 
-In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the "glmer" function with a random intercept for ID (a lmer object of the final minimal adequate model will be created later).
+In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the `glmer` function with a random intercept for ID (a `lmer` object of the final minimal adequate model will be created later).
 
 ```{r blmm10, message=F, warning=F}
 # baseline model glm
@@ -1113,7 +1176,7 @@ m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial)
 
 ### Testing the Random Effect{-}
 
-Now, we check if including the random effect is permitted by comparing the AICs from the glm to AIC from the glmer model. If the AIC of the glmer object is smaller than the AIC of the glm object, then this indicates that including random intercepts is justified.
+Now, we check if including the random effect is permitted by comparing the AICs from the glm to AIC from the glmer model. If the AIC of the `glmer` object is smaller than the AIC of the glm object, then this indicates that including random intercepts is justified.
 
 
 ```{r blmm11, message=F, warning=F}
@@ -1160,7 +1223,7 @@ m0.glmer <- glmer(SUFlike ~ 1+ (1|ID),
                   control=glmerControl(optimizer="bobyqa"))
 ```
 
-During each step of the fitting procedure, we test whether certain assumptions on which the model relies are violated. To avoid *incomplete information* (a combination of variables does not occur in the data), we tabulate the variables we intend to include and make sure that all possible combinations are present in the data. Including variables although not all combinations are present in the data would lead to unreliable models that report (vastly) inaccurate results. A special case of incomplete information is *complete separation* which occurs if one predictor perfectly explains an outcome (in that case the incomplete information would be caused by a level of the dependent variable). In addition, we make sure that the VIFs do not exceed a maximum of 3 for main effects [@zuur2010protocol] - @booth1994regression suggest that VIFs should ideally be lower than 3 for as higher values would indicate multicollinearity and thus that the model is unstable. The value of 3 should be taken with a pinch of salt because there is no clear consensus about what the maximum VIF for interactions should be or if it should be considered at all. The reason is that we would, of course, expect the VIFs to increase when we are dealing with interactions as the main effects that are part of the interaction are very likely to correlate with the interaction itself. However, if the VIFs are too high, then this will still cause the issues with the attribution of variance. The value of 3 was chosen based on recommendations in the standard literature on multicollinearity [@zuur2009mixedmodels; @neter1990vif]. Only once we have confirmed that the incomplete information, complete separation, and *multicollinearity* are not a major concern, we generate the more saturated model and test whether the inclusion of a predictor leads to a significant reduction in residual deviance. If the predictor explains a significant amount of variance, it is retained in the model while being disregarded in case it does not explain a sufficient quantity of variance.  
+During each step of the fitting procedure, we test whether certain assumptions on which the model relies are violated. To avoid *incomplete information* (a combination of variables does not occur in the data), we tabulate the variables we intend to include and make sure that all possible combinations are present in the data. Including variables although not all combinations are present in the data would lead to unreliable models that report (vastly) inaccurate results. A special case of incomplete information is *complete separation* which occurs if one predictor perfectly explains an outcome (in that case the incomplete information would be caused by a level of the dependent variable). In addition, we make sure that the VIFs do not exceed a maximum of 3 for main effects [@zuur2010protocol] - @booth1994regression suggest that VIFs should ideally be lower than 3 for as higher values would indicate multicollinearity and thus that the model is unstable (see [here](https://slcladal.github.io/,col.html) for an explanation of (multi-)collinearity). The value of 3 should be taken with a pinch of salt because there is no clear consensus about what the maximum VIF for interactions should be or if it should be considered at all. The reason is that we would, of course, expect the VIFs to increase when we are dealing with interactions as the main effects that are part of the interaction are very likely to correlate with the interaction itself. However, if the VIFs are too high, then this will still cause the issues with the attribution of variance. The value of 3 was chosen based on recommendations in the standard literature on multicollinearity [@zuur2009mixedmodels; @neter1990vif]. Only once we have confirmed that the incomplete information, complete separation, and *multicollinearity* are not a major concern, we generate the more saturated model and test whether the inclusion of a predictor leads to a significant reduction in residual deviance. If the predictor explains a significant amount of variance, it is retained in the model while being disregarded in case it does not explain a sufficient quantity of variance.  
 
 ```{r blmm14, message=F, warning=F}
 # add Priming
@@ -1455,6 +1518,22 @@ sigfit
 print(mlr.glmer, corr = F)
 ```
 
+Let's go over the output. The first part tells us what kind of model was fit to the data (a *generalized linear mixed model*), that it was fit by *maximum likelihood* (rather than restricted maximum likelihood), and that the model linked the predictors to the response by fitting the model to the logits of the response variable (rather than the response variable itself).
+
+The output then provides use with the model formula and the data to which the model was fit. Next, we get model fit parameters (the AIC, the BIC, the logLik (logged Likelihood), the residual deviance, and the residual degrees of freedom). All of these measures are uninformative by themselves but they are meaningful when comparing this model to another model that was fit to the same data as better model fit would mean lower values. Thus, if we compared two outputs of model that were fit to the same data, the model with the lower AIC, BIC, logLik, and residual deviance would be the *better* model.
+
+Next, the model reports the standard deviation of the random effect which is used later to check how much variance is explained by the random effect structure (in the tabulated model report), the number of observation that the model is fit to, and the number of groups of the random effect.
+
+Then, the output reports the estimates of the predictors which represent the logged odds - values smaller than 1 indicate a negative correlation while values above 1 indicate a positive correlation with the response variable. These logged odds can be transformed into probabilities using the `plogit` function. the probability of discourse *like* appearing in a primed speech unit would thus be the probability of the intercept + the probability of `PrimingPrime`:
+
+
+```{r blmm30c, message=F, warning=F}
+# calculate probability
+plogis(-0.921+1.060)
+```
+
+Hence, the probability of discourse *like* being used in a primed speech unit is `r plogis(-0.921+1.060)`. Commonly, however, the effects in generalized linear mixed effects binomial logistic regressions are reported not as probabilities but as Odds Ratios which tell use how many times more (or less) likely it is that a response occurs given a certain variable level. To transform the logged odds into Odds Ratios, we exponentiate the estimates. Applied to the present case, we would could say that discourse like is  `exp(1.060)` or `r exp(1.060)` times more likely to occur in a primed context compared to a non-primed context. 
+
 To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that effect. This can be problematic when checking the effect of main effects that are involved in significant interactions though [@field2012discovering 622].
 
 ```{r blmm32a, message=F, warning=F}
@@ -1470,6 +1549,25 @@ ef_prigen <- anova(m6.glmer, m4.glmer, test = "Chi")
 # inspect
 ef_prigen
 ```
+
+***
+
+**Post-Hoc Tests**
+
+If you want to test is levels of a categorical predictor differ significantly with respect to their effect on the response variable, you can use so-called post-hoc test. While it is better to specify contrasts and thus avoid repeated testing (as this increases the probability of $\alpha$-errors), post-hoc tests have the advantage that they are easily implemented and avoid potential problems when specifying contrasts manually (which cane be hard - especially when one does not do this regularly). The code below shows how such a post-hoc test could be implemented. However, in the present case, we do not need post-hoc tests because none of our categorical predictors has more than two levels.
+
+
+```{r blmm32c, eval = F, message=F, warning=F}
+# load package
+library (multcomp)
+# perform post-hoc test
+summary(glht(model, mcp(predictor="Tukey")))
+# example
+summary(glht(m5.glmer, mcp(Ethnicity="Tukey")))
+```
+
+***
+
 
 ### Visualizing Effects{-}
 
@@ -1511,7 +1609,7 @@ Hmisc::somers2(probs, mblrdata$SUFlike, normwt = T)
 
 The two lines that start with `probs` are simply two different ways to do the same thing (you only need one of these).
 
-The model fit parameters indicate a suboptimal fit. Both the C-value and Somers's D~xy~ show poor fit between predicted and observed occurrences of discourse *like*.  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204]. The C.value of `r as.vector(somers2(probs, as.numeric(mblrdata$SUFlike))[1])` suggests that the model has some predictive and explanatory power, but not at an optimal level. We now check the prediction accuracy.
+The model fit parameters indicate a suboptimal fit. Both the C-value and Somers's D~xy~ show poor fit between predicted and observed occurrences of discourse *like*.  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204]. The C-value of `r as.vector(somers2(probs, as.numeric(mblrdata$SUFlike))[1])` suggests that the model has some predictive and explanatory power, but not at an optimal level. We now check the prediction accuracy.
 
 In order to calculate the prediction accuracy of the model, we generate a variable called *Prediction* that contains the predictions of pour model and which we add to the data. Then, we use the `confusionMatrix` function from the `caret` package to extract the prediction accuracy. 
 
@@ -1542,18 +1640,18 @@ sjPlot::tab_model(mlr.glmer)
 
 *** 
 
-A mixed-effect binomial logistic regression model with random intercepts for speakers was fit to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model ($\chi$^2^(`r as.vector(unlist(sigfit))[14][1]`): `r sigfit$Chisq[2]`, p  = `r round(as.vector(unlist(sigfit))[16][1], 5)`) and a good but not optimal fit (C: 0.7583, Somers' D~xy~: 0.5167). The final minimal adequate model reported that speakers use more discourse *like* in mixed-gender conversations compared to same-gender conversations ($\chi$^2^(`r as.vector(unlist(ef_conv))[14][1]`): `r `r ef_conv$Chisq[2]`, p  = `r round(as.vector(unlist(ef_conv))[16][1], 5)`) and that there is an interaction between priming and gender with men using more discourse *like* in un-primed contexts while this gender difference is not present in primed contexts where speakers more more likely to use discourse *like* regardless of gender ($\chi$^2^(`r as.vector(unlist(ef_prigen))[14][1]`): `r ef_prigen$Chisq[2]`, p  = `r round(as.vector(unlist(ef_prigen))[16][1], 5)`). 
+A mixed-effect binomial logistic regression model with random intercepts for speakers was fit to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model ($\chi$^2^(`r as.vector(unlist(sigfit))[14][1]`): `r sigfit$Chisq[2]`, p  = `r round(as.vector(unlist(sigfit))[16][1], 5)`) and a good but not optimal fit (C: 0.7583, Somers' D~xy~: 0.5167). The final minimal adequate model reported that speakers use more discourse *like* in mixed-gender conversations compared to same-gender conversations ($\chi$^2^(`r as.vector(unlist(ef_conv))[14][1]`): `r ef_conv$Chisq[2]`, p  = `r round(as.vector(unlist(ef_conv))[16][1], 5)`) and that there is an interaction between priming and gender with men using more discourse *like* in un-primed contexts while this gender difference is not present in primed contexts where speakers more more likely to use discourse *like* regardless of gender ($\chi$^2^(`r as.vector(unlist(ef_prigen))[14][1]`): `r ef_prigen$Chisq[2]`, p  = `r round(as.vector(unlist(ef_prigen))[16][1], 5)`). 
 
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Mixed-Effects Regression Models in R. Workshop at UIT AcqVA Aurora*. Tromsø: The Artic Universitz of Norway. url: https://slcladal.github.io/mmws.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Mixed-Effect Modeling in R*. Tromsø: The Artic University of Norway. url: https://slcladal.github.io/mmws.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
 @manual{schweinberger`r format(Sys.time(), '%Y')`mmws,
   author = {Schweinberger, Martin},
   title = {Fixed- and Mixed-Effects Regression Models in R},
-  note = {https://slcladal.github.io/regression.html},
+  note = {https://slcladal.github.io/mmws.html},
   year = {2021},
   organization = "Arctic University of Norway, AcqVA Aurora Center},
   address = {Tromsø},
