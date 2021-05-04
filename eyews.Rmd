@@ -16,7 +16,7 @@ knitr::include_graphics("https://slcladal.github.io/images/acqva.jpg")
 
 # Introduction{-}
 
-This workshop introduces data processing and analysis for eye-tracking data in  R. The RMarkdown document for the tutorial can be downloaded [here](https://slcladal.github.io/eyews.Rmd) and the bib library [here](https://slcladal.github.io/bibliography.bib). You will find very helpful and detailed tutorials on how to perform analyses and visualize eye-tracking data using `eyetrackeR` [here](http://www.eyetracking-r.com/).
+This workshop introduces data processing and analysis for eye-tracking data in  R. The RMarkdown document for the tutorial can be downloaded [here](https://slcladal.github.io/eyews.Rmd) and the bib library [here](https://slcladal.github.io/bibliography.bib). You can also download a shortened version of the RMarkdown document with only contains the processing chain [here](https://slcladal.github.io/etpro.Rmd). You will find very helpful and detailed tutorials on how to perform analyses and visualize eye-tracking data using `eyetrackeR` [here](http://www.eyetracking-r.com/). 
 
 
 We will go through the following steps:
@@ -25,9 +25,14 @@ We will go through the following steps:
 * loading and combining xls spreadsheets
 * determining image boundaries 
 * loading the master file
-* processing the data  (including defining aois and on- as well as off-target gazes, removing imprecisions, binning, cleaning)
+* processing the data
+  + defining aois 
+  + on- as well as off-target gazes
+  + removing imprecisions
+  + binning
+  + cleaning
 * visualizing the data
-* analyzing the data using a mixed-effects binomial logistic regression
+* analyzing the data (e.g., using a mixed-effects binomial logistic regression)
 * using the `eyetrackeR` package for data visualization and analysis
 
 ## Preparation
@@ -68,6 +73,17 @@ Now that we have prepared out session, we can start with the data processing.
 
 During data processing, we load and prepare the data for further analysis and visualization.
 
+## Define paths{-}
+
+In a first step, we define the paths to the spreadsheets (datapath) and to the masterfile (csv file with information about the experiment). In my case, I have the spreadsheets in a folder called `uploads` which is a folder called `data_exp_50674-v2` in my `data` folder. The masterfile is also in the folder called `data_exp_50674-v2` in my `data` folder but it is not in my `uploads` folder.
+
+```{r}
+datapath <- here::here("data/data_exp_50674-v2", "uploads")
+masterpath <- here::here("data/data_exp_50674-v2", "data_exp_50674-v2_task-etfm.csv")
+```
+
+Now that we have defined the paths, we continue.
+
 ## Load data{-}
 
 In a first step we want to load the data which in our case consists of several spreadsheets (files ending in `xlsx`). 
@@ -75,7 +91,7 @@ In a first step we want to load the data which in our case consists of several s
 We begin by extracting a list of these xlsx files (the paths where these files are located on your computer).
 
 ```{r list, warning=F, message=F}
-fls <- list.files(here::here("data/data_exp_50674-v2", "uploads"), full.names = T)
+fls <- list.files(datapath, full.names = T)
 # inspect files
 head(fls)
 ```
@@ -97,15 +113,11 @@ datls <- lapply(fls, function(x){
 head(datls[1])
 ```
 
-
-
-
-
 We can now merge all the spreadsheets into one file and also add a column called `id` that gives each row a unique identifier. Furthermore, we convert the `participant_id` and the `trial` column into factors.
 
 
 ```{r merge, message=F, warning=F}
-edat <- rbindlist(datls) %>%
+edat <- data.table::rbindlist(datls) %>%
   # add id
   dplyr::mutate(id = 1:nrow(.)) %>%
   # convert participant_id and trial into factors
@@ -122,6 +134,8 @@ edat %>%
 ```
 
 ## Determine image boundaries{-}
+
+### Non-normalized{-}
 
 In a next step, we define image boundaries. In our example, we are dealing with two images: one to the right and one to the left. We now use the `zone_y`, `zone_x`, `zone_height`, and `zone_width` columns to calculate the edges of the images.
 
@@ -156,6 +170,54 @@ ibs %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
                             full_width = F)
 ```
+
+
+### Normalized{-}
+
+We can also use the normalized values. 
+
+***
+>If you do this, then it is very crucial, that you use **x_pred_normalised** and 	**y_pred_normalised** and **not** *x_pred* and	*y_pred* in your analysis!
+
+***
+
+In a next step, we define image boundaries. In our example, we are dealing with two images: one to the right and one to the left. We now use the `zone_y_normalised`, `zone_x_normalised`, `zone_height_normalised`, and `zone_width_normalised` columns to calculate the edges of the images.
+
+* top (upper border) = 246 (zone_y_normalised)
+
+* bottom (lower border) = 246 + 329 (zone_y_normalised + zone_height_normalised)
+
+* left (left border) = 774 (zone_x_normalised)
+
+* right (right border) = 774 + 438 (zone_x_normalised + zone_width_normalised)
+
+```{r bound1c, warning=F, message=F}
+ibs_norm <- edat %>%
+  dplyr::select(participant_id, trial, zone_name, zone_x_normalised, 
+                zone_y_normalised, zone_width_normalised, zone_height_normalised) %>%
+  # get rid of superfluous rows
+  dplyr::filter(zone_name == "Right"|zone_name == "Left") %>%
+  na.omit() %>%
+  # define image boundaries
+  dplyr::mutate(top = zone_y_normalised,
+                bottom = zone_y_normalised + zone_width_normalised,
+                left = zone_x_normalised,
+                right = zone_x_normalised + zone_width_normalised) %>%
+  # remove superfluous columns
+  dplyr::select(-zone_x_normalised, -zone_y_normalised, -zone_width_normalised, -zone_height_normalised)
+```
+
+
+```{r bound1d, echo = F, warning=F, message=F}
+ibs_norm %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of ibs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+### Adding edges{-}
 
 We now transform the data so that we have the information about the edges in separate columns. Thus, we have four columns for the right and the left image: bottomedge, leftedge, rightedge, and topedge.
 
@@ -192,7 +254,7 @@ Now that we have processed the data and defined the image boundaries, we load th
 
 
 ```{r mstr1, warning=F, message=F}
-mstr <- read_csv(here::here("data/data_exp_50674-v2", "data_exp_50674-v2_task-etfm.csv")) %>%
+mstr <- read_csv(masterpath) %>%
   # create participant column that matches the participant column in the data 
   dplyr::mutate(participant_id = `Participant Private ID`)
 ```
@@ -213,7 +275,7 @@ The master file contains a lot of information. As retaining columns with unneces
 mstr_redux <- mstr %>%
   # select columns you need
   dplyr::select(participant_id, `trial number`, condition, target_gender, 
-                target_position, `Zone Type`, Response, Correct) %>%
+                target_position, `Zone Type`, Response, Correct, target_item) %>%
   # filter unique 
   unique() %>%
   # remove rows containing NA
@@ -248,10 +310,15 @@ The next step consists in joining (or merging) the data (`edat`) with the inform
 ```{r join1, warning=F, message=F}
 edat <- edat %>%
   # remove superfluous columns
-  dplyr::select(-`0`, -filename, -spreadsheet_row, -time_stamp, -screen_index, -x_pred_normalised, 
-                -y_pred_normalised, -convergence, -zone_x, -zone_y, -zone_width,
+  dplyr::select(-`0`, -filename, -spreadsheet_row, -time_stamp, -screen_index, 
+                -convergence, -zone_x, -zone_y, -zone_width,
                 -zone_height, -zone_x_normalised, -zone_y_normalised, -zone_width_normalised,
-                -zone_height_normalised, -idname) %>%
+                -zone_height_normalised, -idname, 
+                
+                # WARNING: If you work with normalized values, REPLACE the following 
+                # with their non-normalized counterparts!
+                
+                -x_pred_normalised, -y_pred_normalised) %>%
   # convert participant_id and trial into factors
   dplyr::mutate(participant_id = factor(participant_id),
                 trial = factor(trial)) %>%
@@ -268,7 +335,6 @@ edat %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
                             full_width = F)
 ```
-
 
 Now, we can join (or merge) `edat` with `ibs` (image boundaries).
 
@@ -398,13 +464,37 @@ dat %>%
                             full_width = F)
 ```
 
+## Getting rid of incorrect observations
 
-# Saving the data
+```{r clean2, warning=F, message=F}
+dat <- dat %>%
+  dplyr::filter(Correct != "Incorrect")
+```
+
+
+```{r clean2b, echo = F, warning=F, message=F}
+dat %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+#' Saving the data{-}
+
+You can now save the data in your `data` folder, if you like.
 
 ```{r save, message=F, warning=F}
 write.table(dat, here::here("data", "dat.txt"), sep = "\t", row.names = F)
 ```
 
+To re-load this data, you would have use the following command:
+
+```{r save2, message=F, warning=F}
+reload <- read.delim(here::here("data", "dat.txt"), sep = "\t")
+# inspect
+reload[1:4, 1:4]
+```
 
 # Data Viz
 
@@ -436,17 +526,17 @@ f1 %>%
 
 
 ```{r viz1, warning=F, message=F}
-ggplot(f1, aes(y = Proportion, x = TimeBin, color = Correct)) +
+ggplot(f1, aes(y = Proportion, x = TimeBin, color = condition)) +
   # lines for proportions
   geom_line() +
   # add vertical line
-  geom_vline(xintercept = 1500, linetype="dotted", color = "darkgrey", size=.75) +
+  geom_vline(xintercept = 1900, linetype="dotted", color = "darkgrey", size=.75) +
   # add vertical line
-  geom_vline(xintercept = 2300, linetype="dotted", color = "darkgrey", size=.75) +
+  geom_vline(xintercept = 3450, linetype="dotted", color = "darkgrey", size=.75) +
   # add text
-  ggplot2::annotate(geom = "text", label = "Object", x = 1900, y = .85, color = "gray20", size = 3) +
+  ggplot2::annotate(geom = "text", label = "Object", x = 2800, y = .85, color = "gray20", size = 5) +
   # separate panels for each target_gender
-  facet_grid(target_gender ~ condition) +
+  facet_grid(target_gender ~ .) +
   # black and white theme
   theme_bw() + 
   # no grid lines
@@ -470,21 +560,58 @@ ggplot(f1, aes(y = Proportion, x = TimeBin, color = Correct)) +
        height = 5,  width = 10,  dpi = 320)
 ```
 
+## Lineplot with errorbars
+
+```{r}
+# scatter plot with error bars
+ggplot(dat, aes(x=TimeBin, y= AOI,  group = condition, color = condition)) +                 
+  stat_summary(fun = mean, geom = "line", aes(group= condition, color = condition)) +          
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  # add vertical line
+  geom_vline(xintercept = 1900, linetype="dotted", color = "darkgrey", size=.75) +
+  # add vertical line
+  geom_vline(xintercept = 3450, linetype="dotted", color = "darkgrey", size=.75) +
+  # add text
+  ggplot2::annotate(geom = "text", label = "Object", x = 2800, y = .85, color = "gray20", size = 5) +            
+  # def. font size
+  theme_bw(base_size = 15) +  
+  theme(axis.text.x = element_text(size=10, angle = 90),  
+        axis.text.y = element_text(size=10, face="plain"),
+        legend.position = "top",
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +  
+  # define x-axis
+  scale_x_continuous(name = "Time in Trial (ms)", 
+                     limits = c(0,4000), 
+                     breaks = seq(0,4000,1000), 
+                     labels = seq(0, 4000, 1000)) +
+  # define y-axis
+  scale_y_continuous(name = "Proportion in AOI", 
+                     limits = c(0, 1), 
+                     breaks = seq(0, 1,.2), 
+                     labels = seq(0, 1, .2)) +
+  # save plot
+  ggsave(file = here::here("images","Fig02.png"), 
+       height = 5,  width = 10,  dpi = 320)    
+```
+
+
+
 ## Smoothed line plot{-}
 
 
 ```{r viz2, warning=F, message=F}
-ggplot(f1, aes(y = Proportion, x = TimeBin, color = Correct)) +
+ggplot(f1, aes(y = Proportion, x = TimeBin, color = condition, fill = condition)) +
   # lines for proportions
-  geom_smooth(span = .2) +
+  geom_smooth(span = .2, alpha = .2) +
   # add vertical line
-  geom_vline(xintercept = 1500, linetype="dotted", color = "darkgrey", size=.75) +
+  geom_vline(xintercept = 1900, linetype="dotted", color = "darkgrey", size=.75) +
   # add vertical line
-  geom_vline(xintercept = 2300, linetype="dotted", color = "darkgrey", size=.75) +
+  geom_vline(xintercept = 3450, linetype="dotted", color = "darkgrey", size=.75) +
   # add text
-  ggplot2::annotate(geom = "text", label = "Object", x = 1900, y = .85, color = "gray20", size = 3) +
+  ggplot2::annotate(geom = "text", label = "Object", x = 2700, y = 1.1, color = "gray20", size = 5) +
   # separate panels for each condition
-  facet_grid(condition ~ target_gender) +
+  facet_grid(~target_gender) +
   # black and white theme
   theme_bw() + 
   # no grid lines
@@ -500,11 +627,11 @@ ggplot(f1, aes(y = Proportion, x = TimeBin, color = Correct)) +
                      labels = seq(0, 4000, 1000)) +
   # define y-axis
   scale_y_continuous(name = "Proportion in AOI", 
-                     limits = c(-.1, 1), 
+                     limits = c(-.3, 1.2), 
                      breaks = seq(-.1, 1,.2), 
                      labels = seq(0, 1, .2)) +
   # save plot
-  ggsave(file = here::here("images","Fig01.png"), 
+  ggsave(file = here::here("images","Fig03.png"), 
        height = 5,  width = 10,  dpi = 320)
 ```
 
@@ -514,15 +641,15 @@ We use a mixed-effects binomial logistic regression, to check if the conditions 
 
 ```{r glmer0}
 statzdat <- dat %>%
-  dplyr::filter(time_elapsed > 1600 &
-                  time_elapsed < 2200)
+  dplyr::filter(time_elapsed > 1900 &
+                  time_elapsed < 3450)
 ```
 
 Generate base-line model.
 
 ```{r glmer1}
 # generate model
-m0 <- glmer(AOI ~ (1  | trial), 
+m0 <- glmer(AOI ~ (1  | trial) + (1 | target_item), 
                   family = binomial, 
                   data = statzdat, 
                   control=glmerControl(optimizer="bobyqa"))
@@ -530,9 +657,13 @@ m0 <- glmer(AOI ~ (1  | trial),
 
 ```{r glmer2}
 # generate model
-m1 <- update(m0, .~.+ condition + Correct + target_gender)
+m1 <- update(m0, .~.+ condition * target_gender)
 ```
 
+```{r glmer2b}
+# generate model
+summary(m1)
+```
 
 We can now summarize the model.
 
@@ -600,52 +731,50 @@ We can also tabulate the number of `*on target* gazes that remain in the data us
 table(data$OnTarget)
 ```
 
-In a next step, we specify the window that we want to inspect (in our case, we want to check the window starting at 1600 ms and ending at 2200 ms).
+In a next step, we specify the window that we want to inspect (in our case, we want to check the window starting at 1900 ms and ending at 3450 ms).
 
 ```{r eR7, warning=F, message=F}
 # subset to response window post word-onset
 response_window <- subset_by_window(data, 
-                                    window_start_time = 1600, 
-                                    window_end_time = 2200, 
+                                    window_start_time = 1900, 
+                                    window_end_time = 3450, 
                                     rezero = FALSE)
 ```
 
+
+We now check to see if we need to remove data points.
 
 ```{r eR9, warning=F, message=F}
 # analyze amount of trackloss by subjects and trials
 (trackloss <- trackloss_analysis(data = response_window))
 ```
 
+Remove trackloss (trial_prop_thresh greater than or equal to .25).
 
 ```{r eR10, warning=F, message=F}
 # remove trials with > 25% of trackloss
-response_window_clean <- clean_by_trackloss(data = response_window, trial_prop_thresh = .25)
+response_window_clean <- clean_by_trackloss(data = response_window, 
+                                            trial_prop_thresh = .25)
 ```
+
+Extract response data.
 
 ```{r eR11, warning=F, message=F}
 # aggregate across trials within subjects in time analysis
-response <- make_time_sequence_data(response_window_clean, time_bin_size = 20, 
-                                 predictor_columns = c("condition", "Correct"),
-                                 aois = c("OnTarget", "OffTarget")
+response <- make_time_sequence_data(response_window_clean, 
+                                    time_bin_size = 50,
+                                    predictor_columns = c("condition", "Correct"),
+                                    aois = c("OnTarget", "OffTarget")
                             )
 ```
 
+Visualize response data.
 
 ```{r eR13, warning=F, message=F}
 # visualize time results
 plot(response, 
      predictor_column = "condition") + 
   theme_light() +
-  coord_cartesian(ylim = c(0,1))
-```
-
-
-```{r eR17, warning=F, message=F}
-# visualize time results
-plot(response, 
-     predictor_column = "Correct") + 
-  theme_bw() +
-  theme(legend.position = "top") +
   coord_cartesian(ylim = c(0,1))
 ```
 
