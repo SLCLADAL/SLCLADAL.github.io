@@ -28,29 +28,101 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces mixed-effects regression modeling using R. The R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/mmws.Rmd).
+This tutorial introduces regression analyses (also called regression modeling) using R. Regression models are among the most widely used quantitative methods in the language sciences to assess if and how predictors (variables or interactions between variables) correlate with a certain response. The R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/regression.Rmd).
 
-Regression models are among the most widely used methods in data analysis because they are/can
+Regression models are so popular because they can
 
 * incorporate many predictors in a single model (multivariate: allows to test the impact of one predictor while the impact of (all) other predictors is controlled for)
+
 * extremely flexible and and can be fitted to different types of predictors and dependent variables
+
 * provide output that can be easily interpreted
+
 * conceptually relative simple and not overly complex from a  mathematical perspective
 
-There are two basic types of regression models: fixed-effects regression models and mixed-effects regression models. The first part of this tutorial focuses on fixed-effects regression models while the second part focuses on mixed-effects regression models (the difference lies in the fact that fixed-effects regression models allow us to model hierarchical or nested data - more on that in the second part of this tutorial).
+R offers various ready-made functions with which implementing different types of regression models is very easy.
 
-Fixed-effects regression models are models that assume a non-hierarchical data structure, i.e. data where data points are not nested or grouped in higher order categories (e.g. students within classes). R offers a various ready-made functions with which implementing different types of regression models is very easy.
+The most widely use regression models are
 
-In the following, we will go over the most relevant and frequently used types of regression models:
+* linear regression (dependent variable is numeric, no outliers)
 
-* simple linear regression 
+* logistic regression (dependent variable is binary)
 
-* multiple linear regression
+* ordinal regression (dependent variable represents an ordered factor, e.g. Likert items)
 
-* multiple binomial logistic regression
+* multinomial regression (dependent variable is categorical)
 
 
 The major difference between these types of models is that they take different types of dependent variables: linear regressions take numeric, logistic regressions take nominal variables, ordinal regressions take ordinal variables, and Poisson regressions take dependent variables that reflect counts of (rare) events. Robust regression, in contrast, is a simple multiple linear regression that is able to handle outliers due to a weighing procedure.
+
+If regression models contain a random effect structure which is used to model nestedness or dependence among data points, the regression models are called *mixed-effect models*. Regressions that do not have a random effect component to model  nestedness or dependence are referred to as fixed-effect regressions (we will have a closer look at the difference between fixed and random effects below).
+
+There are two basic types of regression models: fixed-effects regression models and mixed-effects regression models.  Fixed-effects regression models are models that assume a non-hierarchical data structure, i.e. data where data points are not nested or grouped in higher order categories (e.g. students within classes). The first part of this tutorial focuses on fixed-effects regression models while the second part focuses on mixed-effects regression models.
+
+There exists a wealth of literature focusing on  regression analysis and the concepts it is based on.  For instance, there are @achen1982interpreting, @bortz2006statistik, @crawley2005statistics, @faraway2002practical, @field2012discovering (my personal favorite), @gries2021statistics, @levshina2015linguistics,  and @wilcox2009basic to name just a few. Introductions to regression modeling in R are @baayen2008analyzing, @crawley2012r, @gries2021statistics, or @levshina2015linguistics.
+
+**The basic principle**
+
+The idea behind regression analysis is expressed formally in the equation below where $f_{(x)}$ is the $y$-value we want to predict, $\alpha$ is the intercept (the point where the regression line crosses the $y$-axis), $\beta$ is the coefficient (the slope of the regression line). 
+
+$f_{(x)} = \alpha + \beta_{i}x + \epsilon$
+
+To understand what this means, let us imagine that we have collected information about the how tall people are and what they weigh. Now we want to predict the weight of people of a certain height - let's say 180cm.
+
+```{r intro00, echo=F, message=FALSE, warning=FALSE}
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+Height <- c(173, 169, 176, 166, 161, 164, 160, 158, 180, 187)
+Weight <- c(80, 68, 72, 75, 70, 65, 62, 60, 85, 92) 
+df <- data.frame(Height, Weight)
+# inspect data
+df %>%
+  kable(caption = "Weigth and height of a random sample of people.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+```
+
+We can run a simple linear regression on the data and we get the following output:
+
+```{r intro01b, message=FALSE, warning=FALSE}
+# model for upper panels
+summary(glm(Weight ~ 1, data = df))
+```
+
+To estimate how much some weights who is 180cm tall, we would multiply the coefficent (slope of the line) with 180 ($x$) and add the value of the intercept (point where line crosses the $y$-axis). If we plug in the numbers from the regression model below, we get
+
+-93.77 + 0.98 ∗ 180 = 83.33 (kg)
+
+A person who is 180cm tall is predicted to weigh 83.33kg. Thus, the predictions of the weights are visualized as the red line in the figure below. Such lines are called *regression lines*. Regression lines are those lines where the sum of the red lines should be minimal. The slope of the regression line is called *coefficient* and the point where the regression line crosses the y-axis is called the *intercept*. Other important concepts in regression analysis are *variance* and *residuals*. *Residuals* are the distance between the line and the points (the red lines) and it is also called *variance*.
+
+```{r intro01, echo=F, message=FALSE, warning=FALSE}
+# load package
+library(ggpubr)
+library(vip)
+# generate data
+Height <- c(173, 169, 176, 166, 161, 164, 160, 158, 180, 187)
+Weight <- c(80, 68, 72, 75, 70, 65, 62, 60, 85, 92) 
+df <- data.frame(Height, Weight) %>%
+  dplyr::mutate(Pred = predict(lm(Weight ~ Height)))
+# generate plots
+p <- ggplot(df, aes(Height, Weight)) +
+  geom_point() +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+p1 <- p
+p2 <- p +
+  geom_hline(yintercept=mean(Weight), color = "blue") + 
+  geom_segment(aes(xend = Height, yend = mean(Weight)), color = "red") +
+  ggplot2::annotate(geom = "text", label = "Residual Deviance = 946.9", x = 170, y = 100, size = 3) 
+p3 <- p +
+    geom_smooth(color = "blue", se = F, method = "lm", size = .5)
+p4 <- p3 +
+  geom_segment(aes(xend = Height, yend = Pred), color = "red") +
+  ggplot2::annotate(geom = "text", label = "Residual Deviance = 164.3", x = 170, y = 100, size = 3)
+ggpubr::ggarrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+```
+
+Now that we are familiar with the basic principle of regression modeling - i.e. finding the line through data that has the smallest sum of residuals, we will apply this to a linguistic example.
 
 ### Preparation and session set up{-}
 
