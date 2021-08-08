@@ -374,7 +374,12 @@ library(knitr)
 variabletb <- matrix(c("Nominal Scaled / Categorical Variables", "Gender, Nationality, Part of Speech", "Ordinal Scaled Variables", "Graduation, School Grades, Military Rank", "Interval Scaled Variables", "Temperature, Acceptability Judgments", "Ratio-scaled Variables", "Age, Duration, Number of Syllables"), nrow = 4, byrow = T)
 # add column and row names
 colnames(variabletb) <- c("Variable Type", "Variable Level")
-kable(variabletb, caption = "Variable types/Variable scales with examples.")
+variabledf <- as.data.frame(variabletb)
+ft <- flextable(variabledf) %>%
+  flextable::set_caption(caption = "Variable types/Variable scales with examples.")  %>%
+  flextable::theme_zebra() %>%
+  flextable::autofit()
+ft
 ```
 
 It is enormously important to know variable types and levels, as the type of variable requires which tests are possible and which are not. For example, a $\chi$^2^-test can only be applied to nominal or categorical variables, and a t-test to numeric variables only.
@@ -632,54 +637,51 @@ To understand this a more thoroughly, we will consider tossing a coin not merely
 
 ```{r echo=F, eval = T, message=FALSE, warning=FALSE}
 # load packages
-library(grDevices)
+library(tidyverse)
 # set up data
 p100 <- dbinom(0:100, 100, 0.5)
 w100 <- c(0:100)
-wtb <- rbind(w100, p100)
-colnames(wtb) <- c(0:100)
-rownames(wtb) <- c("anzahl (kopf)", "prob")
-xseq <- seq(0.7, 120.7, 1.2)
-xseq <- xseq[c(1, 20, 40, 60, 80, 100)]
-# start plotting
-barplot(wtb[2,], ylim = c(0, 0.1), ylab = "Probability", xlab = "Frequency Count (Head)",
-  axes = F, axisnames = F, col = "lightgrey")
-axis(1, at= xseq, labels= c("0", "20", "40", "60", "80", "100"))
-axis(2, at= seq(0.0, 0.1, 0.05), labels= c("0.00", "0.05", "0.10"), cex = .75)
-box()
+df <- data.frame(w100, p100)
+ggplot(df, aes(x = w100, y = p100)) +
+  geom_bar(stat="identity", fill = "gray") +
+  labs(x = "Frequency Count (Head)", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())
 ```
 
 The next Figure shows at which number of heads the cumulative probabilities dip below 5 percent for two-tailed hypotheses. According to the graph, if head shows up to 40 or more often than 60 times, the cumulative probability dips below 5 percent. Applied to our initial bet, you could thus claim that I cheated if head shows less than 41 times or more than 60 times (if out hypothesis were two-tailed - which it is not). 
 
 ```{r echo=F, eval = T, message=FALSE, warning=FALSE}
-# sum probabilities
-sp <- cumsum(wtb[2,])
-ttsp <- as.vector(unlist(sapply(sp, function(x){
-  x <- ifelse(x <= 0.025, TRUE,
-    ifelse(x >= 0.975, TRUE, FALSE))
-    })))
-barplot(wtb[2,], ylim = c(0, 0.1), ylab = "Probability", xlab = "Frequency Count (Head)",
-  axes = F, axisnames = F, , col = ifelse(ttsp == T, "red", "lightgrey"))
-axis(1, at= xseq, labels= c("0", "20", "40", "60", "80", "100"))
-axis(2, at= seq(0.0, 0.1, 0.05), labels= c("0.00", "0.05", "0.10"), cex = .75)
-box()
-#grid()
-text(75, 0.06, expression(paste(mu^1 !=  mu^2, sep = "")))
+df <- df %>%
+  dplyr::mutate(cump = cumsum(p100),
+                col = ifelse(cump <= 0.025 | cump >= 0.975, T, F))
+ggplot(df, aes(x = w100, y = p100, fill = col)) +
+  geom_bar(stat="identity") +
+  labs(x = "Frequency Count (Head)", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        legend.position = "none") +
+  scale_fill_manual(values = c("gray", "red")) +
+  annotate(geom = "text", label = expression(paste(mu^1 !=  mu^2, sep = "")), x = 70, y = .05)
 ```
 
 The Figure below shows at which point the probability of heads showing dips below 5 percent for one-tailed hypotheses. Thus, according to the figure below, if we toss a coin 100 times and head shows 59 or more often, then you are justified in claiming that I cheated.
 
 ```{r echo=F, eval = T, message=FALSE, warning=FALSE}
-ttsp <- as.vector(unlist(sapply(sp, function(x){
-  x <- ifelse(x <= 0.95, TRUE, FALSE)
-    })))
-barplot(wtb[2,], ylim = c(0, 0.1), ylab = "Probability", xlab = "Frequency Count (Head)",
-  axes = F, axisnames = F, col = ifelse(ttsp == T, "lightgrey", "red"))
-axis(1, at= xseq, labels= c("0", "20", "40", "60", "80", "100"))
-axis(2, at= seq(0.0, 0.1, 0.05), labels= c("0.00", "0.05", "0.10"), cex = .75)
-box()
-#grid()
-text(75, 0.06, expression(paste(mu^1 >=  mu^2, sep = "")))
+df <- df %>%
+  dplyr::mutate(cump = cumsum(p100),
+                col = ifelse(cump >= 0.95, T, F))
+ggplot(df, aes(x = w100, y = p100, fill = col)) +
+  geom_bar(stat="identity") +
+  labs(x = "Frequency Count (Head)", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        legend.position = "none") +
+  scale_fill_manual(values = c("gray", "red")) +
+  annotate(geom = "text", label = expression(paste(mu^1 >=  mu^2, sep = "")), x = 70, y = .05)
 ```
 
 
