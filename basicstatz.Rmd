@@ -36,35 +36,390 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # install packages
-install.packages(c("tidyverse", "VGAM", "fGarch",  "cfa", "gridExtra", 
-                   "calibrate", "car",  "QuantPsyc", "DT"))
+install.packages(c("tidyverse", "VGAM", "fGarch",  "cfa", "gridExtra", "lawstat",
+                   "calibrate", "car",  "QuantPsyc", "DT", "flextable", "e1071",
+                   "effectsize"))
+```
+
+Now, we load the packages that we will need in this tutorial.
+
+```{r qq01, message=F, warning=F}
+# load packages
+library(tidyverse)    # for data processing
+library(tidyr)        # for data transformation
+library(flextable)    # for creating tables
+library(here)         # for generating easy paths
+library(e1071)        # for checking assumptions
+library(lawstat)      # for statistical tests
+library(effectsize)   # for calculating effect sizes
+library(fGarch)       # for statistical tests
+library(gridExtra)    # for plotting
+```
+
+Also we load some sample data sets that we will use in this tutorial.
+
+```{r data, message=F, warning=F}
+# data for indep. t-test
+itdata  <- base::readRDS(url("https://slcladal.github.io/data/itdata.rda", "rb"))
+# data for paired t-test
+ptdata  <- base::readRDS(url("https://slcladal.github.io/data/ptdata.rda", "rb"))
+# data for fishers exact test
+fedata  <- base::readRDS(url("https://slcladal.github.io/data/fedata.rda", "rb"))
+# data for mann-whitney u-test
+mwudata  <- base::readRDS(url("https://slcladal.github.io/data/mwudata.rda", "rb"))
+# data for wilcox test
+uhmdata  <- base::readRDS(url("https://slcladal.github.io/data/uhmdata.rda", "rb"))
+# data for friedmann-test
+frdata  <- base::readRDS(url("https://slcladal.github.io/data/frdata.rda", "rb"))
+# data for x2-test
+x2data  <- base::readRDS(url("https://slcladal.github.io/data/x2data.rda", "rb"))
+# data for extensions of x2-test
+x2edata  <- base::readRDS(url("https://slcladal.github.io/data/x2edata.rda", "rb"))
+# multi purpose data
+mdata <- base::readRDS(url("https://slcladal.github.io/data/mdata.rda", "rb")) 
 ```
 
 Once you have installed R, RStudio, and once you have also initiated the session by executing the code shown above, you are good to go.
 
 
-# Fisher's Exact Test
+# Checking Assumptions
 
-Non-Parametric Tests do not require the data (or the errors of the dependent variable, to be more precise) to be distributed normally. Tests that do not require normal data are referred to as *non-parametric tests* (tests that require the data to be distributed normally are analogously called *parametric tests*). We focus on non-parametric tests first, as this family of test in frequently used in linguistics. In the later part of this section, we will focus on regression modeling where assumptions of about the data become more important.
+Before we focus on the tests themselves, we will see how to test if the errors are distributed normally, then we focus on selected parametric tests which are frequently used in linguistics. In the later part of this tutorial, we then focus on selected non-parametric tests.
+
+Before performing the tests, we will check if the data we want to analyze are normally distributed. There are three basic ways in which can check for normality:
+
+* visual inspection (eye-balling)  
+* statistical parameters  
+* statistical tests
+
+None of these methods are perfect and we will discuss the strengths and weaknesses of each method below. We will begin by investigating how data can be inspected visually to see if the data approximate a normal distribution.
+
+## Visual inspection of normality{-}
+
+To check if data are distributed normally, we extract a sample of words uttered my 100 men and 100 women from a sample corpus (the details of the sample corpus are represented by the `mdata` data set). 
+
+```{r assdat01, message=F, warning=F}
+ndata <- mdata %>%
+  dplyr::rename(Gender = sex,
+                Words = word.count) %>%
+  dplyr::select(Gender, Words) %>%
+  dplyr::filter(!is.na(Words),
+                !is.na(Gender)) %>%
+  dplyr::group_by(Gender) %>%
+  dplyr::sample_n(100)
+```
+
+The table below shows the first ten lines of the women sample.
+
+```{r assdat02, echo = F, message=F, warning=F}
+ ndata %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
+```
+
+We can now go ahead and visualize the data to check for normality.
+
+### Histograms {-}
+
+The first type of visualization we are going to use are histograms (with densities) as histograms will give us an impression about the distribution of the values. If the histograms and density functions follow a symmetric bell-shaped course, then the data are approximately normally distributed.
+
+```{r ass02, message=F, warning=F}
+ggplot(ndata, aes(x = Words)) +
+  facet_grid(~Gender) +
+  geom_histogram(aes(y=..density..)) +
+  geom_density(aes(y=..density..), color = "red") +
+  theme_bw() +
+  labs(title = "Histograms with denisty of words uttered by men and women in a sample corpus")
+```
+
+The histograms shows that the words uttered by men and women in the sample corpus are non-normal (this means that the errors will also be distributed non-normally).
+
+### Quantile-Quantile Plots {-}
+
+Quantile-Quantile Plots (or QQ-Plots) compare the quantiles between two distributions - typically the observed distribution and an assumed distribution like the normal distribution. If the points fall on the diagonal line, then the distributions match. If the points differ from the diagonal line, then the distributions differ. 
+
+A very clear and concise explanation of how to manually create QQ-plots is shown is this [*StatQuest* video](https://www.youtube.com/watch?v=okjYjClSjOg) by Josh Starmer (I can highly recommend all of his really informative, overall fantastic, and entertaining videos!) and explained in this [*TowardsDataScience* post](https://towardsdatascience.com/q-q-plots-explained-5aa8495426c0).
+
+
+```{r ass03, message=F, warning=F}
+ggplot(ndata, aes(sample = Words)) +
+  facet_grid(~Gender) +
+  geom_qq() +
+  geom_qq_line(color = "red") +
+  theme_bw() +
+  labs(title = "QQ-plot of words uttered by men and women in a sample corpus")
+```
+
+The deviation of the points from the line show that the data differs substantively from a normal distribution.
+
+## Statistical measures{-}
+
+Another way to test if data are distributed normally is to calculate certain parameter which tell us about the skewness (whether the distribution is asymmertical) or the kurtosis (is the data is too spiky or too flat) of the data. 
+
+### Skewness{-}
+
+Skewness refers to asymmetry of the distribution of data. As the normal distribution is symmetric, a deviation from symmetry implies that the data cannot be normal. When data are skewed, the mean and medians of a distribution differ. If the median is greater than the mean, the distribution is *negatively skewed* (the long tail points towards negative values). If the median is smaller than the mean, the distribution is *positively skewed* (the long tail points towards positive values).
+
+```{r skew01, echo = F, message=F, warning=F}
+skew <- data.frame(rbeta(1000000,5,2)) %>%
+  mutate(pskew = rbeta(1000000,2,5),
+         nrm = rbeta(1000000,5,5)) %>%
+  dplyr::rename(nskew = colnames(.)[1],
+                pskew = colnames(.)[2],
+                nrm = colnames(.)[3])
+# inspect
+ggplot(skew, aes(x = nskew, alpha = .5)) +
+  geom_density(fill = "lightgreen", alpha = .5) +
+  geom_density(aes(x = pskew), fill = "orange", alpha = .5) +
+  geom_density(aes(x = nrm), fill = "lightgray", alpha = .5) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(title = "Positively skewed distribution (orange), \nnormal, non-skewed distribution (lightgray), \nnegatively skewed distribution (lightgreen)", x = "", y = "Density")
+```
+
+
+
+
+As we need to test skewness within groups, we start by extracting the word counts of only women and then test if the distribution of the women's word counts are normal.
+
+
+```{r skew03, message=F, warning=F}
+# extract word counts for one group
+words_women <- ndata %>%
+  dplyr::filter(Gender == "female") %>%
+  dplyr::pull(Words)
+# inspect
+head(words_women)
+```
+
+To check for skewness, we load the `e1071` package which contains the `skewness` function that we will use to test for skewness here.
+
+```{r skew04, message=F, warning=F}
+skewness(words_women)            
+```
+
+If the reported skewness values is 
+
+* negative, then  the distribution is positively skewed  
+
+* positive, then the distribution is negatively skewed  
+
+* lower than -1.96 or greater than +1.96, then the distribution can be assumed to be significantly skewed.  
+
+### Kurtosis{-}
+
+Kurtosis refers to the thickness of the tails of a distribution. If the tails of a distribution are thicker than that of a normal distribution the distribution is *platykurtic*.If the tails of a distribution are thinner than the tails of a normal distribution the distribution is *leptokurtic* 
+
+## Statistical test of assumptions{-}
+
+The two most common tests to check assumptions are the Shapiro-Wilk test, which tests if the data differ significantly from a normal distribution, and the Levene's test which tests if the variances are of two groups are approximately equal.
+
+### Shapiro-Wilk test{-}
+
+The Shapiro-Wilk test [cf. @shapiro1965analysis] can be used to check if the data differs significantly from a  normal distribution (within groups). However, it has been shown to be too lenient when dealing with small sample sizes (below 50 to 100 cases per variable level), but too strict when dealing with larger sample sizes (500 or more cases per variable level). A such, the Shapiro-Wilk test should only be used in combination with visual inspection on the data.
+
+In this example, we will only test if the words uttered by women differ significantly from a normal distribution (we use the `words_women` vector created above). Once we have a a vector of word counts of one group only (in this case the women's word counts), we can continue by performing the  Shapiro-Wilk test.
+
+```{r shapiro2, message=F, warning=F}
+shapiro.test(words_women)
+```
+
+If the p-value of the Shapiro-Wilk test is greater than .05, the data do not support the hypothesis that they differ from normality. In other words, if the p-value is greater than .05, we can assume that the data are approximately normally distributed.
+
+The output of the Shapiro-Wilk test shown above thus indicates that our data differs significantly from normal (W = 0.7925, p < .001***). For more information about the implementation of the Shapiro-Wilk test in R, type `?shapiro.test` into the console.
+
+### Levene's test{-}
+
+The Levene's test [cf. @levene1961robust] evaluates if the variances of two groups is approximately equal - this is referred to as homoskedasticity. This is important, because unequal variances - or heteroskedasticity - strongly suggest that there is another factor, a confound, that is not included in the model but that significantly affects the dependent variable which renders results of an analysis unreliable.
+
+To implement a Levene's test in R, we need to install and load the`lawstat`  package.
+
+```{r levene, message=F, warning=F}
+levene.test(mdata$word.count, mdata$sex)
+```
+
+If the p-values of the Levene's test is greater than .05, we can assume that the variances are approximately equal. Thus, the output of the Levene's test shown above thus indicates that the variances of men and women in our data are approximately equal (W = 0.005, p = .9436). For more information about the implementation of the Levene's test in R, type `?levene.test` into the console.
+
+# Selected Parametric tests
+
+So-called parametric tests require the data (or the errors of the dependent variable) within groups to be distributed normally (i.e., the errors approximate a normal distribution) and that the data within groups are independent. The within groups is important here because we expect the data between groups to be non-normal (typically bi-model, i.e., with two peaks). In contrast, tests that do not require normal data are referred to as *non-parametric tests* and we will have a look at selected non-parametric tests after this section. 
+
+
+## Student's t-test{-}
+
+There are two basic types of t-tests: the dependent or paired t-test and the independent t-test. Paired t-test are used when the data points are not independent, for example, because they come form the same subjects in a  pre-post test design. In contrast, Independent t-tests are used when the data points are independent and come from two different groups (e.g., from learners and native speakers or from men and women).
+
+The assumptions of the Student's t-test are that 
+
+* the dependent variable is a continuous, numeric variable;
+* the independent variable is a nominal variable (two levels / groups)
+* the variances within each group are approximately normal;
+* the errors within each group are approximately normal (this implies that the distributions of the scores of each group are approximately normal).
+
+If the variances are not normal, then this indicates that another important variable is confounding the results. In such cases, you should go back to the data and check what other variable could cause the unequal variances. If you decide to proceed with the analysis, you can switch to a Welch t-test which does not assume equal variances within each group.
+
+### Paired t-test{-}
+
+Paired t-tests take into account that the scores (or values) come from the same individuals in two conditions (e.g. before and after a treatment).There are two equations for the paired t-test that are used.
+
+$t = \frac{\sum D}{\sqrt{\frac{N \sum D^2 - (\sum D)^2}{N-1}}}$ 
+
+or 
+
+$t = \frac{\bar D}{\frac{s_D}{\sqrt{N}}}$
+
+
+To show how a paired t-tests works, we will test if a treatment (a teaching method) reduces the number of spelling errors in a long essay of 6 students. In a  first step, we generate some data representing the errors in two essays of the same length written before and after the teaching method was used for 8 weeks.
+
+```{r pairedt_01a, message=F, warning=F}
+Pretest <- c(78, 65, 71, 68, 76, 59)
+Posttest <- c(71, 62, 70, 60, 66, 48)
+ptd <- data.frame(Pretest, Posttest)
+```
+
+The data look like as shown in the table below.
+
+```{r pairedt_01b, echo = F, message=F, warning=F}
+ptd %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
+```
+
+
+To perform a paired t-test in R, we use the `t.test` function and specify the argument `paired` as TRUE.
+
+```{r pairedt_02, message=F, warning=F}
+t.test(ptd$Pretest,
+       ptd$Posttest,
+       paired=TRUE,
+       conf.level=0.95)
+```
+
+In addition to testing if the groups differ significantly, we also want to calculate the effect size of the difference. We can use the `effectsize` package to extract Cohen's $d$ which is the standard effect size measure for t-tests.
+
+```{r t-test_effect, message=F, warning = F}
+effectsize::cohens_d(x = ptd$Pretest, 
+                     y = ptd$Posttest,
+                     paired = TRUE)
+```
+
+To check if the effect is small or big - that is if a Cohen's $d$ value can be interpreted as being small or big, we can use the following overview.
+
+
+```{r t-test_effectsize, echo = F, message=F, warning = F}
+EffectSize <- c("Very small", "Small", "Medium", "Large", "Very large", "Huge")
+d <- c(0.01, 0.20, 0.50, 0.80, 1.20, 2.0)  
+Reference <- c("Sawilowsky (2009)", "Cohen (1988)", "Cohen (1988)", "Cohen (1988)","Sawilowsky (2009)", "Sawilowsky (2009)")
+dtb <- data.frame(EffectSize, d, Reference)
+dtb %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
+```
+
+
+The classification combines @sawilowsky2009new and @cohen1988statistical. The analysis can be summarized as follows: A paired t-test test was applied to the data and it confirmed that the number of spelling errors after the 8 weeks of using the new teaching method significantly decreased (t~5~: 4.1523, p = .009\*\*). The treatment had a very large effect (Cohen's $d$ = 0.86 [CIs: -0.35, 2.03]) [cf. @sawilowsky2009new].
+
+### Independent t-tests{-}
+
+Independent t-tests are used very widely and they determine if the means of two groups are significantly different. As such, t-tests are used when we have a normally distributed (or parametric), numeric dependent variable and a nominal predictor variable.
+
+$t = \frac{\bar X_1 - \bar X_2}{\sqrt{\frac{s^2_p}{N_1} + \frac{s^2_p}{N_2}}}$
+
+where
+
+$s^2_p = \frac{(N_1 - 1)s^2_1 + (N_2 - 1)s^2_2}{N_1 + N_2 - 2}$
+
+We now load some data that we can apply a t-test to. The data represents scores on a proficiency test of native speakers and learners of English. We want to use a t-test to determine if the native speakers and learners differ in their proficiency.
+
+```{r t1, message=F, warning=F}
+# load data
+tdata <- read.delim("https://slcladal.github.io/data/data03.txt", 
+                      header = T, sep = "\t") %>%
+  dplyr::rename(NativeSpeakers = 1,
+                Learners = 2) %>%
+  tidyr::gather(Group, Score, NativeSpeakers:Learners) %>%
+  dplyr::mutate(Group = factor(Group))
+```
+
+```{r t2, echo = F, message=F, warning=F}
+# inspect data
+tdata %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
+```
+
+We now apply an independent t-test to the data.
+
+```{r t3, message=F, warning=F}
+t.test(Score ~ Group, 
+       var.equal = T,
+       data = tdata)
+```
+
+As the p-value is higher than .05, we cannot reject the H-0- and we thus have to conclude that our evidence does not suffice to say that learners and Native Speakers differ in their proficiency. However, we still extract the effect size, again using Cohen's $d$. In contract to the extraction of the effect size for paired t-tests, however, we will set the argument `paired` to `FALSE` (in fact, we could simply leave it out as the `paired = FALSE` is the default).
+
+
+```{r indep_ttest_effect, message=F, warning = F}
+effectsize::cohens_d(tdata$Score ~ tdata$Group,
+                     paired = FALSE)
+```
+
+The analysis can be summarized as follows: An independent t-test test was applied to the data and it reported that the scores between the two groups did not differ significantly (t~18~: -0.0546, p = .9571). In addition to not differing significantly, the effect size of the difference between the groups was also very small (Cohen's $d$ = -0.02 [CIs: -0.90, 0.85]) [cf. @sawilowsky2009new].
+
+# Selected Non-Parametric Tests
+
+Non-parametric tests are used when we the data is non-parametric. This is the case if 
+
+* the dependent variable does not represent a continupous intervall-scaled or ratio-scaled variable  
+* errors (also called residuals) which represent the difference between the expected or predicted values and the observed values do not approximate a normal distribution  
+* the dependent variable is ordinal (it represents ranks). 
+
+Non-parametric tests are frequently used when numeric variables have to be transformed into ordinal variables because the numeric variable is distributed non-normally (well, actually, it is not the distribution of the dependent variable that matters but the distribution of the errors). Thus, when the dependent variable is non-normal, it is advisable to apply tests that are designed to handle ordinal data. In the following, we will therefore briefly touch on bi-variate tests that can handle ordinal dependent variables.
+
+## Fisher's Exact Test{-}
 
 Fisher's Exact test is very useful because it does not rely on distributional assumptions relying on normality. Instead, Fisher's Exact Test calculates the probabilities of all possible outcomes and uses these to determine significance. To understand how a Fisher's Exact test, we will use a very simple example. 
 
 Imagine you are interested in adjective modification and you want to find out if *very* and *truly* differ in their collocational preferences. So you extract all instances of *cool*, all instances of *very*, and all instances of *truly* from a corpus. Now that you have gathered this data, you want to test if *truly* and *very* differ with respect to their preference to co-occur with *cool*. Accordingly, you tabulate the results and get the following table.
 
 ```{r fisher1, echo=F, warning=F, message=F}
-# load packages
-library(DT)
-library(knitr)
-library(kableExtra)
-library(tidyverse)
-library(tidyr)
 # generate data
 coolmatrix <- matrix(c("truly", "very", 5, 17, 40, 41), ncol = 3, byrow = F)
 colnames(coolmatrix) <- c("Adverb", "with cool", "with other adjectives")
 # inspect data
 coolmatrix %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 To perform a Fisher's Exact test, we first create a table with these results and then use the `fisher.test` function to perform the Fisher's Exact Test to see if *very* and *truly* differ in their preference to co-occur with *cool* (as shown below). The null hypothesis is that there is no difference between the adverbs.
@@ -86,9 +441,7 @@ fisher.test(coolmx)
 
 The results of the Fisher's Exact test show that the p-value is lower than .05, which means we reject the null hypothesis, and we are therefore justified in assuming that *very* and *truly* differ in their collocational preferences to co-occur with *cool*.
 
-# Selected Non-Parametric Tests
-
-Non-parametric tests are used when we the dependent variable is ordinal (it represents ranks). This is often the case when numeric variables have to be transformed into ordinal variables because the numeric variable is distributed non-normally (well, actually, it is not the distribution of the dependent variable that matters but the distribution of the errors). Thus, when the dependent variable is non-normal, it is advisable to apply tests that are designed to handle ordinal data. In the following, we will therefore briefly touch on bi-variate tests that can handle ordinal dependent variables.
+The results of the Fisher's Exact test can be summarized as follows. A Fisher's Exact test was applied to the data to determine if there was a significant difference in the modification of adjective *cool*. Specifically, we tested if the preference of *cool* to be modified by *very* and by *truly* differed significantly. The results of the Fisher's Exact test confirmed that there was a statistically significant difference in the modification preference of *cool*(p: .030\*). However, the effect size of the preference is small (Odds Ratio: 0.305).
 
 ## Mann-Whitney U-Test {-}
 
@@ -107,20 +460,29 @@ lftb <- data.frame(LanguageFamily, Rank)
 
 ```{r mwu1b, echo=F, warning=F, message=F}
 lftb %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 We will also briefly inspect the data visually using a box plot.
 
 ```{r mwu2, eval = T, echo=T, warning=F, message=F}
-boxplot(Rank ~ LanguageFamily, col = c("orange", "darkgrey"), main = "", data = lftb)
+ggplot(lftb, aes(x = LanguageFamily, y = Rank, fill = LanguageFamily)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("orange", "darkgrey")) +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
 To use Mann-Whitney U test, the dependent variable (Rank) must be ordinal and independent variable (Group) must be a binary factor. We briefly check this by inspecting the structure of the data.
 
 ```{r mwu3, eval = T, echo=T, warning=F, message=F}
-# perform test
+# inspect structure
 str(lftb)
 ```
 
@@ -138,36 +500,56 @@ The Wilcoxon rank sum test can also be used with continuity correction. A contin
 For this example, we generate data is deliberately non-normal.
 
 ```{r mwu5, echo=F, warning=F, message=F}
-# activate packages
-library(fGarch)
-library(gridExtra)
 # generate non-normal skewed numeric data
-r <- .1 
-frequency <- rsnorm(100,0,2,4)
-normal_reaction <- rsnorm(100,0,2,4)
-reaction_times <- frequency*r+normal_reaction*sqrt(1-r^2)
+frequency <- 1:100
+frequency <- round(1/(frequency/20)*1000, 0)
+normal_reaction <- round(rsnorm(100, 2000, 400), 1)
+reaction_times <- order(normal_reaction)
+reaction_times <- reaction_times*1:100
 # combine into data frame
-wxdata <- data.frame(frequency, normal_reaction, reaction_times)
+wxdata <- data.frame(frequency, normal_reaction, reaction_times) %>%
+  dplyr::rename(Frequency = frequency,
+                NormalizedReaction = normal_reaction,
+                Reaction= reaction_times)
+```
+
+
+```{r mwu5b, echo=F, warning=F, message=F}
+ wxdata %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
+```
+
+When we plot the data, we see that both the frequency of words (Frequency) and the reaction times that it took subjects to recognize the token as a word (Reaction) are non-normal (in this case, the distributions are negative skewed).
+
+```{r mwu5c, echo=F, warning=F, message=F}
 # plot data
-p1 <- ggplot(wxdata, aes(frequency)) + # define data
-  geom_density(fill = "orange", alpha = .2) + # define plot type (density)
+p1 <- ggplot(wxdata, aes(Frequency)) + # define data
+  geom_density(fill = "orange", alpha = .5) + # define plot type (density)
   theme_bw() +                                # black + white background
   labs(y="Density", x = "Frequency") +        # axes titles
-  coord_cartesian(ylim = c(0, .5),            # define y-axis coordinates
-                  xlim = c(-5, 10))           # define x-axis coordinates
-p2 <- ggplot(wxdata, aes(reaction_times)) +
-  geom_density(fill = "lightgray", alpha = .2) +
+  coord_cartesian(ylim = c(0, .002),            # define y-axis coordinates
+                  xlim = c(-5, 10000))           # define x-axis coordinates
+p2 <- ggplot(wxdata, aes(Reaction)) +
+  geom_density(fill = "lightgray", alpha = .5) +
   theme_bw() +
   labs(y="Density", x = "Reaction Time") +
-  coord_cartesian(ylim = c(0, .5), xlim = c(-5, 10))
+  coord_cartesian(ylim = c(0, 0.00025), xlim = c(0, 10000))
 grid.arrange(p1, p2, nrow = 1)             # 2 plots in one window
 ```
 
-Both variables are skewed (non-normally distributed) but we can use the Wilcoxon rank sum test with continuity correction which takes the skewness into account. The null hypothesis is that there is no difference between the 2 groups.
+Both variables are negatively skewed (non-normally distributed) but we can use the Wilcoxon rank sum test with continuity correction which takes the skewness into account. The null hypothesis is that there is no difference between the 2 groups.
 
 ```{r mwu6, echo=T, eval = T, warning=F, message=F}
 # perform test
-wilcox.test(reaction_times, frequency) 
+wilcox.test(wxdata$Reaction, 
+            wxdata$Frequency) 
 ```
 
 The p-value is greater than 0.05, therefore we cannot reject the null hypothesis. There is no statistically significant evidence to assume the groups are different.
@@ -186,8 +568,13 @@ intoxtb <- data.frame(sober, intoxicated)
 
 ```{r mwu7b, echo=F, warning=F, message=F}
 intoxtb %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -230,8 +617,13 @@ uhmtb <- data.frame(speaker, uhms)
 
 ```{r kwt1b, echo=F, warning=F, message=F}
 uhmtb %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 Now, we briefly plot the data. 
@@ -266,8 +658,13 @@ uhmtb2 <- data.frame(Gender, Age, uhms)
 
 ```{r ft1b, echo=F, warning=F, message=F}
 uhmtb2 %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 We now perform the Friedman rank sum test.
@@ -301,8 +698,14 @@ colnames(chidata) <- c("BrE", "AmE")
 rownames(chidata) <- c("kindof", "sortof")
 # inspect data
 chidata %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -315,8 +718,14 @@ colnames(chidata_extended) <- c("BrE", "AmE", "Total")
 rownames(chidata_extended) <- c("kindof", "sortof", "Total")
 # inspect data
 chidata_extended %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 Next, we calculate, the values that would have expected if there was no correlation between variety of English and the use of *sort of* and *kind of*. In order to get these "expected" frequencies, we apply the equation below to all cells in our table.
@@ -336,8 +745,14 @@ colnames(chidata_expected) <- c("BrE", "AmE", "Total")
 rownames(chidata_expected) <- c("kindof", "sortof", "Total")
 # inspect data
 chidata_expected %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -359,8 +774,14 @@ colnames(chidata_chi) <- c("BrE", "AmE", "Total")
 rownames(chidata_chi) <- c("kindof", "sortof", "Total")
 # inspect data
 chidata_chi %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 The sum of $\chi$^2^ contributions in our example is 220.7339. To see if this value is statistically significant, we need to calculate the degrees of freedom because the $\chi$ distribution differs across degrees of freedom.  Degrees of freedom are calculated according to the equation below.
@@ -378,8 +799,14 @@ critval <- matrix(c(1, 3.84, 6.64, 10.83, 2, 5.99, 9.21, 13.82, 3, 7.82, 11.35, 
 colnames(critval) <- c("DF", "p<.05", "p<.01", "p<.001")
 # inspect data
 critval %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -409,8 +836,14 @@ Before we summarize the results, we will see how to perform a chi-square test in
 ```{r chi_01_05, message=FALSE, warning=FALSE}
 # inspect data
 chidata %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 We will now visualize the data with an association. Bars above the dashed line indicate that a feature combination occurs more frequently than expected by chance. The width of the bars indicates the frequency of the feature combination. 
@@ -466,8 +899,14 @@ ex1dat <- matrix(c("Young", 61, 43, 104, "Old", 42, 36, 78, "Total", 103, 79, 18
 colnames(ex1dat) <- c("", "1SGPN", "PN without 1SG", "Total")
 # inspect data
 ex1dat %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -500,8 +939,14 @@ critval <- matrix(c("whatever", 17, 55, 71, "other words", 345128, 916552, 12616
 colnames(critval) <- c("", "YoungMales", "YoungFemales", "Total")
 # inspect data
 critval %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -551,8 +996,14 @@ critval <- matrix(c("kind of", 32.9927, 113.0407, 146.0335, "sort of", 16.3593, 
 colnames(critval) <- c("Variant", "BrE", "AmE", "Total")
 # inspect data
 critval %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 If the Yates-correction were applied, then this results in a slightly lower $\chi$^2^-value and thus in more conservative results compared with the traditional test according to Pearson.
@@ -574,8 +1025,14 @@ colnames(critval) <- c("", "Mitosis not reached", "Mitosis reached", "Total")
 
 # inspect data
 critval %>%
-  kable(caption = "Adapted from Bortz (1990:126).") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
@@ -591,8 +1048,14 @@ rownames(wholetable) <- c("rsoft", "rhard", "beta", "light") # add row names
 ```{r echo = F, message=FALSE, warning=FALSE}
 # inspect data
 wholetable %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 Now, we extract the subsample from the data.
@@ -605,8 +1068,14 @@ subtable <- wholetable[1:2,] # extract subtable
 ```{r echo = F, message=FALSE, warning=FALSE}
 # inspect data
 subtable %>%
-  kable(caption = "") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 Next, we apply the ordinary chi-square test to the subsample. 
@@ -632,8 +1101,14 @@ critval <- matrix(c("chi-squared", 0.0255, 0.025, "p-value", 0.8732, 0.8744), nc
 colnames(critval) <- c("", "chi-square" , "chi-square in 2*k-tables")
 # inspect data
 critval %>%
-  kable(caption = "Adapted from Bortz (1990: 126).") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 The comparison shows that, in this example, the results of the two tests are very similar but this may not always be the case.
@@ -660,8 +1135,14 @@ critval <- matrix(c("acad", 8, 5, 4, 8, "spoken", 31, 14, 22, 11, "fiction", 44,
 colnames(critval) <- c("Register", "Heated fluid", "Light", "NatForce", "Other")
 # inspect data
 critval %>%
-  kable(caption = "Adapted from Gries (2014: 9).") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 If we used an ordinary Pearson’s  $\chi$^2^ test (the use of which would be inappropriate here), it would reveal that spoken conversations do not differ significantly from fiction in their use of EMOTION IS LIGHT and EMOTION IS A FORCE OF NATURE ($\chi$^2^=3.3016, df=1, p=.069, $\phi$=.2057).
@@ -692,8 +1173,12 @@ The results show that the difference is, in fact, statistically significant ($\c
 
 ## Configural Frequency Analysis (CFA){-}
 
+Configural Frequency Analysis (CFA) is a multivariate extension of the $\chi^{2}$-test. If we perform a $\chi^{2}$-test on a table with more than 2 rows and 2 columns, the test tells  us that somewhere in that table there is at least one cell tat differs significantly from the expected value. However, we do not know which cell or cells this is. To determine which of the cells differ significantly from the expected value, we use the CFA.
+
+To perform a CFA in R, we need to load the `cfa` package and load some data (as shown below).
+
 ```{r cfa1, message=FALSE, warning=FALSE}
-# load packages
+# load package
 library(cfa)
 # load data
 cfadata <- read.delim("https://slcladal.github.io/data/cfadata.txt", 
@@ -702,14 +1187,19 @@ cfadata <- read.delim("https://slcladal.github.io/data/cfadata.txt",
 
 ```{r cfa1b, echo=F, message=F, warning=F}
 # inspect data
-cfadata %>%
-  head(10) %>%
-  kable(caption = "First 10 rows of cfadata.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+head(cfadata, 10) %>%  
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 16) %>%
+  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::border_outer()
 ```
 
 
-In a next step, we define the configurations and separate them from the counts.
+In a next step, we define the configurations and separate them from the counts. The configurations are the independent variables in this design and the counts represent the dependent variable.
 
 ```{r cfa2, message=FALSE, warning=FALSE}
 # define configurations
@@ -725,6 +1215,10 @@ Now that configurations and counts are separated, we can perform the configural 
 # perform cfa
 cfa(configs,counts)
 ```
+
+The output table contains the configurations (here called *lables*), then the observed frequencies (the *counts*) and the expected frequencies, the Q and the $\chi^{2}$ statistic as well as the p-value asssociated with the $\chi^{2}$ value. In addition, the table provides the z-transformed $\chi^{2}$-values and their p-value.
+
+If a p-value is below the level of significance - typically below .05 - the configuration occurs with a frequency that differs significantly from the expected frequency. If the observed value is higher than the expected value, then the configuration occurs significantly more frequently than would be expected by chance. If the observed value is lower than the expected value, then the configuration occurs significantly less frequently than would be expected by chance. 
 
 ## Hierarchical Configural Frequency Analysis (HCFA){-}
 
@@ -747,38 +1241,6 @@ hcfa(configs,counts)
 
 According to the HCFA, only a single configuration (Variety : Age : Class) is significant (X2 = 12.21, p = .016). 
 
-# t-Test
-
-T-tests are used very widely and they determine if the means of two groups are significantly different. As such, t-tests are used when we have a normally distributed (or parametric), numeric dependent variable and a nominal predictor variable.
-
-We now load some data that we can apply a t-test to. The data represents scores on a proficiency test of native speakers and learners of English. We want to use a t-test to determine if the native speakers and learners differ in their proficiency.
-
-```{r t1, message=F, warning=F}
-# load data
-tdata <- read.delim("https://slcladal.github.io/data/data03.txt", 
-                      header = T, sep = "\t") %>%
-  dplyr::rename(NativeSpeakers = 1,
-                Learners = 2) %>%
-  tidyr::gather(Group, Score, NativeSpeakers:Learners) %>%
-  dplyr::mutate(Group = factor(Group))
-```
-
-```{r t2, echo = F, message=F, warning=F}
-# inspect data
-tdata %>%
-  head(10) %>%
-  kable(caption = "First 10 rows of tdata.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
-```
-
-We now apply a t-test to the data.
-
-```{r}
-t.test(Score ~ Group, data = tdata)
-```
-
-As the p-value is higher than .05, we cannot reject the H-0- and we thus have to conclude that our evidence does not suffice to say that learners and Native Speakers differ in their proficiency.
-
 # Simple Linear Regression
  
 Simple linear regression is a very useful and widely used test to determine if predictors correlate with a numeric dependent variable. (Simple) Linear regression outperforms alternatives such as t-tests because it not only determines significance and provides effect sizes but but it also provides model fit statistics (for example, R^2^) and allows model diagnostics. For an elaborate tutorial on (simple) linear regression and how to implement a linear regression in R, have a look at [this tutorial](https://slcladal.github.io/regression.html#11_Simple_Linear_Regression).
@@ -786,7 +1248,7 @@ Simple linear regression is a very useful and widely used test to determine if p
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Basic Inferential Statistics with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/basicstatzchi.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Basic Inferential Statistics with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/basicstatz.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
 @manual{schweinberger`r format(Sys.time(), '%Y')`basicstatz,
