@@ -38,7 +38,7 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 # install packages
 install.packages(c("tidyverse", "VGAM", "fGarch",  "cfa", "gridExtra", "lawstat",
                    "calibrate", "car",  "QuantPsyc", "DT", "flextable", "e1071",
-                   "effectsize"))
+                   "effectsize", "tibble"))
 ```
 
 Now, we load the packages that we will need in this tutorial.
@@ -117,8 +117,8 @@ The table below shows the first ten lines of the women sample.
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -153,7 +153,7 @@ ggplot(ndata, aes(sample = Words)) +
   geom_qq() +
   geom_qq_line(color = "red") +
   theme_bw() +
-  labs(title = "QQ-plot of words uttered by men and women in a sample corpus")
+  labs(title = "QQ-plot of words uttered by men and women in a sample corpus", x = "", y = "")
 ```
 
 The deviation of the points from the line show that the data differs substantively from a normal distribution.
@@ -164,25 +164,36 @@ Another way to test if data are distributed normally is to calculate certain par
 
 ### Skewness{-}
 
-Skewness refers to asymmetry of the distribution of data. As the normal distribution is symmetric, a deviation from symmetry implies that the data cannot be normal. When data are skewed, the mean and medians of a distribution differ. If the median is greater than the mean, the distribution is *negatively skewed* (the long tail points towards negative values). If the median is smaller than the mean, the distribution is *positively skewed* (the long tail points towards positive values).
+Skewed distributions are asymmetrical and they can be positively or negatively skewed. The tail of a *negatively skewed distribution* points towards negative values (to the left) which means that the distribution leans towards the right (towards positive values) while the tail of a *positively skewed distribution* points towards positive values (to the right) which means that the distribution leans towards the left (towards negative values). 
 
-```{r skew01, echo = F, message=F, warning=F}
-skew <- data.frame(rbeta(1000000,5,2)) %>%
-  mutate(pskew = rbeta(1000000,2,5),
-         nrm = rbeta(1000000,5,5)) %>%
+Another characteristic of skewed distributions is that the mean and median of a distribution differ. If the median is greater than the mean, the distribution is negatively skewed (the long tail points towards negative values). If the median is smaller than the mean, the distribution is positively skewed (the long tail points towards positive values).
+
+Negatively skewed
+
+* Tail points towards negative values (to the left)
+* Median is greater than the mean
+
+Positively skewed
+
+* Tail points towards positive values (to the right)
+* Median is lower than the mean
+
+```{r skewness, echo = F, warning=F, message=F}
+skew <- data.frame(rbeta(1000000,10,2)) %>%
+  mutate(pskew = rbeta(1000000,2,10),
+         nrm = rbeta(1000000,10,10)) %>%
   dplyr::rename(nskew = colnames(.)[1],
                 pskew = colnames(.)[2],
                 nrm = colnames(.)[3])
 # inspect
 ggplot(skew, aes(x = nskew, alpha = .5)) +
-  geom_density(fill = "lightgreen", alpha = .5) +
-  geom_density(aes(x = pskew), fill = "orange", alpha = .5) +
-  geom_density(aes(x = nrm), fill = "lightgray", alpha = .5) +
+  geom_density(fill = "lightgreen", alpha = .5, color = "lightgreen") +
+  geom_density(aes(x = pskew), fill = "orange", alpha = .5, color = "orange") +
+  geom_density(aes(x = nrm), fill = "lightgray", alpha = .5, color = "lightgray") +
   theme_bw() +
   theme(legend.position = "none") +
   labs(title = "Positively skewed distribution (orange), \nnormal, non-skewed distribution (lightgray), \nnegatively skewed distribution (lightgreen)", x = "", y = "Density")
 ```
-
 
 
 
@@ -198,25 +209,82 @@ words_women <- ndata %>%
 head(words_women)
 ```
 
-To check for skewness, we load the `e1071` package which contains the `skewness` function that we will use to test for skewness here.
+
+To see if a distribution is skewed, we can use the `summary` function to check if the mean and the median differ.
+
+
+```{r calskew1, warning=F, message=F}
+summary(words_women)
+```
+
+In our example, the mean is larger than the median which suggests that the data are positively skewed.
+
+We apply the `skewness` function from the `e1071` package to the sample scores to calculated skewness. The `skewness` function  allows to calculate skewness in three different ways:
+
+Type 1 (This is the typical definition used in many older textbooks): 
+\begin{equation}
+g_1 = m_3 / m_2^{(3/2)}.
+\end{equation}
+
+Type 2 (Used in SAS and SPSS): 
+\begin{equation}
+G_1 = g_1 * sqrt(n(n-1)) / (n-2)
+\end{equation}
+
+Type 3 (Used in MINITAB and BMDP): 
+\begin{equation}
+b_1 = m_3 / s^3 = g_1 ((n-1)/n)^{(3/2)}
+\end{equation}
+
+All three formulas have in common that the more negative values are, the more strongly positively skewed are the data (distribution leans to the left) and the  more positive the values are, the more strongly negatively skewed are the data (distribution leans to the right). Here we use the second formula (by setting `type = 2`) that is also used in SPSS.
 
 ```{r skew04, message=F, warning=F}
-skewness(words_women)            
+skewness(words_women, type = 2)            
 ```
 
 If the reported skewness value is negative, then  the distribution is positively skewed. If the value is positive, then the distribution is negatively skewed. If the value is lower than -1 or greater than +1, then the distribution can be assumed to be substantively skewed [@hair2017dist].  
 
 ### Kurtosis{-}
 
-Kurtosis refers to the thickness of the tails of a distribution. If the tails of a distribution are thicker than that of a normal distribution the distribution is *platykurtic*.If the tails of a distribution are thinner than the tails of a normal distribution the distribution is *leptokurtic* 
+Another way in which distributions can differ from the normal distribution  relates to the thickness of the tails and the spikiness of the distribution. If distributions are bell-shaped like the normal distribution, they are called *mesokurtic*. If distributions are symmetrical but they are more spiky than the normal distribution, they are called *leptokurtic*. If symmetrical distributions are flatter and have bigger tails than the normal distribution, the distributions are called *platykurtic*. 
 
-To check for kurtosis in R, we use the `kurtosis` function from the `e1071` package.
+```{r kurtosis, echo = F, warning=F, message=F}
+kur <- data.frame(x <- seq(-4, 4, length.out = 100)) %>%
+  mutate(lep = dt(x, 1)^2*5,
+         nrm = dnorm(x),
+         thk = dt(x, 1)) %>%
+  dplyr::rename(x = colnames(.)[1],
+                lepto = colnames(.)[2],
+                normal = colnames(.)[3],
+                platy = colnames(.)[4])
+ggplot(kur, aes(x, lepto)) + 
+#  geom_line(color = "orange", size = 1.5, linetype = 2, alpha = .5) +
+  geom_ribbon(aes(x = x, ymax = lepto), ymin=0, alpha=0.5, fill = "orange") +
+  geom_ribbon(aes(x = x, ymax = normal), ymin=0, alpha=0.5, fill = "lightgray") +
+  geom_ribbon(aes(x = x, ymax = platy), ymin=0, alpha=0.5, fill = "lightgreen") +
+  theme_bw() + 
+  labs(title = "Leptokurtic distribution (orange, spicky)\nMesokurtic distribution (gray, normal)\nPlatykurtic distribution (green, flattened)", x = "", y = "") +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank()) +
+  coord_cartesian(xlim = c(-4,4), ylim = c(0,.5))
+```
+
+To show how we can calculate kurtosis (or if a distribution suffers from kurtosis), we apply the `kurtosis` function from the `e1071` package to the sample scores we generated above /when we calculated skewness).
 
 ```{r skew05, message=F, warning=F}
 kurtosis(words_women)            
 ```
 
 As the kurtosis value is positive, the distribution is leptokurtic (if it were negative, the distribution would be platykurtic). As a rule of thumb, values greater than +1 indicate that the distribution is too peaked while values lower than –1 indicate that the distribution is substantively platykurtic [@hair2017dist, pp61].
+
+The kurtosis score can thius be interpreted as follows:
+
+* A values of 0 means that the distribution is perfectly *mesokurtic* with Values between -0.5 and 0.5 suggesting that the distribution is *approximately mesokurtic*
+
+* Values between -0.5 and -1 mean that the distribution is *moderately platykurtic* with values smaller than -1 indicating that the distribution is *platykurtic*.
+
+* Values between 0.5 and 1 mean that the distribution is *moderately leptokurtic* with values greater than 1 indicating that the distribution is *leptokurtic*
 
 ## Statistical test of assumptions{-}
 
@@ -270,12 +338,15 @@ If the variances are not normal, then this indicates that another important vari
 
 Paired t-tests take into account that the scores (or values) come from the same individuals in two conditions (e.g. before and after a treatment).There are two equations for the paired t-test that are used.
 
-$t = \frac{\sum D}{\sqrt{\frac{N \sum D^2 - (\sum D)^2}{N-1}}}$ 
+\begin{equation}
+t = \frac{\sum D}{\sqrt{\frac{N \sum D^2 - (\sum D)^2}{N-1}}}
+\end{equation}
 
 or 
 
-$t = \frac{\bar D}{\frac{s_D}{\sqrt{N}}}$
-
+\begin{equation}
+t = \frac{\bar D}{\frac{s_D}{\sqrt{N}}}
+\end{equation}
 
 To show how a paired t-tests works, we will test if a treatment (a teaching method) reduces the number of spelling errors in a long essay of 6 students. In a  first step, we generate some data representing the errors in two essays of the same length written before and after the teaching method was used for 8 weeks.
 
@@ -293,8 +364,8 @@ ptd %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -329,8 +400,8 @@ dtb %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -342,11 +413,15 @@ The classification combines @sawilowsky2009new and @cohen1988statistical. The an
 
 Independent t-tests are used very widely and they determine if the means of two groups are significantly different. As such, t-tests are used when we have a normally distributed (or parametric), numeric dependent variable and a nominal predictor variable.
 
-$t = \frac{\bar X_1 - \bar X_2}{\sqrt{\frac{s^2_p}{N_1} + \frac{s^2_p}{N_2}}}$
+\begin{equation}
+t = \frac{\bar X_1 - \bar X_2}{\sqrt{\frac{s^2_p}{N_1} + \frac{s^2_p}{N_2}}}
+\end{equation}
 
 where
 
-$s^2_p = \frac{(N_1 - 1)s^2_1 + (N_2 - 1)s^2_2}{N_1 + N_2 - 2}$
+\begin{equation}
+s^2_p = \frac{(N_1 - 1)s^2_1 + (N_2 - 1)s^2_2}{N_1 + N_2 - 2}
+\end{equation}
 
 We now load some data that we can apply a t-test to. The data represents scores on a proficiency test of native speakers and learners of English. We want to use a t-test to determine if the native speakers and learners differ in their proficiency.
 
@@ -368,8 +443,8 @@ tdata %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -418,8 +493,8 @@ coolmatrix %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -465,8 +540,8 @@ lftb %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -522,8 +597,8 @@ wxdata <- data.frame(frequency, normal_reaction, reaction_times) %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -573,8 +648,8 @@ intoxtb %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -612,9 +687,9 @@ In the example below, *uhm* represents the number of filled pauses in a short 5 
 ```{r kwt1, warning=F, message=F}
 # create data
 uhms <- c(15, 13, 10, 8, 37, 23, 31, 52, 11, 17)
-speaker <- c(rep("Learner", 5), rep("NativeSpeaker", 5))
+Speaker <- c(rep("Learner", 5), rep("NativeSpeaker", 5))
 # create table
-uhmtb <- data.frame(speaker, uhms)
+uhmtb <- data.frame(Speaker, uhms)
 ```
 
 ```{r kwt1b, echo=F, warning=F, message=F}
@@ -622,8 +697,8 @@ uhmtb %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -631,7 +706,7 @@ uhmtb %>%
 Now, we briefly plot the data. 
 
 ```{r kwt2, eval = T, echo=T, warning=F, message=F}
-ggplot(uhmtb, aes(speaker, uhms)) +
+ggplot(uhmtb, aes(Speaker, uhms)) +
   geom_boxplot(fill = c("orange", "darkgrey")) +
   theme_bw() +
   labs(x = "Speaker type", y = "Errors")
@@ -640,7 +715,7 @@ ggplot(uhmtb, aes(speaker, uhms)) +
 Now, we test for statistical significance. The null hypothesis is that there is no difference between the groups.
 
 ```{r kwt3, echo=T, eval = T, warning=F, message=F}
-kruskal.test(uhmtb$speaker~uhmtb$uhms) 
+kruskal.test(uhmtb$Speaker~uhmtb$uhms) 
 ```
 
 The p-value is greater than 0.05, therefore we fail to reject the null hypothesis. The Kruskal-Wallis test does not report a significant difference for the number of *uhms* produced by native speakers and learners of English in the fictitious data. 
@@ -663,8 +738,8 @@ uhmtb2 %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -701,11 +776,12 @@ rownames(chidata) <- c("kindof", "sortof")
 # inspect data
 chidata %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Hedge") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -721,22 +797,27 @@ rownames(chidata_extended) <- c("kindof", "sortof", "Total")
 # inspect data
 chidata_extended %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Hedge") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
 
 Next, we calculate, the values that would have expected if there was no correlation between variety of English and the use of *sort of* and *kind of*. In order to get these *expected* frequencies, we apply the equation below to all cells in our table.
 
-$\frac{Column total*Row total}{Overall total}$
+\begin{equation}
+\frac{Column total*Row total}{Overall total}
+\end{equation}
 
 In our example this means that for the cell with `[+]BrE` `[+]kindof` we get:
 
-$\frac{836*358}{1080} = \frac{299288}{1080} = 277.1185$
+\begin{equation}
+\frac{836*358}{1080} = \frac{299288}{1080} = 277.1185
+\end{equation}
 
 For the entire table this means we get the following expected values:
 
@@ -748,11 +829,12 @@ rownames(chidata_expected) <- c("kindof", "sortof", "Total")
 # inspect data
 chidata_expected %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Hedge") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -760,12 +842,15 @@ chidata_expected %>%
 
 In a next step, we calculate the contribution of each cell to the overall $\chi$^2^ value ($\chi$^2^ contribution). To get $\chi$^2^ contribution for each cell, we apply the equation below to each cell.
 
-$\frac{(observed – expected)^{2}}{expected}$
+\begin{equation}
+\frac{(observed – expected)^{2}}{expected}
+\end{equation}
 
 In our example this means that for the cell with `[+]BrE` `[+]kindof` we get:
 
-$\frac{(181 – 277.1185)^{2}}{277.1185} = \frac{-96.1185^{2}}{277.1185} = \frac{9238.766}{277.1185} = 33.33868$
-
+\begin{equation}
+\frac{(181 – 277.1185)^{2}}{277.1185} = \frac{-96.1185^{2}}{277.1185} = \frac{9238.766}{277.1185} = 33.33868
+\end{equation}
 
 For the entire table this means we get the following $\chi^{2}$ values:
 
@@ -777,18 +862,21 @@ rownames(chidata_chi) <- c("kindof", "sortof", "Total")
 # inspect data
 chidata_chi %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Hedge") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
 
 The sum of $\chi$^2^ contributions in our example is 220.7339. To see if this value is statistically significant, we need to calculate the degrees of freedom because the $\chi$ distribution differs across degrees of freedom.  Degrees of freedom are calculated according to the equation below.
 
-$DF = (rows -1) * (columns – 1) = (2-1) * (2-1) = 1 * 1 = 1$
+\begin{equation}
+DF = (rows -1) * (columns – 1) = (2-1) * (2-1) = 1 * 1 = 1
+\end{equation}
 
 In a last step, we check whether the $\chi$^2^ value that we have calculated is higher than a critical value (in which case the correlation in our table is significant). Degrees of freedom are relevant here because the critical values are dependent upon the degrees of freedom: the more degrees of freedom, the higher the critical value, i.e. the harder it is to breach the level of significance.
 
@@ -805,8 +893,8 @@ critval %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -823,11 +911,15 @@ Effect sizes are important because they correlations may be highly significant b
 
 The effect size measure for $\chi$^2^ tests can be either the $\phi$-coefficient (phi-coefficient) or Cramer's $\phi$ (Cramer's phi). The $\phi$-coefficient is used when dealing with 2x2 tables while Cramer's $\phi$ is used when dealing with tables with more than 4 cells. The $\phi$ coefficient can be calculated by using the equation below (N = overall sample size).
 
-$\phi = \sqrt{\frac{\chi^{2}}{N}}$
+\begin{equation}
+\phi = \sqrt{\frac{\chi^{2}}{N}}
+\end{equation}
 
 In our case, this means:
 
-$\phi = \sqrt{\frac{220.7339}{1080}} = \sqrt{0.2043832} = 0.4520876$
+\begin{equation}
+\phi = \sqrt{\frac{220.7339}{1080}} = \sqrt{0.2043832} = 0.4520876
+\end{equation}
 
 The $\phi$ coefficient varies between 0 (no effect) and 1 (perfect correlation). For the division into weak, moderate and strong effects one can follow the division for $\omega$ (small omega), so that with values beginning with .1 represent weak, values between 0.3 and .5 represent moderate and values above .5 represent strong effects [@buehner2009statistik, pp. 266]. So, in this example we are dealing with a medium-sized effect/correlation.
 
@@ -839,11 +931,12 @@ Before we summarize the results, we will see how to perform a chi-square test in
 # inspect data
 chidata %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Hedge") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -898,15 +991,15 @@ Imagine you are interested in whether older or younger speakers tend to refer to
 ```{r echo = F, message=FALSE, warning=FALSE}
 ex1dat <- matrix(c("Young", 61, 43, 104, "Old", 42, 36, 78, "Total", 103, 79, 182), ncol = 4, byrow = T)
 # add column names
-colnames(ex1dat) <- c("", "1SGPN", "PN without 1SG", "Total")
+colnames(ex1dat) <- c("Age", "1SGPN", "PN without 1SG", "Total")
 # inspect data
 ex1dat %>%
   as.data.frame() %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -938,15 +1031,15 @@ Imagine you are interested in whether young men or young women exhibit a prefere
 ```{r whatevertb, echo=F, message=FALSE, warning=FALSE}
 critval <- matrix(c("whatever", 17, 55, 71, "other words", 345128, 916552, 1261680, "Total", 345145, 916607, 1261752), ncol = 4, byrow = T)
 # add column names
-colnames(critval) <- c("", "YoungMales", "YoungFemales", "Total")
+colnames(critval) <- c("Item", "YoungMales", "YoungFemales", "Total")
 # inspect data
 critval %>%
   as.data.frame() %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -988,7 +1081,9 @@ In the following, we will have a look at tests and methods that can be used if t
 
 If all requirements for ordinary chi-square tests are acceptable and only the sample size is the issue, then applying a so-called *Yates-correction* may be appropriate. This type of correction is applied in cases where the overall sample size lies in-between 60 and 15 cases [@bortz109verteilungsfreie, pp. 91]. The difference between the ordinary chi-square and a Yates-corrected chi-square lies in the fact that the Yates-corrected chi-square is calculated according to the equation below.
 
-$\frac{(|observed – expected|-0.5)^{2}}{expected}$
+\begin{equation}
+\frac{(|observed – expected|-0.5)^{2}}{expected}
+\end{equation}
 
 According to this formula, we would get the values shown below rather than the values tabulated above. It is important to note here that this is only a demonstration because a Yates-Correction would actually be inappropriate as our sample size exceeds 60 cases. 
 
@@ -1002,8 +1097,8 @@ critval %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -1021,7 +1116,7 @@ In this example, we want to find out whether soft and hard X-rays differ in thei
 ```{r echo = F, results = 'asis'}
 critval <- matrix(c("X-ray soft",  21, 14, 35, "X-ray hard", 18, 13, 31, "Beta-rays", 24, 12, 36, "Light", 13, 30, 43, "Total", 76, 69, 145), ncol = 4, byrow = T)
 # add column names
-colnames(critval) <- c("", "Mitosis not reached", "Mitosis reached", "Total")
+colnames(critval) <- c("Treatment", "Mitosis not reached", "Mitosis reached", "Total")
 
 
 
@@ -1031,8 +1126,8 @@ critval %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -1051,11 +1146,12 @@ rownames(wholetable) <- c("rsoft", "rhard", "beta", "light") # add row names
 # inspect data
 wholetable %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Treatment") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -1071,11 +1167,12 @@ subtable <- wholetable[1:2,] # extract subtable
 # inspect data
 subtable %>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Treatment") %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -1100,15 +1197,15 @@ Below is a table comparing the results of the two chi-square tests.
 ```{r echo = F, message=FALSE, warning=FALSE}
 critval <- matrix(c("chi-squared", 0.0255, 0.025, "p-value", 0.8732, 0.8744), ncol = 3, byrow = T)
 # add column names
-colnames(critval) <- c("", "chi-square" , "chi-square in 2*k-tables")
+colnames(critval) <- c("Statistic", "chi-square" , "chi-square in 2*k-tables")
 # inspect data
 critval %>%
   as.data.frame() %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -1141,8 +1238,8 @@ critval %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
@@ -1168,10 +1265,11 @@ source("https://slcladal.github.io/rscripts/sub.table.r")
 # apply test
 results <- sub.table(wholetable, 2:3, 2:3, out="short")
 # inspect results
+results
 ```
 
 
-The results show that the difference is, in fact, statistically significant ($\chi^{2}$=3.864, df=1, p=.0
+The results show that the difference is, in fact, statistically significant at an $\alpha$-level of .05 ($\chi^{2}$=3.864, df=1, p<.05*).
 
 ## Configural Frequency Analysis (CFA){-}
 
@@ -1194,8 +1292,8 @@ head(cfadata, 10) %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
-  flextable::fontsize(size = 16) %>%
-  flextable::fontsize(size = 16, part = "header") %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::border_outer()
 ```
