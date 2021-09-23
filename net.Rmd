@@ -49,32 +49,38 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
-# install libraries
-install.packages(c("GGally", "network", "sna", "tidyverse", "knitr", 
-                   "kableExtra", "gutenbergr", "tm", "Matrix"))
+# install packages
+install.packages("flextable")
+install.packages("GGally")
+install.packages("gutenbergr")
+install.packages("Matrix")
+install.packages("network")
+install.packages("quanteda")
+install.packages("sna")
+install.packages("tidyverse")
+install.packages("tm")
 ```
 
-```{r prep2, echo = F, message=FALSE, warning=FALSE}
+Next, we load the packages.
+
+```{r prep2, message=FALSE, warning=FALSE}
 # activate packages
-library(knitr)
-library(kableExtra)
-library(DT)
+library(flextable)
+library(GGally)
+library(gutenbergr)
+library(Matrix)
+library(network)
+library(quanteda)
+library(sna)
+library(tidyverse)
+library(tm)
 ```
 
 Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
 
 # Network Networks
 
-This section shows how to create a network visualization with the `network` and the `GGally` packages. The network we will generate shows how often characters in William Shakespeare's *Romeo and Juliet* occurred in the same scene. In a first step, we load the necessary packages from the library.
-
-```{r net1, message=FALSE, warning=FALSE}
-# activate packages
-library(GGally)
-library(network)
-```
-
-
-The issue we want to investigate here relates to networks of personas in Shakespeare's *Romeo and Juliet* and we thus load this famous work of fiction. Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
+This section shows how to create a network visualization with the `network` and the `GGally` packages. The network we will generate shows how often characters in William Shakespeare's *Romeo and Juliet* occurred in the same scene. The issue we want to investigate here relates to networks of personas in Shakespeare's *Romeo and Juliet* and we thus load this famous work of fiction. Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
 
 
 ```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
@@ -89,80 +95,6 @@ romeo[1:5, 1:5]
 
 The data shows how often a character has appeared with each other character in the play - only Friar Lawrence and Friar John were excluded because they only appear in one scene where they talk to each other. 
 
-In a next step, we create a network object from the matrix. In addition, we define vertex names as these will be used as labels in the network plot.
-
-```{r net5}
-net = network::network(romeo,
-                       directed = FALSE,
-                       ignore.eval = FALSE,
-                       names.eval = "weights")
-# vertex names
-network.vertex.names(net) = rownames(romeo)
-net
-```
-
-Unfortunately, network object are somewhat obscure in that they can not be displayed as simple data frames. 
-
-However, this does not matter at this point and we continue by visualizing the network in a simple network plot using the ggnet2 function.
-
-```{r net7}
-ggnet2(net, 
-       size = 6, 
-       color = "goldenrod", 
-       edge.size = .5,
-       edge.color = "lightgrey", 
-       label = TRUE, 
-       label.size = 3)
-```
-
-The basic network shown above only shows who has co-occurred with whom but it is not really informative. Therefore, we add information to the network object. 
-
-To add information to a simple network graph, we create a new variable. This variable shows to which family each of the characters belong. To do this, we create a separate vector for each family which holds the characters that are members of this family. Then, we create a variable in the network object called "Family" which represents the family which the characters belong to. 
-
-```{r net9}
-# define colors (by family)
-mon <- c("ABRAM", "BALTHASAR", "BENVOLIO", "LADY MONTAGUE", "MONTAGUE", "ROMEO")
-cap <- c("CAPULET", "CAPULET’S COUSIN", "FIRST SERVANT", "GREGORY", "JULIET", 
-         "LADY CAPULET", "NURSE", "PETER", "SAMPSON", "TYBALT")
-oth <- c("APOTHECARY", "CHORUS", "FIRST CITIZEN", "FIRST MUSICIAN", "FIRST WATCH", 
-         "FRIAR JOHN" , "FRIAR LAWRENCE", "MERCUTIO", "PAGE", "PARIS", "PRINCE", 
-         "SECOND MUSICIAN", "SECOND SERVANT", "SECOND WATCH", "SERVANT", "THIRD MUSICIAN")
-# add color by group
-net %v% "Family" = ifelse(network.vertex.names(net) %in% cap, "Capulet", 
-                   ifelse(network.vertex.names(net) %in% mon, "Montague", "other"))
-```
-
-We can now use the family variable to define a color so that each character can be associated with his or her family by coloring. In addition, we specify the edge attributes so that the thickness and the type of a line represent how often characters have co-occurred. Characters that co-occur frequently are connected by thick, straight, solid lines whereas characters that co-occurred together only infrequently are connected by thin, dotted lines.
-
-```{r net10}
-# modify color
-net %v% "color" = ifelse(net %v% "Family" == "Capulet", "goldenrod", 
-                  ifelse(net %v% "Family" == "Montague", "indianred4","gray60"))
-# rescale edge size
-network::set.edge.attribute(net, "weights", ifelse(net %e% "weights" <= 1, 0.25, 
-                                   ifelse(net %e% "weights" <= 3, .5, 1)))
-# define line type
-network::set.edge.attribute(net, "lty", ifelse(net %e% "weights" == 0.25, 3, 
-                                      ifelse(net %e% "weights" == .5, 2, 1)))
-```
-
-We now visualize the network again but include information such as who belongs to which family (the translucent circles around the names) and how often they have co-occurred (thickness any type of the lines). We also specify alpha values which make lines and circles more or less translucent (the higher the value, the more translucent are the lines and circles).
-
-```{r net11}
-ggnet2(net, 
-       color = "color", 
-       label = TRUE, 
-       label.size = 3,
-       alpha = 0.2,
-       size = "degree",
-       size.cut = 3,
-       edge.size = "weights",
-       edge.lty = "lty",
-       edge.alpha = 0.5) +
-  guides(color = FALSE, size = FALSE)
-```
-
-We have now plotted the network of characters in Shakespeare's *Romeo and Juliet* and we have added additional information to this plot. The characters are shown by name and the color behind their name informs us about which family they belong to (Capulet = golden, Montague = red, other = gray). The linetype and line thickness both provide information on how frequently characters interacted: slim dotted gray lines indicate that the characters only co-occurred once, dashed gray lines indicate that the characters co-occurred up to three times and thick solid gray lines show that the characters co-occured more than 3 times together. 
 
 # Quanteda Networks 
 
@@ -172,8 +104,6 @@ In a first step, we transform the text vectors of the `romeo` data into a docume
 
 
 ```{r qtda01, warning=F, message=F}
-# load package
-library(quanteda)
 # create a document feature matrix
 romeo_dfm <- quanteda::as.dfm(romeo)
 # create feature co-occurrence matrix
@@ -185,11 +115,11 @@ head(romeo_fcm)
 This feature-co-occurrence matrix can then serve as the input for the `textplot_network` function which already generates a nice network graph. The network graph can then be modified or customized easily by defining the arguments of the `textplot_network` function. To see how and which arguments can be modified, you can use `?textplot_network`.
 
 ```{r qtda04}
-quanteda::textplot_network(romeo_fcm, 
-                           min_freq = 10, 
-                           edge_alpha = 0.2, 
-                           edge_color = "orange",
-                           edge_size = 5)
+quanteda.textplots::textplot_network(romeo_fcm, 
+                                     min_freq = 10, 
+                                     edge_alpha = 0.2, 
+                                     edge_color = "orange",
+                                     edge_size = 5)
 ```
 
 
@@ -206,7 +136,7 @@ library(tidygraph)
 library(tidyverse)
 ```
 
-In a next step, we define the *nodes* and we can also add information about the odes that we can use later on (suh as frequency information).
+In a next step, we define the *nodes* and we can also add information about the odes that we can use later on (such as frequency information).
 
 ```{r tidy4, message=F, warning=F}
 va <- romeo %>%
@@ -217,9 +147,17 @@ va <- romeo %>%
 ```
 
 ```{r tidy4b, echo = F, message=F, warning=F}
-DT::datatable(va, rownames = F, filter="none", 
-              caption = "Personas and their frequencies of occurrence in Shakespeare's *Romeo and Juliet*.", 
-              options = list(pageLength = 10, scrollX=T))
+va %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Personas and their frequencies of occurrence in Shakespeare's *Romeo and Juliet*.")  %>%
+  flextable::border_outer()
+
 ```
 
 Now, we define the *edges*, i.e., the connections between nodes and, again, we can add information in separate variables that we can use later on. 
@@ -234,9 +172,16 @@ ed <- romeo %>%
 
 
 ```{r tidy5b, echo = F, message=F, warning=F}
-DT::datatable(ed, rownames = F, filter="none", 
-              caption = "Edges between personasin Shakespeare's *Romeo and Juliet*.", 
-              options = list(pageLength = 10, scrollX=T))
+ed %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Edges between personasin Shakespeare's *Romeo and Juliet*.")  %>%
+  flextable::border_outer()
 ```
 
 Now that we have generated tables for the edges and the nodes, we can generate a graph object.
