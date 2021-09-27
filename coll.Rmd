@@ -39,7 +39,7 @@ How would you find words that are associated with a specific term and how can yo
 This tutorial aims to show how you can answer this question. 
 
 
-## Preparation and session set up{-}
+**Preparation and session set up**
 
 This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
@@ -48,7 +48,7 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 # set options
 options(stringsAsFactors = F)
 options(scipen = 999)
-options(max.print=10000)
+options(max.print=1000)
 # install packages
 install.packages("cluster")
 install.packages("corpus")
@@ -65,6 +65,8 @@ install.packages("sna")
 install.packages("tidyverse")
 install.packages("tm")
 install.packages("tokenizers")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
 Next, we load the packages.
@@ -86,6 +88,8 @@ library(sna)
 library(tidyverse)
 library(tm)
 library(tokenizers)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 
@@ -340,37 +344,41 @@ collocates[1:10, 1:10] %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
   flextable::set_caption(caption = "")  %>%
+  flextable::bold(i = 1:10, j = 1, bold = TRUE, part = "body") %>%
   flextable::border_outer()
 ```
 
-We can inspect this co-occurrence matrix and check how many terms (words or elements) it represents using the `ncol` function from base R. We can also check how often terms occur in the data using the `summary` function from base R. The output of the `summary` function tells us that the minimum frequency of a word in the data is 2 with a maximum of 1,474. The difference between the median (36.00) and the mean (74.47) indicates that the frequencies are distributed very non-normally - which is common for language data. 
+We can inspect this co-occurrence matrix and check how many terms (words or elements) it represents using the `ncol` function from base R. We can also check how often terms occur in the data using the `summary` function from base R. The output of the `summary` function tells us that the minimum frequency of a word in the data is 1 with a maximum of 25,435. The difference between the median (36.00) and the mean (74.47) indicates that the frequencies are distributed very non-normally - which is common for language data. 
 
 ```{r coll6, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # inspect size of matrix
 ncol(collocates)
 summary(rowSums(collocates))
 ```
+The `ncol` function reports that the data represents 8,638 words and that the most frequent word occurs 25,435 times in the text.
 
-We will now use an example of one individual word (*selection*) to show, how collocation strength for individual terms is calculated and how it can be visualized or displayed. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) [see also @WN17].
+# Visualizing Collocations
+
+We will now use an example of one individual word (*selection*) to show, how collocation strength for individual terms is calculated and how it can be visualized. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) [see also @WN17].
 
 ```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load function for co-occurrence calculation
 source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # define term
 coocTerm <- "selection"
-# calculate cooccurence statistics
+# calculate co-occurence statistics
 coocs <- calculateCoocStatistics(coocTerm, darwinsdtm, measure="LOGLIK")
 # inspect results
 coocs[1:20]
 ```
 
-# Visualizing Collocations
+The output shows that the word most strongly associated with *selection* in Charles Darwin's *Origin* is unsurprisingly *natural* - given the substantive strength of the association between *natural* and *selection* these term are definitely collocates and almost - if not already - a lexicalized construction (at least in this text).
 
 There are various visualizations options for collocations. Which visualization method is appropriate depends on what the visualizations should display. 
 
 ## Association Strength{-}
 
-We start with the most basic and visualize the collocation strength using a simple dot chart.
+We start with the most basic and visualize the collocation strength using a simple dot chart. We use the vector of association strengths generated above and transform it into a table. Also, we exclude elements with an association strength lower than 30.
 
 ```{r assocs01, message=F, warning=F}
 coocdf <- coocs %>%
@@ -396,7 +404,7 @@ coocdf %>%
   flextable::border_outer()
 ```
 
-We can now visualize the association strength as shown in the code chunk below.
+We can now visualize the association strengths as shown in the code chunk below.
 
 ```{r assocs03, message=F, warning=F}
 ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
@@ -406,7 +414,7 @@ ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
   labs(y = "")
 ```
 
-The dot chart shows that *natural* is collocating more strongly with *selection* compared to any other term. This substantiates that *natural* and *selection* are a collocation in Darwin's *On the Origin of Species by Means of Natural Selection* (which is unsurprising, of course).
+The dot chart shows that *natural* is collocating more strongly with *selection* compared to any other term. This confirms that *natural* and *selection* form a collocation in Darwin's *Origin*.
 
 ## Dendrograms{-}
 
@@ -517,7 +525,7 @@ The bi-plot shows that *natural* and *selection* collocate as they are plotted i
 
 # Determining Significance
 
-In order to identify which words occur together significantly(1) more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *selection*.
+In order to identify which words occur together significantly more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *selection*.
 
 To determine which terms collocate significantly with the key term (*selection*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
 
@@ -653,7 +661,7 @@ coocStatz %>%
 The results show that *selection* collocates significantly with *selection* (of course) but also, as expected, with *natural*. The corrected p-values shows that after Benjamini-Hochberg correction for multiple/repeated testing [see @field2012discovering] these are the only significant collocates of *selection*. Corrections are necessary when performing multiple tests because otherwise, the reliability of the test result would be strongly impaired as repeated testing causes substantive $\alpha$-error inflation. The Benjamini-Hochberg correction that has been used here is preferrable over the more popular Bonferroni correction because it is less conservative and therefore less likely to result in $\beta$-errors [see again @field2012discovering].
 
 
-# Comparive Analyses of Collocation Strength
+# Changes in Collocation Strength
 
 We now turn to analyses of changes in collocation strength over apparent time. The example focuses on adjective amplification in Australian English. The issue we will analyze here is whether we can unearth changes in the collocation pattern of adjective amplifiers such as *very*, *really*, or *so*. In other words, we will investigate if amplifiers associate with different adjectives among speakers from different age groups. 
 
@@ -850,21 +858,13 @@ The analyses performed here are based on the `collostructions` package [@flach20
 
 ## Simple Collexeme Analysis{-}
 
-***
-
-NOTE!
-
-The code in this section does not work at the moment as the `collostructions` package has not yet been updated and is therefore still incompatible with the R version used for this tutorial. The code is merely displayed and would work is processed with an older R versions.
-
-***
-
 Simple Collexeme Analysis determines if a word is significantly attracted to a specific construction within a corpus. The idea is that the frequency of the word that is attracted to a construction is significantly higher within the construction than would be expected by chance.
 
 The example here analyzes the Go + Verb construction (e.g. *Go suck a nut!*). The question is which verbs are attracted to this constructions (in this case, if *suck* is attracted to this construction).
 
-To perform these analyses, we use the `collostructions` package. Information about how to download and install this package can be found [here](https://userpage.fu-berlin.de/~flach/corpling/collostructions/.
+To perform these analyses, we use the `collostructions` package. Information about how to download and install this package can be found [here](https://sfla.ch/collostructions/).
 
-In a first step, we load the collostructions package and inspect the data. In this case, we will only use a sample of 100 rows from the data set as the output would become hard to read.
+In a first step, we load the `collostructions` package and inspect the data. In this case, we will only use a sample of 100 rows from the data set as the output would become hard to read.
 
 ```{r coll_03_02, message=FALSE, warning=FALSE}
 # draw a sample of the data
