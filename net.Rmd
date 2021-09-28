@@ -34,7 +34,7 @@ This tutorial introduces network analysis using R. Network analysis is a method 
 > **How can you display the relationship between different elements, be they authors, characters, or words?**
 >
 
-The most common way to visualize such relationships are networks [@silge2017text : 131-137]. Networks, also called graphs, consist of nodes (typically represented as dots) and edges (typically represented as lines) and they can be directed or undirected networks. 
+The most common way to visualize such relationships are networks [@silge2017text, 131-137]. Networks, also called graphs, consist of nodes (typically represented as dots) and edges (typically represented as lines) and they can be directed or undirected networks. 
 
 In directed networks, the direction of edges is captured. For instance, the exports of countries. In such cases the lines are directed and typically have arrows to indicate direction. The thickness of lines can also be utilized to encode information such as frequency of contact.
 
@@ -62,6 +62,9 @@ install.packages("sna")
 install.packages("tidygraph")
 install.packages("tidyverse")
 install.packages("tm")
+install.packages("tibble")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
 Next, we load the packages.
@@ -80,11 +83,14 @@ library(sna)
 library(tidygraph)
 library(tidyverse)
 library(tm)
+library(tibble)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
 
-# Network Networks
+# Creating a matrix
 
 This section shows how to create a network visualization with the `network` and the `GGally` packages. The network we will generate shows how often characters in William Shakespeare's *Romeo and Juliet* occurred in the same scene. The issue we want to investigate here relates to networks of personas in Shakespeare's *Romeo and Juliet* and we thus load this famous work of fiction. Now that we have loaded the data, we need to split the data into scenes. Scenes during which personas leave or enter will have to be split too so that we arrive at a table that contains the personas that are present during a sub-scene.
 
@@ -92,12 +98,47 @@ This section shows how to create a network visualization with the `network` and 
 ```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
 # load data
 rom <- read.delim("https://slcladal.github.io/data/romeo_tidy.txt", sep = "\t")
+```
+
+
+```{r na1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+rom %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Persona") %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of rom data.")  %>%
+  flextable::border_outer()
+```
+
+We now transform that table into a co-occurrence matrix.
+
+```{r na2, echo = F, message=FALSE, warning=FALSE}
 rome <- crossprod(table(rom[1:2]))
 diag(rome) <- 0
 romeo <- as.data.frame(rome)
-romeo[1:5, 1:5]
 ```
 
+
+```{r na2b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+romeo[1:5, 1:5]%>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 5 rows and 5 columns of the of romeoco-occurrence matrix.")  %>%
+  flextable::border_outer()
+```
 
 The data shows how often a character has appeared with each other character in the play - only Friar Lawrence and Friar John were excluded because they only appear in one scene where they talk to each other. 
 
@@ -171,6 +212,7 @@ ed <- romeo %>%
 ```{r tidy5b, echo = F, message=F, warning=F}
 ed %>%
   as.data.frame() %>%
+  head(15) %>%
   flextable() %>%
   flextable::set_table_properties(width = .5, layout = "autofit") %>%
   flextable::theme_zebra() %>%
@@ -219,9 +261,9 @@ mon <- c("ABRAM", "BALTHASAR", "BENVOLIO", "LADY MONTAGUE", "MONTAGUE", "ROMEO")
 cap <- c("CAPULET", "CAPULET’S COUSIN", "FIRST SERVANT", "GREGORY", "JULIET", "LADY CAPULET", "NURSE", "PETER", "SAMPSON", "TYBALT")
 oth <- c("APOTHECARY", "CHORUS", "FIRST CITIZEN", "FIRST MUSICIAN", "FIRST WATCH", "FRIAR JOHN" , "FRIAR LAWRENCE", "MERCUTIO", "PAGE", "PARIS", "PRINCE", "SECOND MUSICIAN", "SECOND SERVANT", "SECOND WATCH", "SERVANT", "THIRD MUSICIAN")
 # create color vectors
-Family <- dplyr::case_when(names(evcent(tg)$vector) %in% mon ~ "MONTAGUE",
-                              names(evcent(tg)$vector) %in% cap ~ "CAPULET",
-                              TRUE ~ "Other")
+Family <- dplyr::case_when(sapply(tg, "[")$nodes$name %in% mon ~ "MONTAGUE",
+                           sapply(tg, "[")$nodes$name %in% cap ~ "CAPULET",
+                           TRUE ~ "Other")
 # inspect colors
 Family
 ```
