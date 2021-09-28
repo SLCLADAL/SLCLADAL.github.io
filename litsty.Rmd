@@ -33,7 +33,7 @@ Computational literary stylistics refers to analyses of the language of literary
 
 While this tutorial builds on @silge2017text (see [here](https://www.tidytextmining.com/)), it substantially expands @silge2017text in terms of the range of methods that are presented and the data sources that are used.
 
-## Preparation and session set up{-}
+**Preparation and session set up**
 
 This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/Intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
@@ -41,14 +41,18 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 # set options
 options(stringsAsFactors = F)
 # install libraries
-install.packages(c("tidytext","janeaustenr","tidyverse", "quanteda", "forcats", "gutenbergr"))
+install.packages("tidytext")
+install.packages("janeaustenr")
+install.packages("tidyverse")
+install.packages("quanteda")
+install.packages("forcats")
+install.packages("gutenbergr")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
-Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
-
-# Getting started{-}
-
-For this tutorial we will use several packages that contain functions that are particularly useful for computational literary stylistics. We will start by loading the required packages. 
+We now activate these packages as shown below.
 
 ```{r pack_01, message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -57,36 +61,54 @@ library(tidytext)
 library(forcats)
 library(quanteda)
 library(gutenbergr)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
-After loading the packages, we will download data from the Project Gutenberg. For this tutorial, we will download William Shakespeare's *Romeo and Juliet*, Charles Darwin's *On the Origin of Species*, Edgar Allan Poe's *The Raven*, Jane Austen's *Pride and Prejudice*, Athur Conan Doyle's *The Adventures of Sherlock Holmes*, and Mark Twain's *The Adventures of Tom Sawyer* (to see how to download data from Project Gutenberg, check out this [tutorial](https://slcladal.github.io/gutenberg.html)).
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
 
-```{r echo = F, eval = F}
+# Getting started{-}
+
+To explore different methods used in literary stylistics, we will analyze selected works from the Project Gutenberg. For this tutorial, we will download William Shakespeare's *Romeo and Juliet*, Charles Darwin's *On the Origin of Species*, Edgar Allan Poe's *The Raven*, Jane Austen's *Pride and Prejudice*, Athur Conan Doyle's *The Adventures of Sherlock Holmes*, and Mark Twain's *The Adventures of Tom Sawyer* (to see how to download data from Project Gutenberg, check out this [tutorial](https://slcladal.github.io/gutenberg.html)).
+
+```{r echo = F, eval = F, message=FALSE, warning=FALSE}
 gb <- gutenberg_works()
 gb %>% 
-  filter(str_detect(author, "Shakespeare"),
-         str_detect(title, "Romeo"))
+  filter(stringr::str_detect(author, "Shakespeare"),
+         stringr::str_detect(title, "Romeo"))
 ```
 
 The code below downloads the data from a server that mirrors the content of Project Gutenberg (which is more stable than the Project itself).
 
-```{r loaddat}
-shakespeare <- gutenberg_works(gutenberg_id == "1513") %>%
-  gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
-darwin <- gutenberg_works(gutenberg_id == "1228") %>%
-  gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
-twain <- gutenberg_works(gutenberg_id == "74") %>%
-  gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
-poe <- gutenberg_works(gutenberg_id == "1065") %>%
-  gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
-austen <- gutenberg_works(gutenberg_id == "1342") %>%
-  gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
-doyle <- gutenberg_works(gutenberg_id == "1661") %>%
-  gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
-# inspect data
-head(shakespeare, 15)
+```{r loaddat, message=FALSE, warning=FALSE}
+shakespeare <- gutenbergr::gutenberg_works(gutenberg_id == "1513") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+darwin <- gutenbergr::gutenberg_works(gutenberg_id == "1228") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+twain <- gutenbergr::gutenberg_works(gutenberg_id == "74") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+poe <- gutenbergr::gutenberg_works(gutenberg_id == "1065") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+austen <- gutenbergr::gutenberg_works(gutenberg_id == "1342") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+doyle <- gutenbergr::gutenberg_works(gutenberg_id == "1661") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
 ```
 
+
+```{r loaddat_tb, echo = F, message=F, warning=F}
+ shakespeare %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the shakespeare data.")  %>%
+  flextable::border_outer()
+```
 
 We can now begin to load and n a next step process the data.
 
@@ -96,7 +118,7 @@ The most basic but also most common task is to extract instances of individual w
 
 The code below extracts the word *pride* from the novel *Pride and Prejudice* and displays the resulting instances of this keyword in a kwic.
 
-```{r kwic_01}
+```{r kwic_01, message=FALSE, warning=FALSE}
 # extract text
 austen_text <- austen %>%
   dplyr::summarise(text = paste0(text, collapse = " ")) %>%
@@ -106,15 +128,26 @@ names(austen_text)  <- "Pride & Prejudice"
 # extract instances of pride
 pride <- quanteda::kwic(austen_text, "pride") %>%
   as.data.frame()
-# inspect data
-head(pride)
+```
+
+```{r pride_tb, echo = F, message=F, warning=F}
+ pride %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the pride data.")  %>%
+  flextable::border_outer()
 ```
 
 The kwic display could now be processed further or could be inspected to see how the keyword in question (*pride*) is used in this novel.
 
 We can also inspect the use of phrases, for example *natural selection*, expand the context window size, and clean the output (as shown below).
 
-```{r kwic_02}
+```{r kwic_02, message=FALSE, warning=FALSE}
 # extract text
 darwin_text <- darwin %>%
   dplyr::summarise(text = paste0(text, collapse = " ")) %>%
@@ -123,8 +156,19 @@ darwin_text <- darwin %>%
 ns <- quanteda::kwic(darwin_text, phrase("natural selection"), window = 10) %>%
   as.data.frame() %>%
   dplyr::select(-docname, -from, -to, -pattern)
-# inspect data
-head(ns)
+```
+
+```{r kwic_tb, echo = F, message=F, warning=F}
+ ns %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 concordances of natural selection in Charles Darwin's Origin.")  %>%
+  flextable::border_outer()
 ```
 
 # Identifying Keywords{-}
@@ -143,7 +187,7 @@ The *Inverse Document Frequency* decreases the weight for most used words and in
 
 Before we calculate the *tf-idf*, we will collapse all the books into a single data frame though.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 books <- rbind(shakespeare, darwin, twain, poe, austen, doyle)
 # add names to books 
 books$book <- c(
@@ -159,12 +203,23 @@ books <- books %>%
   dplyr::filter(text != "") %>%
   dplyr::mutate(book = factor(book)) %>%
   dplyr::select(-gutenberg_id)
-# inspect data
-head(books)
+```
+
+```{r books_tb, echo = F, message=F, warning=F}
+ books %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the books data.")  %>%
+  flextable::border_outer()
 ```
 
 
-Now, we continue by calculating the *tf-idf* for eahc term in each of the books.
+Now, we continue by calculating the *tf-idf* for each term in each of the books.
 
 
 ```{r book_tf_idf, warning=F, message = F}
@@ -175,17 +230,30 @@ book_words <- books %>%
   dplyr::mutate(total = sum(n))
 book_tf_idf <- book_words %>%
   tidytext::bind_tf_idf(word, book, n)
-# inspect data
-book_tf_idf
 ```
+
+```{r book_tf_idf_tb, echo = F, message=F, warning=F}
+ book_tf_idf %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the tf-idf data frame.")  %>%
+  flextable::border_outer()
+```
+
 
 From the above table it is evident that the extremely common words have a very low inverse document frequency and thus a low tf-idf score. The inverse document frequency will be a higher number for words that occur in fewer documents in the collection of novels.
 
-```{r high_tf_idf}
+```{r high_tf_idf, message=FALSE, warning=FALSE}
 book_tf_idf %>%
   dplyr::select(-total) %>%
   dplyr::arrange(desc(tf_idf))
 ```
+
 
 Next, we plot the 15 words with the highest tf-idf scores for each novel to show which words are particularly charateristic of each of the novels.
 
@@ -216,8 +284,20 @@ book_words <- books %>%
   dplyr::count(book, word, sort = TRUE)  %>% 
   dplyr::group_by(book) %>% 
   dplyr::mutate(total = sum(n))
-# inspect data
-head(book_words)
+```
+
+
+```{r book_words_tb, echo = F, message=F, warning=F}
+ book_words %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the book_words data.")  %>%
+  flextable::border_outer()
 ```
 
 From the above table it is evident that the usual suspects *the*, *and*, *to* and so-forth are leading in terms of their usage frequencies in the novels. Now let us look at the distribution of *n/total* for each term in each of the novels (which represents the normalized term frequency).
@@ -252,15 +332,27 @@ f(k;s,N)={\frac {1/k^{s}}{\sum \limits _{n=1}^{N}(1/n^{s})}}
 
 In the code chunk below, we check if Zipf's Law applies to the words that occur in texts that we have downloaded from Project Gutenberg.
 
-```{r Zipf}
+```{r Zipf, message=FALSE, warning=FALSE}
 freq_by_rank <- book_words %>% 
   dplyr::group_by(book) %>% 
   dplyr::mutate(rank = row_number(), 
          `term frequency` = n/total) %>%
   dplyr::ungroup()
-# inspect data
-freq_by_rank
 ```
+
+```{r freq_by_rank_tb, echo = F, message=F, warning=F}
+ freq_by_rank %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the freq_by_rank data.")  %>%
+  flextable::border_outer()
+```
+
 
 To get a better understanding of Zipf's law, let us visualize the distribution by plotting on the logged rank of elements on the x-axis and logged frequency of the terms on the y-axis. If Zipf's law holds, then we should see more or less straight lines that go from top left to bottom right.
 
@@ -299,9 +391,9 @@ head(tokens_texts)
 
 Next, we calculate the TTR using the `textstat_lexdiv` function from the `quanteda` package and visualize the resulting TTRs for the literary texts thta we have downloaded from Project Gutenberg.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 dfm(tokens_texts) %>%
-  quanteda::textstat_lexdiv(measure = "TTR") %>%
+  quanteda.textstats::textstat_lexdiv(measure = "TTR") %>%
   ggplot(aes(x = TTR, y = reorder(document, TTR))) + 
   geom_point() +
   xlab("Type-Token-Ratio (TTR)") +
@@ -324,14 +416,25 @@ books_sentences <- books %>%
   dplyr::group_by(book) %>%
   dplyr::summarise(text = paste(text, collapse = " ")) %>%
   lexRankr::unnest_sentences(sentence, text)
-# inspect data
-head(books_sentences)
+```
+
+```{r books_sentences_tb, echo = F, message=F, warning=F}
+ books_sentences %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the books_sentences data.")  %>%
+  flextable::border_outer()
 ```
 
 
 Let's now visualize the results for potential differences or trends.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 books_sentences %>%
   dplyr::mutate(sentlength = stringr::str_count(sentence, '\\w+')) %>%
   ggplot(aes(x = sentlength, y = reorder(book, sentlength, mean), group = book)) +
@@ -367,8 +470,8 @@ We see that the texts are represented as the row names and the terms the column 
 
 We can now perform agglomerative hierarchical clustering and visualize the results in a dendrogram to assess the similarity of texts.
 
-```{r sim03}
-books_dist <- as.dist(textstat_dist(feature_mat))
+```{r sim03, message=FALSE, warning=FALSE}
+books_dist <- as.dist(quanteda.textstats::textstat_dist(feature_mat))
 books_clust <- hclust(books_dist)
 plot(books_clust)
 ```
@@ -392,7 +495,7 @@ As the `quanteda` package has a very neat and easy to use function (`textplot_ne
 
 
 ```{r net_05, message=FALSE, warning=FALSE}
-textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)
+quanteda.textplots::textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)
 ```
 
 The thickness of the lines indicates how often characters have co-occurred. We could now generate different network graphs for the personas in different plays to see how these plays and personas differ or we could apply the network analysis to other types of information such as co-occurrences of words.
