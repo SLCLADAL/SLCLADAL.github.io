@@ -45,17 +45,17 @@ Text Analysis or Distant Reading are rapidly growing in use and gaining populari
 knitr::include_graphics("https://slcladal.github.io/images/romeonet.png")
 ```
 
-While rapidly growing as a valid approach to analysing textual data, Text Analysis is [critizised](https://www.chronicle.com/article/The-Digital-Humanities-Debacle/245986)  for lack of "quantitative rigor and because its findings are either banal or, if interesting, not statistically robust (see [here](https://www.chronicle.com/article/The-Digital-Humanities-Debacle/245986). This criticism is correct in that most of the analysis that performed in *Computational Literary Studies* (CLS) are not yet as rigorous as analyses in fields that have a longer history of computational based, quantitative research, such as, for instance, corpus linguistics. However, the practices and methods used in CLS will be refined, adapted and show a rapid increase in quality if more research is devoted to these approaches. Also, Text Analysis simply offers an alternative way to analyse texts that is not in competition to traditional techniques but rather complements them.
+While rapidly growing as a valid approach to analyzing textual data, Text Analysis is [critizised](https://www.chronicle.com/article/The-Digital-Humanities-Debacle/245986)  for lack of "quantitative rigor and because its findings are either banal or, if interesting, not statistically robust (see [here](https://www.chronicle.com/article/The-Digital-Humanities-Debacle/245986). This criticism is correct in that most of the analysis that performed in *Computational Literary Studies* (CLS) are not yet as rigorous as analyses in fields that have a longer history of computational based, quantitative research, such as, for instance, corpus linguistics. However, the practices and methods used in CLS will be refined, adapted and show a rapid increase in quality if more research is devoted to these approaches. Also, Text Analysis simply offers an alternative way to analyze texts that is not in competition to traditional techniques but rather complements them.
 
 Given it relatively recent emergence, so far, most of the applications of Text Analysis are based upon a relatively limited number of key procedures or concepts (e.g. concordancing, word frequencies, annotation or tagging, parsing, collocation, text classification, Sentiment Analysis, Entity Extraction, Topic Modeling, etc.). In the following, we will explore these procedures and introduce some basic tools that help you perform the introduced tasks. 
 
-## Text Analysis at UQ{-}
+**Text Analysis at UQ**
 
 The [UQ Library](https://www.library.uq.edu.au/) offers a very handy and attractive summary of [resources, concepts, and tools](https://guides.library.uq.edu.au/research-techniques/text-mining-analysis/introduction) that can be used by researchers interested in Text Analysis and Distant Reading. Also, the UQ library site offers short video introductions and addresses issues that are not discussed here such as [copyright issues](https://guides.library.uq.edu.au/research-techniques/text-mining-analysis/considerations), [data sources available at the UQ library](https://guides.library.uq.edu.au/research-techniques/text-mining-analysis/sources-of-text-data), as well as [social media](https://guides.library.uq.edu.au/research-techniques/text-mining-analysis/sources-of-text-data) and [web scaping](https://guides.library.uq.edu.au/research-techniques/text-mining-analysis/web-scraping).
 
 In contrast to the UQ library site, the focus of this introduction lies on the practical how-to of text analysis. this means that the following concentrates on how to perform analyses rather than discussing their underlying concepts or evaluating their scientific merits. 
 
-## Tools versus Scripts{-}
+**Tools versus Scripts**
 
 It is perfectly fine to use tools for the analyses exemplified below. However, the aim here is not primarily to show how to perform text analyses but how to perform text analyses in a way that complies with practices that guarantee sustainable, transparent, reproducible research. As R code can be readily shared and optimally contains all the data extraction, processing, visualization, and analysis steps, using scripts is preferable over using (commercial) software. 
 
@@ -63,7 +63,7 @@ In addition to being not as transparent and hindering reproduction of research, 
 
 Finally, the widespread use of R particularly among data scientists, engineers, and analysts reduces the risk of software errors as a very active community corrects flawed functions typically quite rapidly. 
 
-## Preparation and session set up{-}
+**Preparation and session set up**
 
 
 This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
@@ -71,20 +71,50 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # set options
 options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.print=1000)
 # install packages
-install.packages(c("DT", "knitr", "kableExtra", "quanteda", 
-                   "tidyverse", "tm", "tidytext", "wordcloud2", 
-                   "scales", "quanteda.textstats", 
-                   "quanteda.textplots", "tidyr", "cluster", 
-                   "class", "NLP", "openNLP", "openNLPdata"))
+install.packages("DT")
+install.packages("knitr")
+install.packages("kableExtra")
+install.packages("quanteda")
+install.packages("tidyverse")
+install.packages("tm", "tidytext")
+install.packages("wordcloud2")
+install.packages("scales")
+install.packages("quanteda.textstats")
+install.packages("quanteda.textplots")
+install.packages("tidyr")
+install.packages("cluster")
+install.packages("class")
+install.packages("NLP")
+install.packages("openNLP")
+install.packages("openNLPdata"))
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
+Now that we have installed the packages, we can activate them as shown below.
 
-```{r prep2, echo=F, eval = T, message=FALSE} 
+```{r prep2, message=FALSE} 
 # load packages for website
-library(DT)
-library(knitr)
-library(kableExtra)
+library(tidyverse)
+library(flextable)
+library(quanteda)
+library(tm)
+library(tidytext)
+library(wordcloud2)
+library(scales)
+library(quanteda.textstats)
+library(quanteda.textplots)
+library(tidyr)
+library(cluster)
+library(class)
+library(NLP)
+library(openNLP)
+library(openNLPdata)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 Once you have installed R and RStudio and once you have also initiated the session by executing the code shown above, you are good to go.
@@ -93,13 +123,10 @@ Once you have installed R and RStudio and once you have also initiated the sessi
 
 In Text Analysis, concordancing refers to the extraction of words from a given text or texts [@lindquist2009corpus]. Commonly, concordances are displayed in the form of key-word in contexts (KWIC) where the search term is shown with some preceding and following context. Thus, such displays are referred to as key word in context concordances. A more elaborate tutorial on how to perform concordancing with R is available [here](https://slcladal.github.io/kwics.html).
 
-<br>
 
 ```{r antconc, echo=FALSE, out.width= "60%", out.extra='style="float:right; padding:10px"'}
 knitr::include_graphics("https://slcladal.github.io/images/AntConcConcordance.png")
 ```
-
-<br>
 
 Concordancing is helpful for seeing how the term is used in the data, for inspecting how often a given word occurs in a text or a collection of texts, for extracting examples, and it also represents a basic procedure and often the first step in more sophisticated analyses of language data. 
 
@@ -108,14 +135,26 @@ In the following, we will use R to create KWICs displays of the term *organism* 
 We begin by loading the `quanteda` package that we will use for generating the KWICs and the `tidyverse` package that we use to process the data. In addition, we load the data which represents the text of Charles Darwin's *On the Origin of Species*. For the present tutorial, we load data that is available on the LADAL GitHUb repository. If you want to know how to load your own data, have a look at [this tutorial](https://slcladal.github.io/intror.html#Working_with_text). 
 
 ```{r conc1, message=FALSE, warning=FALSE}
-# load package
-library(quanteda)
-library(tidyverse)
 # load text
 darwin <- readLines("https://slcladal.github.io/data/origindarwin.txt")
-# inspect
-head(darwin)
 ```
+
+```{r conc1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+darwin %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 text elements of Charles Darwin's Origin")  %>%
+  flextable::border_outer()
+```
+
+
 
 The data still consists of short text snippets which is why we collapse these snippets and then split the collapsed data into chapters. 
 
@@ -133,11 +172,23 @@ darwin_chapters <- darwin %>%
   stringr::str_split("qwertz") %>%
   # unlist the result (convert into simple vector)
   unlist()
-# inspect structure of resultsing data
-str(darwin_chapters)
 ```
 
-
+```{r conc2b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+darwin_chapters %>%
+  substr(start=1, stop=500) %>%
+  as.data.frame() %>%
+  head(5) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 500 characters of the first 5 chapters of Charles Darwin's Origin")  %>%
+  flextable::border_outer()
+```
 
 Once we have split the data into chapters, we perform the concordancing and extract the KWICs. To create these kwics, we use the `kwic` function from the `quanteda` package. This function takes the data (x), the search pattern (pattern), and the window size as its main arguments. 
 
@@ -156,11 +207,23 @@ kwic_o <- quanteda::kwic(x = darwin_chapters, # define text(s)
   dplyr::select(-to, -from, -pattern)
 ```
 
-
-```{r conc4, echo = F, message=FALSE, warning=FALSE}
+```{r conc3b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-DT::datatable(kwic_o, rownames = FALSE, filter = "none")
+kwic_o %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances of organism in Charles Darwin's Origin")  %>%
+  flextable::border_outer()
 ```
+
+
+
 
 
 We can also use regular expressions in our search to extract not only *organism* but also *organisms* and *organic*. When using a regular expression in the `pattern` argument, we need to specify the `valuetype` as `regex` (as shown below).
@@ -178,10 +241,21 @@ kwic_os <- quanteda::kwic(x = darwin_chapters,
 ```
 
 
-```{r conc6, echo = F, message=FALSE, warning=FALSE}
+```{r conc5b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-DT::datatable(kwic_os, rownames = FALSE, filter = "none")
+kwic_o %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 cleaned Concordances of organism in Charles Darwin's Origin")  %>%
+  flextable::border_outer()
 ```
+
 
 When search for expressions that represent phrase and that consists out of several elements such as *natural selection*, we also need to specify that we are looking for a phrase in the pattern argument. 
 
@@ -197,9 +271,20 @@ kwic_ns <- quanteda::kwic(x = darwin_chapters,
 ```
 
 
-```{r conc8, echo = F, message=FALSE, warning=FALSE}
+
+```{r conc8b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-DT::datatable(kwic_ns, rownames = FALSE, filter = "none")
+kwic_ns %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 cleaned Concordances of the phrase natural selection in Charles Darwin's Origin")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -214,8 +299,6 @@ As extracting word frequency lists is very important, we will now We will now ex
 In a first step, we load a corpus, convert everything to lower case, remove non-word symbols (including punctuation), and split the corpus data into individual words.
 
 ```{r wf1, message=FALSE, warning=FALSE}
-# load package
-library(tm)
 # load and process corpus
 darwin_words <- darwin  %>%
   # convert everything to lower case
@@ -226,8 +309,22 @@ darwin_words <- darwin  %>%
   stringr::str_squish() %>%
   stringr::str_split(" ") %>%
   unlist()
-# inspect result
-head(darwin_words, 20)
+```
+
+
+```{r wf1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+darwin_words %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 words in Charles Darwin's Origin")  %>%
+  flextable::border_outer()
 ```
 
 Now that we have a vector of words, we can easily create a table representing a word frequency list (as shown below).
@@ -242,16 +339,25 @@ wfreq <- darwin_words %>%
                 frequency = 2)
 ```
 
-```{r wf3, echo = F, message=FALSE, warning=FALSE}
+
+```{r wf2b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-DT::datatable(wfreq, rownames = FALSE, filter = "none")
+wfreq %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Top 15 words in Charles Darwin's Origin by frequency.")  %>%
+  flextable::border_outer()
 ```
 
 The most frequent words are all function words which are often not meaningful or useful for an analysis. Thus, we now remove these function words (also called *stopwords*) from the frequency list and inspect the list without stopwords.
 
 ```{r wf4, message=FALSE, warning=FALSE}
-# load package
-library(tidytext)
 # create table wo stopwords
 wfreq_wostop <- wfreq %>%
   anti_join(stop_words, by = "word") %>%
@@ -259,12 +365,22 @@ wfreq_wostop <- wfreq %>%
 ```
 
 
-```{r wf5, echo = F, message=FALSE, warning=FALSE}
+
+```{r wf5b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 wfreq_wostop %>%
-  head(10) %>%
-  kable(caption = "Words and their (relative) freqeuncy in Darwin's *Origin*") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Top 15 lexical words in Charles Darwin's Origin by frequency.")  %>%
+  flextable::border_outer()
 ```
+
 
 Such word frequency lists can be visualized in various ways. The most common way to visualize word frequency lists is in the form of bargraphs.
 
@@ -283,9 +399,6 @@ wfreq_wostop %>%
 Alternatively, word frequency lists can be visualized, although less informative, as word clouds. 
 
 ```{r wc1, message=FALSE, warning=FALSE}
-# load packages
-library(wordcloud2)
-library(scales)
 # create wordcloud
 wordcloud2(wfreq_wostop[1:100,],
            shape = "diamond",
@@ -314,7 +427,7 @@ corp_dom <- quanteda::corpus(c(darwin_doc, orwell, melville))
 attr(corp_dom, "docvars")$Author = c("Darwin", "Orwell", "Melville")
 ```
 
-Now, we can remove stopwords and punctuation and generate the comparison cloud.
+Now, we can remove so-called *stopwords* (non-lexical function words) and punctuation and generate the comparison cloud.
 
 ```{r wc4, message=FALSE, warning=FALSE}
 corp_dom  %>%
@@ -323,7 +436,7 @@ corp_dom  %>%
     quanteda::dfm() %>%
     quanteda::dfm_group(groups = corp_dom$Author) %>%
     quanteda::dfm_trim(min_termfreq = 200, verbose = FALSE) %>%
-    quanteda::textplot_wordcloud(comparison = TRUE, 
+    quanteda.textplots::textplot_wordcloud(comparison = TRUE, 
                                  max_words = 100,
                                  max_size = 6)
 ```
@@ -369,11 +482,19 @@ tb <- data.frame(Chapters, Matches, Words) %>%
   dplyr::mutate(Frequency = round(Matches/Words*1000, 2))
 ```
 
-```{r wf17, echo = F, message=FALSE, warning=FALSE}
+```{r wf17b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 tb %>%
-  head(10) %>%
-  kable(caption = "Words and their (relative) freqeuncy across chapters in Darwin's *Origin*") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Words and their (relative) freqeuncy across in Charles Darwin's Origin by frequency.")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -383,8 +504,8 @@ We can now visualize the relative frequencies of our search word per chapter.
 ```{r wf18, echo=T, eval = T, message=FALSE, warning=FALSE}
 # create plot
 ggplot(tb, aes(x = Chapters, y = Frequency, group = 1)) + 
-  geom_smooth(color = "goldenrod2") +
-  geom_line(color = "indianred4") +         
+  geom_smooth(color = "purple") +
+  geom_line(color = "darkgray") +         
   guides(color=guide_legend(override.aes=list(fill=NA))) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
@@ -401,7 +522,7 @@ names(darwin_chapters) <- Chapters
 # generate corpus from chapters
 darwin_corpus <- quanteda::corpus(darwin_chapters)
 # generate dispersion plots
-textplot_xray(kwic(darwin_corpus, pattern = "organism"),
+quanteda.textplots::textplot_xray(kwic(darwin_corpus, pattern = "organism"),
               kwic(darwin_corpus, pattern = "selection"),
               sort = T)
 ```
@@ -413,13 +534,28 @@ Frequency information can also tell us something about the nature of a text. For
 As an example, below you find the number of the second person pronouns *you* and *your* and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the *International Corpus of English* (ICE). In addition, the tables shows  the percentage of second person pronouns in both text types to enable seeing  whether private dialogues contain more of these second person pronouns than scripted monologues (i.e. speeches).
 
 ```{r ou1, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
-numbers <- matrix(c("you, your", "6761", "659", 
-"Other words",	"259625",	"105295", "Percent",	"2.60",	"0.63"), byrow = T, nrow = 3)
+numbers <- matrix(c("you, your", "6761", "659", "Other words",	"259625",	
+                    "105295", "Percent",	"2.60",	"0.63"), byrow = T, nrow = 3)
 colnames(numbers) <- c("", "Private dialogues", "Scripted monologues")
-numbers %>%
-  kable(caption = "Use of 2nd person pronouns (and all other words) in ICE Ireland") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
 ```
+
+```{r ou1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+ndf <- numbers %>%
+  as.data.frame()
+colnames(ndf)[1] <- "."
+ndf %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Use of 2nd person pronouns (and all other words) in ICE Ireland.")  %>%
+  flextable::border_outer()
+```
+
+
 
 This simple example shows that second person pronouns make up 2.6 percent of all words that are used in private dialogues while they only amount to 0.63 percent in scripted speeches. A handy way to present such differences visually are association and mosaic plots.
 
@@ -450,14 +586,21 @@ darwin_bigrams <- data.frame(darwin_words[1:length(darwin_words)-1],
   dplyr::arrange(-Frequency)
 ```
 
-```{r coll3, echo = F, message=FALSE, warning=FALSE}
+
+```{r coll3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 darwin_bigrams %>%
-  head(10) %>%
-  kable(caption = "Bigrams and their (relative) freqeuncy in Darwin's *Origin*") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Top 10 most frequent bigrams and their (relative) freqeuncy in Charles Darwin's Origin.")  %>%
+  flextable::border_outer()
 ```
-
-
 
 Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots which makes it harder to retrieve of collocates that are not adjacent- We will find out how to identify non-adjacent collocates in the next section.
 
@@ -465,7 +608,7 @@ Both N-grams and collocations are not only an important concept in language teac
 
 There are various techniques for identifying collocations. To identify collocations without having a pre-defined target term, we can use the `textstat_collocations` function from the `quanteda.textstats` package.
 
-However, before we can apply that function and start identifying collocations, we need to process teh data to which we want to apply this fucntion. In the present case, we will apply that function to the sentences in Charles darwin's *Origin* which we extract in the code chunk below.
+However, before we can apply that function and start identifying collocations, we need to process the data to which we want to apply this function. In the present case, we will apply that function to the sentences in Charles Darwin's *Origin* which we extract in the code chunk below.
 
 ```{r coll5}
 darwin_sentences <- darwin %>%
@@ -477,20 +620,28 @@ darwin_sentences <- darwin %>%
   stringr::str_squish()
 ```
 
-```{r coll6, echo = F, message=FALSE, warning=FALSE}
+
+```{r coll6b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 darwin_sentences %>%
-  head(10) %>%
-  kable(caption = "First 10 sentences in Darwin's *Origin*") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 sentences in Charles Darwin's Origin.")  %>%
+  flextable::border_outer()
 ```
 
-From the output shown above, we also see that splitting texts simply by full stops is not optimal as it produces some unwarranted artefacts like the "sentences" that consist of single characters (due to the name of the H.M.S. Beagle - the ship on which Darwin traveled when he explored the southern hemisphere). Fortunately, these errors do not really matter in the case of our example.
+
+From the output shown above, we also see that splitting texts simply by full stops is not optimal as it produces some unwarranted artifacts like the "sentences" that consist of single characters (due to the name of the H.M.S. Beagle - the ship on which Darwin traveled when he explored the southern hemisphere). Fortunately, these errors do not really matter in the case of our example.
 
 Now that we have split Darwin's *Origin* into sentences, we can tokenize these sentences and apply the `textstat_collocations` function which identifies collocations.
 
 ```{r coll7, warning=F, message=F}
-# load packages
-library(quanteda.textstats)
 # create a token object
 darwin_tokens <- tokens(darwin_sentences, remove_punct = TRUE) %>%
   tokens_remove(stopwords("english"))
@@ -498,14 +649,25 @@ darwin_tokens <- tokens(darwin_sentences, remove_punct = TRUE) %>%
 darwin_coll <- textstat_collocations(darwin_tokens, size = 2, min_count = 20)
 ```
 
-```{r coll8, echo = F}
+
+```{r coll8b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 darwin_coll %>%
+  as.data.frame() %>%
   head(15) %>%
-  kable(caption = "Collocations in Charles darwin's *Origin*") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Top 10 collocations in Charles Darwin's Origin.")  %>%
+  flextable::border_outer()
 ```
 
-The resulting table shows collocations in Darwin's *Origin* decending by collocation strength.
+
+
+The resulting table shows collocations in Darwin's *Origin* descending by collocation strength.
 
 ## Visualizing Collocation Networks{-}
 
@@ -514,17 +676,26 @@ Network graphs are a very useful and flexible tool for visualizing relationships
 In a first step, we generate a document-feature matrix based on the sentence sin Charles Darwin's *Origin*. A document-feature matrix shows how often elements (here these elements are the words that occur in the *Origin*) occur in a selection of documents (here these documents are the sentences in the *Origin*).
 
 
-```{r dfm1}
+```{r dfm1, message=F, warning=F}
 # create document-feature matrix
 darwin_dfm <- darwin_sentences %>% 
     quanteda::dfm(remove = stopwords('english'), remove_punct = TRUE) %>%
     quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE)
 ```
 
-```{r dfm2, echo = F, message=FALSE, warning=FALSE}
+```{r dfm1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 darwin_dfm[1:6, 1:6] %>%
-  kable(caption = "First lines of the document-feature matrix.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 6 rows and columns of the document-feature matrix.")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -549,10 +720,21 @@ redux_dfm <- dfm_select(darwin_dfm,
                         pattern = c(names(coocs)[1:20], "organism"))
 ```
 
-```{r dfm5, echo = F, message=FALSE, warning=FALSE}
+
+
+```{r dfm4b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 redux_dfm[1:6, 1:6] %>%
-  kable(caption = "First lines of the reduced feature co-occurrence matrix.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 6 rows and columns of the reduced feature co-occurrence matrix.")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -562,17 +744,26 @@ Now, we can transform the document-feature matrix into a feature-co-occurrence m
 tag_fcm <- fcm(redux_dfm)
 ```
 
-```{r dfm7, echo = F, message=FALSE, warning=FALSE}
+
+```{r dfm6b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 tag_fcm[1:6, 1:6] %>%
-  kable(caption = "Overview of the feature co-occurrence matrix.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 6 rows and columns of the feature co-occurrence matrix.")  %>%
+  flextable::border_outer()
 ```
+
 
 Using the feature-co-occurrence matrix, we can generate the network graph which shows the terms that collocate with the target term *organism* with the edges representing the co-occurrence frequency. To generate this network graph, we use the `textplot_network` function from the `quanteda.textplots` package.
 
 ```{r dfm8, message=F, warning=F}
-# load package
-library(quanteda.textplots)
 # generate network graph
 textplot_network(tag_fcm, 
                  min_freq = 1, 
@@ -600,16 +791,27 @@ In a next step, we use the `textstat_frequency` function from the `quanteda` pac
  
 ```{r key2, message=F, warning=F}
 # Calculate relative frequency by president
-freq_weight <- quanteda::textstat_frequency(dfm_authors, n = 10,
+freq_weight <- quanteda.textstats::textstat_frequency(dfm_authors, n = 10,
                                             groups = dfm_authors$Author)
 ```
 
-```{r key3, echo = F, message=F, warning=F}
+
+
+```{r key3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 freq_weight %>%
-  head(10) %>%
-  kable(caption = "Most common words in three texts.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Most common words across three texts.")  %>%
+  flextable::border_outer()
 ```
+
 
 Now, we can simply plot the most common words and most indicative non-stop words in the three texts.
  
@@ -677,29 +879,48 @@ colnames(Unknown)[1:2] <- c("Phoneme", "Frequency")
 classdata <- rbind(German, English, Spanish, Unknown) 
 ```
 
-```{r tc4, echo = F, message=FALSE, warning=FALSE}
+
+```{r tc3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 classdata %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 lines of the class data.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the class data.")  %>%
+  flextable::border_outer()
 ```
+
 
 Now, we group the data so that we see, how often each phoneme is used in each language.
 
 ```{r tc5, echo=T, eval = T, message=FALSE, warning=FALSE}
-# activate package
-library(tidyr)
 # convert into wide format
 classdw <- classdata %>%
   spread(Phoneme, Frequency) %>%
   replace(is.na(.), 0)
 ```
 
-```{r tc6, echo = F, message=FALSE, warning=FALSE}
+```{r tc6b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 classdw[, 1:6] %>%
-  kable(caption = "Overview of the class data in wide format.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Overview of the class data in wide format.")  %>%
+  flextable::border_outer()
 ```
+
+
 
 Now, we need to transform the data again, so that we have the frequency of each phoneme by language as the classifier will use "Language" as the dependent variable and the phoneme frequencies as predictors.
 
@@ -712,11 +933,23 @@ normalize <- function(x) { (x-min(x))/(max(x)-min(x))   }
  classdw[numvar] <- as.data.frame(lapply(classdw[numvar], normalize))
 ```
 
-```{r tc9, echo = F, message=FALSE, warning=FALSE}
+
+
+```{r tc9b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 classdw[, 1:6] %>%
-  kable(caption = "Overview of the probabilities.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Overview of the probabilities.")  %>%
+  flextable::border_outer()
 ```
+
 
 Before turning to the actual classification, we will use a cluster analysis to see which texts the unknown text is most similar with.
 
@@ -727,8 +960,6 @@ textm <- classdw[,2:ncol(classdw)]
 rownames(textm) <- classdw[,1]
 # create distance matrix
 distmtx <- dist(textm)
-# load package
-library(cluster)    
 # perform clustering
 clustertexts <- hclust(distmtx, method="ward.D")  
 # visualize cluster result
@@ -748,17 +979,27 @@ test <- classdw %>%
   filter(Language == "Unknown")
 ```
 
-```{r tc12, echo = F, message=FALSE, warning=FALSE}
+
+
+```{r tc12b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
 classdw[, 1:6] %>%
-  kable(caption = "Overview of the training set probabilities.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Overview of the training set probabilities.")  %>%
+  flextable::border_outer()
 ```
+
 
 Finally, we can apply our classifier to our data. The classifier we use is a k-nearest neighbor classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
 
 ```{r message=FALSE, warning=FALSE}
-# load package
-library(class)
 # set seed for reproducibility
 set.seed(12345)
 # apply k-nearest-neighbor (knn) classifier
@@ -774,13 +1015,9 @@ Based on the frequencies of phonemes in the unknown text, the knn-classifier pre
 
 # Entity Extraction
 
-Entity Extraction is a process during which textual elements which have characteristics that are common to proper nouns (locations, people, organizations, etc.) rather than other parts of speech, e.g. non-sentence initial capitalization, are extracted from texts. Retrieving entities is common in automated summarization and in Topic Modelling. Entity extraction can be achieved by simple feature extraction (e.g. extract all non-sentence initial capitalized words) or with the help of training sets. Using training sets, i.e. texts that are annotated for entities and non-entities, achieves better results when dealing with unknown data and data with inconsistent capitalization.
+Entity Extraction is a process during which textual elements which have characteristics that are common to proper nouns (locations, people, organizations, etc.) rather than other parts of speech, e.g. non-sentence initial capitalization, are extracted from texts. Retrieving entities is common in automated summarization and in Topic Modeling. Entity extraction can be achieved by simple feature extraction (e.g. extract all non-sentence initial capitalized words) or with the help of training sets. Using training sets, i.e. texts that are annotated for entities and non-entities, achieves better results when dealing with unknown data and data with inconsistent capitalization.
 
 ```{r ee1, message=FALSE, warning=FALSE}
-# load packages
-library(NLP)
-library(openNLP)
-library(openNLPdata)
 # process data
 orwell <- orwell %>%
   stringr::str_remove_all("Part 2,.*")
@@ -788,16 +1025,43 @@ orwell <- orwell %>%
 orwell = as.String(orwell)
 # define annotators
 # sentence annotator
-sent_annot = Maxent_Sent_Token_Annotator()
+sent_annot = openNLP::Maxent_Sent_Token_Annotator()
 # word annotator
-word_annot = Maxent_Word_Token_Annotator()
+word_annot = openNLP::Maxent_Word_Token_Annotator()
+```
+
+***
+
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE!</b><br>I had an issue with the following lines of code because R asked me for a package (openNLPmodels.en) that I could not install for the R version I am currently running (4.1). So I copied the package openNLPmodels.en from the library of an older version of R (4.0) into my current library. You can find the language packages for English, Spanish, German, Swedish, Dutch, Italian, Danish, and Polish under: https://slcladal.github.io/packages/ - simply download and install them to the library of your current R version.<br><br>The original versions of these packages can be downloaded from https://datacube.wu.ac.at/src/contrib/.</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<div class="question">` 
+
+</div>`
+
+***
+
+Once the `openNLPmodels.en` model is your R library, you can run the code chunk below.
+
+```{r ee1b, message=FALSE, warning=FALSE}
 # location annotator
-loc_annot = Maxent_Entity_Annotator(kind = "location") 
+loc_annot = openNLP::Maxent_Entity_Annotator(kind = "location") 
 # person annotator
-people_annot = Maxent_Entity_Annotator(kind = "person") 
+people_annot = openNLP::Maxent_Entity_Annotator(kind = "person") 
 # apply annotations
 orwellanno = NLP::annotate(orwell, list(sent_annot, word_annot, 
                                         loc_annot, people_annot))
+```
+
+
+Now that we have annotated the data, we can extract elements that have been identified as locations of persons.
+
+```{r ee2, message=FALSE, warning=FALSE}
 # extract features
 k <- sapply(orwellanno$features, `[[`, "kind")
 # extract locations
@@ -807,6 +1071,8 @@ orwellpeople = names(table(orwell[orwellanno[k == "person"]]))
 # inspect extract people
 orwellpeople
 ```
+
+The output shows that the extraction of people and locations from George Orwell's *1984* was successful as we can see various places and persons in the output. 
 
 # Citation & Session Info {-}
 
