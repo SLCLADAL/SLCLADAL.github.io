@@ -30,31 +30,95 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 This tutorial focuses on tree-based models and their implementation in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/tree.Rmd). For the more advanced, a recommendable resource for tree-based modeling is @prasad2006newer or @gries2021statistics. Very good papers dealing with many critical issues related to tree-based models are @strobl2009tree and @breiman2001modeling.
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
-```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
-# set options
-options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # suppress math annotation
-# install libraries
-install.packages(c("Boruta", "caret", "cowplot", "tidyverse", 
-                   "ggparty",  "Gmisc", "grid", "Hmisc", 
-                   "knitr", "party", "partykit", "randomForest", 
-                   "Rling", "pdp"))
+```{r prep1, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("Boruta")
+install.packages("tree")
+install.packages("caret")
+install.packages("cowplot")
+install.packages("tidyverse")
+install.packages("ggparty")
+install.packages("Gmisc")
+install.packages("grid")
+install.packages("Hmisc")
+install.packages("party")
+install.packages("partykit")
+install.packages("randomForest")
+#install.packages("Rling")
+install.packages("pdp")
+install.packages("tidyr")
+install.packages("RCurl")
+install.packages("vip")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
-Once you have installed R, R-Studio, and have also initiated the session by executing the code shown above, you are good to go.
 
-```{r prep2, echo=F, eval = T, message=FALSE, warning=FALSE}
+Now that we have installed the packages, we can activate them as shown below.
+
+
+```{r prep2, message=FALSE, warning=FALSE}
 # set options
-options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # suppress math annotation
-# load packages relevant for the Markdown document but not the stats and vis
+options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.print=10000)
+# load packages
+library(Boruta)
+library(tree)
+library(caret)
+library(cowplot)
+library(tidyverse)
+library(ggparty)
+library(Gmisc)
+library(grid)
+library(Hmisc)
+library(party)
+library(partykit)
+library(randomForest)
+#library(Rling)
+library(pdp)
+library(RCurl)
+library(tidyr)
+library(vip)
 library(flextable)
-library(knitr) 
-library(kableExtra) 
-library(DT)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
+
+***
+
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br><br>In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<div class="question">` 
+
+```{r cit4a, eval = F, message=F, warning=F}
+# install caret library
+source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
+install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
+                                      "http://cran.rstudio.com/", dependencies=TRUE))
+install.packages("dimRed", dependencies = TRUE)
+install.packages('caret', dependencies = TRUE)
+```
+
+```{r cit4b, echo = T}
+# activate caret library
+library(caret)
+```
+
+</div>`
+
+***
+
+Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
 
 # Tree-Structure Model Basics
 
@@ -95,13 +159,11 @@ Below is an example of a decision tree which shows what what response to expect 
 
 
 ```{r cit1a, echo = F, message=FALSE, warning=FALSE}
-# example of a simple decision tree
-library(tree)
-library(grid)
-# set options: do not convert strings
-options(stringsAsFactors = T)  
 # load data
 citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t")
+# convert character strings to factors
+citdata <- citdata %>%
+  dplyr::mutate_if(is.character, factor)
 # set.seed
 set.seed(111)        
 dtree <- tree::tree(LikeUser ~ Age + Gender + Status, data = citdata, split = "gini")
@@ -120,60 +182,26 @@ How to prune and evaluate the accuracy of decision trees is not shown here. If y
 
 Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. 
 
-In a first step, we initialize our R session by setting options and activating the necessary packages.
-
-```{r cit3, message=F, warning=F}
-# activate libraries
-library(caret)
-library(partykit)              
-library(tidyverse)  
-library(grid)
-library(Gmisc) 
-library(cowplot)       
-library(randomForest)
-library(party)
-library(Hmisc)
-library(Boruta) 
-library(RCurl)
-# set options
-options(stringsAsFactors = F)
-options(scipen = 999)
-options(max.print=10000)
-```
-
-*** 
-
->NOTE: In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.
-
-```{r cit4a, eval = F, message=F, warning=F}
-# install caret library
-source("https://bioconductor.org/biocLite.R"); biocLite(); library(Biobase)
-install.packages("Biobase", repos=c("http://rstudio.org/_packages", "http://cran.rstudio.com", 
-                                      "http://cran.rstudio.com/", dependencies=TRUE))
-install.packages("dimRed", dependencies = TRUE)
-install.packages('caret', dependencies = TRUE)
-```
-
-```{r cit4b, echo = T}
-# activate caret library
-library(caret)
-```
-
-***
-
-We can now load and inspect the data that we will use in this tutorial.
+In a first step, we load and inspect the data that we will use in this tutorial.
 
 ```{r cit4c,  message=FALSE, warning=FALSE}
 # load data
-citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
+citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t")
 ```
-```{r cit4d,  message=FALSE, warning=FALSE}
+
+```{r cit4d,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 citdata %>%
-  head(20) %>%
-  kable(caption = "First 20 rows of citdata.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the citdata data")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -181,11 +209,25 @@ As tree-based models require either numeric or factorized data, we factorize the
 
 ```{r cit4f, echo=T, message=FALSE, warning=FALSE}
 # factorize variables (cit require factors instead of character vectors)
-fcts <- c("Age", "Gender", "Status", "LikeUser")
-citdata[fcts] <- lapply(citdata[fcts], factor)
-# inspect data
-head(citdata, 10)
+citdata <- citdata %>%
+  dplyr::mutate_if(is.character, factor)
 ```
+
+```{r  cit4g, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+citdata %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the factorized citdata data")  %>%
+  flextable::border_outer()
+```
+
 
 The data now consists of factors which two levels each. 
 
@@ -356,7 +398,7 @@ We would continue to calculate the gini values and always split at the lowest gi
 
 In addition to plotting the decision tree, we can also check its accuracy. To do so, we predict the use of *like* based on the decision tree and compare them to the observed uses of *like*. Then we use the `confusionMatrix` function from the `caret` package to get an overview of the accuracy statistics.
 
-```{r cit24, echo=T, message=FALSE, warning=FALSE}
+```{r cit24, eval = F, echo=T, message=FALSE, warning=FALSE}
 dtreeprediction <- as.factor(ifelse(predict(dtree)[,2] > .5, "yes", "no"))
 confusionMatrix(dtreeprediction, citdata$LikeUser)
 ```
@@ -371,17 +413,46 @@ While it is rather straight forward to calculate the Gini values for categorical
 Age <- c(15, 37, 63, 42, 22, 27)
 LikeUser <- c("yes", "no", "no", "yes", "yes", "yes")
 citdata2 <- data.frame(Age, LikeUser)
-# inspect data
-citdata2
 ```
+
+```{r tb1, echo = F, warning=F, message=F}
+# inspect data
+citdata2 %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the citdata2 data.")  %>%
+  flextable::border_outer()
+```
+
+
 
 In a first step, we order the numeric variable so that we arrive at the following table.
 
 ```{r citn2, echo=F, message=FALSE, warning=FALSE}
 citdata2 <- citdata2 %>%
   arrange(Age)
+```
+
+
+```{r tb2, echo = F, warning=F, message=F}
 # inspect data
-citdata2
+citdata2 %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the citdata2 data arranged by age.")  %>%
+  flextable::border_outer()
 ```
 
 Next, we calculate the means for each level of "Age".
@@ -390,8 +461,21 @@ Next, we calculate the means for each level of "Age".
 Age <- c(15, ((15+22)/2), 22, ((22+27)/2), 27, ((27+37)/2), 37, ((37+42)/2), 42, ((42+63)/2), 63)
 LikeUser <- c("yes", "", "yes", "", "yes", "", "no", "", "yes", "", "no")
 citdata3 <- data.frame(Age, LikeUser)
+```
+
+```{r citn3b, echo = F, warning=F, message=F}
 # inspect data
-citdata3
+citdata3 %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the citdata3 data arranged by age.")  %>%
+  flextable::border_outer()
 ```
 
 Now, we calculate the Gini values for each average level of age. How this is done is shown below for the first split.
@@ -458,8 +542,21 @@ We then have to calculate the gini values for all possible age splits which yiel
 AgeSplit <- c(((15+22)/2), ((22+27)/2), ((27+37)/2), ((37+42)/2), ((42+63)/2))
 Gini <- c(0.4, 0.5,0.444, 0.41, 0.267)
 citdata3 <- data.frame(AgeSplit, Gini)
+```
+
+```{r tb3, echo = F, warning=F, message=F}
 # inspect data
-citdata3
+citdata3 %>%
+  as.data.frame() %>%
+#  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the citdata3 data with Gini coefficients.")  %>%
+  flextable::border_outer()
 ```
 
 The split at 52.5 years of age has the lowest Gini value. Accordingly, we would split the data between speakers who are younger than 52.5 and speakers who are older than 52.5 years of age. The lowest Gini value for any age split would also be the Gini value that would be compared to other variables. 
@@ -477,13 +574,13 @@ When dealing with categorical variables with more than two levels, the situation
 Conditional Inference Trees (CITs) are much better at determining the *true* effect of a predictor, i.e. the effect of a predictor if all other effects are simultaneously considered. In contrast to CARTs, CITs use p-values to determine splits in the data. Below is a conditional inference tree which shows how and what factors contribute to the use of discourse *like*. In conditional inference trees predictors are only included if the predictor is significant (i.e. if these predictors are necessary). 
 
 ```{r cit1b, message=FALSE, warning=FALSE}
-library(partykit)              # activate partykit library
-library(tidyverse)                 # activate dplyr library
-options(stringsAsFactors = T)  # set options: do not convert strings
 citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t")
 set.seed(111)        # set.seed
 # apply bonferroni correction (1 minus alpha multiplied by n of predictors)
 control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
+# convert character strings to factors
+citdata <- citdata %>%
+  dplyr::mutate_if(is.character, factor)
 # create initial conditional inference tree model
 citd.ctree <- partykit::ctree(LikeUser ~ Age + Gender + Status,
                     data = citdata)
@@ -498,9 +595,7 @@ The easiest and most common way to visualize CITs is to simply use the `plot` fu
 To generate this customized CIT, we activate the `ggparty` package and extract the significant p-values from the CIT object. We then plot the CIT and define the nodes, edges, and text elements as shown below. 
 
 
-```{r}
-# activate package
-library(ggparty)
+```{r pretty, warning=F, message=F}
 # extract p-values
 pvals <- unlist(nodeapply(citd.ctree, ids = nodeids(citd.ctree), function(n) info_node(n)$p.value))
 pvals <- pvals[pvals <.05]
@@ -577,7 +672,9 @@ An extension which remedies this problem is to use a so-called ensemble method w
 Random Forests (RFs) are an extension of Conditional Inference Trees [@breiman2001random]. Like Conditional Inference Trees, Random Forests represent a multivariate, non-parametric partitioning method that is particularly useful when dealing with relatively small sample sizes and many predictors (including interactions) and they are insensitive to multicollinearity (if two predictors strongly correlate with the dependent variable AND are highly correlated or collinear, RFs will report both variables as highly important - the ordering in which they were included into the model is irrelevant). The latter point is a real advantage over regression models in particular. Also, RFs outperform CITs in that they are substantially less prone to overfitting and they perform much better when applied to new data. However, random forests have several issues:
 
 * RFs only show variable importance but not if the variable is positively or negatively correlated with the dependent variable;
+
 * RFs do not report if a variable is important as a main effect or as part of an interactions 
+
 * RFs do not indicate in which significant interactions a variable is involved.
 
 Therefore, Random Forest analyses are ideal for classification, imputing missing values, and - though to a lesser degree - as a variable selection procedure but they do not lend themselves for drawing inferences about the relationships of predictors and dependent variables. 
@@ -588,22 +685,29 @@ Random Forests do not work on one-and-the-same data set (as CITs do) but in Rand
 
 Imagine, we are dealing with a very small data set to which we want to apply a Random Forest Analysis. The original data set is displayed below. 
 
-```{r rf1, echo=F, message=FALSE, warning=FALSE}
-citdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/treedata.txt", header = T, sep = "\t")
-citdata <- head(citdata)
-citdata$ID <- 1:nrow(citdata)
+```{r tb4, echo = F, warning=F, message=F}
+citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", 
+                      header = T, sep = "\t")
 citdata <- citdata %>%
-  dplyr::select(ID, Age, Gender, Status, LikeUser)
-```
-
-```{r rf1b,  message=FALSE, warning=FALSE}
+  dplyr::mutate(Id = 1:nrow(.)) %>%
+  dplyr::select(Id, Age, Gender, Status, LikeUser)
 # inspect data
 citdata %>%
-  head(20) %>%
-  kable(caption = "First 20 rows of citdata.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  as.data.frame() %>%
+#  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the citdata data.")  %>%
+  flextable::border_outer()
 ```
+
+
+
+
 
 
 We now draw a sample from this data set and receive the following data set.
@@ -631,33 +735,53 @@ This section shows how a Random Forest Analysis can be implemented in R. Ina fir
 
 ```{r rf3, echo=T, message=FALSE, warning=FALSE}
 # load random forest data
-rfdata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/rfdata.txt", header = T, sep = "\t")
+rfdata <- read.delim("https://slcladal.github.io/data/mblrdata.txt", header = T, sep = "\t")
 ```
 
-```{r rf3b,  message=FALSE, warning=FALSE}
+```{r rf3b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 rfdata %>%
-  head(20) %>%
-  kable(caption = "First 20 rows of rfdata.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the rfdata data.")  %>%
+  flextable::border_outer()
 ```
 
-The data consists of four categorical variables (`Gender`, `Age`, `ConversationType`, and `SUFLike`). Our dependent variable is `SUFLike` which stands for speech-unit final *like* (a pragmatic marker that is common in Irish English and is used as in *A wee girl of her age, like*). While Age and Gender are pretty straight forward what they are called, *ConversationType* encodes whether a conversation has taken place between interlocutors of the same or of different genders.
+The data consists of four categorical variables (`Gender`, `Age`, `ConversationType`, and `SUFlike`). Our dependent variable is `SUFlike` which stands for speech-unit final *like* (a pragmatic marker that is common in Irish English and is used as in *A wee girl of her age, like*). While Age and Gender are pretty straight forward what they are called, *ConversationType* encodes whether a conversation has taken place between interlocutors of the same or of different genders.
 
 Before going any further, we need to factorize the variables as tree-based models require factors instead of character variables (but they can, of course, handle numeric and ordinal variables). In addition, we will check if the data contains missing values (NAs; NA stands for *not available*).
 
-```{r rf4a, echo=T, message=FALSE, warning=FALSE}
+```{r rf4a, message=FALSE, warning=FALSE}
 # factorize variables (rf require factors instead of character vectors)
-fcts <- c("Gender", "Age", "ConversationType", "Priming", "SUFLike")
-rfdata[fcts] <- lapply(rfdata[fcts], factor)
+rfdata <- rfdata %>%
+  dplyr::mutate_if(is.character, factor) %>%
+  dplyr::select(-ID)
+```
+
+```{r rf4b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
-head(rfdata, 7)
+rfdata %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the factorized rfdata data.")  %>%
+  flextable::border_outer()
 ```
 
 We now check if the data contains missing values and remove those (if necessary).
 
-```{r rf4b, echo=T, message=FALSE, warning=FALSE}
+```{r rf4c, echo=T, message=FALSE, warning=FALSE}
 # check for NAs
 natest <- rfdata %>%
   na.omit()
@@ -668,7 +792,7 @@ In our case, the data does not contain missing values. Random Forests offer a ve
 
 ```{r rf5, echo=T, eval = F, message=FALSE, warning=FALSE}
 # replacing NAs with estimates
-data.imputed <- rfImpute(SUFLike ~ ., data = rfdata, iter=6)
+data.imputed <- rfImpute(SUFlike ~ ., data = rfdata, iter=6)
 ```
 
 The argument `iter` refers to the number of iterations to run. According to [@breiman2001random], 4 to 6 iterations is usually good enough. With this data set (if it had NAs) and when we were to execute the code, the resulting OOB-error rates lie somewhere around 17 and 18 percent. When we were to set `iter` to 20, we get values a little better and a little worse, so doing more iterations doesn't improve the situation.
@@ -681,11 +805,11 @@ We will now generate a first random forest object and inspect its model fit. As 
 # set.seed
 set.seed(2019120204)
 # create initial model
-rfmodel1 <- cforest(SUFLike ~ .,  data = rfdata, 
+rfmodel1 <- cforest(SUFlike ~ .,  data = rfdata, 
                     controls = cforest_unbiased(ntree = 50, mtry = 3))
 # evaluate random forest (model diagnostics)
-rfmodel1_pred <- unlist(treeresponse(rfmodel1))[c(FALSE,TRUE)]
-somers2(rfmodel1_pred, as.numeric(rfdata$SUFLike) - 1)
+rfmodel1_pred <- unlist(party::treeresponse(rfmodel1))#[c(FALSE,TRUE)]
+somers2(rfmodel1_pred, as.numeric(rfdata$SUFlike))
 ```
 
 The model parameters are excellent: remember that if the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204].
@@ -712,50 +836,26 @@ The plot shows that Age is the most important predictor and that Priming is not 
 
 We will now use an alternative way to calculate RFs which allows us to use different diagnostics and pruning techniques by using the `randomForest` rather than the `cforest` function. 
 
-A few words on the parameters of the `randomForest` function: if the thing we're trying to predict is a numeric variable, the `randomForest` function will set  `mtry` (the number of variables  considered at each step)to the total number of variables divided by 3 (rounded down), or to 1 if the division results in a value less than 1.  If the thing we're trying to predict is a "factor" (i.e. either "yes/no"  or "ranked"), then `randomForest()` will set `mtry` to  the square root of the number of variables (rounded down to the next  integer value).Again, we start by setting a seed  to store random numbers and thus make results reproducible.
+A few words on the parameters of the `randomForest` function: if the thing we're trying to predict is a numeric variable, the `randomForest` function will set  `mtry` (the number of variables  considered at each step) to the total number of variables divided by 3 (rounded down), or to 1 if the division results in a value less than 1.  If the thing we're trying to predict is a "factor" (i.e. either "yes/no"  or "ranked"), then `randomForest()` will set `mtry` to  the square root of the number of variables (rounded down to the next  integer value).Again, we start by setting a seed  to store random numbers and thus make results reproducible.
 
 ```{r rf9, message=FALSE, warning=FALSE}
 # set.seed
 set.seed(2019120205)
-rfmodel2 <- randomForest(SUFLike ~ ., data=rfdata, proximity=TRUE)
+rfmodel2 <- randomForest::randomForest(SUFlike ~ ., 
+                                       data=rfdata, 
+                                       mtry = 2,
+                                       proximity=TRUE)
 # inspect model
 rfmodel2 
 ```
 
-The output tells us that the OOB error rate is 17.5 percent and produces a confusion matrix. We can now check the development of the OOB error rate to see if it would suffice to use fewer trees (which would be quicker and save computing time).
-
-```{r rf10, message=FALSE, warning=FALSE}
-# lower number of trees makes the computation much quicker
-oob.error.data <- data.frame(
-  Trees=rep(1:nrow(rfmodel2$err.rate), times=3),
-  Type=rep(c("OOB", "no", "yes"), each=nrow(rfmodel2$err.rate)),
-  Error=c(rfmodel2$err.rate[,"OOB"],
-          rfmodel2$err.rate[,"no"],
-          rfmodel2$err.rate[,"yes"]))
-# plot error rates
-ggplot(data=oob.error.data, aes(x=Trees, y=Error)) +
-  geom_line(aes(color=Type)) 
-```
-
-The output shows that the error rate is extremely stable and that we only need very few trees as the prediction accuracy does not improve if we grow more than 30 trees.
-
-In addition to the number of trees, we can check if the model improves if we change the number of variables that are considered at each step (`mtry`).
-
-```{r rf11, message=FALSE, warning=FALSE}
-# check what mtry is optimal
-tuneRF(rfdata[, !colnames(rfdata)== "SUFLike"],
-       rfdata[, colnames(rfdata)== "SUFLike"],
-       stepFactor = 2, # 2 has the lowest value to be optimal
-       plot = T, ntreeTry = 50, trace = T, improve = .05)
-```
-
-The error rate is very similar across different values of `mtry` but the lowest values is reported if all 4 variables are considered at once. We can now create a pruned or optimized RF based on the previous recommendations (ntree = 30, mtry = 4). Again, we begin by setting a seed.
+The output tells us that the model explains less than 15 percent of the variance. It is recommendable to check if changing parameters causes and increase in the amount of variance that is explained by a model (which is desirable). In this case, we can try different values for `mtry` and for `ntree` as shown below and then compare the performance of the random forest models by inspecting the amount of variance that they explain. Again, we begin by setting a seed and then continue by specifying the random forest model.
 
 ```{r rf12, message=FALSE, warning=FALSE}
 # set.seed (to store random numbers and thus make results reproducible)
 set.seed(2019120206)
 # create a new model with fewer trees and that takes 2 variables at a time
-rfmodel3 <- randomForest(SUFLike ~ ., data=rfdata, ntree=30, mtry = 4, proximity=TRUE)
+rfmodel3 <- randomForest(SUFlike ~ ., data=rfdata, ntree=30, mtry = 4, proximity=TRUE)
 # inspect model
 rfmodel3
 ```
@@ -764,9 +864,10 @@ Despite optimization, the results have not changed but it may be very useful for
 
 ```{r rf13, message=FALSE, warning=FALSE}
 # save what the model predicted in a new variable
-rfdata$Prediction <- predict(rfmodel3, rfdata) 
+rfdata$Probability <- predict(rfmodel3, rfdata)
+rfdata$Prediction <- ifelse(rfdata$Probability >=.5, 1, 0)
 # create confusion matrix to check accuracy
-confusionMatrix(rfdata$Prediction, rfdata$SUFLike)  
+confusionMatrix(as.factor(rfdata$Prediction), as.factor(rfdata$SUFlike))  
 ```
 
 The RF performs significantly better than a no-information base-line model but the base-line model already predicts 78.18 percent of cases correctly (compared to the RF with a prediction accuracy of 82.5 percent). 
@@ -781,8 +882,6 @@ varImpPlot(rfmodel3, main = "", pch = 20)
 Here is an alternative way of plotting variable importance using the `vip` function from the `vip` package.
 
 ```{r rf16, message=FALSE, warning=FALSE}
-# load package
-library(vip)
 # generate vip plot
 vip::vip(rfmodel3, geom = "point", horizontal = FALSE)
 ```
@@ -790,8 +889,6 @@ vip::vip(rfmodel3, geom = "point", horizontal = FALSE)
 Using the `vip` package, you can also generate variable importance barplots.
 
 ```{r rf17, message=FALSE, warning=FALSE}
-# load package
-library(vip)
 # generate vip plot
 vip::vip(rfmodel3, horizontal = FALSE)
 ```
@@ -799,9 +896,6 @@ vip::vip(rfmodel3, horizontal = FALSE)
 A second type of visualization that can provide insights in the `partial` function from the `pdp` package which shows the effects of individual predictors - but remember that this still does not provide information about the way that the predictor interacts with other predictors.
 
 ```{r rf18, message=FALSE, warning=FALSE}
-# load pdp package
-library(pdp)
-library(ggplot2)
 # extract importance of individual variables
 rfmodel3 %>%  # the %>% operator is read as "and then"
   partial(pred.var = "Age") %>%
@@ -849,16 +943,23 @@ We begin by loading and inspecting the data.
 
 ```{r bo1, message=FALSE, warning=FALSE}
 # load data
-borutadata <- read.delim("https://raw.githubusercontent.com/MartinSchweinberger/coedlss2019materials/master/datatables/borutadata.txt", header = T, sep = "\t")
+borutadata <- read.delim("https://slcladal.github.io/data/ampaus05_statz.txt", header = T, sep = "\t")
 ```
 
-```{r bo1b,  message=FALSE, warning=FALSE}
+
+```{r bo1b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 borutadata %>%
-  head(20) %>%
-  kable(caption = "First 20 rows of borutadata.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the borutadata data.")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -867,10 +968,25 @@ As the data contains non-factorized character variables, we convert those into f
 ```{r bo2, message=FALSE, warning=FALSE}
 # factorize variables (boruta - like rf - require factors instead of character vectors)
 borutadata <- borutadata %>%
+  dplyr::filter(complete.cases(.)) %>%
   dplyr::mutate_if(is.character, factor)
-# inspect data
-head(borutadata, 10)
 ```
+
+```{r bo2b,  echo = F, message=FALSE, warning=FALSE}
+# inspect data
+borutadata %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the factorized borutadata data.")  %>%
+  flextable::border_outer()
+```
+
 
 We can now create our initial Boruta model and set a seed for reproducibility.
 
@@ -913,14 +1029,11 @@ getConfirmedFormula(boruta2)
 Only adjective frequency and adjective type are confirmed as being important while all other variables are considered tentative. However, no more variables need to be removed as all remaining variables are not considered unimportant. In a last step, we visualize the results of the Boruta analysis.
 
 ```{r bo7, message=FALSE, warning=FALSE}
-library(ggplot2)
-library(tidyr)
-library(stringr)
 borutadf <- as.data.frame(boruta2$ImpHistory) %>%
-  gather(Variable, Importance, Adjective:shadowMin) %>%
-  mutate(Type = ifelse(str_detect(Variable, "shadow"), "Control", "Predictor")) %>%
-  mutate(Type = factor(Type),
-         Variable = factor(Variable))
+  tidyr::gather(Variable, Importance, Adjective:shadowMin) %>%
+  dplyr::mutate(Type = ifelse(str_detect(Variable, "shadow"), "Control", "Predictor")) %>%
+  dplyr::mutate(Type = factor(Type),
+                Variable = factor(Variable))
 ggplot(borutadf, aes(x = reorder(Variable, Importance, mean), y = Importance, fill = Type)) + 
   geom_boxplot() +
   geom_vline(xintercept=3.5, linetype="dashed", color = "black") +
@@ -939,7 +1052,7 @@ Of the remaining variables, adjective frequency and adjective type have the stro
 Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Tree-Based Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/tree.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
-@manual{schweinberger2021tree,
+@manual{schweinberger`r format(Sys.time(), '%Y')`tree,
   author = {Schweinberger, Martin},
   title = {Tree-Based Models in R},
   note = {https://slcladal.github.io/tree.html},
