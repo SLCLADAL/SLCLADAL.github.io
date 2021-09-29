@@ -34,37 +34,71 @@ There are various options to generate interactive data visualizations in R. The 
 
 ## Preparation and session set up{-}
 
-This tutorial is based on [R](@rcran). If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+This tutorial is based on [R](@rcran). If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("googleVis")
+install.packages("tidyverse")
+install.packages("DT")
+install.packages("flextable")
+install.packages("ggplot2")
+install.packages("gganimate")
+install.packages("gapminder")
+install.packages("maptools")
+install.packages("plotly")
+install.packages("leaflet")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
 # set options
-options(stringsAsFactors = F)         # no automatic data transformation
-options("scipen" = 100, "digits" = 4) # suppress math annotation
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
 # Warning: the following option adaptation requires re-setting during session outro!
-op <- options(gvis.plot.tag='chart')  # set gViz options 
-# install libraries
-install.packages(c("googleVis", "tidyverse", "DT"))
-```
-
-```{r prep2, echo=F, eval = T, message=FALSE, warning=FALSE}
 op <- options(gvis.plot.tag='chart')  # set gViz options
+# activate packages
+library(googleVis)
+library(tidyverse)
+library(DT)
+library(flextable)
+library(ggplot2)
+library(gganimate)
+library(gapminder)
+library(maptools)
+library(plotly)
+library(leaflet)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
-Once you have installed R  and initiated the session by executing the code shown above, you are good to go.
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
 
 ## Getting Started{-}
 
 To get started with motion charts, we load the `googleVis` package for the visualizations, the `tidyverse` package for data processing, and we load a data set called `coocdata`. The `coocdata` contains information about how often adjectives were amplified by a degree adverb across time (see below). 
 
 ```{r mc1, message=FALSE, warning=FALSE}
-# load packages
-library(googleVis)
-library(tidyverse)
-library(DT)
 # load data
-coocdata <- read.delim("https://slcladal.github.io/data/collex_decade.txt", sep = "\t")
+coocdata  <- base::readRDS(url("https://slcladal.github.io/data/coo.rda", "rb"))
+```
+
+```{r mc2, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-head(coocdata)
+coocdata %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of teh coocdata data.")  %>%
+  flextable::border_outer()
 ```
 
 The `coocdata` is rather complex and requires some processing. First, we rename the columns to render their naming more meaningful. In this context we rename the *OBS* column *Frequency* and the *Amp* column *Amplifier*. As we are only interested if an adjective was amplified by *very*, we collapse all amplifiers that are not *very* in a bin category called *other*. We then calculate the frequency of the adjective within each time period and also the frequency with which each adjective is amplified by either *very* or *other* amplifiers. Then, we calculate the percentage with which each adjective is amplified by *very*.
@@ -88,6 +122,21 @@ coocs <- coocdata %>%
          Adjective = factor(Adjective))
 # inspect data
 head(coocs, 10)
+```
+
+```{r mc3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+coocs %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of teh coocs data.")  %>%
+  flextable::border_outer()
 ```
 
 We now have a data set that we can use to generate interactive visualization.
@@ -166,14 +215,23 @@ print(SC, 'chart')
 Animations or GIFs (Graphics Interchange Format) can be generated using the `gganimate` package written by  Thomas Lin Pedersen and David Robinson. The `gganimate` package allows to track changes over time while simultaneously displaying several variables in one visualization. As we will create animations using the `ggplot2` package, we also load that package from the library. In this case, we use the gapminder data set which comes with the `gapminder` package and which contains information about different countries, such as the average life expectancy, the population, or the gross domestic product (GDP), across time.
 
 ```{r an1, message=F, warning=F}
-# load packages
-library(ggplot2)
-library(gganimate)
-library(gapminder)
 # set options
 theme_set(theme_bw())
+```
+
+```{r an1b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-head(gapminder)
+gapminder %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the gapminder data.")  %>%
+  flextable::border_outer()
 ```
 
 After loading the data, we create static plot so that we can check what the data looks like at one point in time.
@@ -207,7 +265,6 @@ gif
 Another way to generate animations is to use the `plotly` package as shown below. While I personally do not find the visualizations created by the `plot_ly` function as visually appealing, it has the advantage that it allows mouse-over effects.
 
 ```{r an5, results='asis', message=F, warning=F}
-library(plotly)
 fig <- gapminder %>%
   plot_ly(
     x = ~gdpPercap, 
@@ -235,8 +292,6 @@ You can also use the `leaflet` package to create interactive maps. In this examp
 
 
 ```{r int1, message=F, warning=F}
-# load package
-library(leaflet)
 # generate visulization
 m <- leaflet() %>% 
   setView(lng = 153.05, lat = -27.45, zoom = 12)
@@ -249,8 +304,6 @@ Another option is to display information about different countries. In this case
 We start by loading the required package from the library, adding population density to the data, and removing data points without meaningful information (e.g. we set values like Inf to NA).
 
 ```{r int2, message=F, warning=F}
-# load package
-library(maptools)
 # load data
 data(wrld_simpl)
 # calculate population density and add it to the data 
