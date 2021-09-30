@@ -1,0 +1,837 @@
+---
+title: "Processing and Analyzing Eye-Tracking Data in R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: cosmo
+    highlight: tango
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+```{r acqva1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/acqva.jpg")
+```
+
+# Introduction{-}
+
+This workshop introduces data processing and analysis for eye-tracking data in  R. The RMarkdown document for the tutorial can be downloaded [here](https://slcladal.github.io/eyews.Rmd) and the bib library [here](https://slcladal.github.io/bibliography.bib). You can also download a shortened version of the RMarkdown document with only contains the processing chain [here](https://slcladal.github.io/etpro.Rmd) ([here](https://slcladal.github.io/etpro.html) is the link to the html file of the document). You will find very helpful and detailed tutorials on how to perform analyses and visualize eye-tracking data using `eyetrackeR` [here](http://www.eyetracking-r.com/). 
+
+
+We will go through the following steps:
+
+* preparing the analysis
+* loading and combining xls spreadsheets
+* determining image boundaries 
+* loading the master file
+* processing the data
+  + defining AOIs 
+  + on- as well as off-target gazes
+  + removing imprecisions
+  + time binning
+  + cleaning
+* visualizing the data
+* analyzing the data (e.g., using a mixed-effects binomial logistic regression)
+* using the `eyetrackeR` package for data visualization and analysis
+
+We will not address issues relating to adequate sample size and power. If you are interested in that, please check out [this tutorial](https://slcladal.github.io/pwr.html) on the [Language Technology and Data Analysis Laboratory website](https://slcladal.github.io/index.html).
+
+## Preparation
+
+This tutorial is based on R. If you have not installed R or RStudio or if you are new to either of them, you will find an introduction to and more information how to use R and RStudio [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain packages into an R library on our computer so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r install, eval = F, warning=F, message=F}
+install.packages(c("tidyverse", "eyetrackingR", "data.table", "itsadug", "sjPlot", "lme4", "multcomp")
+```
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+Once you have installed the packages, please load them and set useful options as shown below.
+
+```{r setup, warning=F, message=F}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 10) # suppress math annotation
+# load packages
+library(tidyverse)
+library(eyetrackingR)
+library(data.table)
+library(itsadug)
+library(lme4)
+library(sjPlot)
+library(multcomp)
+```
+
+```{r setup2, echo=F, message=FALSE, warning=FALSE}
+# load packages for website
+library(knitr) 
+library(kableExtra) 
+library(DT)
+```
+
+Now that we have prepared out session, we can start with the data processing.
+
+# Data processing
+
+During data processing, we load and prepare the data for further analysis and visualization.
+
+## Define paths{-}
+
+In a first step, we define the paths to the spreadsheets (datapath) and to the masterfile (csv file with information about the experiment). In my case, I have the spreadsheets in a folder called `uploads` which is a folder called `data_exp_50674-v2` in my `data` folder. The masterfile is also in the folder called `data_exp_50674-v2` in my `data` folder but it is not in my `uploads` folder.
+
+```{r}
+datapath <- here::here("data/data_exp_50674-v2", "uploads")
+masterpath <- here::here("data/data_exp_50674-v2", "data_exp_50674-v2_task-etfm.csv")
+```
+
+Now that we have defined the paths, we continue.
+
+## Load data{-}
+
+In a first step we want to load the data which in our case consists of several spreadsheets (files ending in `xlsx`). 
+
+We begin by extracting a list of these xlsx files (the paths where these files are located on your computer).
+
+```{r list, warning=F, message=F}
+fls <- list.files(datapath, full.names = T)
+fls <- fls[2:length(fls)]
+# inspect files
+head(fls)
+```
+
+Next, we can use this list (the paths) to load the files. In addition, we will also create two new columns: a column called `idname` which contains the path to the file and a column called `trial` which tells us what trial the data is from.
+
+
+```{r load, warning=F, message=F}
+datls <- lapply(fls, function(x){
+  name <- x
+  x <- readxl::read_xlsx(x) %>%
+    # create id column (contains path)
+    dplyr::mutate(idname = name) %>%
+    # code trial
+    dplyr::mutate(trial = stringr::str_remove_all(name, ".*collection-"))  %>%
+    dplyr::mutate(trial = stringr::str_remove_all(trial, "-.*"))
+  })
+# inspect data
+head(datls[1])
+```
+
+We can now merge all the spreadsheets into one file and also add a column called `id` that gives each row a unique identifier. Furthermore, we convert the `participant_id` and the `trial` column into factors.
+
+
+```{r merge, message=F, warning=F}
+edat <- data.table::rbindlist(datls) %>%
+  # add id
+  dplyr::mutate(id = 1:nrow(.)) %>%
+  # convert participant_id and trial into factors
+  dplyr::mutate(participant_id = factor(participant_id),
+                trial = factor(trial))
+```
+
+```{r loadb, echo = F, warning=F, message=F}
+edat %>%
+  head(6) %>%
+  kable(caption = "First 6 rows of edat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Determine image boundaries{-}
+
+### Non-normalized{-}
+
+In a next step, we define image boundaries. In our example, we are dealing with two images: one to the right and one to the left. We now use the `zone_y`, `zone_x`, `zone_height`, and `zone_width` columns to calculate the edges of the images.
+
+* top (upper border) = 246 (zone_y)
+
+* bottom (lower border) = 246 + 329 (zone_y + zone_height)
+
+* left (left border) = 774 (zone_x)
+
+* right (right border) = 774 + 438 (zone_x + zone_width)
+
+```{r bound1, warning=F, message=F}
+ibs <- edat %>%
+  dplyr::select(participant_id, trial, zone_name, zone_x, zone_y,zone_width, zone_height) %>%
+  # get rid of superfluous rows
+  dplyr::filter(zone_name == "Right"|zone_name == "Left") %>%
+  na.omit() %>%
+  # define image boundaries
+  dplyr::mutate(top = zone_y,
+                bottom = zone_y + zone_width,
+                left = zone_x,
+                right = zone_x + zone_width) %>%
+  # remove superfluous columns
+  dplyr::select(-zone_x, -zone_y, -zone_width, -zone_height)
+```
+
+
+```{r bound1b, echo = F, warning=F, message=F}
+ibs %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of ibs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+### Normalized{-}
+
+We can also use the normalized values. 
+
+***
+>If you do this, then it is very crucial, that you use **x_pred_normalised** and 	**y_pred_normalised** and **not** *x_pred* and	*y_pred* in your analysis!
+
+***
+
+In a next step, we define image boundaries. In our example, we are dealing with two images: one to the right and one to the left. We now use the `zone_y_normalised`, `zone_x_normalised`, `zone_height_normalised`, and `zone_width_normalised` columns to calculate the edges of the images.
+
+* top (upper border) = 246 (zone_y_normalised)
+
+* bottom (lower border) = 246 + 329 (zone_y_normalised + zone_height_normalised)
+
+* left (left border) = 774 (zone_x_normalised)
+
+* right (right border) = 774 + 438 (zone_x_normalised + zone_width_normalised)
+
+```{r bound1c, warning=F, message=F}
+ibs_norm <- edat %>%
+  dplyr::select(participant_id, trial, zone_name, zone_x_normalised, 
+                zone_y_normalised, zone_width_normalised, zone_height_normalised) %>%
+  # get rid of superfluous rows
+  dplyr::filter(zone_name == "Right"|zone_name == "Left") %>%
+  na.omit() %>%
+  # define image boundaries
+  dplyr::mutate(top = zone_y_normalised,
+                bottom = zone_y_normalised + zone_width_normalised,
+                left = zone_x_normalised,
+                right = zone_x_normalised + zone_width_normalised) %>%
+  # remove superfluous columns
+  dplyr::select(-zone_x_normalised, -zone_y_normalised, -zone_width_normalised, -zone_height_normalised)
+```
+
+
+```{r bound1d, echo = F, warning=F, message=F}
+ibs_norm %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of ibs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+### Adding edges{-}
+
+We now transform the data so that we have the information about the edges in separate columns. Thus, we have four columns for the right and the left image: bottomedge, leftedge, rightedge, and topedge.
+
+```{r bound2, warning=F, message=F}
+ibs <- ibs %>%
+  dplyr::mutate(position = tolower(zone_name)) %>%
+  tidyr::gather(edge, coordinate, top:right) %>%
+  dplyr::mutate(position_edge = paste0(position, "_", edge, "edge")) %>%
+  dplyr::select(-zone_name, -position, -edge) %>%
+  tidyr::spread(position_edge, coordinate) %>%
+  dplyr::group_by(participant_id, trial) %>%
+  dplyr::summarise(left_bottomedge = left_bottomedge,
+                   left_leftedge = left_leftedge,
+                   left_rightedge = left_rightedge,
+                   left_topedge = left_topedge,
+                   right_bottomedge = right_bottomedge,
+                   right_leftedge = right_leftedge,
+                   right_rightedge = right_rightedge,
+                   right_topedge = right_topedge)
+```
+
+
+```{r bound2b, echo = F, warning=F, message=F}
+ibs %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of ibs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Process master file{-}
+
+Now that we have processed the data and defined the image boundaries, we load the master file. The master file contains information about the experiment, the individual trials, and the computer and browser used by the participant. We now load master file (in our example this is called `data_exp_50674-v2_task-etfm.csv`) from the folder called `data_exp_50674-v2` which is located in the `data` folder.
+
+
+```{r mstr1, warning=F, message=F}
+mstr <- read_csv(masterpath) %>%
+  # create participant column that matches the participant column in the data 
+  dplyr::mutate(participant_id = `Participant Private ID`)
+```
+
+```{r mstr1b, echo = F, warning=F, message=F}
+mstr %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of mstr.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+The master file contains a lot of information. As retaining columns with unnecessary information renders it difficult to parse and work with data, we remove columns that we do not need. We would like to retain the following columns though: 
+`participant_id`,  `trial_number`,  `condition`,  `target_gender`,  `target_position`,  `Zone Type`,  `Response`, and  `Correct`.
+
+```{r reduce, warning=F, message=F}
+mstr_redux <- mstr %>%
+  # select columns you need
+  dplyr::select(participant_id, `trial number`, condition, target_gender, 
+                target_position, `Zone Type`, Response, Correct, target_item) %>%
+  # filter unique 
+  unique() %>%
+  # remove rows containing NA
+  na.omit() %>%
+  # filter out superfluous rows
+  dplyr::filter(`Zone Type` == "response_button_image") %>%
+  dplyr::rename(trial = `trial number`) %>%
+  dplyr::mutate(trial = as.character(trial)) %>%
+  # convert participant_id and trial into factors
+  dplyr::mutate(participant_id = factor(participant_id),
+                trial = factor(trial))
+```
+
+```{r mstr2b, echo = F, warning=F, message=F}
+mstr_redux %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of mstr_redux.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Join data and masterfile{-}
+
+The next step consists in joining (or merging) the data (`edat`) with the information about the image boundaries (`ibs`). Before joining these two data sets, we will clean the dat in the `edat` file by 
+
+* removing columns we do not need
+
+* factorizing participants and trials
+
+* removing rows without gaze information
+
+```{r join1, warning=F, message=F}
+edat <- edat %>%
+  # remove superfluous columns
+  dplyr::select(-`0`, -filename, -spreadsheet_row, -time_stamp, -screen_index, 
+                -convergence, -zone_x, -zone_y, -zone_width,
+                -zone_height, -zone_x_normalised, -zone_y_normalised, -zone_width_normalised,
+                -zone_height_normalised, -idname, 
+                
+                # WARNING: If you work with normalized values, REPLACE the following 
+                # with their non-normalized counterparts!
+                
+                -x_pred_normalised, -y_pred_normalised) %>%
+  # convert participant_id and trial into factors
+  dplyr::mutate(participant_id = factor(participant_id),
+                trial = factor(trial)) %>%
+  # remove rows without gaze information
+  dplyr::filter(x_pred != 0,
+                y_pred != 0)
+```
+
+
+```{r join1b, echo = F, warning=F, message=F}
+edat %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of edat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+Now, we can join (or merge) `edat` with `ibs` (image boundaries).
+
+```{r join2, warning=F, message=F}
+edatibs <- left_join(edat, ibs, by = c("participant_id", "trial"))
+```
+
+```{r join2b, echo = F, warning=F, message=F}
+edatibs %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of edatibs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Remove imprecision{-}
+
+It is also useful, to remove data points that have low precision. We thus remove data points with a predicted accuracy lower than .5 (`face_conf` should greater than .5).
+
+```{r prec2, warning=F, message=F}
+edatibs <- edatibs %>%
+  # filter imprecise data points
+  dplyr::filter(face_conf >= .5)
+# inspect
+head(edatibs)
+```
+
+```{r prec2b, echo = F, warning=F, message=F}
+edatibs %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of edatibs.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Combining the data and metadata{-}
+
+Now we combine the collected data (`edatibs` = `edat` plus image boundaries `ibs`) with the metadata (the information from the reduced master file `mstr_redux`)
+
+```{r join3, warning=F, message=F}
+dat <- dplyr::left_join(edatibs, mstr_redux, by = c("participant_id", "trial"))
+# inspect
+head(dat)
+```
+
+```{r join3b, echo = F, warning=F, message=F}
+dat %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## AOI
+
+We now use the edges of the images to determine if gazes were in the AOI
+
+```{r aoi1, warning=F, message=F}
+dat <- dat %>%
+  # determine if participant's gaze was in AOI
+  dplyr::mutate(AOI = ifelse(
+    # if target is left image
+    target_position == "left" &
+      y_pred > left_topedge & 
+      y_pred < left_bottomedge & 
+      x_pred > left_leftedge & 
+      x_pred < left_rightedge, 1,
+    # if target is right image
+    ifelse(target_position == "right" &
+             y_pred > right_topedge   & 
+             y_pred < right_bottomedge &
+             x_pred  > right_leftedge & 
+             x_pred <  right_rightedge, 1,
+           0)))
+```
+
+```{r aoi1b, echo = F, warning=F, message=F}
+dat %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Binning{-}
+
+Define time bins (here 100 ms)
+
+```{r bin1, warning=F, message=F}
+dat <- dat %>%
+  # arrange by participant, trial, and time
+  dplyr::arrange(participant_id, trial, time_elapsed) %>%
+  # bin times into .2 time bins
+  dplyr::mutate(TimeBin = itsadug::timeBins(time_elapsed, 100, pos=0))
+```
+
+```{r bin1b, echo = F, warning=F, message=F}
+dat %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Cleaning{-}
+
+
+```{r clean1, warning=F, message=F}
+dat <- dat %>%
+  # clean condition (spelling error!)
+  dplyr::mutate(condition = dplyr::case_when(condition == "color" ~ "color",
+                                             condition == "same" ~ "same",
+                                             condition == "different" ~ "different",
+                                             condition == "differernt" ~ "different",
+                                             TRUE ~ condition)) %>%
+  # change correct from 0 vs 1 into correct vs incorrect
+  dplyr::mutate(Correct = ifelse(Correct == 1, "Correct",
+                                 ifelse(Correct == 0, "Incorrect", Correct)),
+                Correct = factor(Correct))
+```
+
+```{r clean1b, echo = F, warning=F, message=F}
+dat %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Getting rid of incorrect observations
+
+```{r clean2, warning=F, message=F}
+dat <- dat %>%
+  dplyr::filter(Correct != "Incorrect")
+```
+
+
+```{r clean2b, echo = F, warning=F, message=F}
+dat %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+#' Saving the data{-}
+
+You can now save the data in your `data` folder, if you like.
+
+```{r save, message=F, warning=F}
+write.table(dat, here::here("data", "dat.txt"), sep = "\t", row.names = F)
+```
+
+To re-load this data, you would have use the following command:
+
+```{r save2, message=F, warning=F}
+reload <- read.delim(here::here("data", "dat.txt"), sep = "\t")
+# inspect
+reload[1:4, 1:4]
+```
+
+# Data Viz
+
+Prepare data for a visualization
+
+```{r vizp1, warning=F, message=F}
+f1 <- dat %>%
+  # remove "weird" data points
+  dplyr::filter(x_pred > 0,
+                y_pred > 0,
+                time_elapsed < 4200) %>%
+  # grouping
+  dplyr::group_by(condition, TimeBin, Correct, target_gender) %>%
+  # summarise: calculate proportion of looks in AOI
+  dplyr::summarise(Proportion = mean(AOI))
+# inspect data
+head(f1, 10)
+```
+
+```{r vizp1b, echo = F, warning=F, message=F}
+f1 %>%
+  head(5) %>%
+  kable(caption = "First 5 rows of f1.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+## Line plot{-}
+
+
+```{r viz1, warning=F, message=F}
+ggplot(f1, aes(y = Proportion, x = TimeBin, color = condition)) +
+  # lines for proportions
+  geom_line() +
+  # add vertical line
+  geom_vline(xintercept = 1900, linetype="dotted", color = "darkgrey", size=.75) +
+  # add vertical line
+  geom_vline(xintercept = 3450, linetype="dotted", color = "darkgrey", size=.75) +
+  # add text
+  ggplot2::annotate(geom = "text", label = "Object", x = 2800, y = .85, color = "gray20", size = 5) +
+  # separate panels for each target_gender
+  facet_grid(target_gender ~ .) +
+  # black and white theme
+  theme_bw() + 
+  # no grid lines
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        legend.position = "top",
+        # define x-axis tick labels
+        axis.text.x = element_text(angle = 45, vjust=0.6, size = 10)) +
+  # define x-axis
+  scale_x_continuous(name = "Time in Trial (ms)", 
+                     limits = c(0,4000), 
+                     breaks = seq(0,4000,1000), 
+                     labels = seq(0, 4000, 1000)) +
+  # define y-axis
+  scale_y_continuous(name = "Proportion in AOI", 
+                     limits = c(0, 1), 
+                     breaks = seq(0, 1,.2), 
+                     labels = seq(0, 1, .2)) +
+  # save plot
+  ggsave(file = here::here("images","Fig01.png"), 
+       height = 5,  width = 10,  dpi = 320)
+```
+
+## Lineplot with errorbars
+
+```{r}
+# scatter plot with error bars
+ggplot(dat, aes(x=TimeBin, y= AOI,  group = condition, color = condition)) +                 
+  stat_summary(fun = mean, geom = "line", aes(group= condition, color = condition)) +          
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  # add vertical line
+  geom_vline(xintercept = 1900, linetype="dotted", color = "darkgrey", size=.75) +
+  # add vertical line
+  geom_vline(xintercept = 3450, linetype="dotted", color = "darkgrey", size=.75) +
+  # add text
+  ggplot2::annotate(geom = "text", label = "Object", x = 2800, y = .85, color = "gray20", size = 5) +            
+  # def. font size
+  theme_bw(base_size = 15) +  
+  theme(axis.text.x = element_text(size=10, angle = 90),  
+        axis.text.y = element_text(size=10, face="plain"),
+        legend.position = "top",
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +  
+  # define x-axis
+  scale_x_continuous(name = "Time in Trial (ms)", 
+                     limits = c(0,4000), 
+                     breaks = seq(0,4000,1000), 
+                     labels = seq(0, 4000, 1000)) +
+  # define y-axis
+  scale_y_continuous(name = "Proportion in AOI", 
+                     limits = c(0, 1), 
+                     breaks = seq(0, 1,.2), 
+                     labels = seq(0, 1, .2)) +
+  # save plot
+  ggsave(file = here::here("images","Fig02.png"), 
+       height = 5,  width = 10,  dpi = 320)    
+```
+
+
+
+## Smoothed line plot{-}
+
+
+```{r viz2, warning=F, message=F}
+ggplot(f1, aes(y = Proportion, x = TimeBin, color = condition, fill = condition)) +
+  # lines for proportions
+  geom_smooth(span = .2, alpha = .2) +
+  # add vertical line
+  geom_vline(xintercept = 1900, linetype="dotted", color = "darkgrey", size=.75) +
+  # add vertical line
+  geom_vline(xintercept = 3450, linetype="dotted", color = "darkgrey", size=.75) +
+  # add text
+  ggplot2::annotate(geom = "text", label = "Object", x = 2700, y = 1.1, color = "gray20", size = 5) +
+  # separate panels for each condition
+  facet_grid(~target_gender) +
+  # black and white theme
+  theme_bw() + 
+  # no grid lines
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        legend.position = "top",
+        # define x-axis tick labels
+        axis.text.x = element_text(angle = 45, vjust=0.6, size = 10)) +
+  # define x-axis
+  scale_x_continuous(name = "Time in Trial (ms)", 
+                     limits = c(0,4000), 
+                     breaks = seq(0,4000,1000), 
+                     labels = seq(0, 4000, 1000)) +
+  # define y-axis
+  scale_y_continuous(name = "Proportion in AOI", 
+                     limits = c(-.3, 1.2), 
+                     breaks = seq(-.1, 1,.2), 
+                     labels = seq(0, 1, .2)) +
+  # save plot
+  ggsave(file = here::here("images","Fig03.png"), 
+       height = 5,  width = 10,  dpi = 320)
+```
+
+# Statz
+
+We use a mixed-effects binomial logistic regression, to check if the conditions affect the proportion of AOI gazes during a period of interest (after the stimulus was shown).
+
+We go over this without much explanation. However, if you want to know more about how mixed-effects model work, what to consider, and how to interpret them, @gries2021statistics, @winter2019statistics, or @field2012discovering are highly recommendable resources! You can also find additional information [here](https://slcladal.github.io/mmws.html) or [here](https://slcladal.github.io/regression.html#2_Mixed-Effects_Regression).
+
+```{r glmer0}
+# set options
+options(contrasts  = c("contr.treatment", "contr.poly"))
+#options(contrasts  = c("contr.helmert", "contr.poly"))
+#options(contrasts  = c("contr.sum", "contr.poly"))
+```
+
+
+
+```{r glmer1}
+statzdat <- dat %>%
+  dplyr::filter(time_elapsed > 1900 &
+                  time_elapsed < 3450)
+```
+
+Generate base-line model.
+
+```{r glmer2}
+# generate model
+m0 <- glmer(AOI ~ (1  | trial) + (1 | target_item), 
+                  family = binomial, 
+                  data = statzdat, 
+                  control=glmerControl(optimizer="bobyqa"))
+```
+
+Generate final model.
+
+```{r glmer3}
+# generate model
+m1 <- update(m0, .~.+ condition * target_gender)
+```
+
+Summarize the final model.
+
+```{r glmer4}
+# generate model
+summary(m1)
+```
+
+Run Post-hoc tests
+
+```{r glmer5, message=F, warning=F}
+summary(glht(m1, mcp(condition="Tukey")))
+```
+
+
+We now tabulate the results of the final model.
+
+
+```{r glmer6, warning=F, message=F}
+# generate summary table
+sjPlot::tab_model(m0, m1)
+```
+
+***
+
+And we visualize the fixed effects.
+
+
+```{r glmer7, warning=F, message=F}
+sjPlot::plot_model(m1)
+```
+
+
+# eyetrackeR
+
+Once the data is in in a proper format, we can also use the `eyetrackeR` package for our analysis. The advantage of using the `eyetrackeR` package is that is has many in-built functions that make the analysis of eye-tracking data a lot easier. Also, there are [very helpful and detailed tutorials](http://www.eyetracking-r.com/) on how to perform analyses and visualize eye-tracking data using `eyetrackeR`.
+
+Before we can use the `eyetrackeR` package, however, we need to create certain columns in our data that the `eyetrackeR` package expects.  
+
+In our case, we need to create a 
+
+* column specifying if a gaze was in the AOI (which we will call `OnTarget`)
+
+* column specifying if a gaze was not in  the AOI (which we will call `OffTarget`).
+
+* `trackloss_column` (which we will call `Trackloss`). This column contains information about data point that we want to remove during the analysis. In our case, we will code data points that have negative x- and y-coordinates as well as data points that occurred after 4200ms as TRUE (meaning that we consider them cases of trackloss).
+
+
+```{r eR1, warning=F, message=F}
+dat <- dat %>%
+  dplyr::mutate(TrackLoss = dplyr::case_when(x_pred < 0 ~ TRUE,
+                                             y_pred < 0 ~ TRUE,
+                                             time_elapsed > 4200 ~ TRUE,
+                                             TRUE ~ FALSE)) %>%
+  dplyr::mutate(OnTarget = dplyr::case_when(AOI == 1 ~ 1,
+                                            TRUE ~ 0),
+                OffTarget = dplyr::case_when(AOI == 1 ~ 0,
+                                            TRUE ~ 1))
+```
+
+Now that we have generated the required columns in our data, we can generate an `eyetrackingr_data` and specify the columns that the `eyetraceR` package wants us to specify.
+
+```{r eR2, warning=F, message=F}
+data <- make_eyetrackingr_data(dat, 
+                       participant_column = "participant_id",
+                       trial_column = "trial",
+                       time_column = "time_elapsed",
+                       trackloss_column = "TrackLoss",
+                       aoi_columns = c('OnTarget','OffTarget'),
+                       treat_non_aoi_looks_as_missing = TRUE
+)
+# inspect data
+head(data)
+```
+
+We can also tabulate the number of `*on target* gazes that remain in the data using the `table` function.
+
+```{r eR5, warning=F, message=F}
+table(data$OnTarget)
+```
+
+In a next step, we specify the window that we want to inspect (in our case, we want to check the window starting at 1900 ms and ending at 3450 ms).
+
+```{r eR7, warning=F, message=F}
+# subset to response window post word-onset
+response_window <- subset_by_window(data, 
+                                    window_start_time = 1900, 
+                                    window_end_time = 3450, 
+                                    rezero = FALSE)
+```
+
+
+We now check to see if we need to remove data points.
+
+```{r eR9, warning=F, message=F}
+# analyze amount of trackloss by subjects and trials
+(trackloss <- trackloss_analysis(data = response_window))
+```
+
+Remove trackloss (trial_prop_thresh greater than or equal to .25).
+
+```{r eR10, warning=F, message=F}
+# remove trials with > 25% of trackloss
+response_window_clean <- clean_by_trackloss(data = response_window, 
+                                            trial_prop_thresh = .25)
+```
+
+Extract response data.
+
+```{r eR11, warning=F, message=F}
+# aggregate across trials within subjects in time analysis
+response <- make_time_sequence_data(response_window_clean, 
+                                    time_bin_size = 50,
+                                    predictor_columns = c("condition", "Correct"),
+                                    aois = c("OnTarget", "OffTarget")
+                            )
+```
+
+Visualize response data.
+
+```{r eR13, warning=F, message=F}
+# visualize time results
+plot(response, 
+     predictor_column = "condition") + 
+  theme_light() +
+  coord_cartesian(ylim = c(0,1))
+```
+
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Processing and Analyzing Eye-Tracking Data in R. Workshop at UIT AcqVA Aurora*. Tromsø: The Artic University of Norway. url: https://slcladal.github.io/eyews.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`eyews,
+  author = {Schweinberger, Martin},
+  title = {Processing and Analyzing Eye-Tracking Data in R},
+  note = {https://slcladal.github.io/eyews.html},
+  year = {2021},
+  organization = "Arctic University of Norway, AcqVA Aurora Center},
+  address = {Tromsø},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#introduction)
+
+***
+
+# References{-}
+
+

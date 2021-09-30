@@ -1,0 +1,188 @@
+---
+title: "Introduction to Lexical Similarity"
+author: "Dattatreya Majumdar"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:  
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces Text Similarity [see @zahrotun2016comparison; @li2013distance], i.e. how close or similar two pieces of text are with respect to either their use of words or characters (lexical similarity) or in terms of meaning (semantic similarity). The entire code for the sections below can be downloaded [here](https://slcladal.github.io/lexsim.Rmd). 
+
+*Lexical Similarity* provides a measure of the similarity of two texts based on the intersection of the word sets of same or different languages. A lexical similarity of 1 suggests that there is complete overlap between the vocabularies while a score of 0 suggests that there are no common words in the two texts. There are several different ways of evaluating lexical similarity such as Jaccard Similarity, Cosine Similarity, Levenshtein Distance etc.
+
+*Semantic Similarity* on the other hand measures the similarity between two texts based on their meaning rather than their lexicographical similarity. Semantic similarity is highly useful for summarizing texts and extracting key attributes from large documents or document collections. Semantic Similarity can be evaluated using methods such as *Latent Semantic Analysis* (LSA), *Normalised Google Distance* (NGD), *Salient Semantic Analysis* (SSA) etc.  
+
+As a part of this tutorial we will focus primarily on Lexical Similarity. We begin with a brief overview of relevant concepts and then show different measures can be implemented in R.
+
+## Jaccard Similarity{-}
+
+The Jaccard similarity is defined as an intersection of two texts divided by the union of that two documents. In other words it can be expressed as the number of common words over the total number of the words in the two texts or documents. The Jaccard similarity of two documents ranges from 0 to 1, where 0 signifies no similarity and 1 signifies complete overlap.The mathematical representation of the Jaccard Similarity is shown below: -
+
+\begin{equation}
+J(A,B) = \frac{|A \bigcap B|}{|A \bigcup B |} = \frac{|A \bigcap B|}{|A| + |B| - |A \bigcap B|}
+\end{equation}
+
+## Cosine Similarity{-}
+
+In case of cosine similarity the two documents are represented in a n-dimensional vector space with each word represented in a vector form. Thus the cosine similarity metric measures the cosine of the angle between two n-dimensional vectors projected in a multi-dimensional space. The cosine similarity ranges from 0 to 1. A value closer to 0 indicates less similarity whereas a score closer to 1 indicates more similarity.The mathematical representation of the Cosine Similarity is shown below: -
+
+\begin{equation}
+similarity = cos(\theta) = \frac{A \cdot B}{||A|| ||B||} = \frac{\sum_{i=1}^{n} A_{i} B_{i}}{\sqrt{\sum_{i=1}^{n} A_{i}^{2}} \sqrt{\sum_{i=1}^{n} B_{i}^{2}}}
+\end{equation}
+
+
+## Levenshtein Distance{-}
+
+Levenshtein distance comparison is generally carried out between two words. It determines the minimum number of single character edits required to change one word to another. The higher the number of edits more are the texts different from each other.An edit is defined by either an insertion of a character, a deletion of character or a replacement of a character. For two words *a* and *b* with lengths *i* and *j* the Levenshtein distance is defined as follows: -
+
+\begin{equation}
+lev_{a,b}(i,j) = 
+\begin{cases}
+    max(i,j) & \quad \text{if min(i,j) = 0,}\\
+    min \begin{cases}
+      lev_{a,b}(i-1,j)+1  \\
+      lev_{a,b}(i, j-1)+1  & \text{otherwise.}\\
+      lev_{a,b}(i-1,j-1)+1_{(a_{i} \neq b_{j})} \\
+  \end{cases}
+  \end{cases}
+\end{equation}
+
+
+## Preparation and session set up{-}
+
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)
+# install libraries
+install.packages("stringdist")
+install.packages("hashr")
+install.packages("tidyverse")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# activate packages
+library(stringdist)
+library(hashr)
+library(tidyverse)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+# Measuring Similarity in R{-}
+
+For evaluating the similarity scores and the edit distance for the above discussed methods in R we have installed the *stringdist* package and will be primarily using two functions in that: *stringdist* and *stringsim*. We are also utilising the *hashr* package so that Jaccard and cosine similarity are evaluated word wise instead of letter wise. The sentence is tokenised and the corresponding list of words are hashed so that the sentences are transformed into a list of integers.For the Jaccard and the Cosine similarity we will be using the same set of texts whereas for the Levenshtein edit distance we will take 3 pairs of words to illustrate *insert*, *delete* and *replace* operations.
+
+
+```{r librarydata, echo=T, eval = T, message=FALSE, warning=FALSE}
+text1 = "The quick brown fox jumped over the wall"
+text2 = "The fast brown fox leaped over the wall"
+insert_ex = c("Marta","Martha")
+del_ex = c("Genome","Gnome")
+rep_ex = c("Tim","Tom")
+```
+
+## Jaccard Similarity{-}
+
+```{r jac}
+# Using the seq_dist function along with hash function to calculate the Jaccard similarity word-wise
+jac_sim_score = seq_dist(hash(strsplit(text1, "\\s+")), hash(strsplit(text2, "\\s+")), method = "jaccard",q=2)
+print(paste0("The Jaccard similarity for the two texts is ",jac_sim_score))
+```
+
+## Cosine Similarity{-}
+
+```{r cos}
+# Using the seq_dist function along with hash function to calculate the Jaccard similarity word-wise
+cos_sim_score = seq_dist(hash(strsplit(text1, "\\s+")), hash(strsplit(text2, "\\s+")), method = "cosine",q=2)
+print(paste0("The Cosine similarity for the two texts is ",cos_sim_score))
+```
+
+## Levenshtein distance{-}
+
+```{r le}
+# Insert edit
+ins_edit = stringdist(insert_ex[1],insert_ex[2],method = "lv")
+print(paste0("The insert edit distance for ",insert_ex[1]," and ",insert_ex[2]," is ",ins_edit))
+# Delete edit
+del_edit = stringdist(del_ex[1],del_ex[2],method = "lv")
+print(paste0("The delete edit distance for ",del_ex[1]," and ",del_ex[2]," is ",del_edit))
+# Replace edit
+rep_edit = stringdist(rep_ex[1],rep_ex[2],method = "lv")
+print(paste0("The replace edit distance for ",rep_ex[1]," and ",rep_ex[2]," is ",rep_edit))
+```
+
+# Concluding remarks{-}
+
+As shown above, the Jaccard and Cosine similarity scores are different which is important to note when using different measures to determine similarity. The differences are primarily primarily caused because Jaccard takes only the unique words in the two texts into consideration whereas the Cosine similarity approach takes the total length of the vectors into consideration. For the Levenshtein edit distance, the examples provided above show that for the first case we have to insert an extra *h*, for the second we have to delete an *e* and for the last case we need to replace *i* with *o*. Thus, for all the pairs taken into account here the edit distance is 1.
+
+# Citation & Session Info {-}
+
+Majumdar, Dattatreya. `r format(Sys.time(), '%Y')`. *Lexical Text Similarity using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/lexsim.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{Majumdar`r format(Sys.time(), '%Y')`ta,
+  author = {Majumdar, Dattatreya},
+  title = {Text Analysis and Distant Reading using R},
+  note = {https://slcladal.github.io/lexsim.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+
+```{r fin}
+sessionInfo()
+```
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+
+# References{-}
+
+

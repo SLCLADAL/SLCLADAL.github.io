@@ -1,0 +1,445 @@
+---
+title: "Sentiment Analysis in R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, eval = T, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces sentiment analysis (SA) and show how to perform a SA in R. The entire R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/rscripts/sentiment.Rmd). SA is a cover term for approaches which extract information on emotion or opinion from natural language [@silge2017text]. SA have been successfully applied to analysis of language data in a wide range of disciplines such as psychology, economics, education, as well as political and social sciences. Commonly SA are used to determine the stance of a larger group of speakers towards a given phenomenon such as political candidates or parties, product lines or situations. Crucially, SA are employed in these domains because they have advantages compared to alternative methods investigating the verbal expression of emotion. One advantage of SA is that the emotion coding of SA is fully replicable.
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F}
+# install packages
+install.packages(c("tidyverse", "readr", "tidytext", "zoo", "Hmisc", "sentimentr"))
+```
+
+```{r prep2, echo=F, eval = F, message=FALSE, warning=FALSE}
+install.packages(c("knitr", "kableExtra", "DT"))
+```
+
+```{r prep3, echo=F, message=FALSE, warning=FALSE}
+# load packages for website
+library(knitr) 
+library(kableExtra) 
+library(DT)
+```
+
+Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
+
+# Sentiment Analysis
+
+
+Sentiment Analysis (SA) extracts information on emotion or opinion from natural language [@silge2017text]. Most forms of SA provides information about positive or negative polarity, e.g. whether a tweet is *positive* or *negative*. As such, SA represents a type of classifier that assigns values to texts. As most SA only provide informarion about polarity, SA is often regarded as rather coarse-grained and, thus, rather irrelevant for the types of research questions in linguistics. 
+
+In the language sciences, SA can also be a very helpful tool if the type of SA provides more fine-grained information. In the following, we will perform such a information-rich SA. The SA used here does not only provide information about polarity but it will also provide association values for eight core emotions. 
+
+The more fine-grained output is made possible by relying on the Word-Emotion Association Lexicon [@mohammad2013crowdsourcing], which comprises 10,170 terms, and in which lexical elements are assigned scores based on ratings gathered through the crowd-sourced Amazon Mechanical Turk service. For the Word-Emotion Association Lexicon raters were asked whether a given word was associated with one of eight emotions. The resulting associations between terms and emotions are based on 38,726 ratings from 2,216 raters who answered a sequence of questions for each word which were then fed into the emotion association rating (see @mohammad2013crowdsourcing). Each term was rated 5 times. For 85 percent of words, at least 4 raters provided identical ratings. For instance, the word *cry* or *tragedy* are more readily associated with SADNESS while words such as *happy* or *beautiful* are indicative of JOY and words like *fit* or *burst* may indicate ANGER. This means that the SA here allows us to investigate the expression of certain core emotions rather than merely classifying statements along the lines of a crude positive-negative distinction. 
+
+## Getting started{-}
+
+Before turning to the SA, we will load the packages for this tutorial. 
+
+```{r sa1, message=F, warning=F}
+# activate packages
+library(tidyverse)
+library(readr)
+library(tidytext)
+library(zoo)
+library(Hmisc)
+library(sentimentr)
+```
+
+In the following, we will perform a SA to investigate the emotionality of five different novels. We will start with the first example and load five pieces of literature. 
+
+```{r sa3, message=FALSE, warning=FALSE}
+darwin <- base::readRDS(url("https://slcladal.github.io/data/origindarwin.rda", "rb"))
+twain <- base::readRDS(url("https://slcladal.github.io/data/twainhuckfinn.rda", "rb"))
+orwell <- base::readRDS(url("https://slcladal.github.io/data/orwell.rda", "rb"))
+lovecraft <- base::readRDS(url("https://slcladal.github.io/data/lovecraftcolor.rda", "rb"))
+# inspect data
+head(darwin, 10)
+```
+
+Write function to clean data
+
+```{r sa5, cmessage=FALSE, warning=FALSE}
+txtclean <- function(x, title){
+  require(dplyr)
+  x <- x %>%
+    tolower() %>%
+    paste0(collapse = " ") %>%
+    stringr::str_squish()%>%
+    stringr::str_split(" ") %>%
+    unlist() %>%
+    tibble() %>%
+    dplyr::select(word = 1, everything()) %>%
+    dplyr::mutate(novel = title) %>%
+    dplyr::anti_join(stop_words) %>%
+    dplyr::mutate(word = str_remove_all(word, "\\W")) %>%
+    dplyr::filter(word != "")
+}
+```
+
+Process and clean texts.
+
+```{r sa7, message=FALSE, warning=FALSE}
+# process text data
+darwin_clean <- txtclean(darwin, "darwin")
+lovecraft_clean <- txtclean(lovecraft, "lovecraft")
+orwell_clean <- txtclean(orwell, "orwell")
+twain_clean <- txtclean(twain, "twain")
+```
+
+```{r sa7b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+darwin_clean %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of darwin_clean.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+
+# Basic Sentiment Analysis
+
+In a next step, we clean the data, convert it to lower case, and split it into individual words. 
+
+```{r bsa1, message=FALSE, warning=FALSE}
+novels_anno <- rbind(darwin_clean, twain_clean, orwell_clean, lovecraft_clean) %>%
+  dplyr::group_by(novel) %>%
+  dplyr::mutate(words = n()) %>%
+  dplyr::left_join(get_sentiments("nrc")) %>%
+  dplyr::mutate(novel = factor(novel),
+         sentiment = factor(sentiment))
+```
+
+```{r bsa1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_anno %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_anno.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+We will now summarize the results of the SA and calculate the percentages of the prevalence of emotions across the books.
+
+```{r bsa3, message=FALSE, warning=FALSE}
+novels <- novels_anno %>%
+  dplyr::group_by(novel) %>%
+  dplyr::group_by(novel, sentiment) %>%
+  dplyr::summarise(sentiment = unique(sentiment),
+                   sentiment_freq = n(),
+                   words = unique(words)) %>%
+  dplyr::filter(is.na(sentiment) == F) %>%
+  dplyr::mutate(percentage = round(sentiment_freq/words*100, 1))
+```
+
+```{r bsa3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+After performing the SA, visualize the results and show the scores fro each core emotion by book.
+
+```{r bsa5, message=FALSE, warning=FALSE}
+novels %>%
+  dplyr::filter(sentiment != "positive",
+         sentiment != "negative") %>%
+  ggplot(aes(sentiment, percentage, fill = novel)) +    
+  geom_bar(stat="identity",   
+           position=position_dodge()) + 
+  scale_fill_manual(name = "", values=c("orange", "gray70", "red", "grey30")) +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+We can also display the emotions by book and re-level sentiment so that the different core emotions are ordered from more negative (*red*) to more positive (*blue*).
+
+```{r bsa7, message=FALSE, warning=FALSE}
+novels %>%
+  dplyr::filter(sentiment != "positive",
+         sentiment != "negative") %>%
+  dplyr::mutate(sentiment = factor(sentiment, 
+                            levels = c("anger", "fear", "disgust", "sadness",
+                                   "surprise", "anticipation", "trust", "joy"))) %>%
+  ggplot(aes(novel, percentage, fill = sentiment)) +    
+  geom_bar(stat="identity", position=position_dodge()) + 
+  scale_fill_brewer(palette = "RdBu") +
+  theme_bw() +
+  theme(legend.position = "right") +
+  coord_flip()
+```
+
+
+# Identifying important emotives
+
+We now check, which words have contributed to the emotionality scores. In other words, we investigate, which words are most important for the emotion scores within each novel. For the sake of interpretability, we will remove several core emotion categories and also the polarity.
+
+```{r contribsa1, message=FALSE, warning=FALSE}
+novels_impw <- novels_anno %>%
+  dplyr::filter(!is.na(sentiment),
+         sentiment != "anticipation",
+         sentiment != "surprise",
+         sentiment != "disgust",
+         sentiment != "negative",
+         sentiment != "sadness",
+         sentiment != "positive") %>%
+  dplyr::mutate(sentiment = factor(sentiment, levels = c("anger", "fear",  "trust", "joy"))) %>%
+  dplyr::group_by(novel) %>%
+  dplyr::count(word, sentiment, sort = TRUE) %>%
+  dplyr::group_by(novel, sentiment) %>%
+  dplyr::top_n(3) %>%
+  dplyr::mutate(score = n/sum(n))
+```
+
+```{r contribsa1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_impw %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_impw.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+We can now visualize the top three words for the remaining core emotion categories. 
+
+```{r contribsa2, message=FALSE, warning=FALSE}
+ggplot(novels_impw, aes(x = reorder(word, score, sum), y = score, fill = word)) +
+  facet_grid(novel~sentiment,  scales = "free_y") +
+  geom_col(show.legend = FALSE) +
+  coord_flip()
+```
+
+
+# Calculating and dispalying polarity
+
+Now, we visualize the polarity of each book, i.e. the ratio of the number of positive emotion words divided by the number of negative words.
+
+
+```{r pol1, message=FALSE, warning=FALSE}
+novels %>%
+  dplyr::filter(sentiment == "positive" | sentiment == "negative") %>%
+  dplyr::select(-percentage, -words) %>%
+  dplyr::mutate(sentiment_sum = sum(sentiment_freq),
+         positive = sentiment_sum-sentiment_freq) %>%
+  dplyr::filter(sentiment != "positive") %>%
+  dplyr::rename(negative = sentiment_freq) %>%
+  dplyr::select(novel, positive, negative) %>%
+  dplyr::group_by(novel) %>%
+  dplyr::summarise(polarity = positive/negative) %>%
+  ggplot(aes(reorder(novel, polarity, mean), polarity)) +    
+  geom_point(size = 3) + 
+  theme_bw() +
+  labs(y = "polarity\n\nmore negative                                more positive\n",
+       x = "novel")
+```
+
+Overall, all books are in the positive range (the polarity score is not negative) and we see that *lovecraft* is the book with the most negative emotion words while *darwin* is the most positive book as it has the highest average polarity ratio.
+
+# Calculating and dispalying changes in polarity
+
+There are two main methods for tracking changes in polarity: binning and moving averages. binning splits the data up into sections and calculates the polarity ration within each bin. Moving averages calculate the mean within windows that are then shifted forward. We begin with an exemplification of binning and then move on to calcualting moving averages. 
+
+## Binning{-}
+
+```{r bin1, message=FALSE, warning=FALSE}
+novels_bin <- novels_anno %>%
+  dplyr::group_by(novel) %>%
+  dplyr::filter(is.na(sentiment) | sentiment == "negative" | sentiment == "positive") %>%
+  dplyr::mutate(sentiment = as.character(sentiment),
+         sentiment = case_when(is.na(sentiment) ~ "0", 
+                               TRUE ~ sentiment),
+         sentiment= case_when(sentiment == "0" ~ 0,
+                              sentiment == "positive" ~ 1,
+                              TRUE ~ -1),
+         id = 1:n(),
+         index = as.numeric(cut2(id, m=100))) %>%
+  dplyr::group_by(novel, index) %>%
+  dplyr::summarize(index = unique(index),
+            polarity = mean(sentiment))
+```
+
+```{r bin1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_bin %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_bin.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+
+We now have an average polarity for each bin and can plot this polarity over the development of the story.
+
+```{r bin5, message=FALSE, warning=FALSE}
+ggplot(novels_bin, aes(index, polarity)) + 
+  facet_wrap(vars(novel), scales="free_x") +
+  geom_smooth(se = F, col = "black") + 
+  theme_bw() +
+  labs(y = "polarity ratio (mean by bin)",
+       x = "index (bin)")
+```
+
+
+
+## Moving average{-}
+
+Another method for tracking changes in polarity over time is to calculate rolling or moving means. It should be noted thought that rolling means are not an optimal method fro tracking chnages over time and rather represent a method for as moothing chaotic time-series data. However, they can be used to complement the analysis of changes that are detected by binning.  
+
+To calculate moving averages, we will assign words with positive polarity a value +1 and words with negative polarity a value of -1 (neutral words are coded as 0). A rolling mean calculates the mean over a fixed window span. Once the initial mean is calculated, the window is shifted to the next position and the mean is calculated for that window of values, and so on. We set the window size to 100 words which represents an arbitrary value.
+
+```{r ma1, message=FALSE, warning=FALSE}
+novels_change <- novels_anno %>%
+  dplyr::filter(is.na(sentiment) | sentiment == "negative" | sentiment == "positive") %>%
+  dplyr::group_by(novel) %>%
+  dplyr::mutate(sentiment = as.character(sentiment),
+         sentiment = case_when(is.na(sentiment) ~ "0", 
+                               TRUE ~ sentiment),
+         sentiment= case_when(sentiment == "0" ~ 0,
+                              sentiment == "positive" ~ 1,
+                              TRUE ~ -1),
+         id = 1:n()) %>%
+  dplyr::summarise(id = id,
+                 rmean=rollapply(sentiment, 100, mean, align='right', fill=NA)) %>%
+  na.omit()
+# inspect results
+head(novels_change)
+```
+
+```{r ma1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+novels_change %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of novels_change.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+We will now display the values of the rolling mean to check if three are notable trends in how the polarity shifts over the course of the unfolding of the story within George Orwell's *Nineteen Eighty-Four*.
+
+
+```{r ma5, message=FALSE, warning=FALSE}
+ggplot(novels_change, aes(id, rmean)) +    
+  facet_wrap(vars(novel), scales="free_x") +
+  geom_smooth(se = F, col = "black") + 
+  theme_bw() +
+  labs(y = "polarity ratio (rolling mean, k = 100)",
+       x = "index (word in monograph)")
+```
+
+The difference between the rolling mean and the binning is quite notable and results from the fact, that rolling means represent a smoothing method rather than a method to track changes over time. 
+
+# Neutralizing negation
+
+So far we have ignored that negation affects the meaning and also the sentiment that is expressed by words. In practice, this means that the sentence *you are a good boy* and *You are not a good boy* would receive the same scores as we strictly focused on the use of emotive but ignored how words interact and how the context affects word meaning.
+
+In fact, we removed *not* and other such negators (e.g. *none*, *never*, or *neither*) when we removed stop words. In this section, we want to discover how we can incorporate context in our SA. Unfortunately, we have to restrict this example to an analysis of polarity as performing a context-sensitive sentiment analysis that would extend the *Word-Emotion Association Lexicon* would be quite complex and require generating our own sentiment dictionary.
+
+We begin by cleaning George Orwell's *Nineteen Eighty-Four*, then splitting it into sentences, and selecting the first 50 sentences as the sample that we will be working with.
+
+```{r neg1, message=FALSE, warning=FALSE}
+# split text into sentences
+orwell_sent <- orwell %>%
+  iconv(to = "latin1") %>%
+  paste0(collapse = " ") %>%
+  stringr::str_replace_all(., "([a-z])- ([a-z])", "\\1\\2") %>%
+  stringr::str_squish() %>%
+  tibble() %>%
+  dplyr::select(text = 1, everything()) %>%
+  tidytext::unnest_tokens(sentence, text, token = "sentences") %>%
+  dplyr::top_n(50)
+```
+
+```{r neg1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_sent %>%
+  head(10) %>%
+  kable(caption = "First 10 sentences of orwell_sent.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+In a next step, we load the `sentimentr` package which allows us to extract negation-sensitive polarity scores for each sentences. In addition, we apply the `sentimentr` function to each sentence and extract their polarity scores.
+
+```{r neg3, message=FALSE, warning=FALSE}
+orwell_sent_class <- orwell_sent %>%
+  dplyr::mutate(ressent = sentiment(sentence)$sentiment)
+```
+
+
+```{r neg3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+orwell_sent_class %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of orwell_sent_class.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+If you are interested in learning more about SA in R, @silge2017text is highly recommended as it goes more into detail and offers additional information.
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y.')` *Sentiment Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/sentiment.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`sentiment,
+  author = {Schweinberger, Martin},
+  title = {Sentiment Analysis in R},
+  note = {https://slcladal.github.io/sentiment.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = {The University of Queensland, School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+
+# References{-}
+
+
+
