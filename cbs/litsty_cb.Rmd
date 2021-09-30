@@ -1,0 +1,540 @@
+---
+title: "Computational Literary Stylistics with R"
+author: "Dattatreya Majumdar and Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: default
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+
+# Introduction{-}
+
+This tutorial focuses on **computational literary stylistics** (also digital literary stylistics) and shows how fictional texts can be analyzed by using computational means. The entire code for the sections below can be downloaded [here](https://slcladal.github.io/litsty.Rmd). 
+
+Computational literary stylistics refers to analyses of the language of literary texts by computational means using linguistic concepts and categories, with the goal of finding patters among the literary texts and explaining how literary meaning/s is/are created by specific language choices. Computational literary stylistics has been linked with distant reading which aims to find patterns in large amounts of literary data that would not be detectable by traditional close reading techniques.
+
+While this tutorial builds on @silge2017text (see [here](https://www.tidytextmining.com/)), it substantially expands @silge2017text in terms of the range of methods that are presented and the data sources that are used.
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/Intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+
+```{r prep1, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("tidytext")
+install.packages("janeaustenr")
+install.packages("tidyverse")
+install.packages("quanteda")
+install.packages("forcats")
+install.packages("gutenbergr")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
+```
+
+We now activate these packages as shown below.
+
+```{r pack_01, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+library(tidyverse)
+library(janeaustenr)
+library(tidytext)
+library(forcats)
+library(quanteda)
+library(gutenbergr)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+# Getting started{-}
+
+To explore different methods used in literary stylistics, we will analyze selected works from the Project Gutenberg. For this tutorial, we will download William Shakespeare's *Romeo and Juliet*, Charles Darwin's *On the Origin of Species*, Edgar Allan Poe's *The Raven*, Jane Austen's *Pride and Prejudice*, Athur Conan Doyle's *The Adventures of Sherlock Holmes*, and Mark Twain's *The Adventures of Tom Sawyer* (to see how to download data from Project Gutenberg, check out this [tutorial](https://slcladal.github.io/gutenberg.html)).
+
+```{r echo = F, eval = F, message=FALSE, warning=FALSE}
+gb <- gutenberg_works()
+gb %>% 
+  filter(stringr::str_detect(author, "Shakespeare"),
+         stringr::str_detect(title, "Romeo"))
+```
+
+The code below downloads the data from a server that mirrors the content of Project Gutenberg (which is more stable than the Project itself).
+
+```{r loaddat, message=FALSE, warning=FALSE}
+shakespeare <- gutenbergr::gutenberg_works(gutenberg_id == "1513") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+darwin <- gutenbergr::gutenberg_works(gutenberg_id == "1228") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+twain <- gutenbergr::gutenberg_works(gutenberg_id == "74") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+poe <- gutenbergr::gutenberg_works(gutenberg_id == "1065") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+austen <- gutenbergr::gutenberg_works(gutenberg_id == "1342") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+doyle <- gutenbergr::gutenberg_works(gutenberg_id == "1661") %>%
+  gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+```
+
+
+```{r loaddat_tb, echo = F, message=F, warning=F}
+ shakespeare %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the shakespeare data.")  %>%
+  flextable::border_outer()
+```
+
+We can now begin to load and n a next step process the data.
+
+# Extracting words{-}
+
+The most basic but also most common task is to extract instances of individual words and seeing how they are used in context. This is also called *concordancing*. When extracting words, they are typically displayed in context which is why their display is called a *keyword in context concordance* or kwic, for short.
+
+The code below extracts the word *pride* from the novel *Pride and Prejudice* and displays the resulting instances of this keyword in a kwic.
+
+```{r kwic_01, message=FALSE, warning=FALSE}
+# extract text
+austen_text <- austen %>%
+  dplyr::summarise(text = paste0(text, collapse = " ")) %>%
+  stringr::str_squish()
+# give text a name
+names(austen_text)  <- "Pride & Prejudice"
+# extract instances of pride
+pride <- quanteda::kwic(austen_text, "pride") %>%
+  as.data.frame()
+```
+
+```{r pride_tb, echo = F, message=F, warning=F}
+ pride %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the pride data.")  %>%
+  flextable::border_outer()
+```
+
+The kwic display could now be processed further or could be inspected to see how the keyword in question (*pride*) is used in this novel.
+
+We can also inspect the use of phrases, for example *natural selection*, expand the context window size, and clean the output (as shown below).
+
+```{r kwic_02, message=FALSE, warning=FALSE}
+# extract text
+darwin_text <- darwin %>%
+  dplyr::summarise(text = paste0(text, collapse = " ")) %>%
+  stringr::str_squish()
+# generate kwics
+ns <- quanteda::kwic(darwin_text, phrase("natural selection"), window = 10) %>%
+  as.data.frame() %>%
+  dplyr::select(-docname, -from, -to, -pattern)
+```
+
+```{r kwic_tb, echo = F, message=F, warning=F}
+ ns %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 concordances of natural selection in Charles Darwin's Origin.")  %>%
+  flextable::border_outer()
+```
+
+# Identifying Keywords{-}
+
+Another common task in literary stylistics is to extract terms that are particularly characteristic of a given text. The problem underlying the identification of keywords is to figure out the importance of words in each document. We can assign weights to words that are more characteristic for a text if these terms are used more frequently than expected in a given text. We can then show terms ordered by their relative weight. Using the `bind_tf_idf()` function from the *tidytext* package, we can extract the *term frequency - inverse document frequency*, or tf-idf, scores which represent these relative weights and we can also  report other parameters such as number of occurrences of that word, total number of words and term frequency.
+
+Before we continue, we need to define certain terms of concepts that are related to literary stylistics and that we will use repeatedly in this tutorials and that we need to define so that the analysis shown below makes sense.
+
+*Term Frequency* is the measure of importance of a word in a document or how frequently it appears in that document. However there are some words such as *the*,*is*, *of*, etc. which appear frequently even though they might not be important. An approach of using a list of stop-words and removing them before analysis can be useful but in case of some documents these words might be highly relevant. 
+
+The *Inverse Document Frequency* decreases the weight for most used words and increases the weight for words that are not much used in a collection of documents. This together with the Term Frequency can be used to calculate a term's *tf-idf* (the multiplication of both the terms) which adjusts the frequency of the term based on how rarely it is used. Mathematically *idf* can be expressed as follows:
+
+\begin{equation}
+  idf_{(term)}=  ln (\frac{n_{documents}}{n_{documents\; containing\; term}})
+\end{equation}
+
+Before we calculate the *tf-idf*, we will collapse all the books into a single data frame though.
+
+```{r, message=FALSE, warning=FALSE}
+books <- rbind(shakespeare, darwin, twain, poe, austen, doyle)
+# add names to books 
+books$book <- c(
+  rep("Shakespeare", nrow(shakespeare)),
+  rep("Darwin", nrow(darwin)),
+  rep("Twain", nrow(twain)),
+  rep("Poe", nrow(poe)),
+  rep("Austen", nrow(austen)),
+  rep("Doyle", nrow(doyle))
+)
+# clean data
+books <- books %>%
+  dplyr::filter(text != "") %>%
+  dplyr::mutate(book = factor(book)) %>%
+  dplyr::select(-gutenberg_id)
+```
+
+```{r books_tb, echo = F, message=F, warning=F}
+ books %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the books data.")  %>%
+  flextable::border_outer()
+```
+
+
+Now, we continue by calculating the *tf-idf* for each term in each of the books.
+
+
+```{r book_tf_idf, warning=F, message = F}
+book_words <- books %>%
+  tidytext::unnest_tokens(word, text) %>%
+  dplyr::count(book, word, sort = TRUE) %>% 
+  dplyr::group_by(book) %>% 
+  dplyr::mutate(total = sum(n))
+book_tf_idf <- book_words %>%
+  tidytext::bind_tf_idf(word, book, n)
+```
+
+```{r book_tf_idf_tb, echo = F, message=F, warning=F}
+ book_tf_idf %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the tf-idf data frame.")  %>%
+  flextable::border_outer()
+```
+
+
+From the above table it is evident that the extremely common words have a very low inverse document frequency and thus a low tf-idf score. The inverse document frequency will be a higher number for words that occur in fewer documents in the collection of novels.
+
+```{r high_tf_idf, message=FALSE, warning=FALSE}
+book_tf_idf %>%
+  dplyr::select(-total) %>%
+  dplyr::arrange(desc(tf_idf))
+```
+
+
+Next, we plot the 15 words with the highest tf-idf scores for each novel to show which words are particularly charateristic of each of the novels.
+
+```{r high_tf_idfplot,  fig.height=8, fig.width=6, fig.cap="Highest tf-idf words in each of Jane Austen's Novels"}
+book_tf_idf %>%
+  dplyr::group_by(book) %>%
+  slice_max(tf_idf, n = 15) %>%
+  dplyr::ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free") +
+  labs(x = "tf-idf", y = NULL)
+```
+
+As you can see, the method has indeed extracted words (and by extension concepts) that are characteristic of the texts. 
+
+# Extracting Structural Features{-}
+
+Extracting structural features of texts is a very common and has a wide range of applications such as determining if texts belong to the same genre or if texts represent a real language or a made up nonsensical language, for example.
+
+## Word-Frequency Distributions{-}
+
+Word-frequency distributions can be used to determine if a text represents natural language (or a simple replacement cipher, for example) or if the text does not represent natural language (or a more complex cipher). In the following, we will check if the language used in texts we have downloaded from Project Gutenberg aligns with distributions that we would expect when dealing with natural language. In a first step, we determine both the term-frequency and the idf.
+
+```{r book_words, message=FALSE, warning=FALSE}
+book_words <- books %>%
+  tidytext::unnest_tokens(word, text) %>%
+  dplyr::count(book, word, sort = TRUE)  %>% 
+  dplyr::group_by(book) %>% 
+  dplyr::mutate(total = sum(n))
+```
+
+
+```{r book_words_tb, echo = F, message=F, warning=F}
+ book_words %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the book_words data.")  %>%
+  flextable::border_outer()
+```
+
+From the above table it is evident that the usual suspects *the*, *and*, *to* and so-forth are leading in terms of their usage frequencies in the novels. Now let us look at the distribution of *n/total* for each term in each of the novels (which represents the normalized term frequency).
+
+```{r tfplot, message = F, warning = F, fig.height=6, fig.width=6, fig.cap="Term frequency distributions"}
+ggplot(book_words, aes(n/total, fill = book)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.005) +
+  facet_wrap(~book, ncol = 2, scales = "free_y")
+```
+
+From the plots it is clear that we are dealing with a negative exponential distribution and that many words occur only rarely and that only few words occur frequently. In other words, only few words occur frequently while most words occur rarely. This relationship represents a distribution that is captured by *Zipf's law*.
+
+
+## Zipf's Law{-}
+
+Zipf's Law represents an empirical power law or power function that was established in the 1930s. Zipf's law is one of the most fundamental laws in linguistics [see @george1935zipf] and it states that the frequency of a word is inversely proportional to its rank in a text or collection of texts. 
+
+Let
+
+* N be the number of elements in a text (or collection of texts);
+
+* k be their rank;
+
+* s be the value of the exponent characterizing the distribution.
+
+Zipf's law then predicts that out of a population of N elements, the normalized frequency of the element of rank k, f(k;s,N), is:
+
+\begin{equation}
+f(k;s,N)={\frac {1/k^{s}}{\sum \limits _{n=1}^{N}(1/n^{s})}} 
+\end{equation}
+
+In the code chunk below, we check if Zipf's Law applies to the words that occur in texts that we have downloaded from Project Gutenberg.
+
+```{r Zipf, message=FALSE, warning=FALSE}
+freq_by_rank <- book_words %>% 
+  dplyr::group_by(book) %>% 
+  dplyr::mutate(rank = row_number(), 
+         `term frequency` = n/total) %>%
+  dplyr::ungroup()
+```
+
+```{r freq_by_rank_tb, echo = F, message=F, warning=F}
+ freq_by_rank %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the freq_by_rank data.")  %>%
+  flextable::border_outer()
+```
+
+
+To get a better understanding of Zipf's law, let us visualize the distribution by plotting on the logged rank of elements on the x-axis and logged frequency of the terms on the y-axis. If Zipf's law holds, then we should see more or less straight lines that go from top left to bottom right.
+
+```{r fr, fig.width=5, fig.height=4.5, fig.cap="Zipf's law for a sample of literary texts"}
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = book)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+We can see that the plot has a negative slope which corroborates the inverse relationship of rank with respect to term frequency which shows that the words in the texts from Project Gutenberg follow Zipf's law. This would ascertain that we are dealing with natural language and not a made up nonsense language or a complex cipher. 
+
+## Lexical Diversity{-}
+
+Lexical diversity is a complexity measure that provides information about the lexicon size of a text, i.e. how many different words occur in a text given the size of the text. The Type-Token-Ratio (TTR) provides information about the number of word tokens (individual instances of a word) divided by the number of different word types (word forms). Let's briefly elaborate on that and look a bit more closely at the terms *types* and *tokens*. The sentence *The dog chased the cat* contains five tokens but only 4 types because *the* occurs twice. Now, a text that is 100 words long and consist of 50 distinct words would have a TTR of .5 (50/100) while a text that is 100 words long but consist of 80 distinct words would have a TTR of .8 (80/100). Thus, typically, higher values indicate higher lexical diversity and more complex texts or more advanced learners of a language commonly have higher TTRs compared to simpler texts or less advanced language learners. 
+
+As such, we can use lexical diversity measures to analyze the complexity of the language in which a text is written which can be used to inspect the advances a language learner makes when acquiring a language: initially, the learner will have high TTR as they do not have a large vocabulary. The TTRs will increase as lexicon of the learner grows.
+
+In the following example, we calculate the TTRs for the literary texts we have downloaded from Project Gutenberg. Ina  first step, we tokenize the texts, i.e. we split the texts into individual words (tokens).
+
+```{r ttr, message=F, warning=F}
+books_texts <- books %>%
+  dplyr::group_by(book) %>%
+  dplyr::summarise(text = paste(text, collapse = " "))
+texts <- books_texts %>%
+  dplyr::pull(text)
+names(texts) <- books_texts %>%
+  dplyr::pull(book)
+tokens_texts <- texts %>%
+  quanteda::corpus() %>%
+  quanteda::tokens()
+# inspect data
+head(tokens_texts)
+```
+
+Next, we calculate the TTR using the `textstat_lexdiv` function from the `quanteda` package and visualize the resulting TTRs for the literary texts thta we have downloaded from Project Gutenberg.
+
+```{r, message=FALSE, warning=FALSE}
+dfm(tokens_texts) %>%
+  quanteda.textstats::textstat_lexdiv(measure = "TTR") %>%
+  ggplot(aes(x = TTR, y = reorder(document, TTR))) + 
+  geom_point() +
+  xlab("Type-Token-Ratio (TTR)") +
+  ylab("")
+```
+
+We can see that Darwin's *On the Origin of Species* has the lowest lexical diversity while Edgar Allan Poe's *The Raven* has the highest. This would suggest that the language in *The Raven* is more complex than the language of *On the Origin of Species*. However, this is too simplistic and shows that simple Type-Token Ratios are severely affected by text length (as well as orthographic errors) and should only be used to compare texts 
+
+* that are comparatively long (at least 200 words) 
+* that are approximately of the same length
+* that were error corrected so that orthographic errors do not confound the ratios
+
+### Average Sentence Length{-}
+
+The average sentence length (ASL) is another measure of textual complexity with more sophisticated language use being associated with longer and more complex sentences. As such, we can use the ASL as an alternative measure of the linguistic complexity of a text or texts. 
+
+```{r asl, warning=F, message=F}
+library(lexRankr)
+books_sentences <- books %>%
+  dplyr::group_by(book) %>%
+  dplyr::summarise(text = paste(text, collapse = " ")) %>%
+  lexRankr::unnest_sentences(sentence, text)
+```
+
+```{r books_sentences_tb, echo = F, message=F, warning=F}
+ books_sentences %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+    flextable::set_caption(caption = "First 15 rows of the books_sentences data.")  %>%
+  flextable::border_outer()
+```
+
+
+Let's now visualize the results for potential differences or trends.
+
+```{r, message=FALSE, warning=FALSE}
+books_sentences %>%
+  dplyr::mutate(sentlength = stringr::str_count(sentence, '\\w+')) %>%
+  ggplot(aes(x = sentlength, y = reorder(book, sentlength, mean), group = book)) +
+  stat_summary(fun = mean, geom = "point")   +          
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  xlab("Average Sentence Length (ASL)") +
+  ylab("")
+```
+
+We can see that that *The Raven* (which does not contain any punctuation) is (unsurprisingly) the text with the longest ASL while Shakespeare's play *Romeo and Juliet* (which contains a lost of dialogues) is deemed the work with the shortest ASL. With the exception of Poe's *The Raven*, the ALS results reflect text complexity with Darwin's *On the Origin of Species* being more complex or written like than the other texts with *Romeo and Juliet* being the most similar to spoken dialogue. 
+
+## Similarity among literary texts{-}
+
+We will now explore how similar the language of literary works is. This approach can, of course, be extended to syntactic features or, for instance, to determine if certain texts belong to a certain literary genre or were written by a certain author. When extending this approach to syntactic features, one would naturally use features like the ALS, TTRs, or the frequency of adjectives as the basis for determining similarity. Regarding authorship, things like bigrams, spacing or punctuation methods would be relevant features. 
+
+To assess the similarity of literary works (based on the words that occur in the texts), we first create a feature list, i.e. a matrix with word frequencies. In teh present case, we remove stop words as well as symbols (it can be useful to retain thse but this is depends on the task at hand).
+
+
+```{r sim01, message=FALSE, warning=FALSE}
+feature_mat <- books %>%
+  dplyr::group_by(book) %>%
+  dplyr::sample_n(100) %>%
+  dplyr::summarise(text = paste0(text, collapse = " ")) %>%
+  dplyr::ungroup() %>%
+  quanteda::corpus(text_field = "text", docid_field = "book") %>%
+  quanteda::dfm(remove_punct = TRUE, remove_symbols = TRUE) %>% 
+  quanteda::dfm_remove(pattern = stopwords("en"))
+# inspect data
+feature_mat[1:6, 1:6]
+```
+
+We see that the texts are represented as the row names and the terms the column names. The content of the matrix consists of the term frequencies. 
+
+We can now perform agglomerative hierarchical clustering and visualize the results in a dendrogram to assess the similarity of texts.
+
+```{r sim03, message=FALSE, warning=FALSE}
+books_dist <- as.dist(quanteda.textstats::textstat_dist(feature_mat))
+books_clust <- hclust(books_dist)
+plot(books_clust)
+```
+
+According to the dendrogram, Conan Doyle's *The Adventures of Sherlock Holmes* and Shakespeare's *Romeo and Juliet* are the most similar texts. Edgar Allen Poe's *The Raven* is the most idiosyncratic texts as it is on a branch by its own and is amalgamated with the other texts only as a very last step at the root of the tree.
+
+## Networks of Personas{-}
+
+A final procedure we will perform is a network analysis of the personas in Shakespeare's *Romeo and Juliet*. We directly load a co-occurrence matrix which provides information about how often character's in that play have been in the same scene (as the extraction of this information is a bit cumbersome, I have done that for you and you can simply load the matrix into R). 
+
+```{r net_01, message=FALSE, warning=FALSE}
+# load data
+romeo <- read.delim("https://slcladal.github.io/data/romeo.txt", sep = "\t")
+# convert into feature co-occurrence matrix
+romeo_fcm <- as.fcm(as.matrix(romeo))
+# inspect data
+romeo_fcm
+```
+
+As the `quanteda` package has a very neat and easy to use function (`textplot_network`) for generating network graphs, we make use this function and can directly generate the network.  
+
+
+```{r net_05, message=FALSE, warning=FALSE}
+quanteda.textplots::textplot_network(romeo_fcm, min_freq = 0.1, edge_alpha = 0.1, edge_size = 5)
+```
+
+The thickness of the lines indicates how often characters have co-occurred. We could now generate different network graphs for the personas in different plays to see how these plays and personas differ or we could apply the network analysis to other types of information such as co-occurrences of words.
+
+
+We have reached the end of this tutorial. Please feel free to explore more of our content at https://slcladal.github.io/index.html - for computational literary stylistics, especially the tutorials on [part-of-speech tagging and syntactic parsing](https://slcladal.github.io/tagging.html) as well as on [lexicography with R](https://slcladal.github.io/lex.html) provide relevant additional information. 
+
+# Citation & Session Info {-}
+
+Majumdar, Dattatreya and Martin Schweinberger. `r format(Sys.time(), '%Y')`. *Literary Stylistics with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/litsty.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{Majumdar`r format(Sys.time(), '%Y')`ta,
+  author = {Majumdar, Dattatreya and Martin Schweinberger},
+  title = {Literary Stylistics with R},
+  note = {https://slcladal.github.io/litsty.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+
+```{r fin}
+sessionInfo()
+```
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+# References {-}
+
+
+

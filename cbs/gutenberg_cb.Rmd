@@ -1,0 +1,215 @@
+---
+title: "Downloading Texts from Project Gutenberg using R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:  
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial shows how to download and clean works from the [Project Gutenberg](https://www.gutenberg.org/) archive using R. Project Gutenberg is a data base whcih contains roughly 60,000 texts for which the US copyright ahs expired. The entire R-markdown document for the sections below can be downloaded [here](https://slcladal.github.io/gutenberg.Rmd).
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, eval = F, message=FALSE, warning=FALSE}
+# install libraries
+install.packages("tidyverse")
+install.packages("gutenbergr")
+install.packages("DT")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r gb1, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
+# activate packages
+library(tidyverse)
+library(gutenbergr)
+library(DT)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+# Project Gutenberg
+
+In a first step, we inspect which works are available for download. We can do this by typing `gutenberg()` or simply `gutenberg_metadata` into the console which will output a table containing  all available texts.
+
+```{r gb3, eval = F}
+gutenberg_metadata
+```
+
+The table below shows the first 15 lines of the overview table which shows all available texts. As there are currently 51,997 texts available, we limit the output here to 15.
+
+```{r gb4a, echo = F}
+overview <- gutenberg_metadata
+```
+
+```{r gb4b, echo = F}
+DT::datatable(head(overview, 20), rownames = FALSE, filter="none", 
+              caption = "Table showing the first texts available in the Gutenberg data base.", 
+              options = list(pageLength = 5, scrollX=T))
+```
+
+To find all works by a specific author, you need to specify the *author* in the `gutenberg_works` function as shown below.
+
+```{r gb5a}
+# load data
+darwin <- gutenberg_works(author == "Darwin, Charles")
+```
+
+```{r gb5b, echo = F}
+DT::datatable(darwin, rownames = FALSE, filter="none", 
+              caption = "All texts of Charles Darwin available through Project Gutenberg.", 
+              options = list(pageLength = 5, scrollX=T))
+```
+
+To find all texts in, for example, German, you need to specify the *language* in the `gutenberg_works` function as shown below.
+
+```{r gb6}
+# load data
+gutenberg_works(languages = "de", all_languages = TRUE) %>%
+  dplyr::count(language)
+```
+
+
+
+# Loading individual texts
+
+To download any of these text, you need to specify the text you want, e.g. by specifying the title. In a next step, you can then use the `gutenberg_download` function to download the text. To exemplify how this works we download William Shakespeare's *Romeo and Juliet*.
+
+```{r gb8}
+# load data
+romeo <- gutenberg_works(title == "Romeo and Juliet") %>%
+  gutenberg_download(meta_fields = "title")
+```
+
+
+```{r gb9, echo = F}
+# inspect data
+romeo %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of William Shakespeare's Romeo and Juliet.")  %>%
+  flextable::border_outer()
+```
+
+
+We could also use the *gutenberg_id* to download this text.
+
+```{r gb10}
+# load data
+romeo <- gutenberg_works(gutenberg_id == "1513") %>%
+  gutenberg_download(meta_fields = "gutenberg_id")
+```
+
+```{r gb11, echo = F}
+# inspect data
+romeo %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of William Shakespeare's Romeo and Juliet.")  %>%
+  flextable::border_outer()
+```
+
+
+# Loading texts simultaneously
+
+To load more than one text, you can use the `|` (or) operator to inform R that you want to download the text with the *gutenberg_id* 768 (*Wuthering Heights* and the text with the *gutenberg_id* 1260 which is *Jane Eyre* (both from Jane Austen).
+
+```{r gb12}
+texts <- gutenberg_download(c(768, 1260), meta_fields = "title", 
+                            mirror = "http://mirrors.xmission.com/gutenberg/")
+```
+
+```{r gb13, echo = F}
+# generate table
+as.data.frame(table(texts$gutenberg_id)) %>%
+  dplyr::rename(Text = Var1, 
+                NumberOfLines = Freq) %>%
+  dplyr::mutate(Text = dplyr::case_when(Text == "768" ~ "Wuthering Heights",
+                                        Text == "1260" ~ "Jane Eyre"))
+```
+
+Feel free to have a look at different texts provided by the Project Gutenberg!
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Downloading Texts from Project Gutenberg using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/gutenberg.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`gb,
+  author = {Schweinberger, Martin},
+  title = {Downloading Texts from Project Gutenberg using R},
+  note = {https://slcladal.github.io/gutenberg.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+# References {-}
+
+
+
+
+
+
+
