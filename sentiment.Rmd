@@ -32,25 +32,50 @@ This tutorial introduces sentiment analysis (SA) and show how to perform a SA in
 
 ## Preparation and session set up{-}
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F}
 # install packages
-install.packages(c("tidyverse", "readr", "tidytext", "zoo", "Hmisc", "sentimentr"))
+install.packages("tidyverse")
+install.packages("readr")
+install.packages("tidytext")
+install.packages("zoo")
+install.packages("Hmisc")
+install.packages("sentimentr")
+install.packages("knitr")
+install.packages("kableExtra")
+install.packages("DT")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
-```{r prep2, echo=F, eval = F, message=FALSE, warning=FALSE}
-install.packages(c("knitr", "kableExtra", "DT"))
-```
 
-```{r prep3, echo=F, message=FALSE, warning=FALSE}
-# load packages for website
-library(knitr) 
-library(kableExtra) 
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# activate packages
+library(tidyverse)
+library(readr)
+library(tidytext)
+library(zoo)
+library(Hmisc)
+library(sentimentr)
+library(knitr)
+library(kableExtra)
 library(DT)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
-Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+
 
 # Sentiment Analysis
 
@@ -63,18 +88,6 @@ The more fine-grained output is made possible by relying on the Word-Emotion Ass
 
 ## Getting started{-}
 
-Before turning to the SA, we will load the packages for this tutorial. 
-
-```{r sa1, message=F, warning=F}
-# activate packages
-library(tidyverse)
-library(readr)
-library(tidytext)
-library(zoo)
-library(Hmisc)
-library(sentimentr)
-```
-
 In the following, we will perform a SA to investigate the emotionality of five different novels. We will start with the first example and load five pieces of literature. 
 
 ```{r sa3, message=FALSE, warning=FALSE}
@@ -82,8 +95,21 @@ darwin <- base::readRDS(url("https://slcladal.github.io/data/origindarwin.rda", 
 twain <- base::readRDS(url("https://slcladal.github.io/data/twainhuckfinn.rda", "rb"))
 orwell <- base::readRDS(url("https://slcladal.github.io/data/orwell.rda", "rb"))
 lovecraft <- base::readRDS(url("https://slcladal.github.io/data/lovecraftcolor.rda", "rb"))
+```
+
+```{r ds02, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-head(darwin, 10)
+darwin %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the darwin data.")  %>%
+  flextable::border_outer()
 ```
 
 Write function to clean data
@@ -116,12 +142,19 @@ orwell_clean <- txtclean(orwell, "orwell")
 twain_clean <- txtclean(twain, "twain")
 ```
 
-```{r sa7b, echo = F, message=FALSE, warning=FALSE}
+```{r sa7b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 darwin_clean %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of darwin_clean.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the cleaned darwin data.")  %>%
+  flextable::border_outer()
 ```
 
 
@@ -138,14 +171,21 @@ novels_anno <- rbind(darwin_clean, twain_clean, orwell_clean, lovecraft_clean) %
          sentiment = factor(sentiment))
 ```
 
-```{r bsa1b, echo = F, message=FALSE, warning=FALSE}
+```{r bsa1b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 novels_anno %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of novels_anno.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the novels_anno data.")  %>%
+  flextable::border_outer()
 ```
+
 
 
 We will now summarize the results of the SA and calculate the percentages of the prevalence of emotions across the books.
@@ -161,14 +201,23 @@ novels <- novels_anno %>%
   dplyr::mutate(percentage = round(sentiment_freq/words*100, 1))
 ```
 
-```{r bsa3b, echo = F, message=FALSE, warning=FALSE}
+```{r bsa3b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 novels %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of novels.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the novels data.")  %>%
+  flextable::border_outer()
 ```
+
+
+
 
 
 After performing the SA, visualize the results and show the scores fro each core emotion by book.
@@ -224,14 +273,22 @@ novels_impw <- novels_anno %>%
   dplyr::mutate(score = n/sum(n))
 ```
 
-```{r contribsa1b, echo = F, message=FALSE, warning=FALSE}
+```{r contribsa1b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 novels_impw %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of novels_impw.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the novels_impw data.")  %>%
+  flextable::border_outer()
 ```
+
+
 
 We can now visualize the top three words for the remaining core emotion categories. 
 
@@ -291,13 +348,23 @@ novels_bin <- novels_anno %>%
             polarity = mean(sentiment))
 ```
 
-```{r bin1b, echo = F, message=FALSE, warning=FALSE}
+
+```{r bin1b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 novels_bin %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of novels_bin.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the novels_bin data.")  %>%
+  flextable::border_outer()
 ```
+
+
 
 
 We now have an average polarity for each bin and can plot this polarity over the development of the story.
@@ -333,17 +400,23 @@ novels_change <- novels_anno %>%
   dplyr::summarise(id = id,
                  rmean=rollapply(sentiment, 100, mean, align='right', fill=NA)) %>%
   na.omit()
-# inspect results
-head(novels_change)
 ```
 
-```{r ma1b, echo = F, message=FALSE, warning=FALSE}
+```{r ma1b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 novels_change %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of novels_change.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the novels_change data.")  %>%
+  flextable::border_outer()
 ```
+
 
 We will now display the values of the rolling mean to check if three are notable trends in how the polarity shifts over the course of the unfolding of the story within George Orwell's *Nineteen Eighty-Four*.
 
@@ -380,14 +453,23 @@ orwell_sent <- orwell %>%
   dplyr::top_n(50)
 ```
 
-```{r neg1b, echo = F, message=FALSE, warning=FALSE}
+```{r neg1b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 orwell_sent %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 sentences of orwell_sent.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the orwell_sent data.")  %>%
+  flextable::border_outer()
 ```
+
+
+
 
 
 In a next step, we load the `sentimentr` package which allows us to extract negation-sensitive polarity scores for each sentences. In addition, we apply the `sentimentr` function to each sentence and extract their polarity scores.
@@ -397,15 +479,22 @@ orwell_sent_class <- orwell_sent %>%
   dplyr::mutate(ressent = sentiment(sentence)$sentiment)
 ```
 
-
-```{r neg3b, echo = F, message=FALSE, warning=FALSE}
+```{r neg3b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 orwell_sent_class %>%
+  as.data.frame() %>%
   head(10) %>%
-  kable(caption = "First 10 rows of orwell_sent_class.") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                            full_width = F)
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the orwell_sent_class data.")  %>%
+  flextable::border_outer()
 ```
+
+
 
 If you are interested in learning more about SA in R, @silge2017text is highly recommended as it goes more into detail and offers additional information.
 
