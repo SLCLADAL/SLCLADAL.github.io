@@ -87,6 +87,7 @@ install.packages("class")
 install.packages("NLP")
 install.packages("openNLP")
 install.packages("openNLPdata")
+install.packages("pacman")
 # install klippy for copy-to-clipboard button in code chunks
 remotes::install_github("rlesur/klippy")
 ```
@@ -114,6 +115,8 @@ library(class)
 library(NLP)
 library(openNLP)
 library(openNLPdata)
+library(pacman)
+pacman::p_load_gh("trinker/entity")
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -1016,14 +1019,72 @@ Based on the frequencies of phonemes in the unknown text, the knn-classifier pre
 
 # Entity Extraction
 
-Entity Extraction is a process during which textual elements which have characteristics that are common to proper nouns (locations, people, organizations, etc.) rather than other parts of speech, e.g. non-sentence initial capitalization, are extracted from texts. Retrieving entities is common in automated summarization and in Topic Modeling. Entity extraction can be achieved by simple feature extraction (e.g. extract all non-sentence initial capitalized words) or with the help of training sets. Using training sets, i.e. texts that are annotated for entities and non-entities, achieves better results when dealing with unknown data and data with inconsistent capitalization.
+Named Entity Recognition (NER) (also referred to as *named entity extraction* or simply as *entity extraction*) is a text analytic method which allows us to automatically identify or extract named entities from text(s) such as persons, locations, brands, etc. 
 
-```{r ee1, message=FALSE, warning=FALSE}
-# process data
-orwell <- orwell %>%
-  stringr::str_remove_all("Part 2,.*")
+As such, NER is a process during which textual elements which have characteristics that are common to proper nouns (locations, people, organizations, etc.) rather than other parts of speech, e.g. non-sentence initial capitalization, are extracted from texts. Retrieving entities is common in automated summarization and in Topic Modeling. NER can be achieved by simple feature extraction (e.g. extract all non-sentence initial capitalized words) or with the help of training sets. Using training sets, i.e. texts that are annotated for entities and non-entities, achieves better results when dealing with unknown data and data with inconsistent capitalization.
+
+There are different options to extract entities from texts in R. Here, we will focus on two methods:
+
+a) entity extraction using `pacman` and `entity` packages provided by Tyler Rinker which builds on the `NLP` and `openNLP` packages; and
+
+b) entity extraction using the `NLP` and `openNLP` packages directly.
+
+## NER using pacman
+
+As we have already installed and activated the required packages during the session preparation, we can start right away by loading and cleaning a sample text - which is a summary of Aldous Huxley's *Brave New World*.
+
+
+```{r ea01, message=F, warning=F}
+# load corpus data
+text <- readLines("https://slcladal.github.io/data/text4.txt", skipNul = T) %>%
+  # clean data
+  stringr::str_squish() %>%
+  # remove empty elements
+  .[. != ""]
+
+```
+```{r ea3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+text %>%
+  as.data.frame() %>%
+  head(1) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First paragraph of the text element (a description of Aldous Huxley's Brave New World)")  %>%
+  flextable::border_outer()
+```
+
+We can now extract the entities form that text using the `person_entity` from the `entity` package.
+
+```{r ea04, message=F, warning=F}
+# extract person entities
+entity::person_entity(text)
+```
+
+We can also extract other types of entities as shown below - I have de-activated the code chunk, but you can run the code and check out the results.
+
+```{r ea05, eval = F, message=F, warning=F}
+# extract locations
+entity::location_entity(text)
+entity::organization_entity(text)
+entity::date_entity(text)
+entity::money_entity(text)
+entity::percent_entity(text)
+```
+
+
+## NER using NLP and openNLP{-}
+
+We can also perform NER using the `NLP` and `openNLP` packages directly (rather than the `pacman` and `entity` packages which are wrapper of the `NLP` and `openNLP` packages). This is a bit more complex, but it also allows for more flexibility, e.g. extarcting entities by sentence rather than by text.
+
+
+```{r ee6, message=FALSE, warning=FALSE}
 # convert text into string
-orwell = as.String(orwell)
+text = as.String(text)
 # define annotators
 # sentence annotator
 sent_annot = openNLP::Maxent_Sent_Token_Annotator()
@@ -1036,44 +1097,75 @@ word_annot = openNLP::Maxent_Word_Token_Annotator()
 <div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br>I had an issue with the following lines of code because R asked me for a package (openNLPmodels.en) that I could not install for the R version I am currently running (4.1). So I copied the package openNLPmodels.en from the library of an older version of R (4.0) into my current library. You can find the language packages for English, Spanish, German, Swedish, Dutch, Italian, Danish, and Polish under: https://slcladal.github.io/packages/ - simply download and install them to the library of your current R version.<br><br>The original versions of these packages can be downloaded from https://datacube.wu.ac.at/src/contrib/.</p>
+<b>NOTE</b><br>I had an issue with the following lines of code because R asked me for a package (openNLPmodels.en) that I could not install for the R version I am currently running (4.1). You can find the language packages for English, Spanish, German, Swedish, Dutch, Italian, Danish, and Polish under: https://slcladal.github.io/packages/ - simply download and install them to the library of your current R version.<br><br>The original versions of these packages can be downloaded from https://datacube.wu.ac.at/src/contrib/.</p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
-
-<div class="question">` 
-
-</div>`
 
 ***
 
 Once the `openNLPmodels.en` model is your R library, you can run the code chunk below.
 
-```{r ee1b, message=FALSE, warning=FALSE}
+```{r ee6b, message=FALSE, warning=FALSE}
 # location annotator
 loc_annot = openNLP::Maxent_Entity_Annotator(kind = "location") 
 # person annotator
 people_annot = openNLP::Maxent_Entity_Annotator(kind = "person") 
 # apply annotations
-orwellanno = NLP::annotate(orwell, list(sent_annot, word_annot, 
+textanno = NLP::annotate(text, list(sent_annot, word_annot, 
                                         loc_annot, people_annot))
 ```
 
 
 Now that we have annotated the data, we can extract elements that have been identified as locations of persons.
 
-```{r ee2, message=FALSE, warning=FALSE}
+```{r ee7, message=FALSE, warning=FALSE}
 # extract features
-k <- sapply(orwellanno$features, `[[`, "kind")
+k <- sapply(textanno$features, `[[`, "kind")
 # extract locations
-orwelllocations = names(table(orwell[orwellanno[k == "location"]]))
+textlocations = names(table(text[textanno[k == "location"]]))
 # extract people
-orwellpeople = names(table(orwell[orwellanno[k == "person"]]))
+textpeople = names(table(text[textanno[k == "person"]]))
 # inspect extract people
-orwellpeople
+textpeople
 ```
 
-The output shows that the extraction of people and locations from George Orwell's *1984* was successful as we can see various places and persons in the output. 
+The output shows that the extraction of people and locations from the example text was successful as we can see various places and persons in the output. 
+
+# Part-of-Speech tagging
+
+A very common procedure to add information to texts is to part-of-speech tag the data, which means to determine to what type of word a specific word belongs. Below, we will add pos-tags to a short English text.
+
+We begin by writing a function which adds part of speech tags to an English text.
+
+```{r}
+# function for pos-tagging
+tagPOS <-  function(x, ...) {
+  s <- as.String(x)
+  word_token_annotator <- Maxent_Word_Token_Annotator()
+  a2 <- Annotation(1L, "sentence", 1L, nchar(s))
+  a2 <- annotate(s, word_token_annotator, a2)
+  a3 <- annotate(s, Maxent_POS_Tag_Annotator(), a2)
+  a3w <- a3[a3$type == "word"]
+  POStags <- unlist(lapply(a3w$features, `[[`, "POS"))
+  POStagged <- paste(sprintf("%s/%s", s[a3w], POStags), collapse = " ")
+  list(POStagged = POStagged)
+  }
+```
+
+
+We now apply this function to the text and then display the results.
+
+```{r pos2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load text
+text <- readLines("https://slcladal.github.io/data/english.txt")
+# pos tagging data
+textpos <- tagPOS(text)
+# inspect data
+textpos
+```
+
+We could, for example, use pos-tagging to check differences in the distribution of word classes across different registers. or to find certain syntactic patterns in a collection of texts. 
 
 # Citation & Session Info {-}
 
