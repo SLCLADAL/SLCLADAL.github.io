@@ -105,7 +105,6 @@ rom <- read.delim("https://slcladal.github.io/data/romeo_tidy.txt", sep = "\t")
 # inspect data
 rom %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Persona") %>%
   head(15) %>%
   flextable() %>%
   flextable::set_table_properties(width = .95, layout = "autofit") %>%
@@ -130,6 +129,7 @@ romeo <- as.data.frame(rome)
 # inspect data
 romeo[1:5, 1:5]%>%
   as.data.frame() %>%
+  tibble::rownames_to_column("Persona") %>%
   flextable() %>%
   flextable::set_table_properties(width = .95, layout = "autofit") %>%
   flextable::theme_zebra() %>%
@@ -226,18 +226,39 @@ ed %>%
 Now that we have generated tables for the edges and the nodes, we can generate a graph object.
 
 ```{r tidy6, message=F, warning=F}
-ig <- graph_from_data_frame(d=ed, vertices=va, directed = FALSE)
+ig <- igraph::graph_from_data_frame(d=ed, vertices=va, directed = FALSE)
 ```
 
 We will also add labels to the nodes as follows:
 
 ```{r tidy7, message=F, warning=F}
 tg <- tidygraph::as_tbl_graph(ig) %>% 
-  activate(nodes) %>% 
-  mutate(label=name)
+  tidygraph::activate(nodes) %>% 
+  dplyr::mutate(label=name)
 ```
 
-Now, we use the number of occurrences to define Vertice size (or node size)
+When we now plot our network, it looks as shown below.
+
+```{r tidy7b, message=F, warning=F}
+# set seed
+set.seed(12345)
+# edge size shows frequency of co-occurrence
+tg %>%
+   ggraph(layout = "fr") +
+   geom_edge_arc(colour= "gray50",
+                 lineend = "round",
+                 strength = .1,
+                 alpha = .1) +
+   geom_node_text(aes(label = name), 
+                  repel = TRUE, 
+                  point.padding = unit(0.2, "lines"), 
+                  colour="gray10") +
+  theme_graph(background = "white") +
+  guides(edge_width = FALSE,
+         edge_alpha = FALSE)
+```
+
+Now, we use the number of occurrences to define vertex size (or node size): the more often a character appears, the bigger it will appear in the graph.
 
 ```{r tidy8, message=F, warning=F}
 v.size <- V(tg)$Occurrences
@@ -245,7 +266,31 @@ v.size <- V(tg)$Occurrences
 v.size
 ```
 
-We can also use the frequency information to define weights
+When we include this into our network, it looks as shown below.
+
+```{r tidy8b, message=F, warning=F}
+# set seed
+set.seed(12345)
+# edge size shows frequency of co-occurrence
+tg %>%
+   ggraph(layout = "fr") +
+   geom_edge_arc(colour= "gray50",
+                  lineend = "round",
+                 strength = .1) +
+   geom_node_point(size=log(v.size)*2) +
+   geom_node_text(aes(label = name), 
+                  repel = TRUE, 
+                  point.padding = unit(0.2, "lines"), 
+                  size=sqrt(v.size), 
+                  colour="gray10") +
+  scale_edge_width(range = c(0, 2.5)) +
+  scale_edge_alpha(range = c(0, .3)) +
+  theme_graph(background = "white") +
+  guides(edge_width = FALSE,
+         edge_alpha = FALSE)
+```
+
+Next, we modify the edges by using frequency information to define weights: the more often two characters appear in the same scene, the bigger the edge.
 
 ```{r tidy9, message=F, warning=F}
 E(tg)$weight <- E(tg)$Frequency
@@ -253,7 +298,34 @@ E(tg)$weight <- E(tg)$Frequency
 head(E(tg)$weight, 10)
 ```
 
-Finally, we define colors (by family).
+When we include this into our network, it looks as shown below.
+
+```{r tidy10b, message=F, warning=F}
+# set seed
+set.seed(12345)
+# edge size shows frequency of co-occurrence
+tg %>%
+   ggraph(layout = "fr") +
+   geom_edge_arc(colour= "gray50",
+                  lineend = "round",
+                 strength = .1,
+                 aes(edge_width = weight,
+                     alpha = weight)) +
+   geom_node_point(size=log(v.size)*2) +
+   geom_node_text(aes(label = name), 
+                  repel = TRUE, 
+                  point.padding = unit(0.2, "lines"), 
+                  size=sqrt(v.size), 
+                  colour="gray10") +
+  scale_edge_width(range = c(0, 2.5)) +
+  scale_edge_alpha(range = c(0, .3)) +
+  theme_graph(background = "white") +
+  theme(legend.position = "top") +
+  guides(edge_width = FALSE,
+         edge_alpha = FALSE)
+```
+
+Finally, we define colors so that characters belonging to the same family have the same color.
 
 ```{r tidy10, message=F, warning=F}
 # define colors (by family)
@@ -268,7 +340,7 @@ Family <- dplyr::case_when(sapply(tg, "[")$nodes$name %in% mon ~ "MONTAGUE",
 Family
 ```
 
-Now, that we c´have created the different objects and defined their properties, we visualize the network.
+Now, that we have created the different objects and defined their properties, we can finally visualize the finished network.
 
 
 ```{r tidy11, message=F, warning=F}
