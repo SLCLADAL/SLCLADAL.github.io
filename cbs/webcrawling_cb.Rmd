@@ -4,9 +4,23 @@ author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   bookdown::html_document2:
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
 link-citations: yes
 ---
 
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
 
 ```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
@@ -14,11 +28,21 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces how to extract and process text data from social media sites, web pages, or other documents for later analysis. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/webcrawling.Rmd). This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_2_Web_crawling.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann . [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and overs many more very useful text mining methods. An alternative approach for web crawling and scraping would be to use the `RCrawler` package  which is not introduced here thought (inspecting the `RCrawler` package and its functions is, however, also highly recommended). For a more in-depth introduction to web crawling in scraping,is a very useful introduction.
+This tutorial introduces how to extract and process text data from social media sites, web pages, or other documents for later analysis. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/webcrawling.Rmd). This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_2_Web_crawling.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and overs many more very useful text mining methods. An alternative approach for web crawling and scraping would be to use the `RCrawler` package [@khalil2017rcrawler] which is not introduced here thought (inspecting the `RCrawler` package and its functions is, however, also highly recommended). For a more in-depth introduction to web crawling in scraping, @miner2012practical is a very useful introduction.
 
-NOTE: The code show below does not work at the moment - we are working on making it functional again and we hope that we will have a working version again in due time!
+***
 
-The automated download of HTML pages is called *Crawling*. The extraction of the textual data and/or metadata (for example, article date, headlines, author names, article text) from the HTML source code (or the DOM document object model of the website) is called *Scraping* . 
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br>The code show below does not work at the moment - we are working on making it functional again and we hope that we will have a working version again in due time!</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+***
+
+The automated download of HTML pages is called *Crawling*. The extraction of the textual data and/or metadata (for example, article date, headlines, author names, article text) from the HTML source code (or the DOM document object model of the website) is called *Scraping* [see @olston2010web]. 
 
 ## Preparation and session set up{-}
 
@@ -30,6 +54,8 @@ install.packages("rvest")
 install.packages("readtext")
 install.packages("webdriver")
 webdriver::install_phantomjs()
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
 If not done yet, please install the `webdriver` package for R and install the [phantomJS](https://phantomjs.org) headless browser. This needs to be done only once.
@@ -43,6 +69,8 @@ options("scipen" = 100, "digits" = 4) # suppress math annotation
 # load packages
 library(tidyverse)
 library(webdriver)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
@@ -60,6 +88,8 @@ For web crawling and scraping, we use the package `rvest` and to extract text da
 # Scraping of dynamic web pages
 
 Modern websites often do not contain the full content displayed in the browser in their corresponding source files which are served by the webserver. Instead, the browser loads additional content dynamically via javascript code contained in the original source file. To be able to scrape such content, we rely on a headless browser "phantomJS" which renders a site for a given URL for us, before we start the actual scraping, i.e. the extraction of certain identifiable elements from the rendered site. 
+
+
 
 
 Now we can start an instance of PhantomJS and create a new browser session that awaits to load URLs to render the corresponding websites.
@@ -108,7 +138,7 @@ The following xpath expression queries for first-order-headline elements `h1`, a
 The next expression uses R pipe operator %>%, which takes the input from the left side of the expression and passes it on to the function ion the right side as its first argument. The result of this function is either passed onto the next function, again via %>% or it is assigned to the variable, if it is the last operation in the pipe chain. Our pipe takes the `html_document` object, passes it to the html_node function, which extracts the first node fitting the given xpath expression. The resulting node object is passed to the `html_text` function which extracts the text wrapped in the `h1`-element.
 
 ```{r}
-title_xpath <- "//h1[contains( 'content__headline')]"
+title_xpath <- "//h1[contains(@class, 'content__headline')]"
 title_text <- html_document %>%
   html_node(xpath = title_xpath) %>%
   html_text(trim = T)
@@ -123,12 +153,12 @@ cat(title_text)
 Now we modify the xpath expressions, to extract the article info, the paragraphs of the body text and the article date. Note that there are multiple paragraphs in the article. To extract not only the first, but all paragraphs we utilize the `html_nodes` function and glue the resulting single text vectors of each paragraph together with the `paste0` function.
 
 ```{r}
-intro_xpath <- "//div[contains( 'content__standfirst')]//p"
+intro_xpath <- "//div[contains(@class, 'content__standfirst')]//p"
 intro_text <- html_document %>%
   html_node(xpath = intro_xpath) %>%
   html_text(trim = T)
 cat(intro_text)
-body_xpath <- "//div[contains( 'content__article-body')]//p"
+body_xpath <- "//div[contains(@class, 'content__article-body')]//p"
 body_text <- html_document %>%
   html_nodes(xpath = body_xpath) %>%
   html_text(trim = T) %>%
@@ -173,7 +203,7 @@ Second, we download and scrape each individual article page. For this, we extrac
 
 ```{r}
 links <- html_document %>%
-  html_nodes(xpath = "//div[contains( 'fc-item__container')]/a") %>%
+  html_nodes(xpath = "//div[contains(@class, 'fc-item__container')]/a") %>%
   html_attr(name = "href")
 ```
 
@@ -204,7 +234,7 @@ for (url in paging_urls) {
   html_document <- read_html(rendered_source)
   # extract links to articles
   links <- html_document %>%
-    html_nodes(xpath = "//div[contains( 'fc-item__container')]/a") %>%
+    html_nodes(xpath = "//div[contains(@class, 'fc-item__container')]/a") %>%
     html_attr(name = "href")
   
   # append links to vector of all links
@@ -221,17 +251,17 @@ scrape_guardian_article <- function(url) {
   rendered_source <- pjs_session$getSource()
   html_document <- read_html(rendered_source)
   
-  title_xpath <- "//h1[contains( 'content__headline')]"
+  title_xpath <- "//h1[contains(@class, 'content__headline')]"
   title_text <- html_document %>%
     html_node(xpath = title_xpath) %>%
     html_text(trim = T)
   
-  intro_xpath <- "//div[contains( 'content__standfirst')]//p"
+  intro_xpath <- "//div[contains(@class, 'content__standfirst')]//p"
   intro_text <- html_document %>%
     html_node(xpath = intro_xpath) %>%
     html_text(trim = T)
   
-  body_xpath <- "//div[contains( 'content__article-body')]//p"
+  body_xpath <- "//div[contains(@class, 'content__article-body')]//p"
   body_text <- html_document %>%
     html_nodes(xpath = body_xpath) %>%
     html_text(trim = T) %>%
@@ -299,7 +329,7 @@ For this, investigate the URL patterns of the page and look into the source code
 Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Web Crawling and Scraping using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/webcrawling.html (Version   edition = {`r format(Sys.time(), '%Y.%m.%d')`}).
 
 ```
- '%Y')`webc,
+@manual{schweinberger`r format(Sys.time(), '%Y')`webc,
   author = {Schweinberger, Martin},
   title = {Web Crawling and Scraping using R},
   note = {https://slcladal.github.io/webcrawling.html},
@@ -323,6 +353,8 @@ sessionInfo()
 
 ***
 
+
+# References{-}
 
 
 

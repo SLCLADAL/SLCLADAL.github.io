@@ -4,9 +4,23 @@ author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   bookdown::html_document2: 
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
 link-citations: yes
 ---
 
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
 
 ```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
@@ -14,7 +28,7 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial focuses on tree-based models and their implementation in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/tree.Rmd). For the more advanced, a recommendable resource for tree-based modeling isorVery good papers dealing with many critical issues related to tree-based models areand 
+This tutorial focuses on tree-based models and their implementation in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/tree.Rmd). For the more advanced, a recommendable resource for tree-based modeling is @prasad2006newer or @gries2021statistics. Very good papers dealing with many critical issues related to tree-based models are @strobl2009tree and @breiman2001modeling.
 
 This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
@@ -38,8 +52,8 @@ install.packages("tidyr")
 install.packages("RCurl")
 install.packages("vip")
 install.packages("flextable")
-
-
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
 
@@ -70,12 +84,21 @@ library(RCurl)
 library(tidyr)
 library(vip)
 library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
+***
 
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br><br>In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
 
-NOTE: In some cases, installing the `caret` package can be a bit more complicated. In my case, it was necessary to execute the code chunk shown below. However, once the `caret` package is installed, you do not need to go through these steps again and can simply activate it by calling `library(caret)`.
-
+<div class="question">` 
 
 ```{r cit4a, eval = F, message=F, warning=F}
 # install caret library
@@ -91,6 +114,9 @@ install.packages('caret', dependencies = TRUE)
 library(caret)
 ```
 
+</div>`
+
+***
 
 Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
 
@@ -102,7 +128,7 @@ The most basic type of tree-structure model is a decision tree or CART (classifi
 
 1. Tree-structure models are very useful because they can deal with different types of variables and provide a very good understanding of the structure in the data. 
 
-2. Tree-structure models have been deemed particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models shows that there can be issues especially when dealing with small data samples, single trees (rather than forests), and data where the variance is predictable based on a single interaction (as shown bychapter 7). 
+2. Tree-structure models have been deemed particularly interesting for linguists because they can handle moderate sample sizes and many high-order interactions better then regression models shows that there can be issues especially when dealing with small data samples, single trees (rather than forests), and data where the variance is predictable based on a single interaction (as shown by @gries2021statistics, chapter 7). 
 
 3. Tree-structure models are (supposedly) better at detecting non-linear or non-monotonic relationships between predictors and dependent variables. 
 
@@ -110,24 +136,24 @@ The most basic type of tree-structure model is a decision tree or CART (classifi
 
 5. Tree-structure models can be used as variable-selection procedure which informs about which variables have any sort of significant relationship with the dependent variable and can thereby inform model fitting.
 
-Despite these potential advantages, a word of warning is in order:admits that tree-based models can be very useful but there are some issues that but some serious short-comings of tree-structure models remain under-explored. For instance, 
+Despite these potential advantages, a word of warning is in order: @gries2021statistics admits that tree-based models can be very useful but there are some issues that but some serious short-comings of tree-structure models remain under-explored. For instance, 
 
 1. Tree-structure models only inform about the importance of a variable but not if the variable is important as a main effect or as part of interactions (or both)! The importance only shows that there is some important connection between the predictor and the dependent variable.
 
-2. Simple tree-structure models have been shown to fail in detecting the correct predictors if the variance is solely determined by a single interaction . This failure is caused by the fact that the predictor used in the first split of a tree is selected as the one with the strongest main effect . This issue can, however, be avoided by hard-coding the interactions as predictors plus using ensemble methods such as random forests rather than individual trees . 
+2. Simple tree-structure models have been shown to fail in detecting the correct predictors if the variance is solely determined by a single interaction [@gries2021statistics, chapter 7.3]. This failure is caused by the fact that the predictor used in the first split of a tree is selected as the one with the strongest main effect [@boulesteix2015interaction, 344]. This issue can, however, be avoided by hard-coding the interactions as predictors plus using ensemble methods such as random forests rather than individual trees [see @gries2021statistics, chapter 7.3]. 
 
-3. Another shortcoming is that tree-structure models partition the data (rather than "fitting a line" through the data which can lead to more coarse-grained predictions compared to regression models when dealing with numeric dependent variables [again, seechapter 7.3]. 
+3. Another shortcoming is that tree-structure models partition the data (rather than "fitting a line" through the data which can lead to more coarse-grained predictions compared to regression models when dealing with numeric dependent variables [again, see @gries2021statistics, chapter 7.3]. 
 
-4.341 state that high correlations between predictors can hinder the detection of interactions when using small data sets. However, regression do not fare better here as they are even more strongly affected by (multi-)collinearity (seechapter 7.3).
+4. @boulesteix2015interaction, 341 state that high correlations between predictors can hinder the detection of interactions when using small data sets. However, regression do not fare better here as they are even more strongly affected by (multi-)collinearity (see @@gries2021statistics, chapter 7.3).
 
-5. Tree-structure models are bad a detecting interactions when the variables have strong main effects which is, unfortunately, common when dealing with linguistic data .
+5. Tree-structure models are bad a detecting interactions when the variables have strong main effects which is, unfortunately, common when dealing with linguistic data [@wrigt2016interac].
 
 
 Before we implement a conditional inference tree in R, we will have a look at how decision trees work. We will do this in more detail here as random forests and Boruta analyses are extensions of inference trees and are therefore based on the same concepts.
 
 # Classification And Regression Trees
 
-The most basic type of tree-structure model is a decision tree which is a type of classification and regression tree (CART). A more elaborate version of a CART is called a Conditional Inference Tree (CIT). The difference between a CART and a CIT is that CITs use significance tests, e.g. the p-values, to select and split variables rather than some information measures like the Gini coefficient .
+The most basic type of tree-structure model is a decision tree which is a type of classification and regression tree (CART). A more elaborate version of a CART is called a Conditional Inference Tree (CIT). The difference between a CART and a CIT is that CITs use significance tests, e.g. the p-values, to select and split variables rather than some information measures like the Gini coefficient [@gries2021statistics].
 
 Below is an example of a decision tree which shows what what response to expect - in this case whether a speaker uses discourse *like* or not. Decision trees, like all CARTs and CITs, answer a simple question, namely *How do we best classify elements based on the given predictors?*. The answer that decision trees provide is the classification of the elements based on the levels of the predictors. In simple decision trees, all predictors, even those that are not significant are included in the decision tree. The decision tree shows that the best (or most important) predictor for the use of discourse *like* is age as it is the highest node. Among young speakers, those with high status use *like* more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
 
@@ -152,7 +178,7 @@ The *yes* and *no* at the bottom show if the speaker should be classified as a u
 
 Before going through how this conditional decision tree is generated, let us first go over some basic concepts. The top of the decision tree is called *root* or *root node*, the categories at the end of branches are called *leaves* or *leaf nodes*. Nodes that are in-between the root and leaves are called *internal nodes* or just *nodes*. The root node has only arrows or lines pointing away from it, internal nodes have lines going to and from them, while leaf nodes only have lines pointing towards them.
 
-How to prune and evaluate the accuracy of decision trees is not shown here. If you are interested in this, please check out chapter 7 ofwhich is a highly recommendable resource that provide a lot of additional information about decision trees and CARTs. 
+How to prune and evaluate the accuracy of decision trees is not shown here. If you are interested in this, please check out chapter 7 of @gries2021statistics which is a highly recommendable resource that provide a lot of additional information about decision trees and CARTs. 
 
 Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. 
 
@@ -405,6 +431,7 @@ citdata2 %>%
 ```
 
 
+
 In a first step, we order the numeric variable so that we arrive at the following table.
 
 ```{r citn2, echo=F, message=FALSE, warning=FALSE}
@@ -642,7 +669,7 @@ An extension which remedies this problem is to use a so-called ensemble method w
 
 #  Random Forests
 
-Random Forests (RFs) are an extension of Conditional Inference Trees . Like Conditional Inference Trees, Random Forests represent a multivariate, non-parametric partitioning method that is particularly useful when dealing with relatively small sample sizes and many predictors (including interactions) and they are insensitive to multicollinearity (if two predictors strongly correlate with the dependent variable AND are highly correlated or collinear, RFs will report both variables as highly important - the ordering in which they were included into the model is irrelevant). The latter point is a real advantage over regression models in particular. Also, RFs outperform CITs in that they are substantially less prone to overfitting and they perform much better when applied to new data. However, random forests have several issues:
+Random Forests (RFs) are an extension of Conditional Inference Trees [@breiman2001random]. Like Conditional Inference Trees, Random Forests represent a multivariate, non-parametric partitioning method that is particularly useful when dealing with relatively small sample sizes and many predictors (including interactions) and they are insensitive to multicollinearity (if two predictors strongly correlate with the dependent variable AND are highly correlated or collinear, RFs will report both variables as highly important - the ordering in which they were included into the model is irrelevant). The latter point is a real advantage over regression models in particular. Also, RFs outperform CITs in that they are substantially less prone to overfitting and they perform much better when applied to new data. However, random forests have several issues:
 
 * RFs only show variable importance but not if the variable is positively or negatively correlated with the dependent variable;
 
@@ -677,6 +704,10 @@ citdata %>%
   flextable::set_caption(caption = "First 10 rows of the citdata data.")  %>%
   flextable::border_outer()
 ```
+
+
+
+
 
 
 We now draw a sample from this data set and receive the following data set.
@@ -764,7 +795,7 @@ In our case, the data does not contain missing values. Random Forests offer a ve
 data.imputed <- rfImpute(SUFlike ~ ., data = rfdata, iter=6)
 ```
 
-The argument `iter` refers to the number of iterations to run. According to , 4 to 6 iterations is usually good enough. With this data set (if it had NAs) and when we were to execute the code, the resulting OOB-error rates lie somewhere around 17 and 18 percent. When we were to set `iter` to 20, we get values a little better and a little worse, so doing more iterations doesn't improve the situation.
+The argument `iter` refers to the number of iterations to run. According to [@breiman2001random], 4 to 6 iterations is usually good enough. With this data set (if it had NAs) and when we were to execute the code, the resulting OOB-error rates lie somewhere around 17 and 18 percent. When we were to set `iter` to 20, we get values a little better and a little worse, so doing more iterations doesn't improve the situation.
 
 Also, if you want to customize the `rfImpute` function, you can change the number of trees it uses (the default is 300) and the number of variables that it will consider at each step.
 
@@ -781,7 +812,7 @@ rfmodel1_pred <- unlist(party::treeresponse(rfmodel1))#[c(FALSE,TRUE)]
 somers2(rfmodel1_pred, as.numeric(rfdata$SUFlike))
 ```
 
-The model parameters are excellent: remember that if the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity . Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction .
+The model parameters are excellent: remember that if the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204].
 
 In a next step, we extract the variable importance (conditional=T adjusts for correlations between predictors).
 
@@ -881,11 +912,12 @@ partial(rfmodel3, pred.var = c("Age", "Gender"), plot = TRUE, plot.engine = "ggp
 ```
 
 
+
 Another common way to evaluate the performance of RFs is to split the data into a test and a training set. the model is then fit to the training set and, after that, applied to the test set. This allows us to evaluate how well the RF performs on data that it was not trained on. This approach is particularly common in machine learning contexts. 
 
 # Boruta
 
-Boruta  is a variable selection procedure and it represents an extension of random forest analyses . The name *Boruta* is derived from a demon in Slavic mythology who dwelled in pine forests. Boruta is an alternative to regression modeling that is better equipped to handle small data sets because it uses a distributional approach during which hundreds of (random) forests are grown from permuted data sets. Boruta outperforms random forest analyses because:
+Boruta [@kursa2010feature] is a variable selection procedure and it represents an extension of random forest analyses [@breiman2001random]. The name *Boruta* is derived from a demon in Slavic mythology who dwelled in pine forests. Boruta is an alternative to regression modeling that is better equipped to handle small data sets because it uses a distributional approach during which hundreds of (random) forests are grown from permuted data sets. Boruta outperforms random forest analyses because:
 
 * Boruta does not provide merely a single value for each predictor but a distribution of values leading to higher reliability. 
 
@@ -1020,7 +1052,7 @@ Of the remaining variables, adjective frequency and adjective type have the stro
 Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Tree-Based Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/tree.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
- '%Y')`tree,
+@manual{schweinberger`r format(Sys.time(), '%Y')`tree,
   author = {Schweinberger, Martin},
   title = {Tree-Based Models in R},
   note = {https://slcladal.github.io/tree.html},
@@ -1044,6 +1076,8 @@ sessionInfo()
 
 ***
 
+
+# References{-}
 
 
 

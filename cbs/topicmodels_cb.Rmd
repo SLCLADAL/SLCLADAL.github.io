@@ -4,9 +4,23 @@ author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
   bookdown::html_document2:
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
 link-citations: yes
 ---
 
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
 
 ```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
@@ -19,7 +33,7 @@ This tutorial introduces topic modeling using R. The entire R markdown document 
 > Topic models aim to find topics (which are operationalized as bundles of correlating terms) in documents to see what the texts are about. 
 
 
-This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_6_Topic_Models.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann . [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and covers many more very useful text mining methods. an alternative and equally recommendable introduction to topic modeling with R is, of course, 
+This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_6_Topic_Models.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and covers many more very useful text mining methods. an alternative and equally recommendable introduction to topic modeling with R is, of course, @silge2017text.  
 
 Topic models are a common procedure in In machine learning and natural language processing. Topic models represent a type of statistical model that is use to discover more or less abstract *topics* in a given selection of documents. Topic models are particularly common in text mining  to unearth hidden semantic structures in textual data. Topics can be conceived of as networks of collocation terms that, because of the co-occurrence across documents, can be assumed to refer to the same semantic domain (or topic). This assumes that, if a document is about a certain topic, one would expect words, that are related to that topic, to appear in the document more often than in documents that deal with other topics. For instance, *dog* and *bone* will appear more often in documents about dogs whereas *cat* and *meow* will appear in documents about cats. Terms like *the* and *is* will, however, appear approximately equally in both. 
 
@@ -27,7 +41,7 @@ Topic models are also referred to as probabilistic topic models, which refers to
 
 ## Preparation and session set up{-}
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # install packages
@@ -37,8 +51,8 @@ install.packages("reshape2")
 install.packages("ggplot2")
 install.packages("wordcloud")
 install.packages("pals")
-
-
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
 Next, we activate the packages. 
@@ -58,8 +72,8 @@ library(ggplot2)
 library(wordcloud)
 library(pals)
 library(flextable)
-
-
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
@@ -91,7 +105,7 @@ processedCorpus <- tm_map(processedCorpus, stripWhitespace)
 
 ## Model calculation{-}
 
-After the preprocessing, we have two corpus objects: `processedCorpus`, on which we calculate an LDA topic model . To this end, *stopwords*, i.e. function words that have relational rather than content meaning,  were removed, words were stemmed and converted to lowercase letters and special characters were removed. The second corpus object `corpus` serves to be able to view the original texts and thus to facilitate a qualitative control of the topic model results.
+After the preprocessing, we have two corpus objects: `processedCorpus`, on which we calculate an LDA topic model [@blei2003lda]. To this end, *stopwords*, i.e. function words that have relational rather than content meaning,  were removed, words were stemmed and converted to lowercase letters and special characters were removed. The second corpus object `corpus` serves to be able to view the original texts and thus to facilitate a qualitative control of the topic model results.
 
 We now calculate a topic model on the `processedCorpus`. For this purpose, a DTM of the corpus is created. In this case, we only want to consider terms that occur with a certain minimum frequency in the body. This is primarily used to speed up the model calculation.
 
@@ -254,7 +268,7 @@ ggplot(data = vizDataFrame, aes(topic, value, fill = document), ylab = "proporti
 
 ## Topic ranking{-}
 
-First, we try to get a more meaningful order of top terms per topic by re-ranking them with a specific score . The idea of re-ranking terms is similar to the idea of TF-IDF. The more a term appears in top levels w.r.t. its probability, the less meaningful it is to describe the topic. Hence, the scoring advanced favors terms to describe a topic.
+First, we try to get a more meaningful order of top terms per topic by re-ranking them with a specific score [@Chang2009]. The idea of re-ranking terms is similar to the idea of TF-IDF. The more a term appears in top levels w.r.t. its probability, the less meaningful it is to describe the topic. Hence, the scoring advanced favors terms to describe a topic.
 
 ```{r tm13}
 # re-rank top topic terms for topic names
@@ -351,7 +365,7 @@ Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Topic Modeling with R*. Br
 
 
 ```
- '%Y')`topic,
+@manual{schweinberger`r format(Sys.time(), '%Y')`topic,
   author = {Schweinberger, Martin},
   title = {Topic Modeling with R},
   note = {https://slcladal.github.io/topicmodels.html},
@@ -368,6 +382,7 @@ sessionInfo()
 ```
 
 
+
 ***
 
 [Back to top](#introduction)
@@ -377,6 +392,7 @@ sessionInfo()
 ***
 
 
+# References{-}
 
 
 
