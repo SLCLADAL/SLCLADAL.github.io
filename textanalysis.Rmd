@@ -417,17 +417,20 @@ In a first step, we load these texts and collapse them into single documents.
 
 ```{r wc2, message=FALSE, warning=FALSE}
 # load data
-orwell <- base::readRDS(url("https://slcladal.github.io/data/orwell.rda", "rb")) %>%
+orwell_sep <- base::readRDS(url("https://slcladal.github.io/data/orwell.rda", "rb"))
+orwell <- orwell_sep %>%
   paste0(collapse = " ")
-melville <- base::readRDS(url("https://slcladal.github.io/data/melville.rda", "rb"))
+melville_sep <- base::readRDS(url("https://slcladal.github.io/data/melville.rda", "rb"))
+melville <- melville_sep %>%
   paste0(collapse = " ")
-darwin_doc <- paste0(darwin, collapse = " ")
+darwin_sep <- darwin
+darwin <- paste0(darwin_sep, collapse = " ")
 ```
 
 Now, we generate a corpus object from these texts and create a variable with the author name.
 
 ```{r wc3, message=FALSE, warning=FALSE}
-corp_dom <- quanteda::corpus(c(darwin_doc, orwell, melville)) 
+corp_dom <- quanteda::corpus(c(darwin, orwell, melville)) 
 attr(corp_dom, "docvars")$Author = c("Darwin", "Orwell", "Melville")
 ```
 
@@ -783,11 +786,25 @@ Another common method that can be used for automated text summarization is keywo
 
 Below, we identify key words for Charles Darwin's *Origin*, Herman Melville's *Moby Dick*, and George Orwell's *1984*. We start by creating a weighted document feature matrix from the corpus containing the three texts. 
 
+In order to create a corpus, we use the text objects that consist out of many different elements rather than the objects which contained the collapsed texts that we used above. Thus, in a first step, we create a corpus of the texts.
+
+```{r key0, message=F, warning=F}
+corp_dom <- quanteda::corpus(c(darwin_sep, orwell_sep, melville_sep)) 
+attr(corp_dom, "docvars")$Author = c(rep("Darwin", length(darwin_sep)), 
+                                     rep("Orwell", length(orwell_sep)),
+                                     rep("Melville", length(melville_sep)))
+```
+
+Next, we generate the document feature matrix and we clean it by removing stopwords and selected other words. In addition, we group the documents feature matrix by author.
+
+
 ```{r key1, message=F, warning=F}
 dfm_authors <- corp_dom %>%
   quanteda::tokens(remove_punct = TRUE) %>%
-  quanteda::tokens_remove(stopwords("english")) %>%
+  quanteda::tokens_remove(quanteda::stopwords("english")) %>%
+  quanteda::tokens_remove(c("now", "one", "like", "may", "can")) %>%
   quanteda::dfm() %>%
+  quanteda::dfm_group(groups = Author) %>%
   quanteda::dfm_weight(scheme = "prop")
 ```
 
@@ -795,8 +812,9 @@ In a next step, we use the `textstat_frequency` function from the `quanteda` pac
  
 ```{r key2, message=F, warning=F}
 # Calculate relative frequency by president
-freq_weight <- quanteda.textstats::textstat_frequency(dfm_authors, n = 10,
-                                            groups = dfm_authors$Author)
+freq_weight <- quanteda.textstats::textstat_frequency(dfm_authors, 
+                                                      n = 10,
+                                                      groups = dfm_authors$Author)
 ```
 
 
