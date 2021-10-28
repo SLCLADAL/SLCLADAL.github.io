@@ -1,0 +1,178 @@
+---
+title: "Analyzing learner language using R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:  
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial focuses on learner language and how to analyze how learners differ from L1 speakers using R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/llr.Rmd). 
+
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("DT")
+install.packages("knitr")
+install.packages("kableExtra")
+install.packages("flextable")
+install.packages("quanteda")
+install.packages("tidyverse")
+install.packages("tm")
+install.packages("tidytext")
+install.packages("tidyr")
+install.packages("NLP")
+install.packages("openNLP")
+install.packages("openNLPdata")
+install.packages("pacman")
+# install the language support package
+install.koRpus.lang("en")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we can activate them as shown below.
+
+```{r prep2, message=FALSE} 
+# set options
+options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.print=1000)
+# load packages
+library(tidyverse)
+library(flextable)
+library(quanteda)
+library(tm)
+library(tidytext)
+
+library(pacman)
+pacman::p_load_gh("trinker/entity")
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed R and RStudio and once you have also initiated the session by executing the code shown above, you are good to go.
+
+**Loading data**
+
+We use 7 essays written by learners from the [*International Corpus of Learner English* (ICLE)](https://uclouvain.be/en/research-institutes/ilc/cecl/icle.html) and two files containing a-level essays written by L1-English British students from [*The Louvain Corpus of Native English Essays* (LOCNESS)](https://uclouvain.be/en/research-institutes/ilc/cecl/locness.html) which was compiled by the Centre for English Corpus Linguistics (CECL), Université catholique de Louvain, Belgium.
+
+```{r load}
+# loading l1 data
+ns1 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns1.rda", "rb"))
+ns1 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns1.rda", "rb"))
+# load l2 data
+es <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/es.rda", "rb"))
+de <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/de.rda", "rb"))
+fr <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/fr.rda", "rb"))
+it <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/it.rda", "rb"))
+pl <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/pl.rda", "rb"))
+ru <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ru.rda", "rb"))
+```
+
+
+```{r conc1b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+ru %>%
+  as.data.frame() %>%
+  head(3) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 3 text elements of the Russian learner data.")  %>%
+  flextable::border_outer()
+```
+
+```{r koRpus, message=F, warning=F}
+library(koRpus)
+available.koRpus.lang()
+install.packages("koRpus.lang.en", repos="https://undocumeantit.github.io/repos/l10n/")
+```
+
+```{r}
+
+# load the package
+library(koRpus.lang.en)
+set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-english.bat", lang="en") 
+postagged <- treetag(here::here("data/LCorpus", "ru.txt"))
+```
+
+
+```{r}
+postagged
+```
+
+
+# Vocabulary size
+
+
+```{r}
+ru_lds<- lex.div(postagged,
+                 measure=c("TTR", "MSTTR", "MATTR",
+                           "HD-D", "MTLD"),
+                 char=c("TTR", "MATTR","HD-D", 
+                        "MTLD"))
+```
+
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Power Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/pwr.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`pwr,
+  author = {Schweinberger, Martin},
+  title = {Power Analysis in R},
+  note = {https://slcladal.github.io/pwr.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+# References {-}
