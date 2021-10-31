@@ -63,13 +63,16 @@ Now that we have installed the packages, we can activate them as shown below.
 options(stringsAsFactors = F)
 options(scipen = 999)
 options(max.print=1000)
+options(java.parameters = c("-XX:+UseConcMarkSweepGC", "-Xmx8192m"))
+gc()
 # load packages
 library(tidyverse)
 library(flextable)
 library(quanteda)
 library(tm)
 library(tidytext)
-
+library(NLP)
+library(openNLP)
 library(pacman)
 pacman::p_load_gh("trinker/entity")
 # activate klippy for copy-to-clipboard button
@@ -80,13 +83,13 @@ Once you have installed R and RStudio and once you have also initiated the sessi
 
 **Loading data**
 
-We use 7 essays written by learners from the [*International Corpus of Learner English* (ICLE)](https://uclouvain.be/en/research-institutes/ilc/cecl/icle.html) and two files containing a-level essays written by L1-English British students from [*The Louvain Corpus of Native English Essays* (LOCNESS)](https://uclouvain.be/en/research-institutes/ilc/cecl/locness.html) which was compiled by the Centre for English Corpus Linguistics (CECL), Université catholique de Louvain, Belgium.
+We use 7 essays written by learners from the [*International Corpus of Learner English* (ICLE)](https://uclouvain.be/en/research-institutes/ilc/cecl/icle.html) and two files containing a-level essays written by L1-English British students from [*The Louvain Corpus of Native English Essays* (LOCNESS)](https://uclouvain.be/en/research-institutes/ilc/cecl/locness.html) which was compiled by the *Centre for English Corpus Linguistics* (CECL), Université catholique de Louvain, Belgium.
 
 ```{r load}
-# loading l1 data
+# load essays from l1 speakers
 ns1 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns1.rda", "rb"))
-ns1 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns1.rda", "rb"))
-# load l2 data
+ns2 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns2.rda", "rb"))
+# load essays from l2 speakers
 es <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/es.rda", "rb"))
 de <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/de.rda", "rb"))
 fr <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/fr.rda", "rb"))
@@ -100,7 +103,8 @@ ru <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ru.rda", "rb"))
 # inspect data
 ru %>%
   as.data.frame() %>%
-  head(3) %>%
+  dplyr::filter(!stringr::str_detect(., "<[A-Z]{4,4}")) %>%
+  head(4) %>%
   flextable() %>%
   flextable::set_table_properties(width = .75, layout = "autofit") %>%
   flextable::theme_zebra() %>%
@@ -111,46 +115,268 @@ ru %>%
   flextable::border_outer()
 ```
 
-```{r koRpus, message=F, warning=F}
-library(koRpus)
-available.koRpus.lang()
-install.packages("koRpus.lang.en", repos="https://undocumeantit.github.io/repos/l10n/")
-```
+# Splitting texts into sentences
+
+In a first step, we clean the data file identifiers and html teags as well as quoatation marks within sentences. 
 
 ```{r}
-
-# load the package
-library(koRpus.lang.en)
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-english.bat", lang="en") 
-postagged <- treetag(here::here("data/LCorpus", "ru.txt"))
+cleanText <- function(x,...){
+  require(tokenizers)
+  # paste text together
+  x <- paste0(x)
+  # remove file identifiers
+  x <- stringr::str_remove_all(x, "<.*?>")
+  # remove quotation marks
+  x <- stringr::str_remove_all(x, fixed("\""))
+  # remove empty elements
+  x <- x[!x==""]
+  # split text into sentences
+  x <- tokenize_sentences(x)
+  x <- unlist(x)
+}
+# clean texts
+ns1_sen <- cleanText(ns1)
+ns2_sen <- cleanText(ns2)
+de_sen <- cleanText(de)
+es_sen <- cleanText(es)
+fr_sen <- cleanText(fr)
+it_sen <- cleanText(it)
+pl_sen <- cleanText(pl)
+ru_sen <- cleanText(ru)
+# inspect
+ru_sen
 ```
+
+# Analyzing sentence length
+
 
 
 ```{r}
-postagged
+senLen <- function(x, ...){
+  sapply(x, function(x){
+    x <- stringr::str_remove_all(x, "[^[:alnum:] ]") %>%
+      stringr::str_squish() %>%
+      stringr::str_split(" ")
+    y <- sapply(x, function(y){
+      y <- length(y)
+      })
+    return(as.vector(y))
+    })
+}
+# apply function to text
+senLen(ru_sen)[1:5]
 ```
 
+We can now apply the function to all texts and visualize the average sentence length using box plots.
+
+```{r}
+# extract sentnecs lengths
+ns1_sl <- senLen(ns1_sen)
+ns2_sl <- senLen(ns2_sen)
+de_sl <- senLen(de_sen)
+es_sl <- senLen(es_sen)
+fr_sl <- senLen(fr_sen)
+it_sl <- senLen(it_sen)
+pl_sl <- senLen(pl_sen)
+ru_sl <- senLen(ru_sen)
+# create a data frame from the results
+sl_df <- data.frame(c(ns1_sl, ns2_sl, de_sl, es_sl, fr_sl, it_sl, pl_sl, ru_sl)) %>%
+  dplyr::rename(sentenceLength = 1) %>%
+  dplyr::mutate(l1 = c(rep("en", length(ns1_sl)),
+                       rep("en", length(ns2_sl)),
+                       rep("de", length(de_sl)),
+                       rep("es", length(es_sl)),
+                       rep("fr", length(fr_sl)),
+                       rep("it", length(it_sl)),
+                       rep("pl", length(pl_sl)),
+                       rep("ru", length(ru_sl))))
+# inspect
+head(sl_df)
+```
+
+Create a box plot showing the results the results
+
+```{r}
+sl_df %>%
+  ggplot(aes(x = reorder(l1, -sentenceLength, mean), y = sentenceLength, fill = l1)) +
+  geom_boxplot() +
+  # adapt y-axis labels
+  labs(y = "Sentence lenghts") +
+  # adapt tick labels
+  scale_x_discrete("L1 of learners", 
+                   breaks = names(table(sl_df$l1)), 
+                   labels = c("en" = "English",
+                              "de" = "German",
+                              "es" = "Spanish",
+                              "fr" = "French",
+                              "it" = "Italian",
+                              "pl" = "Polish",
+                              "ru" = "Russian")) +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+
+
+# Part-of-speech tagging
+
+Part-of-speech tagging is a vry useful procedure for many analyses. Here, we automatically identify parts of speech (word classes) in the text which, for a well-studied language like English, is approximately 95% accurate.
+
+The code chunk below defines a function which applies this kind of tagging to any text fed into the function.
+
+```{r}
+POStag <- function(x){
+  # load necessary packages
+  require("stringr")
+  require("NLP")
+  require("openNLP")
+  # define annotators
+  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
+  word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
+  pos_tag_annotator <- openNLP::Maxent_POS_Tag_Annotator(language = "en", probs = FALSE)
+  # convert all file content to strings
+  strings <- lapply(x, function(x){
+    x <- as.String(x)  })
+  # loop over file contents
+  sapply(strings, function(x){
+    a <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
+    p <- NLP::annotate(x, pos_tag_annotator, a)
+    w <- subset(p, type == "word")
+    tags <- sapply(w$features, '[[', "POS")
+    as <- sprintf("%s/%s", x[w], tags)
+    at <- paste(as, collapse = " ")
+    return(at)  
+    })
+  }
+```
+
+We now apply this function to a test sentence to see if the function does what we want it to and to chck the output format.
+
+```{r}
+# generate test text
+text <- "It is now a very wide spread opinion, that in the modern world there is no place for dreaming and imagination."
+# apply pos-tag function to test text
+tagged_text <- POStag(text)
+# inspect result
+tagged_text
+```
+
+The tags which you see here are from the tag set developed for the *Penn Treebank*, a corpus of English text with syntactic annotations. The tags are not always transparent, and this is very much the case for the word class we will be looking at - the tag for an adjective is `/JJ`!
+
+The next step is to tag all our texts.
+
+```{r}
+comText <- function(x,...){
+  # paste text together
+  x <- paste0(x)
+  # remove file identifiers
+  x <- stringr::str_remove_all(x, "<.*?>")
+  # remove quotation marks
+  x <- stringr::str_remove_all(x, fixed("\""))
+  # remove superfluous white spaces
+  x <- stringr::str_squish(x)
+  # remove empty elements
+  x <- x[!x==""]
+}
+```
+
+
+Now we apply the function to the texts, generate a corpus object from the texts and apply the pos-tagging function.
+
+```{r}
+# combine texts
+ns1_com <- comText(ns1)
+ns2_com <- comText(ns2)
+de_com <- comText(de)
+es_com <- comText(es)
+fr_com <- comText(fr)
+it_com <- comText(it)
+pl_com <- comText(pl)
+ru_com <- comText(ru)
+```
+
+
+Now we apply the function to the texts, generate a corpus object from the texts and apply the pos-tagging function.
+
+```{r}
+# apply pos-tag function to data
+ns1_pos <- as.vector(unlist(POStag(ns1_com)))
+ns2_pos <- as.vector(unlist(POStag(ns2_com)))
+de_pos <- as.vector(unlist(POStag(de_com)))
+es_pos <- as.vector(unlist(POStag(es_com)))
+fr_pos <- as.vector(unlist(POStag(fr_com)))
+it_pos <- as.vector(unlist(POStag(it_com)))
+pl_pos <- as.vector(unlist(POStag(pl_com)))
+ru_pos <- as.vector(unlist(POStag(ru_com)))
+# inspect
+head(ns1_pos)
+```
+
+Next we get a frequency list from each of the tagged corpora, then we extract the adjectives from the data by subsetting the data frame using the grepl() function. This function returns TRUE or FALSE, so we only need to call the function as the conditional part of the subset() function.
 
 # Vocabulary size
 
+We can now extract lexical diversity measures of the texts. In teh present case, we will extract
+
+* `TTR`: *type-token ratio*
+* `C`: Herdan's C (see @tweedie1988lexdiv; sometimes referred to as LogTTR)
+* `R`: Guiraud's Root TTR (see @tweedie1988lexdiv)
+* `CTTR`: Carroll's Corrected TTR 
+* `U`: Dugast's Uber Index (see @tweedie1988lexdiv)
+* `S`: Summer's index
+* `Maas`: Maas' indices
+
+Before we extract the lexical diversity measures, however, we split the data into individual essays.
 
 ```{r}
-ru_lds<- lex.div(postagged,
-                 measure=c("TTR", "MSTTR", "MATTR",
-                           "HD-D", "MTLD"),
-                 char=c("TTR", "MATTR","HD-D", 
-                        "MTLD"))
+cleanEss <- function(x){
+  x %>%
+  paste0(collapse = " ") %>%
+  stringr::str_split("Transport [0-9]{1,2}") %>%
+  unlist() %>%
+  stringr::str_squish() %>%
+  .[. != ""]
+}
+# apply function
+ns1_ess <- cleanEss(ns1)
+ns2_ess <- cleanEss(ns2)
+de_ess <- cleanEss(de)
+es_ess <- cleanEss(es)
+fr_ess <- cleanEss(fr)
+it_ess <- cleanEss(it)
+pl_ess <- cleanEss(pl)
+ru_ess <- cleanEss(ru)
+# inspect
+head(ns1_ess, 1)
+```
+
+
+
+```{r}
+library(koRpus)
+#koRpus::install.koRpus.lang("en")
+library(koRpus.lang.en)
+# extract lex. div. measures
+ns1_lds <- koRpus::lex.div(ns1_ess, 
+                           force.lang = 'en', # define language 
+                           segment = 20,      # define segment width
+                           window = 20,       # define window width
+                           # define lex div measures
+                           measure=c("TTR", "C", "R", "CTTR", "U", "Maas"), 
+                           char=c("TTR", "C", "R", "CTTR","U", "Maas"))
+# inspect
+ns1_lds
 ```
 
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Power Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/pwr.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Analyzing learner language using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/llr.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 ```
-@manual{schweinberger`r format(Sys.time(), '%Y')`pwr,
+@manual{schweinberger`r format(Sys.time(), '%Y')`llr,
   author = {Schweinberger, Martin},
-  title = {Power Analysis in R},
+  title = {Analyzing learner language using R},
   note = {https://slcladal.github.io/pwr.html},
   year = {`r format(Sys.time(), '%Y')`},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
