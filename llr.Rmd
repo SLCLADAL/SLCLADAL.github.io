@@ -42,6 +42,7 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 install.packages("quanteda")
 install.packages("flextable")
 install.packages("quanteda.textstats")
+install.packages("quanteda.textplots")
 install.packages("tidyverse")
 install.packages("tm")
 install.packages("tidytext")
@@ -79,6 +80,7 @@ library(NLP)
 library(openNLP)
 library(quanteda)
 library(quanteda.textstats)
+library(quanteda.textplots)
 library(koRpus)
 library(koRpus.lang.en)
 library(stringi)
@@ -107,25 +109,19 @@ fr <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/fr.rda", "rb"))
 it <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/it.rda", "rb"))
 pl <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/pl.rda", "rb"))
 ru <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ru.rda", "rb"))
-```
-
-The table below shows the first 3 text elements from the essay written a Russian learner of English to provide an idea of what the data look like. 
-
-```{r rudat, echo = F, message=FALSE, warning=FALSE}
-# inspect data
+# inspect
 ru %>%
-  as.data.frame() %>%
-  dplyr::filter(!stringr::str_detect(., "<[A-Z]{4,4}")) %>%
-  head(4) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 3 text elements of the Russian learner data.")  %>%
-  flextable::border_outer()
+  # remove header
+  stringr::str_remove(., "<[A-Z]{4,4}.*") %>%
+  # remove empty elements
+  na_if("") %>%
+  na.omit %>%
+  #show first 3 elements
+  head(3)
 ```
+
+The data inspection shows the first 3 text elements from the essay written a Russian learner of English to provide an idea of what the data look like. 
+
 
 Now that we have loaded some data, we can go ahead and extract information from the texts and process the data to analyze differences between L1 speakers and learners of English.
 
@@ -144,10 +140,11 @@ l1 <- c(ns1, ns2)
 # combine data from learners
 learner <- c(de, es, fr, it, pl, ru)
 # extract kwic for term "problem" in learner data
-kwic <- quanteda::kwic(pattern = "problem.*", 
-                       learner, 
-                       valuetype = "regex", 
-                       window = 10) %>%
+kwic <- quanteda::kwic(learner,               # the data in which to search
+                       pattern = "problem.*", # the pattern to look for
+                       valuetype = "regex",   # look for exact matches or patterns
+                       window = 10) %>%       # how much context to display (in elements) 
+  # convert to table (called data.frame in R)
   as.data.frame()
 # inspect
 head(kwic)
@@ -159,26 +156,42 @@ We can also arrange the output according to what comes before or after the searc
 
 
 ```{r conc2, message=FALSE, warning=FALSE}
-# arrange kwic alphabetically by what comes after the key term
+# take kwic
 kwic %>%
+  # arrange kwic alphabetically by what comes after the key term
   dplyr::arrange(post)
 ```
 
 
 ```{r conc3, message=FALSE, warning=FALSE}
-# arrange kwic alphabetically by what comes before the key term
+# take quick
 kwic %>%
+  # reverse the preceding context
   dplyr::mutate(prerev = stringi::stri_reverse(pre)) %>%
+  # arrange kwic alphabetically by reversed preceding context
   dplyr::arrange(prerev) %>%
+  # remove column with reversed preceding context
   dplyr::select(-prerev)
+```
+
+We can also combine concordancing with visualizations. For instance, use the `textplot_xray` function from the `quanteda.textplots` package to visualize where in some texts the term *people* and the term *imagination*  occurs.
+
+```{r conc4, message=FALSE, warning=FALSE}
+# create kwics for people and imagination
+kwic_people <- quanteda::kwic(learner, pattern = c("people", "imagination"))
+# generate x-ray plot
+quanteda.textplots::textplot_xray(kwic_people)
 ```
 
 We can also search for phrases rather than individual words. To do this, we need to use the `phrase` function in the `pattern` argument as shown below. In the code chunk below, we look for any combination of the word *very* and any following word. It we would wish, we could of course also  sort (or order) the concordances as we have done above.
 
 
 ```{r conc5, message=FALSE, warning=FALSE}
-kwic <- quanteda::kwic(pattern = phrase("^very [a-z]{1,}"), 
-                       learner, valuetype = "regex") %>%
+# generate kwic for phrases staring with very
+kwic <- quanteda::kwic(learner,                              # data
+                       pattern = phrase("^very [a-z]{1,}"),  # search pattern
+                       valuetype = "regex") %>%              # type of pattern
+  # convert into a data frame
   as.data.frame()
 ```
 
@@ -233,6 +246,7 @@ We can easily remove stop words (words without lexical content) using the `anti_
 
 ```{r fr4, message=FALSE, warning=FALSE}
 ftb_wosw <- ftb %>%
+  # remove stop words
   dplyr::anti_join(stop_words)
 # inspect
 head(ftb_wosw)
@@ -242,12 +256,19 @@ We can then visualize the results as a bar chart as shown below.
 
 ```{r fr5, message=FALSE, warning=FALSE}
 ftb_wosw %>%
+  # take 20 most frequent terms
   head(20) %>%
+  # generate a plot
   ggplot(aes(x = reorder(word, -freq), y = freq, label = freq)) +
+  # define type of plot
   geom_bar(stat = "identity") +
+  # add labels
   geom_text(vjust=1.6, color = "white") +
+  # display in black-and-whie theme
   theme_bw() +
+  # adapt x-axis tick labels
   theme(axis.text.x = element_text(size=8, angle=90)) +
+  # adapt axes labels
   labs(y = "Frequnecy", x = "Word")
 ```
 
@@ -255,12 +276,12 @@ Or we can visualize the data as a word cloud (see below).
 
 
 ```{r}
-
 # create wordcloud
-wordcloud2(ftb_wosw[1:100,],
+wordcloud2(ftb_wosw[1:100,],    # define data to use
+           # define shape
            shape = "diamond",
-           color = scales::viridis_pal()(8)
-          )
+           # define colors
+           color = scales::viridis_pal()(8))
 ```
 
 
