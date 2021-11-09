@@ -23,10 +23,13 @@ Since the primary concern of the LADAL is to introduce computational methods tha
 
 To get in touch, please feel free to contact us via email and stay up to date by following us on Twitter or Facebook. Webinars or recordings of other events are available on our YouTube channel.
 
-Email: ladal@uq.edu.au
-Twitter: @slcladal
-Facebook: https://www.facebook.com/profile.php?id=100073328753218
-YouTube: https://slcladal.github.io/opening.html
+**EMAIL**: ladal@uq.edu.au
+
+**Twitter**: @slcladal
+
+**Facebook**: https://www.facebook.com/profile.php?id=100073328753218
+
+**YouTube**: https://slcladal.github.io/opening.html
 
 
 # Audience
