@@ -1,7 +1,7 @@
 ![Beautiful UQ](https://slcladal.github.io/images/uq1.jpg)
 
 # SLCLADAL.github.io
-This is the GitHub repo of the website of the [Language Technology and Data Analysis Laboratory (LADAL)](https://slcladal.github.io/index.html). The LADAL (pronouced lah’dahl) is a school-based, collaborative support infrastructure for digital and computational humanities established and maintained by the School of Languages and Cultures at the University of Queensland. The LADAL assists with data processing, visualization, and analysis and offers guidance on matters relating to language technology and digital research tools.
+This is the GitHub repo of the website of the [Language Technology and Data Analysis Laboratory (LADAL)](https://slcladal.github.io/index.html). The LADAL (pronouced lah’dahl) is a school-based, collaborative support infrastructure for digital and computational humanities established and maintained by the [School of Languages and Cultures](https://languages-cultures.uq.edu.au/) at the [University of Queensland](https://www.uq.edu.au/). 
 
 ![LADAL logo UQ](https://slcladal.github.io/images/LadalGrey.png)
 
