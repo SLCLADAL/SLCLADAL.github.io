@@ -1,5 +1,9 @@
+![Beautiful UQ](https://slcladal.github.io/images/uq1.jpg)
+
 # SLCLADAL.github.io
-This is the GitHub repo of the website of the Language Technology and Data Analysis Laboratory (LADAL). The LADAL (pronouced lah’dahl) is a school-based, collaborative support infrastructure for digital and computational humanities established and maintained by the School of Languages and Cultures at the University of Queensland. The LADAL assists with data processing, visualization, and analysis and offers guidance on matters relating to language technology and digital research tools.
+This is the GitHub repo of the website of the [Language Technology and Data Analysis Laboratory (LADAL)](https://slcladal.github.io/index.html). The LADAL (pronouced lah’dahl) is a school-based, collaborative support infrastructure for digital and computational humanities established and maintained by the School of Languages and Cultures at the University of Queensland. The LADAL assists with data processing, visualization, and analysis and offers guidance on matters relating to language technology and digital research tools.
+
+![LADAL logo UQ](https://slcladal.github.io/images/LadalGrey.png)
 
 # Goals
 
@@ -15,6 +19,15 @@ Since the primary concern of the LADAL is to introduce computational methods tha
 
 - tutorials on text analysis, text mining, distant reading, and corpus linguistics.
 
+# Contact
+
+To get in touch, please feel free to contact us via email and stay up to date by following us on Twitter or Facebook. Webinars or recordings of other events are available on our YouTube channel.
+
+Email: ladal@uq.edu.au
+Twitter: @slcladal
+Facebook: https://www.facebook.com/profile.php?id=100073328753218
+YouTube: https://slcladal.github.io/opening.html
+
 
 # Audience
 
@@ -22,7 +35,11 @@ The LADAL resources are aimed at researchers in HASS (Humanities, Arts, and the 
 
 # License & Citation
 
-The LADAL website was created by Martin Schweinberger. It was freely released under GNU General Public License, Version 3, June 2007. If you use (parts of) it for your own research or in your teaching materials, please cite the individual subpages as shown at the bottom of each page or reference it as:
+The LADAL website was created by Martin Schweinberger. It was freely released under GNU General Public License, Version 3, June 2007. 
 
-Schweinberger, Martin. 2021. The Language Technology and Data Analysis Laboratory (LADAL). Brisbane: The University of Queensland, School of Languages and Cultures. url: https://slcladal.github.io/index.html (Version 2021.05.08).
+![CC BY-SA](https://slcladal.github.io/images/license.png)
+
+If you use (parts of) it for your own research or in your teaching materials, please cite the individual subpages as shown at the bottom of each page or reference it as:
+
+Schweinberger, Martin. 2021. The Language Technology and Data Analysis Laboratory (LADAL). Brisbane: The University of Queensland, School of Languages and Cultures. url: https://slcladal.github.io/index.html.
 
