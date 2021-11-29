@@ -28,14 +28,14 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces web crawling and web scraping with R. Web crawling and web scraping are important and common procedures for collecting text data from social media sites, web pages, or other documents for later analysis. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/webcrawling.Rmd). If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. 
+This tutorial introduces web crawling and web scraping with R. Web crawling and web scraping are important and common procedures for collecting text data from social media sites, web pages, or other documents for later analysis. Regarding terminology, the automated download of HTML pages is called *crawling* while the extraction of the textual data and/or metadata (for example, article date, headlines, author names, article text) from the HTML source code (or the DOM document object model of the website) is called *scraping* [see @olston2010web]. The entire R markdown document for the present tutorial can be downloaded [here](https://slcladal.github.io/webcrawling.Rmd). If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. 
 
 The aim of this tutorial is to showcase how to perform web crawling and web scraping using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify some common methods for web crawling and web scraping can be applied to some example web pages and how to implement this in R.
 
-This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_2_Web_crawling.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and overs many more very useful text mining methods. An alternative approach for web crawling and scraping would be to use the `RCrawler` package [@khalil2017rcrawler] which is not introduced here thought (inspecting the `RCrawler` package and its functions is, however, also highly recommended). For a more in-depth introduction to web crawling in scraping, @miner2012practical is a very useful introduction.
+This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_2_Web_crawling.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and overs many more very useful text mining methods. An alternative approach for web crawling and scraping would be to use the `RCrawler` package [@khalil2017rcrawler] which is not introduced here though (inspecting the `RCrawler` package and its functions is, however, also highly recommended). For a more in-depth introduction to web crawling in scraping, @miner2012practical is a very useful introduction.
 
 
-The automated download of HTML pages is called *Crawling*. The extraction of the textual data and/or metadata (for example, article date, headlines, author names, article text) from the HTML source code (or the DOM document object model of the website) is called *Scraping* [see @olston2010web]. 
+ 
 
 ## Preparation and session set up{-}
 
@@ -131,7 +131,7 @@ Modern websites often do not contain the full content displayed in the browser i
 
 Now we can start an instance of `PhantomJS` and create a new browser session that awaits to load URLs to render the corresponding websites.
 
-```{r startPJS, eval=T}
+```{r startPJS, message=FALSE, warning=FALSE}
 pjs_instance <- run_phantomjs()
 pjs_session <- Session$new(port = pjs_instance$port)
 ```
@@ -144,7 +144,7 @@ Usually, we do not want download a single document, but a series of documents. I
 
 First, we download and parse the tag overview page to extract all links to articles of interest: 
 
-```{r}
+```{r singlepage, message=FALSE, warning=FALSE}
 url <- "https://www.theguardian.com/world/angela-merkel"
 # go to URL
 pjs_session$go(url)
@@ -156,7 +156,7 @@ html_document <- read_html(rendered_source)
 
 Second, we download and scrape each individual article page. For this, we extract all `href`-attributes from `a`-elements fitting a certain CSS-class. To select the right contents via XPATH-selectors, you need to investigate the HTML-structure of your specific page. Modern browsers such as Firefox and Chrome support you in that task by a function called "Inspect Element" (or similar), available through a right-click on the page element.
 
-```{r}
+```{r extractlinks, message=FALSE, warning=FALSE}
 links <- html_document %>%
   html_nodes(xpath = "//div[contains(@class, 'fc-item__container')]/a") %>%
   html_attr(name = "href")
@@ -169,7 +169,7 @@ Now, `links` contains a list of `r length(links)` hyperlinks to single articles 
 
 But stop! There is not only one page of links to tagged articles. If you have a look on the page in your browser, the tag overview page has several more than 60 sub pages, accessible via a paging navigator at the bottom. By clicking on the second page, we see a different URL-structure, which now contains a link to a specific paging number. We can use that format to create links to all sub pages by combining the base URL with the page numbers.
 
-```{r}
+```{r searchresults, message=FALSE, warning=FALSE}
 page_numbers <- 1:3
 base_url <- "https://www.theguardian.com/world/angela-merkel?page="
 paging_urls <- paste0(base_url, page_numbers)
@@ -179,7 +179,7 @@ paging_urls
 
 Now we can iterate over all URLs of tag overview pages, to collect more/all links to articles tagged with *Angela Merkel*. We iterate with a for-loop over all URLs and append results from each single URL to a vector of all links.
 
-```{r}
+```{r getlinks, message=FALSE, warning=FALSE}
 all_links <- NULL
 for (url in paging_urls) {
   # download and parse single overview page
@@ -202,9 +202,10 @@ An effective way of programming is to encapsulate repeatedly used code in a spec
 
 ```{r scrapefun, message=F, warning=F}
 scrape_guardian_article <- function(url) {
-  
+  # start PhantomJS
   pjs_session$go(url)
   rendered_source <- pjs_session$getSource()
+  # read raw html
   html_document <- read_html(rendered_source)
   # extract title
   title <- html_document %>%
@@ -217,7 +218,7 @@ scrape_guardian_article <- function(url) {
   # extract date
   date <- url %>%
     stringr::str_replace_all(".*([0-9]{4,4}/[a-z]{3,4}/[0-9]{1,2}).*", "\\1")
-  
+  # generate data frame from results
   article <- data.frame(
     url = url,
     date = date,
@@ -235,11 +236,15 @@ scrape_guardian_article <- function(url) {
 Now we can use that function `scrape_guardian_article` in any other part of our script. For instance, we can loop over each of our collected links. We use a running variable i, taking values from 1 to `length(all_links)` to access the single links in `all_links` and write some progress output.
 
 ```{r downloadarticles, message=F, warning=F}
+# create container for loop output
 all_articles <- data.frame()
+# loop over links
 for (i in 1:length(all_links)) {
-  cat("Downloading", i, "of", length(all_links), "URL:", all_links[i], "\n")
+  # print progress (optional)
+  #cat("Downloading", i, "of", length(all_links), "URL:", all_links[i], "\n")
+  # scrape website
   article <- scrape_guardian_article(all_links[i])
-  # Append current article data.frame to the data.frame of all articles
+  # append current article data.frame to the data.frame of all articles
   all_articles <- rbind(all_articles, article)
 }
 # inspect
@@ -268,7 +273,7 @@ The last command write the extracted articles to a tba-separated file in the dat
 
 <div class="question">` 
 
-1. Try to perform extraction of news articles from another web page, e.g. `https://www.spiegel.de` or `https://www.nytimes.com`. For this, investigate the URL patterns of the page and look into the source code with the `inspect element' functionality of your browser to find appropriate XPATH expressions.<br>
+1. Try to perform extraction of news articles from another web page, e.g. `https://www.theaustralian.com.au`, `https://www.nytimes.com`, or `https://www.spiegel.de`. For this, investigate the URL patterns of the page and look into the source code with the `inspect element' functionality of your browser to find appropriate XPATH expressions.<br>
 
 </div>`
 
