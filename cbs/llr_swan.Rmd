@@ -1,0 +1,1186 @@
+
+![An interactive LADAL notebook.](https://slcladal.github.io/images/uq1.jpg)
+
+***
+
+Please copy this Jupyter notebook so that you are able to edit it.
+
+Simply go to: File > Save a copy in Drive.
+
+If you want to run this notebook on your own computer, you need to do 2 things:
+
+1. Make sure that you have R installed.
+
+2. You need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file.
+
+Once you have done that, you are good to go.
+
+***
+
+# Analyzing learner language using R
+
+This tutorial focuses on learner language and how to analyze differences between learners and L1 speakers of English using R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/llr.Rmd). 
+
+The aim of this tutorial is to showcase how to extract information from essays from learners and L1 speakers of English and how to analyze these essays. The aim is not to provide a fully-fledged analysis but rather to show and exemplify some common methods for data extraction, processing, and analysis.
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+
+```{r prep0}
+# create a local folder for the local files (Creates a folder call "R" in your CloudStor home)
+dir.create('/scratch/R', showWarnings = FALSE)
+# add the local folder to R's
+.libPaths(new='/scratch/R')
+# install a package (zip) locally
+install.packages("zip", lib="/scratch/R")
+# import the lib (zip)
+library(zip)
+```
+
+
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages(c("quanteda", "quanteda.textstats", "quanteda.textplots", "tidyverse", "tidytext", "tidyr"), lib="/scratch/R")
+install.packages(c("tm", "NLP", "openNLP", "openNLPdata", "koRpus", "stringi", "hunspell", "wordcloud", "pacman"), lib="/scratch/R")
+# install the language support package
+koRpus::install.koRpus.lang("en")
+# install the language support package
+koRpus::install.koRpus.lang("en")
+```
+
+Now that we have installed the packages, we can activate them as shown below.
+
+```{r prep2, message=FALSE} 
+# set options
+options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.print=1000)
+options(java.parameters = c("-XX:+UseConcMarkSweepGC", "-Xmx8192m"))
+# load packages
+library(tidyverse)
+library(tidytext)
+library(tidyr)
+library(tm)
+library(NLP)
+library(openNLP)
+library(quanteda)
+library(quanteda.textstats)
+library(quanteda.textplots)
+library(koRpus)
+library(koRpus.lang.en)
+library(stringi)
+library(hunspell)
+library(wordcloud)
+library(pacman)
+pacman::p_load_gh("trinker/entity")
+```
+
+Once you have installed R and RStudio and once you have also initiated the session by executing the code shown above, you are good to go.
+
+**Loading data**
+
+We use 7 essays written by learners from the [*International Corpus of Learner English* (ICLE)](https://uclouvain.be/en/research-institutes/ilc/cecl/icle.html) and two files containing a-level essays written by L1-English British students from [*The Louvain Corpus of Native English Essays* (LOCNESS)](https://uclouvain.be/en/research-institutes/ilc/cecl/locness.html) which was compiled by the *Centre for English Corpus Linguistics* (CECL), Université catholique de Louvain, Belgium. The code chunk below loads the data from the LADAL repository on GitHub into R.
+
+```{r load, echo = T, message=FALSE, warning=FALSE}
+# load essays from l1 speakers
+ns1 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns1.rda", "rb"))
+ns2 <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ns2.rda", "rb"))
+# load essays from l2 speakers
+es <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/es.rda", "rb"))
+de <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/de.rda", "rb"))
+fr <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/fr.rda", "rb"))
+it <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/it.rda", "rb"))
+pl <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/pl.rda", "rb"))
+ru <- base::readRDS(url("https://slcladal.github.io/data/LCorpus/ru.rda", "rb"))
+# inspect
+ru %>%
+  # remove header
+  stringr::str_remove(., "<[A-Z]{4,4}.*") %>%
+  # remove empty elements
+  na_if("") %>%
+  na.omit %>%
+  #show first 3 elements
+  head(3)
+```
+
+The data inspection shows the first 3 text elements from the essay written a Russian learner of English to provide an idea of what the data look like. 
+
+The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+
+![Colab Folder Symbol](https://slcladal.github.io/images/ColabFolder.png)
+
+Then on the upload symbol. 
+
+![Colab Upload Symbol](https://slcladal.github.io/images/ColabUpload.png)
+
+Next, upload the files you want to analyze and then the respective files names in the `file` argument of the `scan` function. When you then execute the code (like to code chunk below, you will upload your own data.
+
+
+```{r loadown, echo = T, eval = F, message=FALSE, warning=FALSE}
+mytext1 <- scan(file = "BGSU1001.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+mytext2 <- scan(file = "BGSU1002.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+# inspect
+mytext1
+```
+
+To apply the code and functions below to your own data, you will need to modify the code chunks and replace the data we use here with your own data object. 
+
+Now that we have loaded some data, we can go ahead and extract information from the texts and process the data to analyze differences between L1 speakers and learners of English.
+
+# Concordancing
+
+Concordancing refers to the extraction of words or phrases from a given text or texts (Lindquist 2009). Commonly, concordances are displayed in the form of key-word in contexts (KWIC) where the search term is shown with some preceding and following context. Thus, such displays are referred to as key word in context concordances. A more elaborate tutorial on how to perform concordancing with R is available [here](https://slcladal.github.io/kwics.html).
+
+Concordancing is helpful for seeing how a given term or phrased is used in the data, for inspecting how often a given word occurs in a text or a collection of texts, for extracting examples, and it also represents a basic procedure, and often the first step, in more sophisticated analyses. 
+
+We begin by creating KWIC displays of the term *problem* as shown below. To extract the kwic concordances, we use the `kwic` function from the `quanteda` package (cf. Benoit et al. 2018). 
+
+```{r conc1, message=FALSE, warning=FALSE}
+# combine data from l1 speakers
+l1 <- c(ns1, ns2)
+# combine data from learners
+learner <- c(de, es, fr, it, pl, ru)
+# extract kwic for term "problem" in learner data
+kwic <- quanteda::kwic(learner,               # the data in which to search
+                       pattern = "problem.*", # the pattern to look for
+                       valuetype = "regex",   # look for exact matches or patterns
+                       window = 10) %>%       # how much context to display (in elements) 
+  # convert to table (called data.frame in R)
+  as.data.frame() %>%
+  # remove superfluous columns
+  dplyr::select(-to, -from, -pattern)
+# inspect
+head(kwic)
+```
+
+The output shows that the term *problem* occurs six times in the learner data.
+
+We can also arrange the output according to what comes before or after the search term as shown below.
+
+```{r conc2, message=FALSE, warning=FALSE}
+# take kwic
+kwic %>%
+  # arrange kwic alphabetically by what comes after the key term
+  dplyr::arrange(post)
+```
+
+```{r conc3, message=FALSE, warning=FALSE}
+# take quick
+kwic %>%
+  # reverse the preceding context
+  dplyr::mutate(prerev = stringi::stri_reverse(pre)) %>%
+  # arrange kwic alphabetically by reversed preceding context
+  dplyr::arrange(prerev) %>%
+  # remove column with reversed preceding context
+  dplyr::select(-prerev)
+```
+
+We can also combine concordancing with visualizations. For instance, use the `textplot_xray` function from the `quanteda.textplots` package to visualize where in some texts the term *people* and the term *imagination*  occurs.
+
+```{r conc4, message=FALSE, warning=FALSE}
+# create kwics for people and imagination
+kwic_people <- quanteda::kwic(learner, pattern = c("people", "imagination"))
+# generate x-ray plot
+quanteda.textplots::textplot_xray(kwic_people)
+```
+
+We can also search for phrases rather than individual words. To do this, we need to use the `phrase` function in the `pattern` argument as shown below. In the code chunk below, we look for any combination of the word *very* and any following word. It we would wish, we could of course also  sort (or order) the concordances as we have done above.
+
+```{r conc5, message=FALSE, warning=FALSE}
+# generate kwic for phrases staring with very
+kwic <- quanteda::kwic(learner,                              # data
+                       pattern = phrase("^very [a-z]{1,}"),  # search pattern
+                       valuetype = "regex") %>%              # type of pattern
+  # convert into a data frame
+  as.data.frame()
+# inspect
+head(kwic)
+```
+
+# Frequency lists
+
+A useful procedure when dealing with texts is to extract frequency information. To exemplify how to extract frequency lists from texts, we will do this here using the L1 data.
+
+```{r fr1, message=FALSE, warning=FALSE}
+ftb <- c(ns1, ns2) %>%
+  # remove punctuation
+  stringr::str_replace_all(., "\\W", " ") %>%
+  # remove superfluous white spaces
+  stringr::str_squish() %>%
+  # convert to lower case
+  tolower() %>%
+  # split into words
+  stringr::str_split(" ") %>%
+  # unlist
+  unlist() %>%
+  # convert into table
+  as.data.frame() %>%
+  # rename column
+  dplyr::rename(word = 1) %>%
+  # remove empty rows
+  dplyr::filter(word != "") %>%
+  # count words
+  dplyr::group_by(word) %>%
+  dplyr::summarise(freq = n()) %>%
+  # order by freq
+  dplyr::arrange(-freq)
+# inspect
+head(ftb)
+```
+
+We can easily remove stop words (words without lexical content) using the `anti_join` function as shown below.
+
+```{r fr4, message=FALSE, warning=FALSE}
+ftb_wosw <- ftb %>%
+  # remove stop words
+  dplyr::anti_join(stop_words)
+# inspect
+head(ftb_wosw)
+```
+
+We can then visualize the results as a bar chart as shown below.
+
+```{r fr5, message=FALSE, warning=FALSE}
+ftb_wosw %>%
+  # take 20 most frequent terms
+  head(20) %>%
+  # generate a plot
+  ggplot(aes(x = reorder(word, -freq), y = freq, label = freq)) +
+  # define type of plot
+  geom_bar(stat = "identity") +
+  # add labels
+  geom_text(vjust=1.6, color = "white") +
+  # display in black-and-white theme
+  theme_bw() +
+  # adapt x-axis tick labels
+  theme(axis.text.x = element_text(size=8, angle=90)) +
+  # adapt axes labels
+  labs(y = "Frequnecy", x = "Word")
+```
+
+Or we can visualize the data as a word cloud (see below).
+
+```{r}
+# create wordcloud
+wordcloud::wordcloud(words = ftb_wosw$word, 
+                     # frequencies
+                     freq = ftb_wosw$freq, 
+                     # n of words
+                     max.words=100,
+                     # define colors
+                     color = scales::viridis_pal()(8))
+```
+
+# Splitting texts into sentences
+
+It can be every useful to split texts into individual sentences. This can be done, e.g., to extract the average sentence length or simply to inspect or annotate individual sentences. To split a text into sentences, we clean the data by removing file identifiers and html tags as well as quotation marks within sentences. As we are dealing with several texts, we write a function that performs this task and that we can then apply to the individual texts.
+
+```{r split1, message=FALSE, warning=FALSE}
+cleanText <- function(x,...){
+  require(tokenizers)
+  # paste text together
+  x <- paste0(x)
+  # remove file identifiers
+  x <- stringr::str_remove_all(x, "<.*?>")
+  # remove quotation marks
+  x <- stringr::str_remove_all(x, fixed("\""))
+  # remove empty elements
+  x <- x[!x==""]
+  # split text into sentences
+  x <- tokenize_sentences(x)
+  x <- unlist(x)
+}
+# clean texts
+ns1_sen <- cleanText(ns1)
+ns2_sen <- cleanText(ns2)
+de_sen <- cleanText(de)
+es_sen <- cleanText(es)
+fr_sen <- cleanText(fr)
+it_sen <- cleanText(it)
+pl_sen <- cleanText(pl)
+ru_sen <- cleanText(ru)
+# inspect
+head(ru_sen)
+```
+
+
+
+Now that we have split the texts into individual sentences, we can easily extract and visualize the average sentence lengths of L1 speakers and learners of English.
+
+# Sentence length
+
+The most basic complexity measure is average sentence length. In the following, we will extract the average sentence length for L1-speakers and learners of English with different language backgrounds.
+
+We can use the `count_words` function from the `tokenizers` package to count the words in each sentence. We apply the function to all texts and generate a table (a data frame) of the results and add the L1 of the speaker who produced the sentence.
+
+```{r senl5, message=FALSE, warning=FALSE}
+# extract sentences lengths
+ns1_sl <- tokenizers::count_words(ns1_sen)
+ns2_sl <- tokenizers::count_words(ns2_sen)
+de_sl <- tokenizers::count_words(de_sen)
+es_sl <- tokenizers::count_words(es_sen)
+fr_sl <- tokenizers::count_words(fr_sen)
+it_sl <- tokenizers::count_words(it_sen)
+pl_sl <- tokenizers::count_words(pl_sen)
+ru_sl <- tokenizers::count_words(ru_sen)
+# create a data frame from the results
+sl_df <- data.frame(c(ns1_sl, ns2_sl, de_sl, es_sl, fr_sl, it_sl, pl_sl, ru_sl)) %>%
+  dplyr::rename(sentenceLength = 1) %>%
+  dplyr::mutate(l1 = c(rep("en", length(ns1_sl)),
+                       rep("en", length(ns2_sl)),
+                       rep("de", length(de_sl)),
+                       rep("es", length(es_sl)),
+                       rep("fr", length(fr_sl)),
+                       rep("it", length(it_sl)),
+                       rep("pl", length(pl_sl)),
+                       rep("ru", length(ru_sl))))
+# inspect
+head(sl_df)
+```
+
+
+
+Now, we can use the resulting table to create a box plot showing the results.
+
+```{r senl8, message=FALSE, warning=FALSE}
+sl_df %>%
+  ggplot(aes(x = reorder(l1, -sentenceLength, mean), y = sentenceLength, fill = l1)) +
+  geom_boxplot() +
+  # adapt y-axis labels
+  labs(y = "Sentence lenghts") +
+  # adapt tick labels
+  scale_x_discrete("L1 of learners", 
+                   breaks = names(table(sl_df$l1)), 
+                   labels = c("en" = "English",
+                              "de" = "German",
+                              "es" = "Spanish",
+                              "fr" = "French",
+                              "it" = "Italian",
+                              "pl" = "Polish",
+                              "ru" = "Russian")) +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+# Extracting N-grams
+
+In a next step, we extract n-grams using the `tokens_ngrams` function from the `quanteda` package. In a first step, we take the sentence data, convert it to lower case and remove punctuation. Then we apply the `tokens_ngrams` function to extract the n-grams (in this case 2-grams).
+
+```{r ng1, message=FALSE, warning=FALSE}
+ns1_tok <- ns1_sen %>%
+  tolower() %>%
+  quanteda::tokens(remove_punct = TRUE)
+# extract n-grams
+ns1_2gram <- quanteda::tokens_ngrams(ns1_tok, n = 2)
+# inspect
+head(ns1_2gram[[2]], 10)
+```
+
+We can also extract tri-grams easily by changing the `n` argument in the `tokens_ngrams` function.
+
+```{r ng2, message=FALSE, warning=FALSE}
+# extract n-grams
+ns1_3gram <- quanteda::tokens_ngrams(ns1_tok, n = 3)
+# inspect
+head(ns1_3gram[[2]])
+```
+
+We now apply the same procedure to all texts as shown below.
+
+```{r ng3, message=FALSE, warning=FALSE}
+ns1_tok <- ns1_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+ns2_tok <- ns2_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+de_tok <- de_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+es_tok <- es_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+fr_tok <- fr_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+it_tok <- it_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+pl_tok <- pl_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+ru_tok <- ru_sen %>% tolower() %>% quanteda::tokens(remove_punct = TRUE)
+# extract n-grams
+ns1_2gram <- as.vector(unlist(quanteda::tokens_ngrams(ns1_tok, n = 2)))
+ns2_2gram <- as.vector(unlist(quanteda::tokens_ngrams(ns2_tok, n = 2)))
+de_2gram <- as.vector(unlist(quanteda::tokens_ngrams(de_tok, n = 2)))
+es_2gram <- as.vector(unlist(quanteda::tokens_ngrams(es_tok, n = 2)))
+fr_2gram <- as.vector(unlist(quanteda::tokens_ngrams(fr_tok, n = 2)))
+it_2gram <- as.vector(unlist(quanteda::tokens_ngrams(it_tok, n = 2)))
+pl_2gram <- as.vector(unlist(quanteda::tokens_ngrams(pl_tok, n = 2)))
+ru_2gram <- as.vector(unlist(quanteda::tokens_ngrams(ru_tok, n = 2)))
+```
+
+Next, we generate a table with the ngrams and the L1 background of the speaker that produced the bi-grams.
+
+```{r ng4, message=FALSE, warning=FALSE}
+ngram_df <- c(ns1_2gram, ns2_2gram, de_2gram, es_2gram, 
+              fr_2gram, it_2gram, pl_2gram, ru_2gram) %>%
+  as.data.frame() %>%
+  dplyr::rename(ngram = 1) %>%
+  dplyr::mutate(l1 = c(rep("en", length(ns1_2gram)),
+                       rep("en", length(ns2_2gram)),
+                       rep("de", length(de_2gram)),
+                       rep("es", length(es_2gram)),
+                       rep("fr", length(fr_2gram)),
+                       rep("it", length(it_2gram)),
+                       rep("pl", length(pl_2gram)),
+                       rep("ru", length(ru_2gram))),
+                learner = ifelse(l1 == "en", "no", "yes"))
+# inspect
+head(ngram_df)
+```
+
+Now, we process the table further to add frequency information, i.e., how often a given n-gram occurs in each the language of speakers with distinct L1 backgrounds.
+
+```{r ng5, message=FALSE, warning=FALSE}
+ngram_fdf <- ngram_df %>%
+  dplyr::group_by(ngram, learner) %>%
+  dplyr::summarise(freq = n()) %>%
+  dplyr::arrange(-freq)
+# inspect
+head(ngram_fdf)
+```
+
+As the word counts of the texts are quite different, we normalize the frequencies to per-1,000-word frequencies which are comparable across texts of different lengths.
+
+```{r ng7, message=FALSE, warning=FALSE}
+ngram_nfdf <- ngram_fdf %>%
+  dplyr::group_by(ngram) %>%
+  dplyr::mutate(total_ngram = sum(freq)) %>%
+  dplyr::arrange(-total_ngram) %>%
+  # total by learner
+  dplyr::group_by(learner) %>%
+  dplyr::mutate(total_learner = sum(freq),
+                rfreq = freq/total_learner*1000)
+# inspect
+head(ngram_nfdf, 10)
+```
+
+We now reformat the table so that we have relative frequencies for both learners and L1 speakers even if a particular n-gram does not occur in the text produced by either a learner or a L1 speaker.
+
+```{r ng8, message=FALSE, warning=FALSE}
+ngram_rel <- ngram_nfdf %>%
+  dplyr::select(ngram, learner, rfreq, total_ngram) %>%
+  tidyr::spread(learner, rfreq) %>%
+  dplyr::mutate(no = ifelse(is.na(no), 0, no),
+                yes = ifelse(is.na(yes), 0, yes)) %>%
+  tidyr::gather(learner, rfreq, no:yes) %>%
+  dplyr::arrange(-total_ngram)
+# inspect
+head(ngram_rel)
+```
+
+Finally, we visualize the most frequent n-grams in the data in a bar chart.
+
+```{r ng10, message=FALSE, warning=FALSE}
+ngram_rel %>%
+  head(20) %>%
+  ggplot(aes(y = rfreq, x = reorder(ngram, -total_ngram), group = learner, fill = learner)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  theme_bw() +
+  theme(axis.text.x = element_text(size=8, angle=90),
+        legend.position = "top") +
+  labs(y = "Relative frequnecy\n(per 1,000 words)", x = "n-gram")
+```
+
+We can, of course also investigate only specific n-grams, e.g., n-grams containing a specific word such as *public* (below, we only show the first 6 n-grams containing *public* by using the `head` function).
+
+```{r ng12, message=FALSE, warning=FALSE}
+ngram_rel %>%
+  dplyr::filter(stringr::str_detect(ngram, "public")) %>%
+  head()
+```
+
+We can also specify the order by adding the underscore as shown below.
+
+```{r ng15, message=FALSE, warning=FALSE}
+ngram_rel %>%
+  dplyr::filter(stringr::str_detect(ngram, "public_")) %>%
+  head()
+```
+
+# Differences in ngram use
+
+Next, we will set out to identify differences in n-gram frequencies between learners and L1 speakers. In a first step, we transform the table so that we have separate columns for learners and L1-speakers. In addition, we also add columns containing all the information we need to perform Fisher's exact test to check if learners use certain n-grams significantly  more or less frequently compared to L1-speakers. 
+
+```{r ang1, message=FALSE, warning=FALSE}
+sdif_ngram <- ngram_fdf %>%
+  tidyr::spread(learner, freq) %>%
+  dplyr::mutate(no = ifelse(is.na(no), 0, no),
+                yes = ifelse(is.na(yes), 0, yes)) %>%
+  dplyr::rename(l1speaker = no, 
+                learner = yes) %>%
+  dplyr::mutate(total_ngram = l1speaker+learner) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(total_learner = sum(learner),
+              total_l1 = sum(l1speaker)) %>%
+  dplyr::mutate(a = l1speaker,
+                b = learner) %>%
+  dplyr::mutate(c = total_l1-a,
+                d = total_learner-b)
+# inspect
+head(sdif_ngram)
+```
+
+On this re-arranged data set, we can now apply the Fisher's exact tests. As we are performing many different tests, we need to correct for multiple comparisons. To this end, we create a column which holds the Bonferroni corrected critical value (\alpha .05). If a p-value is lower than the corrected critical value, then the learners and L1-speakers differ significantly in their use of that n-gram.
+
+```{r ang3, message=FALSE, warning=FALSE}
+sdif_ngram <- sdif_ngram  %>%
+  # perform fishers exact test and extract estimate and p
+  dplyr::rowwise() %>%
+  dplyr::mutate(fisher_p = fisher.test(matrix(c(a,c,b,d), nrow= 2))$p.value,
+                oddsratio = fisher.test(matrix(c(a,c,b,d), nrow= 2))$estimate,
+                # calculate bonferroni correction
+                crit = .05/nrow(.),
+                sig_corr = ifelse(fisher_p < crit, "p<.05", "n.s.")) %>%
+  dplyr::arrange(fisher_p) %>%
+  dplyr::select(-total_ngram, -total_learner, -total_l1, -a, -b, -c, -d, -crit)
+# inspect
+head(sdif_ngram)
+```
+
+In our case, there are no n-grams that differ significantly in their use by learners and L1-speakers once we have corrected for repeated testing as indicated by the *n.s.* (not significant) in the column called *sig_corr*.
+
+# Finding collocations
+
+There are various techniques for identifying collocations. To identify collocations without having a pre-defined target term, we can use the `textstat_collocations` function from the `quanteda.textstats` package (cf. Benoit et al. 2021).
+
+However, before we can apply that function and start identifying collocations, we need to process the data to which we want to apply this function. In the present case, we will apply that function to the sentences in the L1 data which we extract in the code chunk below.
+
+```{r coll5}
+ns_sen <- c(ns1_sen, ns2_sen) %>%
+  tolower()
+# inspect
+head(ns_sen)
+```
+
+
+
+From the output shown above, we also see that splitting texts did not work perfectly as it produces some unwarranted artifacts like the "sentences" that consist of headings (e.g., *transport 01*). Fortunately, these errors do not really matter in the case of our example.
+
+Now that we have the L1 data split into sentences, we can tokenize these sentences and apply the `textstat_collocations` function which identifies collocations.
+
+```{r coll7, warning=F, message=F}
+# create a token object
+ns_tokens <- quanteda::tokens(ns_sen, remove_punct = TRUE)
+# extract collocations
+ns_coll <- quanteda.textstats::textstat_collocations(ns_tokens, size = 2, min_count = 20)
+# inspect
+head(ns_coll)
+```
+
+
+
+The resulting table shows collocations in L1 data descending by collocation strength.
+
+## Visualizing collocation networks
+
+Network graphs are a very useful and flexible tool for visualizing relationships between elements such as words, personas, or authors. This section shows how to generate a network graph for collocations of the term *transport* using the `quanteda` package.
+
+In a first step, we generate a document-feature matrix based on the sentences in the L1 data. A document-feature matrix shows how often elements (here these elements are the words that occur in the L1 data) occur in a selection of documents (here these documents are the sentences in the L1 data).
+
+```{r dfm1, message=F, warning=F}
+# create document-feature matrix
+ns_dfm <- ns_sen %>% 
+    quanteda::dfm(remove = stopwords('english'), remove_punct = TRUE)
+# inspect
+ns_dfm[1:6, 1:6]
+```
+
+
+
+As we want to generate a network graph of words that collocate with the term *transport*, we use the `calculateCoocStatistics` function to determine which words most strongly collocate with our target term (*transport*).  
+
+```{r dfm3, message=F, warning=F}
+# load function for co-occurrence calculation
+source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
+# define term
+coocTerm <- "transport"
+# calculate co-occurrence statistics
+coocs <- calculateCoocStatistics(coocTerm, ns_dfm, measure="LOGLIK")
+# inspect results
+coocs[1:10]
+```
+
+We now reduce the document-feature matrix to contain only the top 20 collocates of *transport* (plus our target word *transport*).
+
+```{r dfm4}
+redux_dfm <- dfm_select(ns_dfm, 
+                        pattern = c(names(coocs)[1:10], "transport"))
+# inspect
+redux_dfm[1:6, 1:6] 
+```
+
+
+Now, we can transform the document-feature matrix into a feature-co-occurrence matrix as shown below. A feature-co-occurrence matrix shows how often each element in that matrix co-occurs with every other element in that matrix.
+
+```{r dfm6}
+tag_fcm <- fcm(redux_dfm)
+# inspect
+tag_fcm[1:6, 1:6]
+```
+
+
+
+Using the feature-co-occurrence matrix, we can generate the network graph which shows the terms that collocate with the target term *transport* with the edges representing the co-occurrence frequency. To generate this network graph, we use the `textplot_network` function from the `quanteda.textplots` package.
+
+```{r dfm8, message=F, warning=F}
+# generate network graph
+quanteda.textplots::textplot_network(tag_fcm, 
+                                     min_freq = 1, 
+                                     edge_alpha = 0.3, 
+                                     edge_size = 5,
+                                     edge_color = "gray80",
+                                     vertex_labelsize = log(rowSums(tag_fcm)*15))
+```
+
+# Part-of-speech tagging
+
+Part-of-speech tagging is a very useful procedure for many analyses. Here, we automatically identify parts of speech (word classes) in the text which, for a well-studied language like English, is approximately 95% accurate.
+
+The code chunk below defines a function which applies this kind of tagging to any text fed into the function.
+
+```{r pos1, message=F, warning=F}
+POStag <- function(x){
+  # load necessary packages
+  require("stringr")
+  require("NLP")
+  require("openNLP")
+  # define annotators
+  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
+  word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
+  pos_tag_annotator <- openNLP::Maxent_POS_Tag_Annotator(language = "en", probs = FALSE)
+  # convert all file content to strings
+  strings <- lapply(x, function(x){
+    x <- as.String(x)  })
+  # loop over file contents
+  sapply(strings, function(x){
+    a <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
+    p <- NLP::annotate(x, pos_tag_annotator, a)
+    w <- subset(p, type == "word")
+    tags <- sapply(w$features, '[[', "POS")
+    as <- sprintf("%s/%s", x[w], tags)
+    at <- paste(as, collapse = " ")
+    return(at)  
+    })
+  }
+```
+
+We now apply this function to a test sentence to see if the function does what we want it to and to chck the output format.
+
+```{r pos2, message=F, warning=F}
+# generate test text
+text <- "It is now a very wide spread opinion, that in the modern world there is no place for dreaming and imagination."
+# apply pos-tag function to test text
+tagged_text <- POStag(text)
+# inspect result
+tagged_text
+```
+
+The tags which you see here are from the tag set developed for the *Penn Treebank*, a corpus of English text with syntactic annotations. The tags are not always transparent, and this is very much the case for the word class we will be looking at - the tag for an adjective is `/JJ`!
+
+The next step, we write a function that will clean our texts by removing tags and quotation marks as well as superfluous white spaces.
+
+```{r pos4, message=F, warning=F}
+comText <- function(x,...){
+  # paste text together
+  x <- paste0(x)
+  # remove file identifiers
+  x <- stringr::str_remove_all(x, "<.*?>")
+  # remove quotation marks
+  x <- stringr::str_remove_all(x, fixed("\""))
+  # remove superfluous white spaces
+  x <- stringr::str_squish(x)
+  # remove empty elements
+  x <- x[!x==""]
+}
+```
+
+Now we apply the text cleaning function to the texts.
+
+```{r pos5, message=F, warning=F}
+# combine texts
+ns1_com <- comText(ns1_sen)
+ns2_com <- comText(ns2_sen)
+de_com <- comText(de_sen)
+es_com <- comText(es_sen)
+fr_com <- comText(fr_sen)
+it_com <- comText(it_sen)
+pl_com <- comText(pl_sen)
+ru_com <- comText(ru_sen)
+```
+
+Now we apply the pos-tagging function to the texts.
+
+```{r pos7, message=F, warning=F}
+# apply pos-tag function to data
+ns1_pos <- as.vector(unlist(POStag(ns1_com)))
+ns2_pos <- as.vector(unlist(POStag(ns2_com)))
+de_pos <- as.vector(unlist(POStag(de_com)))
+es_pos <- as.vector(unlist(POStag(es_com)))
+fr_pos <- as.vector(unlist(POStag(fr_com)))
+it_pos <- as.vector(unlist(POStag(it_com)))
+pl_pos <- as.vector(unlist(POStag(pl_com)))
+ru_pos <- as.vector(unlist(POStag(ru_com)))
+# inspect
+head(ns1_pos)
+```
+
+We end up with pos-tagged texts where the pos-tags are added to each word (or symbol).
+
+In the following section, we will use these pos-tags to identify potential differences between learners and L1-speakers of English.
+
+# Differences in pos-sequences
+
+To analyze differences in part-of-speech sequences between L1-speakers and learners of English,, we write a function that extracts pos-tag bigrams from the tagged texts. 
+
+```{r pa1, message=F, warning=F}
+# tokenize and extract pos tags
+posngram <- function(x,...){
+  x <- x %>%
+  stringr::str_remove_all("\\w*/") %>%
+  quanteda::tokens(remove_punct = TRUE)  %>%
+    quanteda::tokens_ngrams(n = 2) %>%
+    stringr::str_remove_all("-")
+  return(x)
+}
+```
+
+We now apply the function to the pos-tagged texts.
+
+```{r pa3, message=F, warning=F}
+# apply pos-tag function to data
+ns1_posng <- as.vector(unlist(posngram(ns1_pos)))
+ns2_posng <- as.vector(unlist(posngram(ns2_pos)))
+de_posng <- as.vector(unlist(posngram(de_pos)))
+es_posng <- as.vector(unlist(posngram(es_pos)))
+fr_posng <- as.vector(unlist(posngram(fr_pos)))
+it_posng <- as.vector(unlist(posngram(it_pos)))
+pl_posng <- as.vector(unlist(posngram(pl_pos)))
+ru_posng <- as.vector(unlist(posngram(ru_pos)))
+# inspect
+head(ns1_posng)
+```
+
+In a next step, we tabulate the results and add a column telling us about the L1 background of the speakers who have produced the texts.
+
+```{r pa5, message=F, warning=F}
+posngram_df <- c(ns1_posng, ns2_posng, de_posng, es_posng, fr_posng, 
+                 it_posng, pl_posng, ru_posng) %>%
+  as.data.frame() %>%
+  # rename column
+  dplyr::rename(ngram = 1) %>%
+  # add l1
+  dplyr::mutate(l1 = c(rep("en", length(ns1_posng)),
+                       rep("en", length(ns2_posng)),
+                       rep("de", length(de_posng)),
+                       rep("es", length(es_posng)),
+                       rep("fr", length(fr_posng)),
+                       rep("it", length(it_posng)),
+                       rep("pl", length(pl_posng)),
+                       rep("ru", length(ru_posng))),
+                # add learner column
+                learner = ifelse(l1 == "en", "no", "yes")) %>%
+  # extract frequencies of ngrams
+  dplyr::group_by(ngram, learner) %>%
+  dplyr::summarise(freq = n()) %>%
+  dplyr::arrange(-freq)
+# inspect
+head(posngram_df)
+```
+
+Next, we transform the table and add all the information that we need to perform the Fisher's exact tests that we will use to determine if there are significant differences between L1 speakers and learners of English regarding their use of pos-sequences.
+
+```{r pa6, message=F, warning=F}
+posngram_df2 <- posngram_df %>%
+  tidyr::spread(learner, freq) %>%
+  dplyr::mutate(no = ifelse(is.na(no), 0, no),
+                yes = ifelse(is.na(yes), 0, yes)) %>%
+  dplyr::rename(l1speaker = no, 
+                learner = yes) %>%
+  dplyr::mutate(total_ngram = l1speaker+learner) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(total_learner = sum(learner),
+              total_l1 = sum(l1speaker)) %>%
+  dplyr::mutate(a = l1speaker,
+                b = learner) %>%
+  dplyr::mutate(c = total_l1-a,
+                d = total_learner-b)
+# inspect
+head(posngram_df2)
+```
+
+On this re-arranged data set, we can now apply the Fisher's exact tests. As we are performing many different tests, we need to correct for multiple comparisons. To this end, we create a column which holds the Bonferroni corrected critical value (\alpha .05). If a p-value is lower than the corrected critical value, then the learners and L1-speakers differ significantly in their use of that n-gram.
+
+```{r pa8, message=F, warning=F}
+sdif_posngram <- posngram_df2  %>%
+  # perform fishers exact test and extract estimate and p
+  dplyr::rowwise() %>%
+  dplyr::mutate(fisher_p = fisher.test(matrix(c(a,c,b,d), nrow= 2))$p.value,
+                oddsratio = fisher.test(matrix(c(a,c,b,d), nrow= 2))$estimate,
+                # calculate bonferroni correction
+                crit = .05/nrow(.),
+                sig_corr = ifelse(fisher_p < crit, "p<.05", "n.s.")) %>%
+  dplyr::arrange(fisher_p) %>%
+  dplyr::select(-total_ngram, -a, -b, -c, -d, -crit)
+# inspect
+head(sdif_posngram)
+```
+
+We can now check and compare the use of the the pos-tagged sequences that differ significantly between learners and L1 speakers of English using simple concordancing. We begin by checking the use in the L1-data.
+
+```{r pa9, message=F, warning=F}
+# combine l1 data
+l1_pos <- c(ns1_pos, ns2_pos)
+# combine l2 data
+l2_pos <- c(de_pos, es_pos, fr_pos, it_pos, pl_pos, ru_pos)
+# extract PRP_VBZ
+PRP_VBZ_l1 <-quanteda::kwic(quanteda::tokens(l1_pos), 
+                            pattern = phrase("\\w* / PRP \\w* / VBZ"), 
+                            valuetype = "regex",
+                            window = 10) %>%
+  as.data.frame() %>%
+  # remove superfluous columns
+  dplyr::select(-from, -to, -docname, -pattern)
+# inspect results
+head(PRP_VBZ_l1)
+```
+
+We now turn to the learner data and also extract condordances for the same pos-sequence.
+
+```{r pa10, message=F, warning=F}
+# extract PRP_VBZ
+PRP_VBZ_l2 <-quanteda::kwic(quanteda::tokens(l2_pos), 
+                            pattern = phrase("\\w* / PRP \\w* / VBZ"), 
+                            valuetype = "regex", 
+                            window = 10) %>%
+  as.data.frame() %>%
+  # remove superfluous columns
+  dplyr::select(-from, -to, -docname, -pattern)
+# inspect results
+head(PRP_VBZ_l2)
+```
+
+# Lexical diversity
+
+Another common measure used to asses the development of language learns is vocabulary size. Vocabulary size can be assessed with various measures that represent lexical diversity. In the present case, we will extract
+
+* `TTR`: *type-token ratio*
+* `C`: Herdan's C (cf. Tweedie and Baayen 1998; sometimes referred to as LogTTR)
+* `R`: Guiraud's Root TTR (cf. Tweedie and Baayen 1998)
+* `CTTR`: Carroll's Corrected TTR 
+* `U`: Dugast's Uber Index (cf. Tweedie and Baayen 1998)
+* `S`: Summer's index
+* `Maas`: Maas' indices
+
+The formulas showing how the lexical diversity measures are calculated as well as additional information about the lexical diversity measures can be found [here](https://quanteda.io/reference/textstat_lexdiv.html).
+
+While we will extract all of these scores, we will only visualize Carroll's Corrected TTR to keep things simple. 
+
+\begin{equation}
+  CTTR =  \frac{N_{Types}}{\sqrt{2 N_{Tokens}}}
+\end{equation}
+
+However, before we extract the lexical diversity measures, we split the data into individual essays.
+
+```{r ld1, message=F, warning=F}
+cleanEss <- function(x){
+  x %>%
+  paste0(collapse = " ") %>%
+  stringr::str_split("Transport [0-9]{1,2}") %>%
+  unlist() %>%
+  stringr::str_squish() %>%
+  .[. != ""]
+}
+# apply function
+ns1_ess <- cleanEss(ns1)
+ns2_ess <- cleanEss(ns2)
+de_ess <- cleanEss(de)
+es_ess <- cleanEss(es)
+fr_ess <- cleanEss(fr)
+it_ess <- cleanEss(it)
+pl_ess <- cleanEss(pl)
+ru_ess <- cleanEss(ru)
+# inspect
+head(ns1_ess, 1)
+```
+
+In a next step, we can apply the `lex.div` function from the `koRpus` package which calculates the different lexical diversity measures for us.
+
+```{r ld2, message=F, warning=F}
+# extract lex. div. measures
+ns1_lds <- lapply(ns1_ess, function(x){
+  x <- koRpus::lex.div(x, force.lang = 'en', # define language 
+                       segment = 20,      # define segment width
+                       window = 20,       # define window width
+                       quiet = T,
+                       # define lex div measures
+                       measure=c("TTR", "C", "R", "CTTR", "U", "Maas"),
+                       char=c("TTR", "C", "R", "CTTR","U", "Maas"))
+})
+# inspect
+ns1_lds[1]
+```
+
+We now go ahead and extract the lexical diversity scores for the other essays.
+
+```{r ld4, message=F, warning=F}
+lexDiv <- function(x){
+  lapply(x, function(y){
+    koRpus::lex.div(y, force.lang = 'en',  segment = 20, window = 20,  
+                    quiet = T, measure=c("TTR", "C", "R", "CTTR", "U", "Maas"),
+                    char=c("TTR", "C", "R", "CTTR","U", "Maas"))
+  })
+}
+
+# extract lex. div. measures
+ns2_lds <- lexDiv(ns2_ess)
+de_lds <- lexDiv(de_ess)
+es_lds <- lexDiv(es_ess)
+fr_lds <- lexDiv(fr_ess)
+it_lds <- lexDiv(it_ess)
+pl_lds <- lexDiv(pl_ess)
+ru_lds <- lexDiv(ru_ess)
+```
+
+In a next step, we extract the CTTR values from L1-speakers and learners and put the results into a table.
+
+```{r ld5, message=F, warning=F}
+cttr <- data.frame(c(as.vector(sapply(ns1_lds, '[', "CTTR")), 
+                     as.vector(sapply(ns2_lds, '[', "CTTR")), 
+                     as.vector(sapply(de_lds, '[', "CTTR")), 
+                     as.vector(sapply(es_lds, '[', "CTTR")),
+                     as.vector(sapply(fr_lds, '[', "CTTR")), 
+                     as.vector(sapply(it_lds, '[', "CTTR")), 
+                     as.vector(sapply(pl_lds, '[', "CTTR")), 
+                     as.vector(sapply(ru_lds, '[', "CTTR"))),
+          c(rep("en", length(as.vector(sapply(ns1_lds, '[', "CTTR")))),
+            rep("en", length(as.vector(sapply(ns2_lds, '[', "CTTR")))),
+            rep("de", length(as.vector(sapply(de_lds, '[', "CTTR")))),
+            rep("es", length(as.vector(sapply(es_lds, '[', "CTTR")))),
+            rep("fr", length(as.vector(sapply(fr_lds, '[', "CTTR")))),
+            rep("it", length(as.vector(sapply(it_lds, '[', "CTTR")))),
+            rep("pl", length(as.vector(sapply(pl_lds, '[', "CTTR")))),
+            rep("ru", length(as.vector(sapply(ru_lds, '[', "CTTR")))))) %>%
+  dplyr::rename(CTTR = 1,
+                l1 = 2)
+# inspect
+head(cttr)
+```
+
+We can now visualize the information in the table in the form of a dot plot to inspect potential differences with respect to the L1-background of speakers.
+
+```{r ld7, message=F, warning=F}
+cttr %>%
+  dplyr::group_by(l1) %>%
+  dplyr::summarise(CTTR = mean(CTTR)) %>%
+  ggplot(aes(x = reorder(l1, CTTR, mean), y = CTTR)) +
+  geom_point() +
+  # adapt y-axis labels
+  labs(y = "Lexical diversity (CTTR)") +
+  # adapt tick labels
+  scale_x_discrete("L1 of learners", 
+                   breaks = names(table(cttr$l1)), 
+                   labels = c("en" = "English",
+                              "de" = "German",
+                              "es" = "Spanish",
+                              "fr" = "French",
+                              "it" = "Italian",
+                              "pl" = "Polish",
+                              "ru" = "Russian")) +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 15)) +
+  theme(legend.position = "none")
+```
+
+# Readability
+
+Another measure to assess text quality or text complexity is *readability*. As with lexical diversity scores, the `textstat_readability` function from the `quanteda.textstats` package provides a multitude of different measures (see [here](https://quanteda.io/reference/textstat_readability.html) for the entire list of readability scores that can be extracted). In the following, we will focus on Flesch's Reading Ease Score exclusively (cf. Flesch 1948) (see below; ALS = average sentence length).
+
+\begin{equation}
+  Flesch =  206.835−(1.015 ASL)−(84.6 \frac{N_{Syllables}}{N_{Words}})
+\end{equation}
+
+In a first step, we extract the Flesch scores by applying the `textstat_readability` to the essays.
+
+```{r rd1, message=F, warning=F}
+ns1_read <- quanteda.textstats::textstat_readability(ns1_ess)
+ns2_read <- quanteda.textstats::textstat_readability(ns2_ess)
+de_read <- quanteda.textstats::textstat_readability(de_ess)
+es_read <- quanteda.textstats::textstat_readability(es_ess)
+fr_read <- quanteda.textstats::textstat_readability(fr_ess)
+it_read <- quanteda.textstats::textstat_readability(it_ess)
+pl_read <- quanteda.textstats::textstat_readability(pl_ess)
+ru_read <- quanteda.textstats::textstat_readability(ru_ess)
+# inspect
+ns1_read
+```
+
+Now, we generate a table with the results and the L1 of the speaker that prodced the essay.
+ 
+```{r rd3, message=F, warning=F}
+read <- rbind(ns1_read, ns2_read, de_read, es_read, fr_read, it_read, pl_read, ru_read) %>%
+  dplyr::mutate(l1 = c(rep("en", nrow(ns1_read)),
+                       rep("en", nrow(ns2_read)),
+                       rep("de", nrow(de_read)),
+                       rep("es", nrow(es_read)),
+                       rep("fr", nrow(fr_read)),
+                       rep("it", nrow(it_read)),
+                       rep("pl", nrow(pl_read)),
+                       rep("ru", nrow(ru_read)))) %>%
+  dplyr::group_by(l1) %>%
+  dplyr::summarise(Flesch = mean(Flesch))
+# inspect
+head(read)
+```
+
+As before, we can visualize the results to check for potential differences between L1-speakers and learners of English. In this case, we use bar charts to visualize the results.
+
+```{r rd4, message=F, warning=F}
+read %>%
+  ggplot(aes(x = l1, y = Flesch, label = round(Flesch, 1))) +
+  geom_bar(stat = "identity") +
+  geom_text(vjust=1.6, color = "white")+
+  # adapt tick labels
+  scale_x_discrete("L1 of learners", 
+                   breaks = names(table(read$l1)), 
+                   labels = c("en" = "English",
+                              "de" = "German",
+                              "es" = "Spanish",
+                              "fr" = "French",
+                              "it" = "Italian",
+                              "pl" = "Polish",
+                              "ru" = "Russian")) +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 75)) +
+  theme(legend.position = "none")
+```
+ 
+# Spelling errors
+
+We can also determine the number of spelling errors in L1 and learner texts by checking if words in a given text occur in a dictionary or not. To do this, we can use the `hunspell` function from the `hunspell` package. We can choose between different dictionaries (use `list_dictionaries()` to see which dictionaries are available) and we can specify words to ignore via the `ignore` argument.
+
+```{r sp1, message=F, warning=F}
+# list words that are not in dict
+hunspell(ns1_ess, 
+         format = c("text"),
+         dict = dictionary("en_GB"),
+         ignore = en_stats) 
+```
+
+We can check how many spelling mistakes and words are in a text as shown below.
+
+```{r sp3, message=F, warning=F}
+ns1_nerr <- hunspell(ns1_ess, dict = dictionary("en_GB")) %>%
+  unlist() %>%
+  length()
+ns1_nw <- sum(tokenizers::count_words(ns1_ess))
+# inspect
+ns1_nerr; ns1_nw
+```
+
+To check if L1 speakers and learners differ regrading the likelihood of making spelling errors, we apply the `hunspell` function to all texts and also extract the number of words for each text.
+
+```{r sp4, message=F, warning=F}
+# ns1
+ns1_nerr <- hunspell(ns1_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+ns1_nw <- sum(tokenizers::count_words(ns1_ess))
+# ns2
+ns2_nerr <- hunspell(ns2_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+ns2_nw <- sum(tokenizers::count_words(ns2_ess))
+# de
+de_nerr <- hunspell(de_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+de_nw <- sum(tokenizers::count_words(de_ess))
+# es
+es_nerr <- hunspell(es_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+es_nw <- sum(tokenizers::count_words(es_ess))
+# fr
+fr_nerr <- hunspell(fr_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+fr_nw <- sum(tokenizers::count_words(fr_ess))
+# it
+it_nerr <- hunspell(it_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+it_nw <- sum(tokenizers::count_words(it_ess))
+# pl
+pl_nerr <- hunspell(pl_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+pl_nw <- sum(tokenizers::count_words(pl_ess))
+# ru
+ru_nerr <- hunspell(ru_ess, dict = dictionary("en_GB")) %>%  unlist() %>% length()
+ru_nw <- sum(tokenizers::count_words(ru_ess))
+```
+
+Now, we generate a table from the results.
+
+```{r sp6, message=F, warning=F}
+err_tb <- c(ns1_nerr, ns2_nerr, de_nerr, es_nerr, fr_nerr, it_nerr, pl_nerr, ru_nerr) %>%
+  as.data.frame() %>%
+  # rename column
+  dplyr::rename(errors = 1) %>%
+  # add n of words
+  dplyr::mutate(words = c(ns1_nw, ns2_nw, de_nw, es_nw, fr_nw, it_nw, pl_nw, ru_nw)) %>%
+  # add l1
+  dplyr::mutate(l1 = c("en", "en", "de", "es", "fr", "it", "pl", "ru")) %>%
+  # calculate rel freq
+  dplyr::mutate(freq = round(errors/words*1000, 1)) %>%
+  # summarise
+  dplyr::group_by(l1) %>%
+  dplyr::summarise(freq = mean(freq))
+# inspect
+head(err_tb)
+```
+
+We can now visualize the results.
+
+```{r sp7, message=F, warning=F}
+err_tb %>%
+  ggplot(aes(x = reorder(l1, -freq), y = freq, label = freq)) +
+  geom_bar(stat = "identity") +
+  geom_text(vjust=1.6, color = "white") +
+  # adapt tick labels
+  scale_x_discrete("L1 of learners", 
+                   breaks = names(table(read$l1)), 
+                   labels = c("en" = "English",
+                              "de" = "German",
+                              "es" = "Spanish",
+                              "fr" = "French",
+                              "it" = "Italian",
+                              "pl" = "Polish",
+                              "ru" = "Russian")) +
+  labs(y = "Relative frequency\n(per 1,000 words)") +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 40)) +
+  theme(legend.position = "none")
+```
+
+# Citation & Session Info 
+
+Schweinberger, Martin. 2021. *Analyzing learner language using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/llr.html.
+
+
+```{r fin}
+sessionInfo()
+```
+
+***
+
+# References 
+
+Benoit, Kenneth, Watanabe, Kohei, Wang, Haiyan, Nulty, Paul, Obeng, Adam,  Müller, Stefan and Matsuo, Akitaka (2018). quanteda: An R package for the quantitative analysis of textual data. *Journal of Open Source Software* 3(30): 774.
+
+Benoit, Kenneth, Watanabe, Kohei, Wang, Haiyan, Lua, Jiong Wei and Kuha, Jouni (2021). Package ‘quanteda. textstats’. *Research Bulletin* 27(2): 37-54.
+
+Flesch, Rudolph. 1948. A New Readability Yardstick. *Journal of Applied Psychology* 32(3): 221–233.
+
+Lindquist, Hans (2009). *Corpus linguistics and the description of English*. Edinburgh: Edinburgh University Press.
+
+Tweedie, Fiona J. and Baayen, Harald R. (1998). How Variable May a Constant Be? Measures of Lexical Richness in Perspective. *Computers and the Humanities* 32(5): 323–352.
