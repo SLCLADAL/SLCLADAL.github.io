@@ -28,7 +28,8 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces how to extract concordances and keyword-in-context (KWIC) displays with R. The entire R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/kwics.Rmd).  
+This tutorial introduces how to extract concordances and keyword-in-context (KWIC) displays with R. The entire R-markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/kwics.Rmd).  If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. 
+
 
 In the language sciences, concordancing refers to the extraction of words from a given text or texts [@lindquist2009corpus 5]. Commonly, concordances are displayed in the form of keyword-in-context displays (KWICs) where the search term is shown in context, i.e. with preceding and following words. Concordancing are central to analyses of text and they often represents the first step in more sophisticated analyses of language data [@stafanowitsch2020corpus]. The play such a key role in the language sciences because concordances are extremely valuable for understanding how a word or phrase is used, how often it is used, and in which contexts is used. As concordances allow us to analyze the context in which a word or phrase occurs and provide frequency information about word use, they also enable us to analyze collocations or the collocational profiles of words and phrases [@stafanowitsch2020corpus 50-51]. Finally, concordances can also be used to extract examples and it is a very common procedure. 
 
@@ -282,7 +283,7 @@ kwic_natural_longer %>%
 
 While extracting single words is very common, you may want to extract more than just one word. To extract phrases, all you need to so is to specify that the pattern you are looking for is a phrase, as shown below.
 
-```{r multikwic2}
+```{r multikwic2, message=FALSE, warning=FALSE}
 kwic_naturalselection <- kwic(origin, pattern = phrase("natural selection"))
 ```
 
@@ -374,7 +375,7 @@ There are three basic types of regular expressions:
 
 The regular expressions below show the first type of regular expressions, i.e. regular expressions that stand for individual symbols and determine frequencies.
 
-```{r regex05, echo=F, eval = T}
+```{r regex05, echo=F, eval = T, message=FALSE, warning=FALSE}
 symbols1 <- c("?", "\\*", "\\+", "{n}", "{n,}", "{n,m}")
 explanation1 <- c("The preceding item is optional and will be matched at most once", "The preceding item will be matched zero or more times", "The preceding item will be matched one or more times", "The preceding item is matched exactly n times", "The preceding item is matched n or more times", "The preceding item is matched at least n times, but not more than m times")
 example1 <- c("walk[a-z]? = walk, walks", 
@@ -404,7 +405,7 @@ df_regex %>%
 
 The regular expressions below show the second type of regular expressions, i.e. regular expressions that stand for classes of symbols.
 
-```{r regex03, echo=F, eval = T}
+```{r regex03, echo=F, eval = T, message=FALSE, warning=FALSE}
 symbols2 <- c("[ab]", "[AB]", "[12]", "[:digit:]", "[:lower:]", "[:upper:]", "[:alpha:]", "[:alnum:]", "[:punct:]", "[:graph:]", "[:blank:]", "[:space:]", "[:print:]")
 explanations2 <- c("lower case a and b", 
                    "upper case a and b", 
@@ -440,7 +441,7 @@ df_regex %>%
 
 The regular expressions that denote classes of symbols are enclosed in `[]` and `:`. The last type of regular expressions, i.e. regular expressions that stand for structural properties are shown below.
 
-```{r regex09, echo=F, eval = T}
+```{r regex09, echo=F, eval = T, message=FALSE, warning=FALSE}
 symbols3 <- c("\\\\\\w", "\\\\\\W", "\\\\\\s", "\\\\\\S", "\\\\\\d", "\\\\\\D", "\\\\\\b", "\\\\\\B", "\\\\<", "\\\\>", "^", "$")
 explanations3 <- c("Word characters: [[:alnum:]_]",
                    "No word characters: [^[:alnum:]_]",
@@ -641,6 +642,71 @@ kwic_ordered_coll %>%
 ```
 
 We add more columns according to which we could arrange the concordance following the same schema. For example, we could add another column that represented the frequency of words that immediately preceded the search term and then arrange according to this column.
+
+## Ordering by subsequent elements{-}
+
+In this section, we will extract the three words following the keyword (*selection*) and organize the concordances by the frequencies of the following words. We begin by insoecting the first 6 lines of the concordance of *selection*.
+
+```{r, message=FALSE, warning=FALSE}
+head(kwic_natural)
+```
+
+Next, we take the concordances and create a clean post column that is all in lower case and that does not contain any punctuation.
+
+
+```{r, message=FALSE, warning=FALSE}
+kwic_natural %>%
+  # convert to data frame
+  as.data.frame() %>%
+  # create new CleanPost
+  dplyr::mutate(CleanPost = stringr::str_remove_all(post, "[:punct:]"),
+                CleanPost = stringr::str_squish(CleanPost),
+                CleanPost = tolower(CleanPost))-> kwic_natural_following
+# inspect
+head(kwic_natural_following)
+```
+
+In a next step, we extract the 1^st^, 2^nd^, and 3^rd^ words following the keyword.
+
+
+```{r, message=FALSE, warning=FALSE}
+kwic_natural_following %>%
+  # extract first element after keyword
+  dplyr::mutate(FirstWord = stringr::str_remove_all(CleanPost, " .*")) %>%
+  # extract second element after keyword
+  dplyr::mutate(SecWord = stringr::str_remove(CleanPost, ".*? "),
+                SecWord = stringr::str_remove_all(SecWord, " .*")) %>%
+  # extract third element after keyword
+  dplyr::mutate(ThirdWord = stringr::str_remove(CleanPost, ".*? "),
+                ThirdWord = stringr::str_remove(ThirdWord, ".*? "),
+                ThirdWord = stringr::str_remove_all(ThirdWord, " .*")) -> kwic_natural_following
+# inspect
+head(kwic_natural_following)
+```
+
+Next, we calculate the frequencies of the subsequent words and order in descending order from the  1^st^ to the 3^rd^ word following the keyword.
+
+```{r, message=FALSE, warning=FALSE}
+kwic_natural_following %>%
+  # calculate frequency of following words
+  # 1st word
+  dplyr::group_by(FirstWord) %>%
+  dplyr::mutate(FreqW1 = n()) %>%
+  # 2nd word
+  dplyr::group_by(SecWord) %>%
+  dplyr::mutate(FreqW2 = n()) %>%
+  # 3rd word
+  dplyr::group_by(ThirdWord) %>%
+  dplyr::mutate(FreqW3 = n()) %>%
+  # ungroup
+  dplyr::ungroup() %>%
+  # arrange by following words
+  dplyr::arrange(-FreqW1, -FreqW2, -FreqW3) -> kwic_natural_following
+# inspect results
+head(kwic_natural_following, 10)
+```
+
+The results now show the concordance arranged by the frequency of the words following the keyword.
 
 ## Concordances from transcriptions{-}
 
