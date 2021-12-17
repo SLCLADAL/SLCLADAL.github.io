@@ -14,9 +14,9 @@
 
 <meta name="author" content="Martin Schweinberger" />
 
-<meta name="date" content="2021-12-08" />
+<meta name="date" content="2021-12-17" />
 
-<title>Automated text summarization with R</title>
+<title>Automated Text Summarization with R</title>
 
 <script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -30,6 +30,8 @@
 <script src="site_libs/navigation-1.1/tabsets.js"></script>
 <link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
 <script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet" />
+<script src="site_libs/pagedtable-1.1/js/pagedtable.js"></script>
 <link href="site_libs/anchor-sections-1.0/anchor-sections.css" rel="stylesheet" />
 <script src="site_libs/anchor-sections-1.0/anchor-sections.js"></script>
 <script src="site_libs/clipboard-1.7.1/clipboard.min.js"></script>
@@ -527,6 +529,9 @@ div.tocify {
     <li>
       <a href="tagging.html">Tagging and Parsing</a>
     </li>
+    <li>
+      <a href="txtsum.html">Automated Text Summarization</a>
+    </li>
   </ul>
 </li>
 <li class="dropdown">
@@ -603,9 +608,9 @@ div.tocify {
 
 
 
-<h1 class="title toc-ignore">Automated text summarization with R</h1>
+<h1 class="title toc-ignore">Automated Text Summarization with R</h1>
 <h4 class="author">Martin Schweinberger</h4>
-<h4 class="date">2021-12-08</h4>
+<h4 class="date">2021-12-17</h4>
 
 </div>
 
@@ -624,7 +629,7 @@ div.tocify {
 <p><img src="https://slcladal.github.io/images/uq1.jpg" width="100%" /></p>
 <div id="introduction" class="section level1 unnumbered">
 <h1>Introduction</h1>
-<p>This tutorial shows how to summarize texts automatically using R. The RNotebook for this tutorial can be downloaded <a href="https://slcladal.github.io/txtsum.Rmd">here</a>. If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the <a href="https://slcladal.github.io/bibliography.bib">bibliography file</a> and store it in the same folder where you store the Rmd file.</p>
+<p>This tutorial shows how to summarize texts automatically using R by extracting the most prototypical sentences. The RNotebook for this tutorial can be downloaded <a href="https://slcladal.github.io/txtsum.Rmd">here</a>. If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the <a href="https://slcladal.github.io/bibliography.bib">bibliography file</a> and store it in the same folder where you store the Rmd file.</p>
 <p><strong>Preparation and session set up</strong></p>
 <p>This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R <a href="https://slcladal.github.io/intror.html">here</a>. For this tutorials, we need to install certain <em>packages</em> from an R <em>library</em> so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).</p>
 <pre class="r"><code># set options
@@ -634,7 +639,10 @@ options(&quot;scipen&quot; = 100, &quot;digits&quot; = 12) # suppress math annot
 install.packages(&quot;xml2&quot;)
 install.packages(&quot;rvest&quot;)
 install.packages(&quot;lexRankr&quot;)
+install.packages(&quot;textmineR&quot;)
 install.packages(&quot;tidyverse&quot;)
+install.packages(&quot;quanteda&quot;)
+install.packages(&quot;igraph&quot;)
 install.packages(&quot;here&quot;)
 # install klippy for copy-to-clipboard button in code chunks
 remotes::install_github(&quot;rlesur/klippy&quot;)</code></pre>
@@ -643,7 +651,10 @@ remotes::install_github(&quot;rlesur/klippy&quot;)</code></pre>
 library(xml2)
 library(rvest)
 library(lexRankr)
+library(textmineR)
 library(tidyverse)
+library(quanteda)
+library(igraph)
 library(here)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()</code></pre>
@@ -653,71 +664,130 @@ klippy::klippy()</code></pre>
 </script>
 <p>Once you have installed RStudio and have also initiated the session by executing the code shown above, you are good to go.</p>
 </div>
-<div id="text-summarization" class="section level1">
-<h1><span class="header-section-number">1</span> Text summarization</h1>
+<div id="basic-text-summarization" class="section level1 unnumbered">
+<h1>Basic Text summarization</h1>
+<p>This section shows an easy to use text summarizing method which extracts the most prototypical sentences from a text. As such, this text summarizer does not generate sentences based on prototypical words but evaluates how prototypical or cetral sentences are and then orders the sentences in a text according to their prototypicality (or centrality).</p>
+<p>For this example, we will download text from a Guardian article about a meeting between Angela Merkel and Donald Trump at the G20 summit in 2017. In a first step, we define the url of the webpage hosting the artcile.</p>
 <pre class="r"><code># url to scrape
-monsanto_url = &quot;https://www.theguardian.com/environment/2017/sep/28/monsanto-banned-from-european-parliament&quot;</code></pre>
+url = &quot;https://www.theguardian.com/world/2017/jun/26/angela-merkel-and-donald-trump-head-for-clash-at-g20-summit&quot;</code></pre>
+<p>Next, we extract the text of the article using the<code>xml2  and the</code>rvest` packages.</p>
 <pre class="r"><code># read page html
-page = xml2::read_html(monsanto_url)
+page = xml2::read_html(url)
 # extract text from page html using selector
 page %&gt;%
   # extract paragraphs
   rvest::html_nodes(&quot;p&quot;) %&gt;%
   # extract text
-  rvest::html_text() -&gt; page_text
-
+  rvest::html_text() %&gt;%
+  # remove empty elements
+  .[. != &quot;&quot;] -&gt; text
 # inspect data
-page_text</code></pre>
-<pre><code>##  [1] &quot;MEPs withdraw parliamentary access after the firm shunned a hearing into allegations that it unduly influenced studies into the safety of glyphosate used in its RoundUp weedkiller&quot;                                                                                            
-##  [2] &quot;Last modified on Fri 29 Sep 2017 00.17 AEST&quot;                                                                                                                                                                                                                                    
-##  [3] &quot;Monsanto lobbyists have been banned from entering the European parliament after the multinational refused to attend a parliamentary hearing into allegations of regulatory interference.&quot;                                                                                       
-##  [4] &quot;It is the first time MEPs have used new rules to withdraw parliamentary access for firms that ignore a summons to attend parliamentary inquiries or hearings.&quot;                                                                                                                  
-##  [5] &quot;&quot;                                                                                                                                                                                                                                                                               
-##  [6] &quot;Monsanto officials will now be unable to meet MEPs, attend committee meetings or use digital resources on parliament premises in Brussels or Strasbourg.&quot;                                                                                                                       
-##  [7] &quot;While a formal process still needs to be worked through, a spokesman for the parliament’s president Antonio Tajani said that the leaders of all major parliamentary blocks had backed the ban in a vote this morning.&quot;                                                          
-##  [8] &quot;“One has to assume it is effective immediately,” he said.&quot;                                                                                                                                                                                                                      
-##  [9] &quot;MEPs had been incensed at a Monsanto decision to shun a hearing organised by the environment and agriculture committees, with academics, regulators and campaigners, on 11 October. &quot;                                                                                           
-## [10] &quot;The meeting is expected to hear allegations that Monsanto unduly influenced regulatory studies into the safety of glyphosate, a key ingredient in its best-selling RoundUp weedkiller.&quot;                                                                                         
-## [11] &quot;“Those who ignore the rules of democracy also lose their rights as a lobbyist in the European parliament,” said the Green party president Philippe Lamberts. “US corporations must also accept the democratic control function of the parliament. Monsanto cannot escape this.”&quot;
-## [12] &quot;The lobby ban will be a bitter blow to Monsanto’s advocacy campaign ahead of a decision later this year about the relicensing of glyphosate, which has been linked to cancer by one expert WHO panel.&quot;                                                                          
-## [13] &quot;Another deemed it safe for public use, but Monsanto’s outreach to regulatory agencies in the US and Europe sparked controversy and prompted the parliamentary hearing.&quot;                                                                                                         
-## [14] &quot;A Monsanto letter to MEPs seen by the Guardian said that the European parliament was not “an appropriate forum” for discussion on the issues involved. &quot;                                                                                                                        
-## [15] &quot;“The joint hearing could be viewed as the latest attempt by those opposed to modern agricultural practices to influence and frustrate the EU scientific and regulatory process to suit their own agenda,” it says.&quot;                                                             
-## [16] &quot;“We have observed with increasing alarm the politicisation of the EU procedure on the renewal of glyphosate,” wrote Monsanto’s vice president Philip Miller, “a procedure which should be scientific but which in many respects has been hijacked by populism.”&quot;                
-## [17] &quot;Martin Pigeon, a spokesman for the NGO Corporate Europe Observatory, said it was “extremely important that parliament has been prepared to meet Monsanto’s unbelievable arrogance with real retaliation and consequences.”&quot;                                                     
-## [18] &quot;Monsanto spends between \200300,000-\200400,000 (£260,000 - £350,000) annually on lobbying in Brussels, according to its self-declaration form in the EU transparency register.&quot;</code></pre>
+head(text)</code></pre>
+<pre><code>## [1] &quot;German chancellor plans to make climate change, free trade and mass migration key themes in Hamburg, putting her on collision course with US&quot;                                                                                                        
+## [2] &quot;Last modified on Wed 25 Aug 2021 23.54 AEST&quot;                                                                                                                                                                                                         
+## [3] &quot;A clash between Angela Merkel and Donald Trump appears unavoidable after Germany signalled that it will make climate change, free trade and the management of forced mass global migration the key themes of the G20 summit in Hamburg next week.&quot;   
+## [4] &quot;The G20 summit brings together the world’s biggest economies, representing 85% of global gross domestic product (GDP), and Merkel’s chosen agenda looks likely to maximise American isolation while attempting to minimise disunity amongst others. &quot;
+## [5] &quot;The meeting, which is set to be the scene of large-scale street protests, will also mark the first meeting between Trump and the Russian president, Vladimir Putin, as world leaders.&quot;                                                               
+## [6] &quot;Trump has already rowed with Europe once over climate change and refugees at the G7 summit in Italy, and now looks set to repeat the experience in Hamburg but on a bigger stage, as India and China join in the criticism of Washington. &quot;</code></pre>
+<p>Now that we have the text, we apply the <code>lexRank</code> function from the <code>lexRankr</code> package to determine the prototypicality (or centrality) and extract the three most central sentences.</p>
 <pre class="r"><code># perform lexrank for top 3 sentences
-top_3 = lexRankr::lexRank(page_text,
+top3sentences = lexRankr::lexRank(text,
                           # only 1 article; repeat same docid for all of input vector
-                          docId = rep(1, length(page_text)),
-                          # return 3 sentences to mimick /u/autotldr&#39;s output
+                          docId = rep(1, length(text)),
+                          # return 3 sentences
                           n = 3,
                           continuous = TRUE)</code></pre>
 <pre><code>## Parsing text into sentences and tokens...DONE
 ## Calculating pairwise sentence similarities...DONE
 ## Applying LexRank...DONE
 ## Formatting Output...DONE</code></pre>
-<pre class="r"><code># reorder the top 3 sentences to be in order of appearance in article
-order_of_appearance = order(as.integer(gsub(&quot;_&quot;,&quot;&quot;,top_3$sentenceId)))
-# extract sentences in order of appearance
-ordered_top_3 = top_3[order_of_appearance, &quot;sentence&quot;]
-# inspect top 3 most rpresentative sentences
-ordered_top_3</code></pre>
-<pre><code>## [1] &quot;Monsanto lobbyists have been banned from entering the European parliament after the multinational refused to attend a parliamentary hearing into allegations of regulatory interference.&quot;
-## [2] &quot;Monsanto officials will now be unable to meet MEPs, attend committee meetings or use digital resources on parliament premises in Brussels or Strasbourg.&quot;                                
-## [3] &quot;A Monsanto letter to MEPs seen by the Guardian said that the European parliament was not “an appropriate forum” for discussion on the issues involved.&quot;</code></pre>
+<pre class="r"><code># inspect
+top3sentences</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["docId"],"name":[1],"type":["chr"],"align":["left"]},{"label":["sentenceId"],"name":[2],"type":["chr"],"align":["left"]},{"label":["sentence"],"name":[3],"type":["chr"],"align":["left"]},{"label":["value"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"1","2":"1_3","3":"A clash between Angela Merkel and Donald Trump appears unavoidable after Germany signalled that it will make climate change, free trade and the management of forced mass global migration the key themes of the G20 summit in Hamburg next week.","4":"0.05990624"},{"1":"1","2":"1_6","3":"Trump has already rowed with Europe once over climate change and refugees at the G7 summit in Italy, and now looks set to repeat the experience in Hamburg but on a bigger stage, as India and China join in the criticism of Washington.","4":"0.05631492"},{"1":"1","2":"1_17","3":"But the G7, and Trump’s subsequent decision to shun the Paris climate change treaty, clearly left a permanent mark on her, leading to her famous declaration of independence four days later at a Christian Social Union (CSU) rally in a Bavarian beer tent.","4":"0.04952882"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Next, we extract and display the sentences from the table.</p>
+<pre class="r"><code>top3sentences$sentence</code></pre>
+<pre><code>## [1] &quot;A clash between Angela Merkel and Donald Trump appears unavoidable after Germany signalled that it will make climate change, free trade and the management of forced mass global migration the key themes of the G20 summit in Hamburg next week.&quot;            
+## [2] &quot;Trump has already rowed with Europe once over climate change and refugees at the G7 summit in Italy, and now looks set to repeat the experience in Hamburg but on a bigger stage, as India and China join in the criticism of Washington.&quot;                    
+## [3] &quot;But the G7, and Trump’s subsequent decision to shun the Paris climate change treaty, clearly left a permanent mark on her, leading to her famous declaration of independence four days later at a Christian Social Union (CSU) rally in a Bavarian beer tent.&quot;</code></pre>
+<p>The output show the three most prototypical (or central) sentences of the article. The articles are already in chronological order - if the sentences were not in chronological order, we could also have ordered them by <em>sentenceId</em> before displaying them using <code>dplyr</code> and <code>stringr</code> package functions as shown below (in our case the order does not change as the prototypicality and the chronological order are identical).</p>
+<pre class="r"><code>top3sentences %&gt;%
+  dplyr::mutate(sentenceId = as.numeric(stringr::str_remove_all(sentenceId, &quot;.*_&quot;))) %&gt;%
+  dplyr::arrange(sentenceId) %&gt;%
+  dplyr::pull(sentence)</code></pre>
+<pre><code>## [1] &quot;A clash between Angela Merkel and Donald Trump appears unavoidable after Germany signalled that it will make climate change, free trade and the management of forced mass global migration the key themes of the G20 summit in Hamburg next week.&quot;            
+## [2] &quot;Trump has already rowed with Europe once over climate change and refugees at the G7 summit in Italy, and now looks set to repeat the experience in Hamburg but on a bigger stage, as India and China join in the criticism of Washington.&quot;                    
+## [3] &quot;But the G7, and Trump’s subsequent decision to shun the Paris climate change treaty, clearly left a permanent mark on her, leading to her famous declaration of independence four days later at a Christian Social Union (CSU) rally in a Bavarian beer tent.&quot;</code></pre>
+<hr />
+<div class="warning" style="padding:0.1em; background-color:#51247a; color:#f2f2f2">
+<span>
+<p style="margin-top:1em; text-align:center">
+<b>EXERCISE TIME!</b>
+</p>
+<p style="margin-left:1em;">
+</p>
+<p></span></p>
+</div>
+<div class="question">
+<p>`</p>
+<ol style="list-style-type: decimal">
+<li>Extract the top 10 sentences from every chapter of Charles Darwin’s <em>On the Origin of Species</em>. You can download the text using this command: <code>darwin &lt;- base::readRDS(url("https://slcladal.github.io/data/origindarwin.rda", "rb"))</code>. You will then have to paste the whole text together, split it into chapters, create a list of sentences in each chapter, and then apply text summarization to each element in the list. <br></li>
+</ol>
+<details>
+<p><summary>Answer</summary></p>
+<pre class="r"><code>  darwin &lt;- base::readRDS(url(&quot;https://slcladal.github.io/data/origindarwin.rda&quot;, &quot;rb&quot;)) %&gt;%
+  # collapse into single document
+  paste0(collapse = &quot; &quot;) %&gt;%
+  # split into chapters
+  stringr::str_split(&quot;CHAPTER&quot;)
+  
+  # split chapters into sentences
+  chapters &lt;- sapply(darwin, function(x){
+    x &lt;- stringi::stri_split_boundaries(x, type = &quot;sentence&quot;)
+  })
+  
+  chapters_clean &lt;- lapply(chapters, function(x){
+    # remove chapter headings
+    x &lt;- stringr::str_remove_all(x, &quot;[A-Z]{2,} {0,1}[0-9]{0,}&quot;)
+  })
+  
+  # extract top 3 sentences from each chapter
+  top3s &lt;- lapply(chapters_clean, function(x){
+    x &lt;- lexRankr::lexRank(x,
+                          # only 1 article; repeat same docid for all of input vector
+                          #docId = rep(1, length(text)),
+                          # return 3 sentences
+                          n = 3,
+                          continuous = TRUE) %&gt;%
+                          dplyr::pull(sentence) %&gt;%
+    # remove special characters
+    stringr::str_remove_all(&quot;[^[:alnum:] ]&quot;) %&gt;%
+    # remove superfluous white spaces
+    stringr::str_squish()
+  })
+  
+  # inspect top 3 sentences of first 5 chapters
+  top3s[1:5]</code></pre>
+</details>
+</div>
+<p>`</p>
+<hr />
+<p>You can go ahead and play with the text summarization and see if it is useful for you or if you can trust the results based on your data.</p>
 </div>
 <div id="citation-session-info" class="section level1 unnumbered">
 <h1>Citation &amp; Session Info</h1>
-<p>Schweinberger, Martin. 2021. <em>Automated text summarization with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/txtsum.html" class="uri">https://slcladal.github.io/txtsum.html</a> (Version 2021.12.08).</p>
+<p>Schweinberger, Martin. 2021. <em>Automated text summarization with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/txtsum.html" class="uri">https://slcladal.github.io/txtsum.html</a> (Version 2021.12.17).</p>
 <pre><code>@manual{schweinberger2021txtsum,
   author = {Schweinberger, Martin},
-  title = {Automated text summarization with R},
+  title = {Automated Text Summarization with R},
   note = {https://slcladal.github.io/txtsum.html},
   year = {2021},
   organization = &quot;The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2021.12.08}
+  edition = {2021.12.17}
 }</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
 <pre><code>## R version 4.1.1 (2021-08-10)
@@ -735,27 +805,29 @@ ordered_top_3</code></pre>
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] here_1.0.1      forcats_0.5.1   stringr_1.4.0   dplyr_1.0.7    
-##  [5] purrr_0.3.4     readr_2.1.1     tidyr_1.1.4     tibble_3.1.5   
-##  [9] ggplot2_3.3.5   tidyverse_1.3.1 lexRankr_0.5.2  rvest_1.0.2    
-## [13] xml2_1.3.2     
+##  [1] here_1.0.1      igraph_1.2.7    quanteda_3.1.0  forcats_0.5.1  
+##  [5] stringr_1.4.0   dplyr_1.0.7     purrr_0.3.4     readr_2.1.1    
+##  [9] tidyr_1.1.4     tibble_3.1.5    ggplot2_3.3.5   tidyverse_1.3.1
+## [13] textmineR_3.0.5 Matrix_1.3-4    lexRankr_0.5.2  rvest_1.0.2    
+## [17] xml2_1.3.2     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Rcpp_1.0.7        lubridate_1.8.0   assertthat_0.2.1  rprojroot_2.0.2  
-##  [5] digest_0.6.28     utf8_1.2.2        R6_2.5.1          cellranger_1.1.0 
-##  [9] backports_1.3.0   reprex_2.0.1.9000 evaluate_0.14     httr_1.4.2       
-## [13] highr_0.9         pillar_1.6.4      rlang_0.4.12      curl_4.3.2       
-## [17] readxl_1.3.1      rstudioapi_0.13   klippy_0.0.0.9500 rmarkdown_2.5    
-## [21] selectr_0.4-2     igraph_1.2.7      munsell_0.5.0     broom_0.7.10     
-## [25] compiler_4.1.1    modelr_0.1.8      xfun_0.26         pkgconfig_2.0.3  
-## [29] htmltools_0.5.2   tidyselect_1.1.1  fansi_0.5.0       crayon_1.4.2     
-## [33] tzdb_0.2.0        dbplyr_2.1.1      withr_2.4.3       SnowballC_0.7.0  
-## [37] grid_4.1.1        jsonlite_1.7.2    gtable_0.3.0      lifecycle_1.0.1  
-## [41] DBI_1.1.1         magrittr_2.0.1    scales_1.1.1      cli_3.1.0        
-## [45] stringi_1.7.5     fs_1.5.0          ellipsis_0.3.2    generics_0.1.1   
-## [49] vctrs_0.3.8       tools_4.1.1       glue_1.4.2        hms_1.1.1        
-## [53] fastmap_1.1.0     yaml_2.2.1        colorspace_2.0-2  knitr_1.36       
-## [57] haven_2.4.3</code></pre>
+##  [1] Rcpp_1.0.7         lubridate_1.8.0    lattice_0.20-44    rprojroot_2.0.2   
+##  [5] assertthat_0.2.1   digest_0.6.28      utf8_1.2.2         R6_2.5.1          
+##  [9] cellranger_1.1.0   backports_1.3.0    reprex_2.0.1.9000  evaluate_0.14     
+## [13] httr_1.4.2         highr_0.9          pillar_1.6.4       rlang_0.4.12      
+## [17] curl_4.3.2         readxl_1.3.1       rstudioapi_0.13    klippy_0.0.0.9500 
+## [21] rmarkdown_2.5      selectr_0.4-2      RcppProgress_0.4.2 munsell_0.5.0     
+## [25] broom_0.7.10       compiler_4.1.1     modelr_0.1.8       xfun_0.26         
+## [29] pkgconfig_2.0.3    htmltools_0.5.2    tidyselect_1.1.1   fansi_0.5.0       
+## [33] crayon_1.4.2       tzdb_0.2.0         dbplyr_2.1.1       withr_2.4.3       
+## [37] SnowballC_0.7.0    grid_4.1.1         jsonlite_1.7.2     gtable_0.3.0      
+## [41] lifecycle_1.0.1    DBI_1.1.1          magrittr_2.0.1     scales_1.1.1      
+## [45] RcppParallel_5.1.4 cli_3.1.0          stringi_1.7.5      fs_1.5.0          
+## [49] ellipsis_0.3.2     stopwords_2.3      generics_0.1.1     vctrs_0.3.8       
+## [53] fastmatch_1.1-3    tools_4.1.1        glue_1.4.2         hms_1.1.1         
+## [57] fastmap_1.1.0      yaml_2.2.1         colorspace_2.0-2   knitr_1.36        
+## [61] haven_2.4.3</code></pre>
 <hr />
 <p><a href="#introduction">Back to top</a></p>
 <p><a href="https://slcladal.github.io/index.html">Back to HOME</a></p>

@@ -108,9 +108,13 @@ Once you have installed RStudio and initiated the session by executing the code 
 For this tutorial, we will use Charles Darwin's *On the Origin of Species by means of Natural Selection* which we download from the [Project Gutenberg](https://www.gutenberg.org/) archive [see @stroube2003literary]. Thus, Darwin's *Origin of Species* forms the basis of our analysis. You can use the code below to download this text into R (but you have to have access to the internet to do so).
 
 ```{r skwic2, warning=F, message=F}
-origin <- gutenberg_works(gutenberg_id == "1228") %>%
+origin <- gutenberg_works(
+  # define id of darwin's origin in project gutenberg
+  gutenberg_id == "1228") %>%
+  # download text
   gutenberg_download(meta_fields = "gutenberg_id", 
                      mirror = "http://mirrors.xmission.com/gutenberg/") %>%
+  # remove empty rows
   dplyr::filter(text != "")
 ```
 
@@ -134,7 +138,9 @@ The table above shows that Darwin's *Origin of Species* requires formatting so t
 
 ```{r skwic3, message=F, warning=F}
 origin <- origin$text %>%
+  # collapse lines into a single  text
   paste0(collapse = " ") %>%
+  # remove superfluous white spaces
   str_squish()
 ```
 
@@ -160,7 +166,11 @@ The result confirms that the entire text is now combined into a single character
 Now that we have loaded the data, we can easily extract concordances using the `kwic` function from the `quanteda` package. The `kwic` function takes the text (`x`) and the search pattern (`pattern`) as it main arguments but it also allows the specification of the context window, i.e. how many words/elements are show to the left and right of the key word (we will go over this later on).
 
 ```{r basekwic2, message=F, warning=F}
-kwic_natural <- kwic(x = origin, pattern = "selection")
+kwic_natural <- kwic(
+  # define text
+  origin, 
+  # define search pattern
+  pattern = "selection")
 ```
 
 
@@ -179,6 +189,31 @@ kwic_natural %>%
   flextable::border_outer()
 ```
 
+
+You will see that you get a warning stating that you should use `token` f´before extracting concordances. This can be done as shown below. Also, we can specify the package from which we want to use a function by adding the package name plus :: before the function (see below)
+
+```{r basekwic3, message=F, warning=F}
+kwic_natural <- quanteda::kwic(
+  # define and tokenize text
+  quanteda::tokens(origin), 
+  # define serach pattern
+  pattern = "selection")
+```
+
+```{r basekwic3b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
+# inspect data
+kwic_natural %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 concordances for the keyword natural in Charles Darwin's Origin.")  %>%
+  flextable::border_outer()
+```
 
 We can easily extract the frequency of the search term (*selection*) using the `nrow` or the `length` functions which provide the number of rows of a tables (`nrow`) or the length of a vector (`length`).
 
@@ -201,7 +236,13 @@ To get a better understanding of the use of a word, it is often useful to extrac
 
 
 ```{r basekwic8, message=F, warning=F}
-kwic_natural_longer <- kwic(x = origin, pattern = "selection", window = 10)
+kwic_natural_longer <- kwic(
+  # define text
+  origin, 
+  # define search pattern
+  pattern = "selection", 
+  # define context window size
+  window = 10)
 ```
 
 
@@ -475,10 +516,16 @@ df_regex %>%
 
 To include regular expressions in your KWIC searches, you include them in your search pattern and set the argument `valuetype` to `"regex"`. The search pattern `"\\bnatu.*|\\bselec.*"` retrieves elements that contain `natu` and `selec` followed by any characters and where the `n` in `natu` and the `s` in `selec` are at a word boundary, i.e. where they are the first letters of a word. Hence, our serach would not retrieve words like *unnatural* or *deselect*. The `|` is an operator (like `+`, `-`, or `*`) that stands for *or*.
 
-```{r rkwic6, echo=T, eval = T, message=FALSE, warning=FALSE}
+```{r rkwic6, message=FALSE, warning=FALSE}
 # define search patterns
 patterns <- c("\\bnatu.*|\\bselec.*")
-kwic_regex <- kwic(origin, patterns, valuetype = "regex")
+kwic_regex <- kwic(
+  # define text
+  origin, 
+  # define search pattern
+  patterns, 
+  # define valuetype
+  valuetype = "regex")
 ```
 
 ```{r rkwic6b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
@@ -619,10 +666,18 @@ Arranging concordances according to alphabetical properties may, however, not be
 4. arrange the concordances by the frequency of the collocates in descending order.
 
 ```{r orderkwic4, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_ordered_coll <- kwic(x = origin, pattern = "natural") %>%
-  dplyr::mutate(post_word = str_remove_all(pre, " .*")) %>%
+kwic_ordered_coll <- kwic(
+  # define text
+  x = origin, 
+  # define search pattern
+  pattern = "natural") %>%
+  # extract word following the keyword
+  dplyr::mutate(post_word = str_remove_all(post, " .*")) %>%
+  # group following words
   dplyr::group_by(post_word) %>%
+  # extract frequencies of the following words
   dplyr::mutate(post_word_freq = n()) %>%
+  # arrange/order by the frequency of the following word
   dplyr::arrange(-post_word_freq)
 ```
 
@@ -718,7 +773,7 @@ files <- paste("https://slcladal.github.io/data/ICEIrelandSample/S1A-00", 1:5, "
 # load corpus files
 transcripts <- sapply(files, function(x){
   x <- readLines(x)
-})
+  })
 ```
 
 
@@ -742,8 +797,11 @@ To perform the concordancing, we need to change the format of the transcripts be
 
 ```{r trans4, echo=T, eval = T, message=FALSE, warning=FALSE}
 transcripts_collapsed <- sapply(files, function(x){
+  # read-in text
   x <- readLines(x)
+  # paste all lines together
   x <- paste0(x, collapse = " ")
+  # remove superfluous white spaces
   x <- str_squish(x)
 })
 ```
@@ -767,7 +825,12 @@ transcripts_collapsed %>%
 We can now extract the concordances.
 
 ```{r trans6, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_trans <- kwic(x = transcripts_collapsed, pattern = phrase("you know"))
+kwic_trans <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed), 
+  # define search pattern
+  pattern = phrase("you know"))
+
 ```
 
 ```{r trans6b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
@@ -785,15 +848,18 @@ kwic_trans %>%
   flextable::border_outer()
 ```
 
-The results show that each non-alphanumeric character is counted as a single word which reduces the context of the keyword substantially. Also, the docname column contains the full path to the data which make it hard to parse the content of the table. To address the first issue, we remove symbols by adding `remove_symbols = T` and  remove punctuation by adding `remove_punct = T`. In addition, we clean the docname column and extract only the file name.
-
+The results show that each non-alphanumeric character is counted as a single word which reduces the context of the keyword substantially. Also, the *docname* column contains the full path to the data which make it hard to parse the content of the table. To address the first issue, we specify the tokenizer that we will use to not disrupt the annotation too much. In addition, we clean the *docname* column and extract only the file name. Lastly, we will expand the context window to 10 so that we have a better understanding of the context in which the phrase was used.
 
 ```{r trans8, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_trans <- quanteda::kwic(x = transcripts_collapsed, pattern = phrase("you know"),
-                   remove_symbols = T, remove_punct = T)
-# clean docnames
-kwic_trans$docname <- kwic_trans$docname %>%
-  str_replace_all(".*/([A-Z][0-9][A-Z]-[0-9]{1,3}).txt", "\\1") 
+kwic_trans <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"), 
+  # define search
+  pattern = phrase("you know"),
+  # extend context
+  window = 10) %>%
+  # clean docnames
+  dplyr::mutate(docname = str_replace_all(docname, ".*/([A-Z][0-9][A-Z]-[0-9]{1,3}).txt", "\\1"))
 ```
 
 ```{r trans8b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
@@ -812,9 +878,6 @@ kwic_trans %>%
 ```
 
 
-We could also extend the context window and merge the symbols that the `kwic` function has separated. 
-
-
 Extending the context can also be used to identify the speaker that has uttered the search pattern that we are interested in. We will do just that as this is a common task in linguistics analyses.
 
 To extract speakers, we need to follow these steps:
@@ -828,17 +891,32 @@ To extract speakers, we need to follow these steps:
 4. Add the speakers to the normal concordances using the `left-join` function from the `dplyr` package.
 
 ```{r trans10,  message=FALSE, warning=FALSE}
-kwic_normal <- quanteda::kwic(transcripts_collapsed, phrase("you know")) %>%
+kwic_normal <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"), 
+  # define search
+  pattern = phrase("you know")) %>%
   as.data.frame()
-kwic_long <- quanteda::kwic(transcripts_collapsed, phrase("you know"), window = 500) %>%
+kwic_speaker <- quanteda::kwic(
+    # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"), 
+  # define search
+  pattern = phrase("you know"), 
+  # extend search window
+  window = 500) %>%
+  # convert to data frame
   as.data.frame() %>%
-  dplyr::mutate(pre = stringr::str_remove_all(pre, ".*\\$")) %>%
-  dplyr::mutate(pre = stringr::str_remove_all(pre, "\\>.*"),
-                speaker = stringr::str_squish(pre)) %>%
-  dplyr::select(docname, speaker)
+  # extract speaker (comes after $ and before >)
+  dplyr::mutate(speaker = stringr::str_replace_all(pre, ".*\\$(.*?)>.*", "\\1")) %>%
+  # extract speaker
+  dplyr::pull(speaker)
 # add speaker to normal kwic
-kwic_combined <- dplyr::left_join(kwic_normal, kwic_long) %>%
+kwic_combined <- kwic_normal %>%
+  # add speaker
+  dplyr::mutate(speaker = kwic_speaker) %>%
+  # simplify docname
   dplyr::mutate(docname = stringr::str_replace_all(docname, ".*/([A-Z][0-9][A-Z]-[0-9]{1,3}).txt", "\\1")) %>%
+  # remove superfluous columns
   dplyr::select(-to, -from, -pattern)
 ```
 
