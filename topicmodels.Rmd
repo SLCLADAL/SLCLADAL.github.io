@@ -81,6 +81,7 @@ install.packages("wordcloud")
 install.packages("pals")
 install.packages("SnowballC")
 install.packages("lda")
+install.packages("ldatuning")
 # install klippy for copy-to-clipboard button in code chunks
 remotes::install_github("rlesur/klippy")
 ```
@@ -103,6 +104,7 @@ library(wordcloud)
 library(pals)
 library(SnowballC)
 library(lda)
+library(ldatuning)
 library(flextable)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
@@ -141,7 +143,7 @@ After the preprocessing, we have two corpus objects: `processedCorpus`, on which
 
 We now calculate a topic model on the `processedCorpus`. For this purpose, a DTM of the corpus is created. In this case, we only want to consider terms that occur with a certain minimum frequency in the body. This is primarily used to speed up the model calculation.
 
-```{r tm3}
+```{r tm3a}
 # compute document term matrix with terms >= minimumFrequency
 minimumFrequency <- 5
 DTM <- DocumentTermMatrix(processedCorpus, control = list(bounds = list(global = c(minimumFrequency, Inf))))
@@ -159,7 +161,29 @@ As an unsupervised machine learning method, topic models are suitable for the ex
 
 For parameterized models such as Latent Dirichlet Allocation (LDA), the number of topics `K` is the most important parameter to define in advance. How an optimal `K` should be selected depends on various factors. If `K` is too small, the collection is divided into a few very general semantic contexts. If `K` is too large, the collection is divided into too many topics of which some may overlap and others are hardly interpretable.
 
-For our first analysis we choose a thematic "resolution" of `K = 20` topics. In contrast to a resolution of 100 or more, this number of topics can be evaluated qualitatively very easy.
+An alternative to deciding on a set number of topics is to extract parameters form a models using a rage of number of topics. This approach can be useful when the number of topics is not theoretically motivated or based on closer, qualitative inspection of the data. In the example below, the determination of the optimal number of topics follows @murzintcev2020idealtopics, but we only use two metrics (*CaoJuan2009* and *Deveaud2014*) - it is highly recommendable to inspect the results of the four metrics available for the `FindTopicsNumber` function (*Griffiths2004*, *CaoJuan2009*, *Arun2010*, and *Deveaud2014*). 
+
+```{r tm3b, message=FALSE, warning=FALSE}
+# create models with different number of topics
+result <- ldatuning::FindTopicsNumber(
+  DTM,
+  topics = seq(from = 2, to = 20, by = 1),
+  metrics = c("CaoJuan2009",  "Deveaud2014"),
+  method = "Gibbs",
+  control = list(seed = 77),
+  verbose = TRUE
+)
+```
+
+
+We can now plot the results. In this case, we have only use two methods *CaoJuan2009* and *Griffith2004*. The best number of topics shows low values for *CaoJuan2009* and high values for *Griffith2004* (optimally, several methods should converge and show peaks and dips repectively for a certain number of topics).
+
+```{r tm3c, message=FALSE, warning=FALSE}
+FindTopicsNumber_plot(result)
+```
+
+
+For our first analysis, however, we choose a thematic "resolution" of `K = 20` topics. In contrast to a resolution of 100 or more, this number of topics can be evaluated qualitatively very easy.
 
 ```{r tm4}
 # number of topics
