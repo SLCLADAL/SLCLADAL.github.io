@@ -45,7 +45,7 @@ Assigning these pos-tags to words appears to be rather straight forward. However
 
 * If a word does not occur at the beginning of a sentence but is capitalized, assign the pos-tag `NNP` (for proper noun)
 
-Using such rules has the disadvantage that pos-tags can only be assigned to a relatively small number of words as most words will be ambiguous – think of the similarity of the English plural and the English past tense morpheme,for instance, which are orthographically identical.Another option would be to use a dictionary in which each word is as-signed a certain pos-tag and a program could assign the pos-tag if the word occurs in a given text. This procedure has the disadvantage that most words belong to more than one word class and pos-tagging would thus have to rely on additional information.The problem of words that belong to more than one word class can partly be remedied by including contextual information such as. . 
+Using such rules has the disadvantage that pos-tags can only be assigned to a relatively small number of words as most words will be ambiguous – think of the similarity of the English plural (-(e)s)  and the English 3rd person, present tense indicative morpheme (-(e)s), for instance, which are orthographically identical.Another option would be to use a dictionary in which each word is as-signed a certain pos-tag and a program could assign the pos-tag if the word occurs in a given text. This procedure has the disadvantage that most words belong to more than one word class and pos-tagging would thus have to rely on additional information.The problem of words that belong to more than one word class can partly be remedied by including contextual information such as. . 
 
 * If the previous word is a determiner and the following word is a common noun, assign the pos-tag `JJ` (for a common adjective)
 
@@ -72,6 +72,7 @@ install.packages("udpipe")
 install.packages("textplot") 
 install.packages("ggraph") 
 install.packages("ggplot2") 
+install.packages("pacman") 
 # install phrasemachine
 phrasemachineurl <- "https://cran.r-project.org/src/contrib/Archive/phrasemachine/phrasemachine_1.1.2.tar.gz"
 install.packages(phrasemachineurl, repos=NULL, type="source")
@@ -407,91 +408,6 @@ dplot
 ```
 
 
-# POS-Tagging with openNLP
-
-In R we can pos–tag large amounts of text not only by using `udpipe` but by various means. This section explores pos-tagging using the `openNLP` package. Using the `openNLP` package for pos-tagging works particularly well when the aim is to pos-tag newspaper texts as the `openNLP` package implements the *Apache OpenNLPMaxent Part of Speech tagger* and it comes with pre-trained models. Ideally, pos-taggers should be trained on data resembling the data to be pos-tagged.However, I do not know how to trained the *Apache openNLP pos-tagger* via R and it would be great if someone would provide a tutorial on how to do that. Using pre-trained models has the advantage that we do not need to train the pos-tagger ourselves. However, it also means that one has to rely on models trained on data that may not really resemble the data a at hand.This implies that using it for texts that differ from newspaper texts, i.e.the language the models have been trained on, does not work as well, as the model applies the probabilities of newspaper language to the language variety at hand. pos-tagging with the `openNLP` requires the `NLP` package and installing the models on which the `openNLP` package is based.
-
-To pos-tag a text, we start by loading an example text into R.
-
-```{r pos1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# load corpus data
-text <- readLines("https://slcladal.github.io/data/testcorpus/linguistics07.txt", skipNul = T)
-# clean data
-text <- text %>%
- str_squish() 
-```
-
-```{r showtext, echo=F, warning=F, message=F}
-# inspect data
-text %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "Example text.")  %>%
-  flextable::border_outer()
-```
-
-
-Now that the text data has been read into R, we can proceed with the part-of-speech tagging. To perform the pos-tagging, we load the function for pos-tagging, load the `NLP` and `openNLP` packages.
-
-***
-
-<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br>You need to change the path that is used in the code below and include the path to `en-pos-maxent.bin` on your computer!</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-***
-
-
-```{r op, eval = T}
-POStag <- function(object){
-  require("stringr")
-  require("NLP")
-  require("openNLP")
-  require("openNLPdata")
-  # define paths to corpus files
-  corpus.tmp <- object
-  # define sentence annotator
-  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
-  # define word annotator
-  word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
-  # define pos annotator
-  pos_tag_annotator <- openNLP::Maxent_POS_Tag_Annotator(language = "en", probs = FALSE, 
-    # WARNING: YOU NEED TO INCLUDE YOUR OWN PATH HERE!                                            
-    model = "C:\\Users\\marti\\OneDrive\\Dokumente\\R\\win-library\\4.1\\openNLPdata\\models\\en-pos-maxent.bin")
-  # convert all file content to strings
-  Corpus <- lapply(corpus.tmp, function(x){
-    x <- as.String(x)  }  )
-  # loop over file contents
-  lapply(Corpus, function(x){
-    y1 <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
-    y2<- NLP::annotate(x, pos_tag_annotator, y1)
-    y2w <- subset(y2, type == "word")
-    tags <- sapply(y2w$features, '[[', "POS")
-    r1 <- sprintf("%s/%s", x[y2w], tags)
-    r2 <- paste(r1, collapse = " ")
-    return(r2)  }  )
-  }
-```
-
-We now apply this function to our text.
-
-```{r pos2, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# pos tagging data
-textpos <- POStag(object = text)
-# inspect data
-textpos
-```
-
-The resulting vector contains the part-of-speech tagged text and shows that the function fulfills its purpose in automatically pos-tagging the text. The pos-tagged text could now be processed further, e.g. by extracting all  adjectives in the text or by creating concordances of nouns ending in *ment*.
 
 # Syntactic Parsing with openNLP
 
