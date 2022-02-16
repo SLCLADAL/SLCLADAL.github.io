@@ -1,23 +1,26 @@
 
-title: "Computational Literary Stylistics with R"
-author: "Dattatreya Majumdar and Martin Schweinberger"
+![An interactive LADAL notebook.](https://slcladal.github.io/images/uq1.jpg)
 
- default
+# Computational Literary Stylistics with R
 
-```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-![uq1](https://slcladal.github.io/images/uq1.jpg)
+***
 
-# Introduction
+Please copy this Jupyter notebook so that you are able to edit it.
 
-This tutorial focuses on **computational literary stylistics** (also digital literary stylistics) and shows how fictional texts can be analyzed by using computational means. The entire code for the sections below can be downloaded [here](https://slcladal.github.io/litsty.Rmd). 
+Simply go to: File > Save a copy in Drive.
+
+Once you have done that, you are good to go.
+
+***
+
+This tutorial is the interactive Jupyter notebook accompanying the [LADAL tutorial on computational literary stylistics](https://slcladal.github.io/litsty.html) and it focuses on computational literary stylistics (also digital literary stylistics). It is aimed at beginners and intermediate users of R with the aim of showcasing selected methods that are commonly used in or useful for computational literary stylistics with R. As such, the aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods applied to fiction data. Another highly recommendable tutorial on computational literary stylistics with R is Silge and Robinson (2017) (see [here](https://www.tidytextmining.com/)), but the present tutorial substantially expands Silge and Robinson (2017) in terms of the range of methods that are presented and the data sources that are used.
+
 
 Computational literary stylistics refers to analyses of the language of literary texts by computational means using linguistic concepts and categories, with the goal of finding patters among the literary texts and explaining how literary meaning/s is/are created by specific language choices. Computational literary stylistics has been linked with distant reading which aims to find patterns in large amounts of literary data that would not be detectable by traditional close reading techniques.
 
-While this tutorial builds on @silge2017text (see [here](https://www.tidytextmining.com/)), it substantially expands @silge2017text in terms of the range of methods that are presented and the data sources that are used.
-
 **Preparation and session set up**
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/Intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+This tutorial is based on R. If you are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 10 minutes to install all of the packages so you do not need to worry if it takes some time).
 
 ```{r prep1, eval = F, message=FALSE, warning=FALSE}
 # install packages
@@ -27,9 +30,6 @@ install.packages("tidyverse")
 install.packages("quanteda")
 install.packages("forcats")
 install.packages("gutenbergr")
-install.packages("flextable")
-# install klippy for copy-to-clipboard button in code chunks
-remotes::install_github("rlesur/klippy")
 ```
 
 We now activate these packages as shown below.
@@ -44,12 +44,9 @@ library(tidytext)
 library(forcats)
 library(quanteda)
 library(gutenbergr)
-library(flextable)
-# activate klippy for copy-to-clipboard button
-klippy::klippy()
 ```
 
-Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+Once you have initiated the session by executing the code shown above, you are good to go.
 
 # Getting started
 
@@ -77,22 +74,47 @@ austen <- gutenbergr::gutenberg_works(gutenberg_id == "1342") %>%
   gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
 doyle <- gutenbergr::gutenberg_works(gutenberg_id == "1661") %>%
   gutenbergr::gutenberg_download(mirror = "http://mirrors.xmission.com/gutenberg/")
+# inspect data
+head(shakespeare, 15)
 ```
 
-```{r loaddat_tb, echo = F, message=F, warning=F}
- shakespeare %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the shakespeare data.")  %>%
-  flextable::border_outer()
+
+
+The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+
+![Colab Folder Symbol](https://slcladal.github.io/images/ColabFolder.png)
+
+Then on the upload symbol. 
+
+![Colab Upload Symbol](https://slcladal.github.io/images/ColabUpload.png)
+
+
+Next, upload the files you want to analyze and then the respective files names in the `file` argument of the `scan` function. When you then execute the code (like to code chunk below, you will upload your own data.
+
+
+```{r loadown, echo = T, eval = F, message=FALSE, warning=FALSE}
+mytext1 <- scan(file = "linguistics01.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+mytext2 <- scan(file = "linguistics02.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+# inspect
+mytext1; mytext2
 ```
 
-We can now begin to load and n a next step process the data.
+To apply the code and functions below to your own data, you will need to modify the code chunks and replace the data we use here with your own data object. 
+
+
+We can now begin to load and process the data.
 
 # Extracting words
 
@@ -110,19 +132,8 @@ names(austen_text)  <- "Pride & Prejudice"
 # extract instances of pride
 pride <- quanteda::kwic(austen_text, "pride") %>%
   as.data.frame()
-```
-
-```{r pride_tb, echo = F, message=F, warning=F}
- pride %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the pride data.")  %>%
-  flextable::border_outer()
+# inspect data
+head(pride, 15)
 ```
 
 The kwic display could now be processed further or could be inspected to see how the keyword in question (*pride*) is used in this novel.
@@ -138,19 +149,8 @@ darwin_text <- darwin %>%
 ns <- quanteda::kwic(darwin_text, phrase("natural selection"), window = 10) %>%
   as.data.frame() %>%
   dplyr::select(-docname, -from, -to, -pattern)
-```
-
-```{r kwic_tb, echo = F, message=F, warning=F}
- ns %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 concordances of natural selection in Charles Darwin's Origin.")  %>%
-  flextable::border_outer()
+# inspect data
+head(ns, 15)
 ```
 
 # Identifying Keywords
@@ -185,19 +185,8 @@ books <- books %>%
   dplyr::filter(text != "") %>%
   dplyr::mutate(book = factor(book)) %>%
   dplyr::select(-gutenberg_id)
-```
-
-```{r books_tb, echo = F, message=F, warning=F}
- books %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the books data.")  %>%
-  flextable::border_outer()
+# inspect data
+head(books, 15)
 ```
 
 Now, we continue by calculating the *tf-idf* for each term in each of the books.
@@ -210,19 +199,8 @@ book_words <- books %>%
   dplyr::mutate(total = sum(n))
 book_tf_idf <- book_words %>%
   tidytext::bind_tf_idf(word, book, n)
-```
-
-```{r book_tf_idf_tb, echo = F, message=F, warning=F}
- book_tf_idf %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the tf-idf data frame.")  %>%
-  flextable::border_outer()
+# inspect data
+head(book_tf_idf, 15)
 ```
 
 From the above table it is evident that the extremely common words have a very low inverse document frequency and thus a low tf-idf score. The inverse document frequency will be a higher number for words that occur in fewer documents in the collection of novels.
@@ -262,19 +240,8 @@ book_words <- books %>%
   dplyr::count(book, word, sort = TRUE)  %>% 
   dplyr::group_by(book) %>% 
   dplyr::mutate(total = sum(n))
-```
-
-```{r book_words_tb, echo = F, message=F, warning=F}
- book_words %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the book_words data.")  %>%
-  flextable::border_outer()
+# inspect data
+head(book_words, 15)
 ```
 
 From the above table it is evident that the usual suspects *the*, *and*, *to* and so-forth are leading in terms of their usage frequencies in the novels. Now let us look at the distribution of *n/total* for each term in each of the novels (which represents the normalized term frequency).
@@ -290,7 +257,7 @@ From the plots it is clear that we are dealing with a negative exponential distr
 
 ## Zipf's Law
 
-Zipf's Law represents an empirical power law or power function that was established in the 1930s. Zipf's law is one of the most fundamental laws in linguistics [see @george1935zipf] and it states that the frequency of a word is inversely proportional to its rank in a text or collection of texts. 
+Zipf's Law represents an empirical power law or power function that was established in the 1930s. Zipf's law is one of the most fundamental laws in linguistics (see Zipf 1935)  and it states that the frequency of a word is inversely proportional to its rank in a text or collection of texts. 
 
 Let
 
@@ -314,19 +281,8 @@ freq_by_rank <- book_words %>%
   dplyr::mutate(rank = row_number(), 
          `term frequency` = n/total) %>%
   dplyr::ungroup()
-```
-
-```{r freq_by_rank_tb, echo = F, message=F, warning=F}
- freq_by_rank %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the freq_by_rank data.")  %>%
-  flextable::border_outer()
+# inspect data
+head(freq_by_rank, 15)
 ```
 
 To get a better understanding of Zipf's law, let us visualize the distribution by plotting on the logged rank of elements on the x-axis and logged frequency of the terms on the y-axis. If Zipf's law holds, then we should see more or less straight lines that go from top left to bottom right.
@@ -391,19 +347,8 @@ books_sentences <- books %>%
   dplyr::group_by(book) %>%
   dplyr::summarise(text = paste(text, collapse = " ")) %>%
   lexRankr::unnest_sentences(sentence, text)
-```
-
-```{r books_sentences_tb, echo = F, message=F, warning=F}
- books_sentences %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-    flextable::set_caption(caption = "First 15 rows of the books_sentences data.")  %>%
-  flextable::border_outer()
+# inspect data
+head(books_sentences, 15)
 ```
 
 Let's now visualize the results for potential differences or trends.
@@ -476,31 +421,23 @@ We have reached the end of this tutorial. Please feel free to explore more of ou
 
 # Citation & Session Info 
 
-Majumdar, Dattatreya and Martin Schweinberger. `r format(Sys.time(), '%Y')`. *Literary Stylistics with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/litsty.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Majumdar, Dattatreya and Martin Schweinberger. 2022. *Literary Stylistics with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/litsty.html.
 
-```
-@manual{Majumdar`r format(Sys.time(), '%Y')`ta,
-  author = {Majumdar, Dattatreya and Martin Schweinberger},
-  title = {Literary Stylistics with R},
-  note = {https://slcladal.github.io/litsty.html},
-  year = {`r format(Sys.time(), '%Y')`},
-  organization = "The University of Queensland, Australia. School of Languages and Cultures},
-  address = {Brisbane},
-  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
-}
-```
+
 
 ```{r fin}
 sessionInfo()
 ```
 
-***
 
-[Back to top](#introduction)
+[Back to LADAL](https://slcladal.github.io/index.html)
 
-[Back to HOME](https://slcladal.github.io/index.html)
-
-***
 
 # References 
+
+
+
+Silge, Julia, and David Robinson. 2017. *Text Mining with R: A Tidy Approach*. O’Reilly Media, Inc.
+
+Zipf, K, George. 1935. *The Psychobiology of Language*. Houghton-Mifflin.
 
