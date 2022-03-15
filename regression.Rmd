@@ -174,21 +174,28 @@ install.packages("boot")
 install.packages("Boruta")
 install.packages("car")
 install.packages("caret")
-install.packages("tidyverse")
 install.packages("effects")
+install.packages("emmeans")
 install.packages("flextable")
 install.packages("foreign")
 install.packages("ggfortify")
 install.packages("ggpubr")
+install.packages("here")
 install.packages("Hmisc")
 install.packages("knitr")
 install.packages("lme4")
 install.packages("MASS")
+install.packages("mclogit")
 install.packages("mlogit")
 install.packages("msm")
 install.packages("MuMIn")
 install.packages("nlme")
+install.packages("ordinal")
+install.packages("performance")
 install.packages("QuantPsyc")
+install.packages("readxl")
+install.packages("remotes")
+install.packages("report")
 install.packages("reshape2")
 install.packages("rms")
 install.packages("robustbase")
@@ -199,8 +206,6 @@ install.packages("tidyverse")
 install.packages("vcd")
 install.packages("vip")
 install.packages("visreg")
-install.packages("report")
-install.packages("remotes")
 # install klippy for copy-to-clipboard button in code chunks
 remotes::install_github("rlesur/klippy")
 ```
@@ -216,21 +221,28 @@ library(boot)
 library(Boruta)
 library(car)
 library(caret)
-library(tidyverse)
 library(effects)
+library(emmeans)
 library(flextable)
 library(foreign)
 library(ggfortify)
 library(ggpubr)
+library(here)
 library(Hmisc)
 library(knitr)
 library(lme4)
 library(MASS)
+library(mclogit)
 library(mlogit)
 library(msm)
 library(MuMIn)
 library(nlme)
+library(ordinal)
+library(performance)
 library(QuantPsyc)
+library(readxl)
+library(remotes)
+library(report)
 library(reshape2)
 library(rms)
 library(robustbase)
@@ -241,7 +253,6 @@ library(tidyverse)
 library(vcd)
 library(vip)
 library(visreg)
-library(report)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -3615,7 +3626,7 @@ As only Shots is confirmed as important, we will only check for the effect of Sh
 ```{r pmm5, message=F, warning=F}
 # output the results
 gf = goodfit(countdata$UHM,type= "poisson", method= "ML")
-plot(gf,main="Count data vs Poisson distribution")
+plot(gf, main="Count data vs Poisson distribution")
 ```
 
 The data does not perfectly match a distribution that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then the distribution of the data differs significantly from a Poisson distribution and, given the visualization is likely over-dispersed. 
@@ -3960,6 +3971,161 @@ r.squaredGLMM(m1.glmer)
 ***
 
 A mixed-effect negative binomial regression model which contained the language in which the conversation took place as random effect was fit to the data. Prior to the regression modeling, a Boruta analysis was applied to determine whether any of the predictors had a meaningful relationship with the dependent variable (instances of *uhm*). Since the Boruta analysis indicated that only the number of shots a speaker had was important, only "Shots" was tested during model fitting. The final minimal adequate model showed that the number of *uhm* as fillers increases significantly, and near-linearly with the number of shots speakers had ($\chi$^2^(1):83.0, p <.0001, $\beta$: 0.2782). An inspection of the random effect structure conveyed that there was almost no variability between languages and language did not contribute meaningfully to the model fit.
+
+## Mixed-Effects Multinomial Regression{-}
+
+In this section, we will focus on how to implement a mixed-effects multinomial regression model using the `mblogit` function from the `mclogit` package [see @mclogit]. As we have already gone though model fitting and model validation procedures above, we will strictly see how to implement this type of model here - we will not go through all the other steps that a proper regression analysis would require.
+
+We begin the analysis by loading the example data set. The data represents observations gathered during an experiment where speakers had to report what they saw. The responses are categorized into four groups: 
+
+```{r mult01, message=F, warning=F}
+# description data
+pict  <- base::readRDS(url("https://slcladal.github.io/data/pict.rda", "rb"))
+# inspect
+head(pict)
+```
+
+In a first step, we generate a baseline model that we call `m0`. This model only contains the random effect structure and the intercept as the sole predictor.
+
+```{r mult02, message=F, warning=F}
+m0 <- mblogit(formula = Response ~ 1, 
+              random = ~ 1 | Participant, 
+              data = pict)
+```
+
+In this case, the algorithm did not converge properly - if this were a real analysis, we could ot simply continue but would have to inspect possible causes for this. However, as this is just a showcase, we will ignore this and move on. Next, we add the fixed effects (Gender and Group).
+
+```{r mult03, message=F, warning=F}
+m1 <- mblogit(formula = Response ~ Gender + Group, 
+              random = ~ 1 | Item, 
+              data = pict)
+```
+
+
+Now, we can compare the models to see if including the fixed-effects into the model has significantly improved the model fit.
+
+```{r mult04, message=F, warning=F}
+anova(m0, m1)
+```
+
+As the second model is significantly better, we are justified to believe that our fixed effects have explanatory power. We can now use the `getSummary.mmblogit` fucntion to get a summary of the model with the fixed effects. 
+
+
+```{r mult05, message=F, warning=F}
+# inspect
+mclogit::getSummary.mmblogit(m1)
+```
+
+The NAs (not available information) is a result of the model having a bad fit to the data and, optimally, we would need to inspect why the model has a bad fit. Again, we ignore this and move on. Next, we check the VIFs to see if the model does not violate multicollinearity assumptions.
+
+```{r mult06, message=F, warning=F}
+car::vif(m1) # maybe use cut-off of 5 (maybe 10)
+```
+
+The VIFs are a bit high - especially the GVIF for Group would be a cause for concern if this was not just a demo analysis! However, as we only want to implement a multinomial mixed-effects model here and not provide a proper, clean analysis, we will ignore this issue here. 
+
+In a next step, we visualize effects to get a better understanding of how the predictors that are part of the fixed-effect structure of the mode affect the outcome (the response variable).
+
+```{r mult08, message=F, warning=F}
+sjPlot::plot_model(m1)
+```
+
+Finally, we can extract an alternative summary table produced by the `tab_model` function from the `sjPlot` package [see @sjPlot].
+
+
+```{r mult09, message=F, warning=F}
+sjPlot::tab_model(m1)
+```
+
+
+
+This is the final step in implementing a a mixed-effects multinomial regression model using the `mblogit` function from the `mclogit` package [see @mclogit]. We are aware that the analysis shown here is supervifial(!) - but please keep in mind that we just wanted to showcase the implementation here rather than providing a properly and carefully done analysis.
+
+
+## Mixed-Effects Ordinal Regression{-}
+
+In this section, we will strictly focus on how to implement a mixed-effects ordinal regression model using the `clmm` function from the `ordinal` package [see @ordinal]. This type of regression model is extremely useful when dealing with Likert data or other types of questionnaire and survey data where the responses have some kind of hierarchical structure (i.e. responses are not truly independent because they come from different points in time or from different regions).
+load data
+
+```{r}
+# rating experiment data
+ratex  <- base::readRDS(url("https://slcladal.github.io/data/ratex.rda", "rb"))
+# inspect data
+head(ratex)
+```
+
+We now tabulate the data to get a better understanding of the data structure.
+
+```{r}
+ratex %>%
+  dplyr::group_by(Family, Accent) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  tidyr::spread(Accent, Frequency)
+```
+
+Next, we visualize the data to inspect its properties.
+
+```{r}
+ratex %>%
+  ggplot(aes(Family, AccentNumeric, color = Group)) + 
+  stat_summary(fun = mean, geom = "point") +          
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_bw() +
+  theme(legend.position = "top") +
+  scale_color_manual(values = c("gray20", "gray70"))
+```
+
+
+An alternative plot shows other properties of the data.
+
+```{r}
+ratex %>%
+  dplyr::group_by(Family, Rater, Group) %>%
+  dplyr::summarise(AccentMean = mean(AccentNumeric)) %>%
+  ggplot(aes(Family, AccentMean, fill = Group)) + 
+  geom_boxplot() +
+  theme_bw() +
+  theme(legend.position = "top") +
+  scale_fill_manual(values = c("gray50", "gray85"))
+```
+
+
+We now start the modeling by generating a model with Family as the sole predictor.
+
+```{r}
+# fit baseline model
+m1 <- clmm(Accent ~ (1|Rater) + Family, link="logit", data = ratex)
+# test for incomplete information
+ifelse(min(ftable(ratex$Accent, ratex$Family)) == 0, "incomplete information", "okay")
+# extract aic
+aic.glmer <- AIC(logLik(m1))
+# inspect aic
+aic.glmer
+# summarize model
+summary(m1)
+```
+
+We can now perform Post-Hoc tests to see which comparisons are significant.
+
+```{r}
+lsmeans(m1, pairwise~Family, adjust="tukey")
+```
+
+Finally, we can summarize the model.
+
+```{r}
+sjPlot::tab_model(m1)
+```
+
+
+And we can visualize the effects.
+
+```{r}
+plot_model(m1, type = "pred", terms = c("Family"))
+```
+
+That's it for this tutorial. We hope that you have enjoyed this tutorial and learned how to perform regression analysis including model fitting and model diagnostics as well as reporting regression results.
+
 
 # Citation & Session Info {-}
 
