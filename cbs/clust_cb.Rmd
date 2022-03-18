@@ -1,26 +1,54 @@
+---
+title: "Cluster and Correspondence Analysis in R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2:  
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
 
-![This is an interactive LADAL notebook.](https://slcladal.github.io/images/uq1.jpg)
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
 
-***
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces classification and clustering using R. Cluster analyses fall within the domain of classification methods which are used to find groups or patterns in data or to predict group membership. As such, they are widely used and applied in machine learning. For linguists, classification is not only common when it comes to phylogenetics but also in annotation-based procedures such as part-of-speech tagging and syntactic parsing. 
+
+
+This tutorial is aimed at intermediate users of R with the aim of showcasing how to performing and visualizing the results of cluster and correspondence analyses in R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with cluster and correspondence analyses. 
+
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-**Please copy this Jupyter notebook so that you are able to edit it.**<br><br>**Simply go to: File > Save a copy in Drive.** <br><br>**If you want to run this notebook on your own computer, please make sure that you have R installed!**<br><br>**Once you have done that, you are good to go.**</p>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/clust.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file.</p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
 
-***
-# Cluster and Correspondence Analysis in R
+<br>
 
-This tutorial introduces classification and clustering using R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/clust.Rmd). A more elaborate and highly recommendable introduction to cluster analysis is Kassambara (2017). Other very useful resources are, e.g.,  King (2015), Kettenring (2006), Romesburg (2004), and Blashfield and Aldenderfer (1988).
+A more elaborate and highly recommendable introduction to cluster analysis is @kassambara2017practical. Other very useful resources are, e.g.,  @king2015cluster; @kettenring2006practice; @romesburg2004cluster; and @blashfield1988methods.
 
-Cluster analyses fall within the domain of classification methods which are used to find groups or patterns in data or to predict group membership. As such, they are widely used and applied in machine learning. For linguists, classification is not only common when it comes to phylogenetics but also in annotation-based procedures such as part-of-speech tagging and syntactic parsing. 
+**Preparation and session set up**
 
-## Preparation and session set up
-
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # set options
@@ -39,9 +67,12 @@ install.packages("factoextra")
 install.packages("seriation")
 install.packages("NbClust")
 install.packages("pvclust")
+install.packages("flextable")
 install.packages("tidyverse")
 install.packages("tibble")
 install.packages("gplots")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
 
 In a next step, we load the packages.
@@ -60,9 +91,12 @@ library(factoextra)
 library(seriation)
 library(NbClust)
 library(pvclust)
+library(flextable)
 library(tidyverse)
 library(tibble)
 library(gplots)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
@@ -71,7 +105,7 @@ Once you have installed R and RStudio and initiated the session by executing the
 
 The most common method in linguistics that is sued to detect groups in data are cluster analyses. Cluster analyses are common in linguistics because they not only detect commonalities based on the frequency or occurrence of features but they also allow to visualize when splits between groups have occurred and are thus the method of choice in historical linguistics to determine and show genealogical relationships. 
 
-## Underlying Concepts
+## Underlying Concepts{-}
 
 The next section focuses on the basic idea that underlies all cluster analyses. WE will have a look at some very basic examples to highlight and discuss the principles that cluster analyses rely on. 
 
@@ -178,10 +212,20 @@ students <- matrix(c(2,  3,  2, 1,  3,  2, 1,  2,  1, 2,  4,  4, 3,  4,  3),
 students <- as.data.frame(students)
 colnames(students) <- c("Math", "Music", "Biology")
 rownames(students) <- c("StudentA", "StudentB", "StudentC", "StudentD", "StudentE")
-# inspect
+```
+
+```{r cl5, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
 students %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Student")
+  tibble::rownames_to_column("Student") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Sample of five students and their grades in math, music, and biology.")  %>%
+  flextable::border_outer()
 ```
  
  The first step in determining the similarity among students is to create a distance matrix. 
@@ -193,19 +237,26 @@ diststudents <- dist(students, method = "manhattan") # create a distance matrix
 The distance matrix below shows that Student A and Student B only differ by one grade. Student B and Student C differ by 2 grades. Student A and Student C differ by 3 grades and so on.
 
 ```{r cl7, eval = T, echo = F, results = 'asis', message=FALSE, warning=FALSE}
-# inspect
 diststudentstb <- matrix(c("1", "3", "3","3", "", "2", "4", "4","", "", "6", "6", "", "", "", "2"), nrow = 4, byrow = F)
 # add column and row names
 colnames(diststudentstb) <- c("StudentA", "StudentB", "StudentC", "StudentD")
 rownames(diststudentstb) <- c("StudentB", "StudentC", "StudentD", "StudentE")
 diststudentstb %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Student")
+  tibble::rownames_to_column("Student") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Distance matrix based of students based on grades in math, music, and biology.")  %>%
+  flextable::border_outer()
 ```
 
 Based on this distance matrix, we can now implement a cluster analysis in R. 
 
-## Cluster Analysis on Numeric Data
+## Cluster Analysis on Numeric Data{-}
 
 To create a simple cluster object in R, we use the `hclust` function from the `cluster` package. The resulting object is then plotted to create a dendrogram which shows how students have been amalgamated (combined) by the clustering algorithm (which, in the present case, is called `ward.D`).
 
@@ -232,10 +283,17 @@ diststudentstb <- matrix(c("2.5","3.5","3.5","","6.0","6.0","","","2.0"),
 # add column and row names
 colnames(diststudentstb) <- c("Cluster 1", "Student C", "Student D")
 rownames(diststudentstb) <- c("Student C", "Student D", "Student E")
-# inspect
 diststudentstb %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Student")
+  tibble::rownames_to_column("Student") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Distance matrix of students based on grades in math, music, and biology.")  %>%
+  flextable::border_outer()
 ```
 
 The next lowest distance now is 2.0 between Student D and Student E which means that these two students are merged next. The resulting distance matrix is shown below.
@@ -256,14 +314,22 @@ colnames(diststudentstb) <- c("Cluster 1", "Student C")
 rownames(diststudentstb) <- c("Student C", "Cluster 2")
 diststudentstb %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Student")
+  tibble::rownames_to_column("Student") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Distance matrix based of students based on grades in math, music, and biology.")  %>%
+  flextable::border_outer()
 ```
 
 Now, the lowest distance value occurs between Cluster 1 and Student C. Thus, Student C and Cluster 1 are merged. In the final step, the Cluster 2 is merged with the new cluster encompassing Student C and Cluster 1. This amalgamation process can then be displayed visually as a dendrogram (see above). 
 
 How and which elements are merged depends on the what is understood as distance. Since "distance" is such an important concept in cluster analyses, we will briefly discuss this notion to understand why there are so many different types of clustering algorithms and this cluster analyses.
 
-## Distance and Similarity Measures
+## Distance and Similarity Measures{-}
 
 To understand how a cluster analysis determines to which cluster a given data point belongs, we need to understand what different distance measures represent. Have a look at the Figure below which visually represents three different ways to conceptualize distance.
 
@@ -317,8 +383,18 @@ rownames(clus) <- c("nae_neg", "like", "clefts", "tags", "youse", "soitwas",
 ```{r cl14b, echo = F, message=F, warning=F}
  clus %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Feature")
+  tibble::rownames_to_column("Feature") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Frequencies of on-standard features across selected varieties of English.")  %>%
+  flextable::border_outer()
 ```
+
+
 
 As a next step, we create a cluster object based on the data we have just generated.
 
@@ -334,8 +410,18 @@ clusts <- as.matrix(clusts) # convert into matrix
 ```{r cl15b, echo = F, message=F, warning=F}
  clust %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Variety") 
+  tibble::rownames_to_column("Variety") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Scaled frequencies of on-standard features across selected varieties of English.")  %>%
+  flextable::border_outer()
 ```
+
+
 
 We  assess if data is "clusterable" by testing if the data contains non-randomness. To this end, we calculate the *Hopkins statistic* which indicates how similar the data is to a random distribution. 
 
@@ -343,7 +429,7 @@ We  assess if data is "clusterable" by testing if the data contains non-randomne
 
 * If the Hopkins statistic is close to 1, then the data is highly clusterable. 
 
-* Values of 0 indicate that the data is uniform (Aggarwal 2015: 158). 
+* Values of 0 indicate that the data is uniform [@aggarwal2015data, pp. 158]. 
 
 The `n` in the `get_clust_tendency` functions represents the maximum number of clusters to be tested which should be  number of predictors in the data. 
 
@@ -371,8 +457,17 @@ clustd <- dist(clusts,                 # create distance matrix
  round(clustd, 2) %>%
   as.matrix() %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Variety")
+  tibble::rownames_to_column("Variety") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Distance matrix of scaled frequencies of non-standard features across selected varieties of English.")  %>%
+  flextable::border_outer()
 ```
+
 
 Below are other methods to create distance matrices with some comments on when usign which metric is appropriate. 
 
@@ -393,6 +488,7 @@ clustd_minkowski <- round(dist(clusts, method = "minkowski"), 2)
 clustd_daisy <- round(daisy(clusts, metric = "euclidean"), 2) 
 ```
 
+
 If you call the individual distance matrices, you will see that depending on which distance measure is used, the distance matrices differ dramatically! Have a look at the distance matrix created using the `manhatten` metric and compare it to the distance matrix created using the `euclidian` metric (see above).
 
 ```{r cl19, eval = F, echo =  T, message=FALSE, warning=FALSE}
@@ -403,7 +499,15 @@ clustd_maximum
 clustd_maximum  %>%
   as.matrix() %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Variety") 
+  tibble::rownames_to_column("Variety") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Distance matrix of selected varieties of English.")  %>%
+  flextable::border_outer()
 ```
 
 Next, we create a distance plot using the `distplot` function. If the distance plot shows different regions (non-random, non-uniform gray areas) then clustering the data is permittable as the data contains actual structures.
@@ -444,7 +548,7 @@ cd_centroid <- hclust(clustd, method="centroid")
 cd_complete <- hclust(clustd, method="complete")  
 ```
 
-Now, we determine the optimal number of clusters based on silhouette widths which shows the ratio of internal similarity of clusters against the similarity between clusters. If the silhouette widths have values lower than .2 then this indicates that clustering is not appropriate (Levshina 2015: 311). The function below displays the silhouette width values of 2 to 8 clusters.
+Now, we determine the optimal number of clusters based on silhouette widths which shows the ratio of internal similarity of clusters against the similarity between clusters. If the silhouette widths have values lower than .2 then this indicates that clustering is not appropriate [@levshina2015linguistics 311]. The function below displays the silhouette width values of 2 to 8 clusters.
 
 ```{r cl23, eval = T, echo =  T, message=FALSE, warning=FALSE}
 optclus <- sapply(2:8, function(x) summary(silhouette(cutree(cd, k = x), clustd))$avg.width)
@@ -482,7 +586,7 @@ plot(sort(diff),           # y-values
   type= "n",            # plot type (empty)
   cex.axis = .75,       # axis font size
   cex.lab = .75,        # label font size
-  xlab ="Prototypical for Non-Celtic Varieties (Cluster 2) <--> Prototypical for Celtic Varieties (Cluster 1)", # x-axis label
+  xlab ="Prototypical for Non-Celtic Varieties (Cluster 2) <-----> Prototypical for Celtic Varieties (Cluster 1)", # x-axis label
   yaxt = "n",           # no y-axis tick marks
   ylab = "")            # no y-axis label
 text(sort(diff), 1:length(diff), names(sort(diff)), cex = .75) # plot text into plot
@@ -504,7 +608,7 @@ plot(                   # start plot
   type= "n",            # plot type (empty)
   cex.axis = .75,       # axis font size
   cex.lab = .75,        # label font size
-  xlab ="Prototypical for Inner Circle Varieties (Cluster 2) <--> Prototypical for Outer Circle Varieties (Cluster 1)", # x-axis label
+  xlab ="Prototypical for Inner Circle Varieties (Cluster 2) <-----> Prototypical for Outer Circle Varieties (Cluster 1)", # x-axis label
   yaxt = "n",           # no y-axis tick marks
   ylab = "")            # no y-axis label
 text(sort(diff), 1:length(diff), names(sort(diff)), cex = .75) # plot text into plot
@@ -521,7 +625,7 @@ res.pv <- pvclust(clus,                     # apply pvclust method to clus data
                   nboot = 100)              # use 100 bootstrap runs
 ```
 
-The clustering provides approximately unbiased p-values and bootstrap probability value (cf. Levshina 2015: 316).
+The clustering provides approximately unbiased p-values and bootstrap probability value [see @levlevshina2015linguistics 316].
 
 ```{r cl30, eval = T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 plot(res.pv, cex = .75)
@@ -546,7 +650,7 @@ plot(as.phylo(cd),      # plot cluster object
      label.offset = 1)  # .5 label offset
 ```
 
-## Cluster Analysis on Nominal Data
+## Cluster Analysis on Nominal Data{-}
 
 So far, all analyses were based on numeric data. However, especially when working with language data, the data is nominal or categorical rather than numeric. The following will thus show to implement a clustering method for nominal data.
 
@@ -573,12 +677,21 @@ rownames(clus) <- c("nae_neg", "like", "clefts", "tags", "youse", "soitwas",
 # convert into factors
 clus <- apply(clus, 1, function(x){
   x <- as.factor(x) })
-# inspect
-clus  %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column("Variety")
 ```
 
+```{r cl33b, eval = T, echo =  F, message=FALSE, warning=FALSE}
+clus  %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Variety") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Occurrence of non-standard features across selected varieties of English.")  %>%
+  flextable::border_outer()
+```
 
 
 Now that we have our data, we will create a distance matrix but in contrast to previous methods, we will use a different distance measure that takes into account that we are dealing with nominal (or binary) data.
@@ -588,13 +701,23 @@ Now that we have our data, we will create a distance matrix but in contrast to p
 clusts <- as.matrix(clus)
 # create distance matrix
 clustd <- dist(clusts, method = "binary")   # create a distance object with binary (!) distance
-# inspect
+```
+
+
+```{r cl34b, eval = T, echo =  F, message=FALSE, warning=FALSE}
 round(clustd, 2)  %>%
   as.matrix() %>%
   as.data.frame() %>%
-  tibble::rownames_to_column("Variety")
+  tibble::rownames_to_column("Variety") %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Distance matrix of selected varieties of English.")  %>%
+  flextable::border_outer()
 ```
-
 
 
 As before, we can now use hierarchical clustering to display the results as a dendrogram
@@ -627,6 +750,7 @@ assocstats(table(cluster, clsts.df$like))
 
 Clustering is a highly complex topic and there many more complexities to it. However, this should have helped to get you started.
 
+
 # Correspondence Analysis
 
 Correspondence analysis (CA) represents a multivariate statistical technique that provides a graphic method of exploring the relationship between variables in a contingency table. CA is conceptually similar to principal component analysis (PCA), but applies to categorical rather than continuous data.
@@ -657,12 +781,21 @@ We start by loading the data, and then displaying the data which is called `vsmd
 ```{r vsm1, message=F, warning=F}
 # load data
 vsmdata  <- base::readRDS(url("https://slcladal.github.io/data/vsd.rda", "rb"))
-# inspect
-vsmdata  %>%
-  as.data.frame() %>%
-  head(10)
 ```
 
+```{r vsm1b, eval = T, echo =  F, message=FALSE, warning=FALSE}
+vsmdata  %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Table showing amplification of English adjectives.")  %>%
+  flextable::border_outer()
+```
 
 
 For this tutorial, we will reduce the number of amplifiers and adjectives and thus simplify the data to render it easier to understand what is going on. To simplify the data, we remove 
@@ -692,15 +825,24 @@ vsmdata_simp <- vsmdata %>%
   dplyr::mutate(Adjective = ifelse(AdjFreq > 10, Adjective, "other")) %>%
   dplyr::filter(Adjective != "other") %>%
   dplyr::select(-AmpFreq, -AdjFreq)
-# inspect
-vsmdata_simp  %>%
-  as.data.frame() %>%
-  head(10)
 ```
 
-
+```{r vsm2b, eval = T, echo =  F, message=FALSE, warning=FALSE}
+vsmdata_simp  %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Table showing amplification of English adjectives (simplified).")  %>%
+  flextable::border_outer()
+```
 
 We now use a balloon plot to see if tehre are any potential correlations between amplifiers and adjectives.
+
 
 ```{r ca3}
 # 1. convert the data as a table
@@ -712,12 +854,14 @@ balloonplot(t(dt), main ="vsmdata_simp", xlab ="", ylab="",
 
 The balloon plot suggests that there are potential correlations as the dots (balloons) are not distributed evenly according to frequency. To validate if there is significant correlation between the amplifier types and the adjectives using a $\chi$^2^- test. 
 
+
 ```{r ca4, warning=F, message=F}
 chisq <- chisq.test(dt)
 chisq
 ```
 
 The $\chi$^2^- test confirms that there is a significant correlations between amplifier types and the adjectives.
+
 
 ```{r ca5}
 res.ca <- FactoMineR::CA(dt, graph = FALSE)
@@ -738,6 +882,8 @@ fviz_ca_biplot(res.ca,
 
 The results of the CA show that the adjective *different* is collocating with *other* amplifiers while *very* is collocating with *difficult* and *important*, *pretty* is collocating with *big*, *really* is collocating with *nice*, and *so* is collocating with *bad*.
 
+
+
 ```{r pca1, eval = F, echo=F, message=FALSE, warning=FALSE}
 # Principal Component Analysis
 
@@ -755,10 +901,12 @@ ir.species <- iris[, 5]
 ir.pca <- prcomp(log.ir, center = TRUE, scale. = TRUE) 
 ```
 
+
 ```{r pca3, eval = F, echo=F, message=FALSE, warning=FALSE}
 # print method
 print(ir.pca)
 ```
+
 
 ```{r pca4, eval = F, echo=F, message=FALSE, warning=FALSE}
 # plot method
@@ -774,6 +922,7 @@ summary(ir.pca)
 # predict PCs
 predict(ir.pca, newdata=tail(log.ir, 2))
 ```
+
 
 ```{r pca7, eval = F, echo=F, message=FALSE, warning=FALSE}
 # load library
@@ -800,6 +949,7 @@ trans = preProcess(iris[,1:4],
 PC = predict(trans, iris[,1:4])
 ```
 
+
 ```{r pca9, eval = F, echo=F, message=FALSE, warning=FALSE}
 # inspect retained PCs
 head(PC, 3)
@@ -808,8 +958,12 @@ head(PC, 3)
 trans$rotation
 ```
 
+
+
+
 ```{r mds1, eval = F, echo=F, message=FALSE, warning=FALSE}
 # Multidimensional Scaling 
+
 
 # Classical MDS
 # N rows (objects) x p columns (variables)
@@ -826,6 +980,7 @@ plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
   main="Metric MDS", type="n")
 text(x, y, labels = row.names(clus), cex=.7) 
 ```
+
 
 ```{r mds2, eval = F, echo=F, message=FALSE, warning=FALSE}
 # Nonmetric MDS
@@ -845,15 +1000,28 @@ plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
 text(x, y, labels = row.names(clus), cex=.7) 
 ```
 
-# Citation & Session Info 
 
-Schweinberger, Martin. 2021. *Cluster and Correspondence Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/clust.html.
+# Citation & Session Info {-}
 
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Cluster and Correspondence Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/clust.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`clust,
+  author = {Schweinberger, Martin},
+  title = {Cluster and Correspondence Analysis in R},
+  note = {https://slcladal.github.io/clust.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
 
 
 ```{r fin}
 sessionInfo()
 ```
+
 
 ***
 
@@ -863,18 +1031,6 @@ sessionInfo()
 
 ***
 
-# References 
+# References {-}
 
-Aggarwal, Charu C. 2015. *Data Mining: The Textbook*. Springer.
 
-Blashfield, Roger K, and Mark S. Aldenderfer. 1988. The Methods and Problems of Cluster Analysis. In *Handbook of Multivariate Experimental Psychology*, 447–473. Springer.
-
-Kassambara, Alboukadel. 2017. Practical Guide to Cluster Analysis in R: Unsupervised Machine Learning. Vol. 1. Sthda.
-
-Kettenring, Jon R. 2006. “The Practice of Cluster Analysis.” Journal of Classification 23 (1): 3–30.
-
-King, Ronald S. 2015. Cluster Analysis and Data Mining: An Introduction. Stylus Publishing, LLC.
-
-Levshina, Natalia. 2015. How to Do Linguistics with R: Data Exploration and Statistical Analysis. Amsterdam: John Benjamins Publishing Company.
-
-Romesburg, Charles. 2004. Cluster Analysis for Researchers. Lulu Press.

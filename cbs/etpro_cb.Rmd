@@ -1,0 +1,258 @@
+---
+title: "AcqVA Aurora Guide to Processing Eye-Tracking Data in R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: cosmo
+    highlight: tango
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+# Introduction{-}
+
+This document contains a shortened version of the processing chain that was shown in the workshop *Processing and Analyzing Eye-Tracking Data in R* in the AcqVA Aurora Center at the Arctic University of Norway, Tromsø. The R Markdown document for the tutorial can be downloaded [here](https://slcladal.github.io/etpro.Rmd) and the bib library [here](https://slcladal.github.io/bibliography.bib). You will find very helpful and detailed tutorials on how to perform analyses and visualize eye-tracking data using `eyetrackeR` [here](http://www.eyetracking-r.com/).
+
+## Preparation
+
+```{r install, eval = F, warning=F, message=F}
+install.packages(c("tidyverse", "eyetrackingR", "data.table", "itsadug", "sjPlot", "lme4")
+```
+
+```{r setup, warning=F, message=F}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 10) # suppress math annotation
+# load packages
+library(tidyverse)
+library(eyetrackingR)
+library(data.table)
+library(itsadug)
+library(lme4)
+library(sjPlot)
+```
+
+```{r setup2, echo=F, message=FALSE, warning=FALSE}
+# load packages for website
+library(knitr) 
+library(kableExtra) 
+library(DT)
+```
+
+# Data processing
+
+## Define paths{-}
+
+```{r}
+datapath <- here::here("data/data_exp_50674-v2", "uploads")
+masterpath <- here::here("data/data_exp_50674-v2", "data_exp_50674-v2_task-etfm.csv")
+```
+
+## Load data{-}
+
+```{r list, warning=F, message=F}
+# get list of spreadsheets
+fls <- list.files(datapath, full.names = T)
+fls <- fls[2:length(fls)]
+# create list of tables
+datls <- lapply(fls, function(x){
+  name <- x
+  x <- readxl::read_xlsx(x) %>%
+    dplyr::mutate(idname = name) %>%
+    dplyr::mutate(trial = stringr::str_remove_all(name, ".*collection-"))  %>%
+    dplyr::mutate(trial = stringr::str_remove_all(trial, "-.*"))
+  })
+# combine spreadsheets into a single data frame
+edat <- data.table::rbindlist(datls) %>%
+  dplyr::mutate(id = 1:nrow(.)) %>%
+  dplyr::mutate(participant_id = factor(participant_id),
+                trial = factor(trial))
+# extract boundary data
+ibs <- edat %>%
+  dplyr::select(participant_id, trial, zone_name, zone_x, zone_y,zone_width, zone_height) %>%
+  # get rid of superfluous rows
+  dplyr::filter(zone_name == "Right"|zone_name == "Left") %>%
+  na.omit() %>%
+  # define image boundaries
+  dplyr::mutate(top = zone_y,
+                bottom = zone_y + zone_width,
+                left = zone_x,
+                right = zone_x + zone_width) %>%
+  # remove superfluous columns
+  dplyr::select(-zone_x, -zone_y, -zone_width, -zone_height) %>%
+  dplyr::mutate(position = tolower(zone_name)) %>%
+  tidyr::gather(edge, coordinate, top:right) %>%
+  dplyr::mutate(position_edge = paste0(position, "_", edge, "edge")) %>%
+  dplyr::select(-zone_name, -position, -edge) %>%
+  tidyr::spread(position_edge, coordinate) %>%
+  dplyr::group_by(participant_id, trial) %>%
+  # create aoi
+  dplyr::summarise(left_bottomedge = left_bottomedge,
+                   left_leftedge = left_leftedge,
+                   left_rightedge = left_rightedge,
+                   left_topedge = left_topedge,
+                   right_bottomedge = right_bottomedge,
+                   right_leftedge = right_leftedge,
+                   right_rightedge = right_rightedge,
+                   right_topedge = right_topedge)
+```
+
+## Process master file{-}
+
+```{r mstr1, warning=F, message=F}
+mstr <- read_csv(masterpath) %>%
+  # create participant column that matches the participant column in the data 
+  dplyr::mutate(participant_id = `Participant Private ID`)
+# create reduced master file (no superfluous columns)
+mstr_redux <- mstr %>%
+  # select columns you need
+  dplyr::select(participant_id, `trial number`, condition, target_gender, 
+                target_position, `Zone Type`, Response, Correct, target_item) %>%
+  # filter unique 
+  unique() %>%
+  # remove rows containing NA
+  na.omit() %>%
+  # filter out superfluous rows
+  dplyr::filter(`Zone Type` == "response_button_image") %>%
+  dplyr::rename(trial = `trial number`) %>%
+  dplyr::mutate(trial = as.character(trial)) %>%
+  # convert participant_id and trial into factors
+  dplyr::mutate(participant_id = factor(participant_id),
+                trial = factor(trial))
+```
+
+## Join data and masterfile{-}
+
+```{r join1, warning=F, message=F}
+edat <- edat %>%
+  # remove superfluous columns
+  dplyr::select(-`0`, -filename, -spreadsheet_row, -time_stamp, -screen_index, 
+                -convergence, -zone_x, -zone_y, -zone_width,
+                -zone_height, -zone_x_normalised, -zone_y_normalised, -zone_width_normalised,
+                -zone_height_normalised, -idname, 
+                
+                # WARNING: If you work with normalized values, REPLACE the following 
+                # with their non-normalized counterparts!
+                
+                -x_pred_normalised, -y_pred_normalised) %>%
+  # convert participant_id and trial into factors
+  dplyr::mutate(participant_id = factor(participant_id),
+                trial = factor(trial)) %>%
+  # remove rows without gaze information
+  dplyr::filter(x_pred != 0,
+                y_pred != 0)
+edatibs <- left_join(edat, ibs, by = c("participant_id", "trial"))
+edatibs <- edatibs %>%
+  # filter imprecise data points
+  dplyr::filter(face_conf >= .5)
+```
+
+## Combining the data and metadata{-}
+
+Now we combine the collected data (`edatibs` = `edat` plus image boundaries `ibs`) with the metadata (the information from the reduced master file `mstr_redux`)
+
+```{r join3, warning=F, message=F}
+dat <- dplyr::left_join(edatibs, mstr_redux, by = c("participant_id", "trial"))  %>%
+  # determine if participant's gaze was in AOI
+  dplyr::mutate(AOI = ifelse(
+    # if target is left image
+    target_position == "left" &
+      y_pred > left_topedge & 
+      y_pred < left_bottomedge & 
+      x_pred > left_leftedge & 
+      x_pred < left_rightedge, 1,
+    # if target is right image
+    ifelse(target_position == "right" &
+             y_pred > right_topedge   & 
+             y_pred < right_bottomedge &
+             x_pred  > right_leftedge & 
+             x_pred <  right_rightedge, 1,
+           0)))
+```
+
+## Binning{-}
+
+Define time bins (here 100 ms)
+
+```{r bin1, warning=F, message=F}
+dat <- dat %>%
+  # arrange by participant, trial, and time
+  dplyr::arrange(participant_id, trial, time_elapsed) %>%
+  # bin times into .2 time bins
+  dplyr::mutate(TimeBin = itsadug::timeBins(time_elapsed, 100, pos=0))
+```
+
+## Cleaning{-}
+
+```{r clean1, warning=F, message=F}
+dat <- dat %>%
+  # clean condition (spelling error!)
+  dplyr::mutate(condition = dplyr::case_when(condition == "color" ~ "color",
+                                             condition == "same" ~ "same",
+                                             condition == "different" ~ "different",
+                                             condition == "differernt" ~ "different",
+                                             TRUE ~ condition)) %>%
+  # change correct from 0 vs 1 into correct vs incorrect
+  dplyr::mutate(Correct = ifelse(Correct == 1, "Correct",
+                                 ifelse(Correct == 0, "Incorrect", Correct)),
+                Correct = factor(Correct))
+```
+
+## Getting rid of incorrect observations
+
+```{r clean2, warning=F, message=F}
+dat <- dat %>%
+  dplyr::filter(Correct != "Incorrect")
+```
+
+# Inspect processed data
+
+
+```{r bound1b, echo = F, warning=F, message=F}
+dat %>%
+  head(10) %>%
+  kable(caption = "First 10 rows of dat.") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                            full_width = F)
+```
+
+
+# Saving the data
+
+You can now save the data in your `data` folder, if you like.
+
+```{r save, eval = F, message=F, warning=F}
+write.table(dat, here::here("data", "dat.txt"), sep = "\t", row.names = F)
+```
+
+To re-load this data, you would have use the following command:
+
+```{r save2, eval = F, message=F, warning=F}
+dat <- read.delim(here::here("data", "dat.txt"), sep = "\t")
+```
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *AcqVA Aurora Guide to Processing Eye-Tracking Data in R*. Tromsø: The Artic University of Norway. url: https://slcladal.github.io/etpro.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`etpro,
+  author = {Schweinberger, Martin},
+  title = {AcqVA Aurora Guide to Processing Eye-Tracking Data in R},
+  note = {https://slcladal.github.io/eyews.html},
+  year = {2021},
+  organization = "Arctic University of Norway, AcqVA Aurora Center},
+  address = {Tromsø},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+***
+
+[Back to top](#introduction)
+
+***
+
+

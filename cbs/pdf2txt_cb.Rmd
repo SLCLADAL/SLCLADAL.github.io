@@ -1,49 +1,68 @@
+---
+title: "Converting PDFs to txt files with R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: 
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
 
-![An interactive LADAL notebook.](https://slcladal.github.io/images/uq1.jpg)
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial shows how to extract text from one or more pdf-files and then saving the text(s) in txt-files on your computer. 
 
 
-***
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
 
-Please copy this Jupyter notebook so that you are able to edit it.
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to convert pdfs into txt files using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with extracting texts from pdfs. 
 
-Simply go to: File > Save a copy in Drive.
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/pdf2txt.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
 
-If you want to run this notebook on your own computer, you need to do 2 things:
+<br>
 
-1. Make sure that you have R installed.
-
-2. You need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file.
-
-Once you have done that, you are good to go.
-
-***
-
-# Converting PDFs to txt files with R
-
-This tutorial shows how to extract text from one or more pdf-files and then saving the text(s) in txt-files on your computer. The RNotebook for this tutorial can be downloaded [here](https://slcladal.github.io/pdf2txt.Rmd). If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file.  
-
-The aim of this tutorial is to showcase how to extract text from pdf documents that are stored on your computer. The aim is not to provide a ready-made tool or to provide a perfect text extraction but rather to show and exemplify an easy and common method for extracting text that can be applied to a large number of pdf-documents.
 
 **Preparation and session set up**
 
-For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph - it may take some time (between 5 and 15 minutes to install all of the packages for the first time so you do not need to worry if it takes some time).
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # set options
 options(stringsAsFactors = F)          # no automatic data transformation
 options("scipen" = 100, "digits" = 12) # suppress math annotation
 # install packages
+install.packages("pdftools")
 install.packages("tidyverse")
 install.packages("here")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
 ```
-
-Unfortunately the package `pdftools` has to be installed separately (as shown below).
-
-```{r prep3, message=FALSE, warning=FALSE}
-system2('sudo', 'apt-get install libpoppler-cpp-dev')
-install.packages("pdftools", repos='http://cran.us.r-project.org')
-```
-
 
 Next we activate the packages.
 
@@ -52,10 +71,11 @@ Next we activate the packages.
 library(pdftools)
 library(tidyverse)
 library(here)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
-Once you have installed the packages and initiated the session by executing the code shown above, you are good to go.
-
+Once you have installed RStudio and have also initiated the session by executing the code shown above, you are good to go.
 
 **How to use the RNotebook for this tutorial**
 
@@ -82,39 +102,13 @@ To follow this tutorial interactively (by using the RNotebook - or Rmd for short
    + The Markdown file of this tutorial should now be open in the upper left panel of RStudio. To execute the code which prepare the session, load the data, create the graphs, and perform the statistics, simply click on the green arrows in the top right corner of the code boxes.
    + To render a PDF of this tutorial, simply click on `Knit` above the upper left panel in RStudio.
 
-
-**Upload your data to Google Colab**
-
-The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
-
-![Colab Folder Symbol](https://slcladal.github.io/images/ColabFolder.png)
-
-Then on the upload symbol. 
-
-![Colab Upload Symbol](https://slcladal.github.io/images/ColabUpload.png)
-
-Next, upload the files you want to analyze and then the respective files names in the `file` argument of the `scan` function. When you then execute the code (like to code chunk below, you will upload your own data.
-
-```{r loadown, echo = T, eval = F, message=FALSE, warning=FALSE}
-pdf0 <- "pdf0.pdf"
-pdf1 <- "pdf1.pdf"
-pdf2 <- "pdf2.pdf"
-pdf3 <- "pdf3.pdf"
-# inspect
-pdf0
-```
-
-To apply the code and functions below to your own data, you will need to modify the code chunks and replace the data we use here with your own data object. 
-
-Now that we have loaded some data, we can go ahead and extract the text from the pdf-documents.
-
-
-# Extract text from one pdf
+# Extract text from one pdf{-}
 
 The pdf we will convert is a [pdf of the Wikipedia article about corpus linguistics](https://slcladal.github.io/data/PDFs/pdf0.pdf). The first part of that pdf is shown below.
 
-![An example pdf document](https://slcladal.github.io/images/pdf0.png)
-
+```{r pdf, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/pdf0.png")
+```
 
 Given that the pdf contains tables, urls, reference, etc., the text that we will extract from the pdf will be rather messy - cleaning the content of the text would be another matter (it would be data processing rather than extraction) and we will thus only focus on the conversion process here and not focus on the data cleaning and processing aspect. 
 
@@ -122,7 +116,7 @@ We begin the extraction by defining a path to the pdf. Once we have defined a pa
 
 ```{r pconv01, echo=T, eval = T, message=FALSE, warning=FALSE}
 # you can use an url or a path that leads to a pdf document
-pdf_path <- "pdf0.pdf"
+pdf_path <- "https://slcladal.github.io/data/PDFs/pdf0.pdf"
 # extract text
 txt_output <- pdftools::pdf_text(pdf_path) %>%
   paste0(collapse = " ") %>%
@@ -131,13 +125,22 @@ txt_output <- pdftools::pdf_text(pdf_path) %>%
 ```
 
 ```{r pconv02, echo=F, eval = T, message=FALSE, warning=FALSE}
-# show data: First 1000 characters of the extracted text from a pdf of the wikipedia article on corpus linguistics.
+# show data
 txt_output %>%
   substr(start=1, stop=1000) %>%
-  as.data.frame()
+  as.data.frame() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 1000 characters of the extracted text from a pdf of the wikipedia article on corpus linguistics.")  %>%
+  flextable::border_outer()
 ```
 
-# Extracting text from many pdfs
+
+# Extracting text from many pdfs{-}
 
 To convert many pdf-files, we write a function that preforms the conversion for many documents.
 
@@ -160,16 +163,26 @@ We can now apply the function to the folder in which we have stored the pdf-file
 txts <- convertpdf2txt(here::here("data", "PDFs/"))
 ```
 
+
+
 ```{r pconv06, echo=F, eval = T, message=FALSE, warning=FALSE}
-# show data: First 1000 characters of the extracted texts from pdfs of selected wikipedia articles.
+# show data
 txts %>%
   substr(start=1, stop=1000) %>%
-  as.data.frame()
+  as.data.frame() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 1000 characters of the extracted texts from pdfs of selected wikipedia articles.")  %>%
+  flextable::border_outer()
 ```
 
 The table above shows the first 1000 characters of the texts extracted from 4 pdf-files of Wikipedia articles associated with language technology (*corpus linguistics*, *linguistics*, *natural language processing*, and *computational linguistics*). 
 
-# Saving the texts
+# Saving the texts{-}
 
 To save the texts in txt-files on your disc, you can simply replace the predefined location (the data folder of your Rproject located by the string `here::here("data")` with the folder where you want to store the txt-files and then execute the code below. Also, we will name the texts (or the txt-files if you like) as *pdftext* plus their index number.
 
@@ -183,12 +196,38 @@ lapply(seq_along(txts), function(i)writeLines(text = unlist(txts[i]),
 
 If you check the data folder in your Rproject folder, you should find 4 files called *pdftext1*, *pdftext2*, *pdftext3*, *pdftext4*.
 
-# Citation & Session Info 
+# Citation & Session Info {-}
 
-Schweinberger, Martin. 2021. *Converting PDFs to txt files with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/pdf2txt.html.
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Converting PDFs to txt files with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/pdf2txt.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
 
 
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`pdf2txt,
+  author = {Schweinberger, Martin},
+  title = {Converting PDFs to txt files with R},
+  note = {https://slcladal.github.io/pdf2txt.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
 
 ```{r fin}
 sessionInfo()
 ```
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+
+
+
+
+

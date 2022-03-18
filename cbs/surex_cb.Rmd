@@ -1,0 +1,1092 @@
+---
+title: "Creating Surveys, Questionnaires, and Experiments in R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: 
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+<!--html_preserve-->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-130562131-1');
+</script>
+<!--/html_preserve-->
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial shows how to create surveys, questionnaires, and behavioral experiments in R. The RNotebook for this tutorial can be downloaded [here](https://slcladal.github.io/surex.Rmd). If you want to render the Rmarkdown notebook on your machine, i.e. knitting the document to a html or pdf file, you need to make sure that you have R installed and you also need to download the [bibliography file](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. 
+
+This tutorial is based on the [this tutorial](http://jaysire.djnavarro.net/articles/jaysire01.html) by Danielle Navarro and uses the `jaysire` package which was also developed my Danielle Navarro. I can highly recommend checking out [that tutorial](http://jaysire.djnavarro.net/articles/jaysire01.html) as it is more elaborate and, as it is written by the developer, it is naturally better. The idea behind the `jaysire` package is to allow users to write flexible behavioral experiments that run through a web browser, relying on the jsPsych javascript library to run the experiment itself. In this tutorial, we will walk you through the process of creating a minimal toy experiment using the jaysire package. 
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# install packages
+install.packages("tidyverse")
+install.packages("tibble")
+install.packages("here")
+install.packages("remotes")
+remotes::install_github("djnavarro/jaysire")
+# install klippy for copy-to-clipboard button in code chunks
+remotes::install_github("rlesur/klippy")
+```
+
+Next we activate the packages.
+
+```{r prep2, message=FALSE, warning=FALSE}
+# activate packages
+library(tidyverse)
+library(tibble)
+library(here)
+library(jaysire)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed RStudio and have also initiated the session by executing the code shown above, you are good to go.
+
+# Server hosting 
+
+In this tutorial, we write a survey (or a behavioral experiment). However, if you want to distribute the survey to participants, you will need to upload it to a server where people can take part in the survey/experiment. 
+
+Ther are various options for doing this. a very handy option is [Cognition.run](https://cognition.run) (see https://cognition.run) which is a service for hosting jsPsych experiments online. It's easy to use - and free! Also, it integrates easily with online labor markets like Mechanical Turk and Prolific. [Here is a YouTube tutorial](https://www.youtube.com/watch?v=O628dNA7WCc) on how to upload your experiment to cognition.run.
+
+Here are some sources that also provide additional options and information about server hosting:
+
+* https://redcap.health.uq.edu.au/
+
+* https://qfab.org/training/Clinical%20data%20capture%20and%20management%20with%20REDcap
+
+* https://cran.r-project.org/web/packages/REDCapR/REDCapR.pdf
+
+
+# Getting started
+
+Because the `jaysire` package is a wrapper around jsPsych, the place to start is with jsPsych itself. The key idea in jsPsych is that your job is to provide a description of the experiment, referred to as a timeline. The timeline is an abstract description of what stimuli should be shown to participants, how responses are to be collected, what randomisation procedure to follow, and so on. Once you have specified the timeline, the jsPsych library takes care of all the low level actions like determining which trial will run next, where the data are stored and so on.
+
+In its simplest form, a timeline is straightforward: it’s just a list of the trials that make up the experiment, listed in the order that they should be run. We’ll talk about fancier features like randomisation, loops, conditional branching etc later on, but for now let’s imagine that all we want to do is run a fixed sequence of trials in a fixed order.
+
+That sounds pretty straightforward, but raises the natural question of "what is a ‘trial’, exactly?" Behavioural experiments can vary in all sorts of ways, and so the number of things that can be considered a "trial" in an experiment is limited only by your imagination. The way that jsPsych handles this is providing a system of plugins, where each plugin defines a different kind of experimental trial, and allows you to write your own plugins if you need to. Within the jaysire package, there is a function called `trial_generic` that allows you to create a trial using any plugin you like, but in most cases it is more convenient to use a more specific function because the arguments are better documented.
+
+## Creating instructions{-}
+
+In most experiments, the first thing we want to do is present some instructions to the participant. jsPsych contains an `instructions` plugin that will present multiple pages of instructions to the participant, and there is a corresponding function in jaysire called `trial_instructions` that we can use:
+
+```{r surex01}
+instructions <- jaysire::trial_instructions(
+  pages = c(
+    "Welcome! Use the arrow buttons to browse these instructions",
+    "Your task is to decide if an equation like '2 + 2 = 4' is true or false",
+    "You will respond by clicking a button",
+    "Press the 'Next' button to begin!"
+  ),
+  show_clickable_nav = TRUE,
+  post_trial_gap = 1000
+)
+```
+
+
+In this code, the pages argument specifies four very short pages of text that will be displayed to the participants. By setting `show_clickable_nav` to `TRUE`, we are telling jsPsych to display a pair of buttons that participants can click to move forward or backward within the instructions. By default, these are labeled "Next" and "Previous", but you can change this if you like. The third thing I’ve specified here is the `post_trial_gap`, which is the length of time (in milliseconds) that the experiment will pause between the end of this trial (the instructions) and the start of the next one. During this "gap" period a blank screen is shown.
+
+## Creating simple trials{-}
+
+Our next job is to write some experimental trials! We’ll keep it simple in this first example, and create two variables trial1 and trial2. In both cases we’ll present people with a piece of text, and then ask them to respond by clicking a button with the mouse. We can do this with the `trial_html_button_response` function. This function will use the `html-button-response` plugin within jsPsych. The plugin does exactly what you might expect given the name: it displays some HTML as the stimulus (in this case, just some regular text), and collects responses using buttons! Here’s the code to create trial1:
+
+```{r surex03}
+trial1 <- jaysire::trial_html_button_response(
+  stimulus = "13 + 23 = 36",
+  choices = c("true", "false"),
+  post_trial_gap = 1000
+)
+```
+
+In this code the stimulus argument specifies the text that will be displayed on screen to the participant, and the choices argument specifies the labels that will be shown on the response buttons. Again, the post_trial_gap argument is used to tell jsPsych how long to pause before starting the next trial. We can create trial2 in much the same way:
+
+```{r surex04}
+trial2 <- jaysire::trial_html_button_response(
+  stimulus = "17 - 9 = 6",
+  choices = c("true", "false"), 
+  post_trial_gap = 1000
+)
+```
+
+In fact, the code for trial2 is so similar to the code for trial1 that it feels inefficient. There should be a way to create both trials at the same time, and indeed there is, which I’ll talk about that later.
+
+## Creating a timeline{-}
+
+Now that we have our trial objects, instructions, trial1 and trial2, our next task is to bind together into a timeline. The `build_timeline` function allows us to do this:
+
+```{r surex05}
+all_trials <- jaysire::build_timeline(instructions, trial1, trial2)
+```
+
+At this point we have a complete timeline for our simple experiment! Yay!
+
+## Building the experiment{-}
+
+At the moment we have a complete timeline, but it is stored in an abstract form as the all_trials variable. What we really want to do is *build*" an experiment from this timeline: we want to write the files that will run the experiment, and save those files somewhere. That is the job of the `build_experiment` function. First, let’s specify the location of the experiment. Normally, we would build the experiment into a sensible location (e.g., somewhere inside an RStudio project), but for the purposes of this demonstration – which has to be reproducible on any computer, not just mine – I’ll use the `temporary_folder` function for this purposes. Let's check if there already exists a exp_path folder:
+
+
+```{r surex06, eval = F}
+# inspect location of temp output folder
+exp_path
+```
+
+If the exp_path folder does not yet exist, please run the code below, otherwise, please skip the code below.
+
+```{r surex07, eval = F}
+exp_path <- jaysire::temporary_folder()
+# inspect location of temp output folder
+exp_path
+```
+
+
+
+Now all we have to do is write the experiment into this folder `build_experiment` function, specifying the timeline and path arguments to tell R what to write and where to write it:
+
+```{r  surex09}
+jaysire::build_experiment(
+  timeline = all_trials,
+  path = exp_path,
+  on_finish = save_locally()
+)
+```
+
+The other thing that is specified is the `on_finish` argument, which tells jsPsych what do to when the experiment ends. In the present case, the only thing we want to do is save the data. To keep it simple, we’ll assume the experiment is going to be run on the same computer where the experiment is stored, and so we can use the `save_locally` function here.
+
+## What have we created?{-}
+
+When we run the `build_experiment` function, two subfolders within the *exp_path* folder are created, one called *data* (which is initially empty) and another called *experiment*, which contains all the source files required to run the experiment. Here are the files we have just created:
+
+```{r  surex11}
+list.files(exp_path, recursive = TRUE)
+```
+
+
+## Running the experiment{-}
+
+To run the experiment on the local machine (and save the data to the *data* folder) all we have to do is call the `run_locally` function, specifying the location of the experiment to run:
+
+```{r surex12, eval=F}
+jaysire::run_locally(path = exp_path)
+```
+
+
+
+# Randomisation, repetition and variables
+
+In the previous section, we created three separate trials and put them together into a timeline. This approach works well when your experiment is short and you don’t need to worry about randomization, but most behavioral experiments are considerably longer, and require some degree of randomization.
+
+The goal in this article is to take the same experiment and extend it in three ways:
+
+* Avoid code duplication using timeline variables  
+* Randomise the order of trials within a block  
+* Repetition of blocks of trials
+
+## Trial templates{-}
+
+In the original example, our next step was to define a specific trial using `trial_html_button` response, in which the stimulus argument corresponded to a specific equation like *2 + 2 = 4*, and the choices offered to participants were to judge the equation to be "true" or "false". This time around, we’ll do the same thing except we won’t specify the stimulus directly. Instead, what we’ll do is define a timeline variable using the `variable` function. The `insert_variable` function has only a single argument name, which tells jsPsych what to to call the timeline variable. So we can create a kind of "trial template" like this:
+
+```{r  surex14}
+trial_template <- jaysire::trial_html_button_response(
+  stimulus = insert_variable(name = "my_stimulus"),
+  choices = c("true", "false"),
+  post_trial_gap = 1000
+)
+```
+
+
+## Attaching variables to timelines{-}
+
+Our next step is to specify what possible values the variable can have. Let’s do that by creating a character vector that lists all the equations we want to show people:
+
+```{r  surex16}
+equations <- c(
+  "13 + 23 = 36",  
+  "17 - 9 = 6", 
+  "125 / 5 = 25", 
+  "2 - 4 = 6", 
+  "12 + 39 = 43", 
+  "4 * 23 = 92"
+)
+```
+
+
+Now that we have specified the stimuli as an ordinary R variable, what we need to do is to link it to the trial template we defined earlier. To do this, we first "wrap" `trial_template` into a timeline, and use the `set_variables` function to attach a variable to that timeline:
+
+```{r  surex18}
+trials <- jaysire::build_timeline(trial_template) %>%
+  jaysire::set_variables(my_stimulus = equations)
+```
+
+
+This might seem slightly odd, because in our first example we created all the trials individually and only wrapped them into a timeline at the very end. However, jsPsych allows you to nest timelines within other timelines, and this can be extremely useful. In this situation, what we have create is essentially a new *mini-timeline* that consists of six copies of the trial_template, each one using a different equation. This *templating* approach produces code that is much easier to write than if we had to use `trial_html_button_response` six times, and as you might imagine this is much more efficient when there are hundreds of different stimuli!
+
+## Randomisation{-}
+
+So far, so good. However, one limitation with our code is that the experiment will run the six trials in the same order every time. If our experiment were running in R, what we could to is use the `sample` function to shuffle stimuli, but that won’t work in this situation because the experiment will (eventually) run through a web browser. So if we want to randomise the trial ordering we need to use the randomisation tools built into jsPsych. We can do this by attaching parameters to the timeline that we have just defined using the `set_parameters` function:
+
+```{r  surex20}
+trials <- jaysire::build_timeline(trial_template) %>%
+  jaysire::set_variables(stimulus = equations) %>%
+  jaysire::set_parameters(randomize_order = TRUE)
+```
+
+
+
+In this version, the trials timeline contains the same six copies of the template, but jsPsych will show them in a random order when the experiment is run in the browser.
+
+## Repetition{-}
+
+We’re almost there. Suppose we want to create a *block randomised* design, in which all six items are presented in a random order, and then the same six items are repeated in a different randomised order. This kind of design is quite common in experimental psychology, and we can create one by setting the repetitions parameter for the timeline:
+
+```{r  surex21}
+trials <- jaysire::build_timeline(trial_template) %>%
+  jaysire::set_variables(stimulus = equations) %>%
+  jaysire::set_parameters(randomize_order = TRUE, repetitions = 2)
+```
+
+## Add final page{-}
+
+We can also add a final *good bye* screen to inform participants that the experiment is over by defining a *finish* trial.
+
+```{r  surex22}
+finish <- jaysire::trial_html_keyboard_response(
+  stimulus = "All done! Press any key to finish",
+  choices = respond_any_key()
+)
+```
+
+## Build experiment{-}
+
+```{r  surex23}
+build_experiment(
+  timeline = build_timeline(instructions, trials, finish),
+  path = exp_path,
+  on_finish = save_locally()
+)
+```
+
+## Running the experiment{-}
+
+To run the experiment on the local machine (and save the data to the *data* folder) all we have to do is call the `run_locally` function, specifying the location of the experiment to run:
+
+```{r surex24, eval=F}
+jaysire::run_locally(path = exp_path)
+```
+
+# Using resource files
+
+In the first and second articles, the stimulus materials were simple text, and so I didn’t need to worry about specifying image files or anything like that. This is not the norm, of course: most behavioral experiments include images, audio or video in some form or another. The way we handle this in jaysire is by referring to resource files that are stored somewhere else on your computer, but will be copied (not moved - the original files are untouched) into the experiment folder when the `build_experiment` function is called. In this article I’ll walk you through the process. For the sake of simplicity, I won’t bother with instruction trials this time
+
+## The resource folder{-}
+
+The way jaysire works is to assume that there is a folder on your computer that contains all the files that your experiment needs to use. The current implementation in jaysire is a bit crude, so this needs to be a flat folder (i.e., it cannot contain any subfolders). Normally, this folder would be located somewhere sensible, but for the purposes of this example I’ll create one in a temporary folder:
+
+```{r  surex25}
+# specify the path
+resource_folder <- file.path(exp_path, "images")
+resource_folder
+
+
+# create the empty folder if necessary
+if(!dir.exists(resource_folder)) {
+  dir.create(resource_folder)
+}
+```
+
+
+
+Okay, so now we have a resource folder. Note that this folder is not part of our experiment (it can’t be, since we haven’t created the experiment yet!) it’s somewhere else.
+
+
+## Creating resources in R{-}
+
+The next step is to place resources in the folder. One way to do this is just to copy and paste existing files from your computer, but because we’re in R we might as well use R to create some images for us to use in our experiment.
+
+The experimental task that we’re going to design is one that asks people to look at images containing red and blue dots and judge whether there are more red dots or more blue dots in the image. To do this, here’s a function that will generate an image file that plots nred red dots and nblue blue dots, randomly located.
+
+```{r  surex26}
+make_image <- function(nblue, nred, filename) {
+  points <- tibble(
+    x = runif(nblue + nred),
+    y = runif(nblue + nred),
+    col = c(rep("blue", nblue), rep("red", nred))
+  )
+  img <- ggplot(points, aes(x, y, color = col)) + 
+    geom_point(size = 4, show.legend = FALSE) + 
+    scale_color_identity() + 
+    theme_void()
+  ggsave(filename, img, width = 4, height = 4, dpi = 100)
+}
+```
+
+
+
+
+Now that we have our `make_image` function, let’s create stimuli that vary in the number of red dots and the number of blue dots! To do that, the first step is to specify how many red and blue dots will be in each image:
+
+```{r  surex27}
+nblue <-c(10, 20, 30, 40, 20, 30, 40, 50)
+nred <- c(20, 30, 40, 50, 10, 20, 30, 40)
+image_files <- paste0("stimulus", 1:8, ".png")
+
+```
+
+
+
+Now we create the files:
+
+```{r  surex29}
+for(s in 1:8) {
+  jaysire::make_image(
+    nblue = nblue[s], 
+    nred = nred[s], 
+    filename = file.path(resource_folder, image_files[s])
+  )
+}
+```
+
+
+
+
+Check that it worked:
+
+```{r  surex31}
+list.files(resource_folder)
+```
+
+
+
+Okay, so now we have our stimulus materials, so we’re ready to start incorporating them into an experiment! However, before we do so, there’s something important to note. At this point we have two separate variables resource_folder that specifies the path to the resource folder, and image_files which specifies the names of the images that are contained within that folder. That is:
+
+```{r  surex32}
+resource_folder
+
+image_files
+```
+
+
+
+These are the two variables we’ll need to use when building our experiment.
+
+## The trial template{-}
+
+Because we have several different stimuli to incorprate into the experiment, what we’ll do is specify a template just as we did in the second tutorial article. However, for our new experiment, the stimulus is an image rather than text, so we’ll use the `trial_image_button_response` function this time.
+
+```{r  surex33}
+trial_template <- jaysire::trial_image_button_response(
+  stimulus = insert_variable(name = "my_stimulus"),
+  stimulus_height = 400,
+  stimulus_width = 400,
+  choices = c("there are more red dots", "there are more blue dots"),
+  post_trial_gap = 1000
+)
+```
+
+
+
+
+Notice that again I’ve used the `insert_variable` function to indicate the blank space that will need to be filled in when the experiment gets built. Another thing to notice is that the function allows you to manually specify the height and the width of the image (in pixels), so I’ve done that here.
+
+## Using resources in a timeline{-}
+
+Much like we did in the previous example, we can construct the timeline by first transforming `trial_template` into a timeline object using the `build_timeline` function, and then use the `set_variables` function to specify the timeline variable `my_stimulus` that the template requires. The only difference between this time and the last one is that we need to use the `insert_resource` function so that jaysire knows that it needs to treat image_files as filenames. So our code looks like this:
+
+```{r  surex34}
+trials <- jaysire::build_timeline(trial_template) %>%
+  set_variables(my_stimulus = insert_resource(image_files)) 
+
+```
+
+
+
+Of course, in a real experiment we would probably want to randomise the order in which the stimuli are presented, so it would make more sense to add an extra step like this:
+
+```{r  surex35}
+trials <- jaysire::build_timeline(trial_template) %>%
+  set_variables(my_stimulus = insert_resource(image_files)) %>%
+  set_parameters(randomize_order = TRUE)
+
+```
+
+
+
+In a complete experiment, the trials timeline would need to have other things added to it. We’d need some instructions at the start and a thank you message at the end. But I won’t bother with that in this case, and so we’ll pretend that trials is the entire timeline for the experiment.
+
+
+##Adding the resources to the experiment build{-}
+
+The last step is, as always, building the experiment using the `build_experiment` function. Again, for the purposes of the tutorial I’ll set the experiment path to be a temporary folder, but in real life you’d put it somewhere sensible. Here’s how I do that:
+
+```{r  surex36}
+jaysire::build_experiment(
+  timeline = trials,
+  path = file.path(exp_path, "images_exp"), 
+  resources = build_resources(resource_folder),
+  on_finish = save_locally()
+)
+```
+
+
+Notice the difference from the previous tutorials. This time around there is an extra argument called resources, and I’ve used the `build_resources` function. It’s worth unpacking this a little bit. To understand what is happening here, let’s have a look at the output of the `build_resources` function:
+
+```{r  surex37}
+jaysire::build_resources(resource_folder)
+```
+
+
+What the `build_resources` function does is scan the resource folder and construct a tibble containing all the information that jaysire needs to be able to structure the experiment appropriately. The first column is just the filename, the second column is the type of resource (in this case, everything is an image), the third column indicates where the original file is located, and the final column indicates where copy of that file will be created.
+
+This probably seems unnecessarily complicated. The reason it is structured like this is because there are different kinds of resources, and the browser needs to be given different instructions for how to handle each type. That is, the HTML code for incorporating images is different to the code for audio, video, or javascript code, and so the input to `build_experiment` needs to be explicit about what kind of resource each file corresponds to. By default the `build_resources` function assumes that an .mp3 file is audio, a .png file is an image, etc, but you can override the defaults if you need to. Alternatively, there’s nothing stopping you from constructing this tibble manually if you wanted to: the `build_resources` function is just there to make life slightly less annoying.
+
+
+# Image, video and audio files
+
+In the [previous article](jaysire03.html) I provided a short walkthrough of resource files, and how they are handled in jaysire and jsPsych. However, the only form of resource file we looked at in that article were image files, and trials were handled using the `trial_image_button_response` function. In this article I'll extend this discussion, introducing audio files and video files. To make our lives a little easier, this time around I won't create the resource files from scratch. Instead, I'll use resource files that come bundled with the jaysire package:
+
+```{r  surex39}
+library(jaysire)
+resources <- system.file("extdata", "resources", package = "jaysire")
+list.files(resources)
+```
+
+We have one image file ("heart.png"), two versions of the same video in different formats ("heart.mpg" and "heart.webm"), and a single audio file ("lukewarm_banjo.mp3"). 
+
+## Images{-}
+
+First, let's write an trial using `trial_image_button_response` to handle display the image file and ask people to rate its pleasantness on a 3-point scale:
+
+```{r  surex41}
+image_trial <- jaysire::trial_image_button_response(
+  stimulus = insert_resource("heart.png"), 
+  stimulus_height = 400,
+  stimulus_width = 400,
+  choices = c("Unpleasant", "Neutral", "Pleasant") 
+)
+```
+
+This is familiar to us from the previous article. I've specified the `stimulus` itself using the `insert_resource` function, listed the `choices` available to participants, and some ancillary information about the size of the image. 
+
+## Videos{-}
+
+Embedding videos in an experiment is, in principle, exactly the same as embedding images. Instead of using `trial_image_button_response` we use `trial_video_button_response`. However, there are a few complexities to note here. First, video files often require codecs to run, not every browser supports every form of video, and so on. As a consequence, it is often a good idea to have multiple versions of your video file, and let the browser find a version that it can display. As a consequence, instead of having a `stimulus` argument, we specify the video file using a vector of `sources`, like so:
+
+```{r  surex42}
+video_trial <- jaysire::trial_video_button_response(
+  sources = insert_resource(c("heart.mpg", "heart.webm")), 
+  choices = c("Unpleasant", "Neutral", "Pleasant"), 
+  trial_ends_after_video = FALSE,
+  response_ends_trial = TRUE
+)
+```
+
+By default, `trial_video_button_response` will end the trial as soon as the participant makes a response *or* the video ends. However, there are arguments that you can specify that allow you to make this decision yourself, as this example illustrates.
+
+## Audio{-}
+
+The structure of the audio trial is essentially the same as what we've seen previously.
+
+```{r  surex44}
+audio_trial <- jaysire::trial_audio_button_response(
+  stimulus = insert_resource("lukewarm_banjo.mp3"),
+  choices = c("Unpleasant", "Neutral", "Pleasant"), 
+  trial_ends_after_audio = FALSE,
+  response_ends_trial = TRUE
+)
+```
+
+However, there is one nuance to audio files if you are playing them locally (i.e., on your own computer, rather than from a remote server), which I'll explain in the next section.
+
+## Building the experiment{-}
+
+To build the experiment into the `exp_path` folder, I'll call the `experiment` function:
+
+```{r surex47, warning=FALSE}
+jaysire::build_experiment(
+  timeline = build_timeline(image_trial, video_trial, audio_trial),
+  path = exp_path, 
+  resources = build_resources(resources),
+  use_webaudio = FALSE,
+  on_finish = save_locally()
+)
+```
+
+Most of this should look familiar. I've specified the `timeline` that describes the experiment, the `path` to the folder where it should be located, I've used the `build_resources` function to tell jaysire how to handle each of the resource files, and I've indicated that when the experiment finishes we should `save_locally` into the data folder (see the [first article](jaysire01.html) for more information about the data folder). 
+
+There is one thing that is new. I've specified the `use_webaudio` argument and set it to `FALSE`. The reason for this is that when you're running the experiment locally, the web browser treats locally stored audio files as though they were being hosted on a *different* server to the webpage itself, and that triggers a "cross origin request error" (it is treated as a security risk). Fortunately, jsPsych includes a method to disable this and by setting `use_webaudio = FALSE` you can get around this issue and run your audio files even when the experiment is running locally!  
+
+## Running the experiment{-}
+
+To run the experiment on the local machine (and save the data to the "data" folder) all we have to do is call the `run_locally` function, specifying the location of the experiment to run:
+
+```{r surex48, eval=F}
+jaysire::run_locally(path = exp_path)
+```
+
+## What have we created?{-}
+
+There is one last thing worth discussing, namely the file structure of the experiment that we have build. To start with, let's take a look at what `build_resources` creates:
+
+```{r  surex49}
+jaysire::build_resources(resources)
+```
+
+Now take a look at where all the files have ended up:
+
+```{r  surex51}
+list.files(exp_path, recursive = TRUE)
+```
+
+# Buttons, key presses and sliders
+
+Up to this point we have only considered scenarios in which the participant makes responses by clicking buttons on the screen. Depending on the kind of stimulus that we are presenting, we used a different function:
+
+- When the stimulus is an image, we used `trial_image_button_response` 
+- When the stimulus is text (or HTML more generally), we used `trial_html_button_response` 
+- When the stimulus is a video, we used `trial_video_button_response` 
+- When the stimulus is audio, we used `trial_audio_button_response`
+
+This gives us a family of four trial types that vary depending on the *stimulus* modality. In jaysire (and jsPsych), we can also vary the *response* modality. There are three supported response methods: buttons, key presses, and slider bars. If you want users to respond by pressing a key, the jaysire package includes the following family of functions:
+
+- For images: `trial_image_keyboard_response` 
+- For HTML `trial_html_keyboard_response` 
+- For video: `trial_video_keyboard_response` 
+- For audio: `trial_audio_keyboard_response`
+
+If you would prefer a continuous valued response that uses a slider bar:
+
+- For images: `trial_image_slider_response` 
+- For HTML `trial_html_slider_response` 
+- For video: `trial_video_slider_response` 
+- For audio: `trial_audio_slider_response`
+
+All of these functions work in approximately the same way, but there are slightly different arguments required to describe a button press, a key press, and a slider bar. 
+
+For example, when you specify the `choices` in a button press trial, what you're doing is provide a character vector that contains the *labels* shown on each of the buttons. In contrast, when you specifiy the `choices` argument for a keyboard response trial, you're giving the a vector that specifies which keys can be used to register a response. A common use case is to ask people to press "p" to respond with their left hand or "q" to respond with their right hand, which you can do by setting `choices = c("p","q")`. You can also specify keys numerically by using their [javascript key code value](https://www.cambiaresearch.com/articles/15/javascript-char-codes-key-codes). This is worth noting, because when the data are recorded, it will be the numeric key code that appears in the data set! Also note that jaysire contains the `respond_any_key` function that allows the user to press any key to register a response, and the `respond_no_key` button which makes it impossible the respond with the keyboard (this is useful if you want a trial that runs for a fixed duration)
+
+To give you a sense of how these functions work, here is a very simple experiment that uses a button press trial, a keypress trial, and a slider trial:
+
+```{r surex53, eval = F, message=FALSE, warning=FALSE}
+resources <- system.file("extdata", "resources", package = "jaysire")
+# the keypress trial is used as an instruction screen
+keypress_trial <- jaysire::trial_image_keyboard_response(
+  stimulus = insert_resource("heart.png"),
+  stimulus_height = 400,
+  stimulus_width = 400,
+  prompt = "<br>You will be asked judge the pleasantness of this image. Press any key to continue",
+  choices = respond_any_key()
+)
+# use buttons to ask people to rate on a three-point likert scale
+button_trial <- jaysire::trial_image_button_response(
+  stimulus = insert_resource("heart.png"), 
+  stimulus_height = 400,
+  stimulus_width = 400,
+  choices = c("Unpleasant", "Neutral", "Pleasant") 
+)
+# use a slider to ask people to respond on a continuous valued scale
+slider_trial <- jaysire::trial_image_slider_response(
+  stimulus = insert_resource("heart.png"), 
+  stimulus_height = 400,
+  stimulus_width = 400,
+  labels = c("Most unpleasant", "Neutral", "Most Pleasant"),
+  min = 0,
+  max = 100,
+  start = 50
+)
+# randomise the order of the two "substantial trials"
+tests <- jaysire::jaysire::build_timeline(button_trial, slider_trial) %>%
+  set_parameters(randomize_order = TRUE)
+# build the experiment
+build_experiment(
+  timeline = jaysire::build_timeline(keypress_trial, tests),
+  resources = jaysire::build_resources(resources),
+  path = exp_path, 
+  on_finish = save_locally()
+)
+```
+
+
+# Survey pages
+
+
+In all the experiments we've built so far, it has been assumed that a "trial" consists of a single stimulus to which a participant must give a response. By varying the stimulus type and the response type this produces a family of R functions that map onto different jsPsych plugins. In my experience these are the most common kinds of trials that one wishes to use, but there are also a variety of more specialised situations for which jsPsych supplies dedicated plugins. We've seen one example of this already, namely the `trial_instructions` function. There's nothing stopping you from presenting instructions as a series of `trial_html_button_response` trials, but it's tedious to build and it is hard (not impossible) to allow participants to browse the instruction set using forward and back buttons. So this is a situation where the specialised plugin is handy.
+
+Another very common scenario where a specialised plugin is handy is if you want to include an entire page of survey questions. It would of course be quite easy to create a *single* survey question using `trial_html_button_response`, and create a complete survey by using many such questions, but it is sometimes inconvenient. To make surveys a little simpler, jsPsych has plugins for five different kinds of survey page, four of which are currently supported in jaysire. The four supported types are:
+
+- Pages where every survey question is a multiple choice question (i.e., choose exactly one option) can be created using the `trial_survey_multi_choice` function
+- Pages where every survey question is a multiple selection question (i.e., select as many options as are applicalbe) can be created using the `trial_survey_multi_select` function
+- Pages where every survey question is a Likert scale item can be created with `trial_survey_likert`
+- Pages where every survey question asks for a free text response can be created with `trial_survey_text`
+
+The jsPsych library does not have specialised plugins for the case where a survey page can contain questions of different types, and as a consequence neither does jaysire.
+
+
+## Creating a question{-}
+
+Because a survey page can include more than one question, the jaysire package provides convenience functions that allow you to build questions. For instance, if you want a likert scale question you could do something like this:
+
+```{r, results='hide'}
+jaysire::question_likert(
+  prompt = "Kittens are awesome",
+  labels = c("strong disagree", "somewhat disagree", "neutral",
+             "somewhat agree", "strongly agree"),
+  required = TRUE
+)
+```
+
+which defines a 5 point Likert scale item, and marks it as a required question. If you want to create a multiple choice or multiple selection question, then you can use `question_multi`, which (following the convention in jsPsych) refers to response `options` for multiple choice trials, in contrast to the scale `labels` used by `question_likert`. Here is an example:
+
+```{r, results='hide'}
+jaysire::question_multi(
+  prompt = "Choose your awesomeness",
+  options = c("Kittens", "Puppies", "Otters", "Ducks", "Axolotls")
+)
+```
+
+Note that you don't need to specify whether this is a multiple choice question or a multiple selection question: if you embed it in a `trial_survey_multi_choice` page it will be presented as a multiple choice question, but if you embed it in `trial_survey_multi_select` it will appear in a "choose as many as apply" format.
+
+Finally, you can define a free response question using `question_text` like so:
+
+```{r, results='hide'}
+jaysire::jaysire::question_text(
+  prompt = "Explain the awesomeness of kittens",
+  placeholder = "Type your answer here",
+  rows = 10,
+  columns = 60
+)
+```
+
+When embedded on a `trial_survey_text` this question will appear with a text response box underneat that spans 10 rows and 60 columns. The `placeholder` text will be shown greyed out within the box.
+
+## Composing a page of questions{-}
+
+At this point, our next task in writing a survey is to put together a list of questions that can be passed to one of the survey items. For example, suppose we wanted a page that asks for some basic demographic information. This page would contain a short `preamble` that would be displayed at the top of the page, and then show a list of multiple choice `questions` underneath. Once all of the required questions are answered, a button can be pressed to continue to the next page. Here is how we could do that:
+
+```{r  surex71}
+page1 <- jaysire::trial_survey_multi_choice(
+  preamble = "Welcome! We'd like to ask some demographic questions",
+  questions = list(
+    question_multi(
+      prompt = "Please select the option that best matches your gender",
+      options = c("Male", "Female", "Nonbinary", "Other", "Prefer not to say"),
+      name = "gender"
+    ),
+    question_multi(
+      prompt = "Do you consider yourself to be LGBTIQ+?",
+      options = c("Yes", "No", "Unsure", "Prefer not to say")
+    )
+  )
+)
+```
+
+Notice that the `questions` argument is a *list* of questions. When you have two or more questions to include, this is mandatory, but if there is only one question jaysire will allow you to pass the question directly like so: 
+
+```{r  surex73}
+page2 <- jaysire::trial_survey_multi_select(
+  questions = question_multi(
+    prompt = "Which of the following R packages to you use?",
+    options = c(
+      "ggplot2", "dplyr", "purrr", "janitor", "data.table", "testthat",
+      "usethis", "tibble", "magrittr", "rlang", "babynames", "janeaustenr"
+    )
+  )
+)
+```
+
+When creating Likert pages, it is very common to reuse the same labels for every question, so it can be convenient to create a page of Likert items like this:
+
+```{r  surex75}
+# define the scale
+confidence_scale <- c(
+  "Very unconfident", 
+  "Somewhat unconfident", 
+  "Somewhat confident", 
+  "Very confident"
+)
+# a page of questions that all use the same scale
+page3 <- jaysire::trial_survey_likert(
+  preamble = "How confident in you R skills?",
+  questions = list(
+    question_likert("Data wrangling?", confidence_scale),
+    question_likert("Data visualisation?", confidence_scale),
+    question_likert("Statistical modelling?", confidence_scale),
+    question_likert("Designing experiments?", confidence_scale),
+    question_likert("R markdown documents?", confidence_scale)
+  )
+)
+```
+
+## Example experiment{-}
+
+
+```{r surex76}
+library(jaysire)
+page1 <- jaysire::trial_survey_multi_choice(
+  preamble = "Welcome! We'd like to ask some demographic questions",
+  questions = list(
+    question_multi(
+      prompt = "Please select the option that best matches your gender",
+      options = c("Male", "Female", "Nonbinary", "Other", "Prefer not to say"),
+      name = "gender"
+    ),
+    question_multi(
+      prompt = "Do you consider yourself to be LGBTIQ+?",
+      options = c("Yes", "No", "Unsure", "Prefer not to say")
+    )
+  )
+)
+page2 <- jaysire::trial_survey_multi_select(
+  questions = question_multi(
+    prompt = "Which of the following R packages to you use?",
+    options = c(
+      "ggplot2", "dplyr", "purrr", "janitor", "data.table", "testthat",
+      "usethis", "tibble", "magrittr", "rlang", "babynames", "janeaustenr"
+    )
+  )
+)
+confidence_scale <- c(
+  "Very unconfident", 
+  "Somewhat unconfident", 
+  "Somewhat confident", 
+  "Very confident"
+)
+page3 <- jaysire::trial_survey_likert(
+  preamble = "How confident in you R skills?",
+  questions = list(
+    question_likert("Data wrangling?", confidence_scale),
+    question_likert("Data visualisation?", confidence_scale),
+    question_likert("Statistical modelling?", confidence_scale),
+    question_likert("Designing experiments?", confidence_scale),
+    question_likert("R markdown documents?", confidence_scale)
+  )
+)
+page4 <- jaysire::trial_survey_text(
+  questions = question_text(
+    prompt = "Anything else you would like to mention?",
+    placeholder = "Type your answer here",
+    rows = 8,
+    columns = 60
+  )
+)
+jaysire::build_experiment(
+  timeline = jaysire::build_timeline(page1, page2, page3, page4),
+  path = exp_path, 
+  on_finish = jaysire::save_locally()
+)
+```
+
+
+
+
+# Loops and branches
+
+
+Up to this point our experiments have been mostly linear in structure. Although we have seen examples of nested timelines, randomised timelines, repeated timelines and so on, none of the example experiments we've built so far allow us to *explicitly* rely on programming constructs like *if* (to create conditional branching) or *while* (to build customised loops). The jaysire package provides two functions that provide these programming constructs, `display_if` and `display_while`. The `display_if` function allows you to indicate that a timeline should be executed only if a particular *condition* holds, and the `display_while` function allows you to specify that a timeline should execute over and over again until the condition no longer holds. At the moment, jaysire is quite limited in terms of what conditions are natively supported. Later releases will (I hope) extend this functionality.
+
+
+## Branching timelines{-}
+
+Suppose the first question in our experiment asks people to indicate whether they identify as LGBTIQ+, like so:
+
+```{r surex77}
+page1 <- jaysire::trial_html_button_response(
+  "Do you identify as LGBTIQ+?",
+  c("Yes", "No", "Prefer not to say")
+)
+```
+
+If the user response *Yes*, we might want to ask a follow-up question, one that asks them to indicate (if they are willing to do so) which subcategories they belong to. However, we wouldn't want to show that question to anyone who responds "No" or "Prefer not to say", since the question isn't relevant to those people. How do we do this? First, let's just build the trial the same way we normally would:
+
+```{r  surex79}
+followup <- jaysire::trial_survey_multi_select(
+  jaysire::question_multi(
+    prompt = "Select all that apply",
+    options = c(
+      "Lesbian", 
+      "Gay", 
+      "Bisexual/Pansexual", 
+      "Transgender", 
+      "Nonbinary",
+      "Genderqueer", 
+      "Intersex", 
+      "Asexual",
+      "Other"
+    )
+  )
+)
+```
+
+If we add `followup` to our timeline "as is", it will be shown to everybody regardless of what answer they provide. To fix this, what we do is wrap `followup` into a timeline, and then pipe that timeline through a `display_if` statement. What that looks like is this:
+
+
+```{r  surex81}
+page1a <- jaysire::build_timeline(followup) %>%
+  jaysire::display_if(jaysire::fn_data_condition(button_pressed == "0"))
+```
+
+What we have done here is defined `page1a` as a *conditional* timeline. When the participant actually completes the experiment, this trial will *only* be shown if the condition `fn_data_condition(button_pressed == "0")` is true. This solves our problem, but it may not be obvious *how* we're solving the problem, so it is worth unpacking this a little...
+
+## What is going on here?{-}
+
+Firstly, let's take a look at the  `button_pressed == "0"` part. Within jsPsych, a button response is recorded numerically: it creates an internal "button_pressed" variable to store the results of the trial, where a value of 0 indicates that the user pressed the first button, 1 refers to the second button, and so on. However, everything in jsPsych is internally stored as text, so if we want to check the response we have to use `"0"` rather than `0`. This is the reason why the condition statement takes the form `button_pressed == "0"`: the "Yes" response is the first response option for the `page1` trial, so we only want `page1a` to execute *if* the response on that trial (i.e., the value of `button_pressed` within the jsPsych data storage) is equal to `"0"`. 
+
+Next, I'll expand on what is going on with the `fn_data_condition` function, but to do so I need to explain the `display_if` function in a little more detail. First, let's rewrite the code above without using the pipe, and name our arguments explicitly:
+
+```{r  surex83}
+page1a <- jaysire::display_if(
+  timeline = jaysire::build_timeline(followup), 
+  jaysire::conditional_function = jaysire::fn_data_condition(button_pressed == "0")
+)
+```
+
+This isn't quite so pretty to look at, but it is helpful for the purposes of understanding. The `display_if` function takes two arguments, the `timeline` object itself (i.e., the `followup` page), and a `conditional_function` that is used to determine whether or not the timeline should be executed. Because the experiment is eventually run in javascript through the web browser, this function must be a *javascript* function, not an R function. If you know javascript, then it may be useful to note that jaysire contains an `insert_javascript` function that means that any text you include will be passed as unfiltered javascript, so you can in fact pass anything you like here:
+
+```{r surex84, eval=FALSE}
+page1a <- jaysire::display_if(
+  timeline = jaysire::build_timeline(followup), 
+  jaysire::conditional_function = insert_javascript("/* your javascript function here */")
+)
+```
+
+If your javascript function returns `true` -- logical values in javascript are `true` or `false` unlike in R where they are `TRUE` or `FALSE` -- then the timeline will execute. If it returns `false` the timeline will not execute. 
+
+However, one of the goals of jaysire is to minimise the amount of javascript you have to write when building a behavioural experiment, so there is a helper function called `fn_data_condition` that will create the javascript function that you want. By default, what it does is inspect the contents of the jsPsych data store for the *preceding* trial, and allows the user to construct an expression that will be tested against that data (e.g., `button_pressed == "0"`). This simplifies matters a little, but my intention is to extend this functionality over time to allow you to deal with the most common use cases without ever having to write your own javascript. Nevertheless, this is a work in progress.
+
+
+## Looping timelines{-}
+
+Having gone into all this detail for `display_if`, it is very simple to provide an illustration of `display_while` because it works in exactly the same fashion. Suppose I want to force people to tell me that this picture of a heart looks pleasant. Let's construct a trial:
+
+```{r  surex85}
+resources <- system.file("extdata", "resources", package = "jaysire")
+query <- jaysire::trial_image_button_response(
+  stimulus = jaysire::insert_resource("heart.png"), 
+  stimulus_height = 400,
+  stimulus_width = 400,
+  choices = c("Unpleasant", "Neutral", "Pleasant"),
+  prompt = "You will not be allowed to continue unless you select 'Pleasant'"
+)
+```
+
+Now what we do is take this `query` trial, wrap into a timeline using `build_timeline` and then keep repeating that trial until the user responds by pressing button `"2"` (i.e., selects `"Pleasant"`):
+
+```{r surex87}
+page2 <- jaysire::build_timeline(query) %>%
+  jaysire::display_while(fn_data_condition(button_pressed != "2"))
+```
+
+At this point we are done! Let's wrap all this up in a single timeline, add the resources, and build it as an experiment:
+
+```{r  surex88}
+jaysire::build_experiment(
+  timeline = jaysire::build_timeline(page1, page1a, page2),
+  resources = jaysire::build_resources(resources),
+  path = exp_path, 
+  on_finish = jaysire::save_locally()
+)
+```
+
+
+# A choice reaction time task
+
+
+```{r setup}
+set.seed(143)
+```
+
+In this example we'll build a relatively simple choice reaction time experiment. On any given trial, the participant will be presented with a blue circle or an orange circle, and will respond by pressing the "F" or "J" keys. It is almost identical to the [demonstration experiment](https://www.jspsych.org/tutorials/rt-task/) used in the jsPsych documentation. 
+
+## Creating the resource files{-}
+
+```{r surex89, message = FALSE}
+# where should the images be stored initially?
+resources <- exp_path  
+blue_image <- file.path(resources, "blue.png")
+orange_image <- file.path(resources, "orange.png")
+# create the blue circle plot
+blue_pic <- ggplot() + 
+  theme_void() +
+  annotate(geom = "point", x = 0, y = 0, colour = "blue", size = 60)
+# create the orange circle plot
+orange_pic <- ggplot() + 
+  theme_void() +
+  annotate(geom = "point", x = 0, y = 0, colour = "orange", size = 60)
+# save the images to files in the resource folder
+ggsave(filename = blue_image, plot = blue_pic, width = 2, height = 2)
+ggsave(filename = orange_image, plot = orange_pic, width = 2, height = 2)
+# check that it worked
+list.files(resources)
+```
+
+
+## Defining instructions{-}
+
+```{r surex90}
+welcome <- jaysire::trial_html_keyboard_response(
+  stimulus = "Welcome to the experiment! Press any key to begin",
+  data = insert_property(stage = "start")
+)
+finish <- jaysire::trial_html_keyboard_response(
+  stimulus = "Thank you!", 
+  choices = respond_no_key(),
+  trial_duration = 2000,
+  data = jaysire::insert_property(stage = "end")
+)
+page1 <- paste0(
+  "To navigate these instructions, use the arrow keys on your keyboard. ",
+  "The right arrow will move you forward one page, and the left arrow will ",
+  "move you back one page. Press the right arrow key to continue."
+)
+page2 <- paste0(
+  "In this experiment, a circle will appear in the centre of the screen. ",
+  "If the circle is <b>blue</b>, press the letter F on the keyboard as fast ",
+  "as you can. If the circle is <b>orange</b>, press the letter J as fast as",
+  "you can.<br>"
+)
+page3 <- paste0(
+  "If you see this blue circle, you should press F. <br>", 
+  "<img src = '", insert_resource("blue.png"), "' width = 300px>"
+)
+page4 <- paste0(
+  "If you see this orange circle, you should press J. <br>", 
+  "<img src = '", insert_resource("orange.png"), "' width = 300px>"
+)
+page5 <- "When you are ready to begin, press the right arrow key."
+instructions <- trial_instructions(
+  pages = c(page1, page2, page3, page4, page5), 
+  show_clickable_nav = FALSE,
+  allow_keys = TRUE,
+  post_trial_gap = 2000,
+  data = jaysire::insert_property(stage = "instruction")
+)
+```
+
+## Defining the experiment trials{-}
+
+```{r  surex91}
+intervals <- c(250, 500, 750, 1000, 1250, 1500, 1750, 2000)
+fixation <- jaysire::trial_html_keyboard_response(
+  stimulus = '<div style="font-size:60px;">+</div>',
+  choices = jaysire::respond_no_key(),
+  trial_duration = fn_sample(intervals, 1),
+  data = jaysire::insert_property(stage = "fixation")
+)
+test <- jaysire::trial_image_keyboard_response(
+  stimulus = insert_variable("circle"), 
+  stimulus_height = 300,
+  stimulus_width = 300,
+  choices = c("f", "j"),
+  data = jaysire::insert_property(
+    stage = "choice", 
+    colour = insert_variable("colour"),
+    correct_key = insert_variable("correct_key")
+  )
+)
+trials <- jaysire::build_timeline(fixation, test) %>%
+  jaysire::set_variables(
+    circle = jaysire::insert_resource(c("orange.png", "blue.png")),
+    colour = c("orange", "blue"),
+    correct_key = keycode(c("f","j"))
+  ) %>%
+  set_parameters(
+    repetitions = 5,
+    randomize_order = TRUE
+  )
+```
+
+
+## Building the experiment{-}
+
+```{r surex95, eval=FALSE}
+jaysire::build_experiment(
+  timeline = jaysire::build_timeline(welcome, instructions, trials, finish),
+  resources = build_resources(resources),
+  columns = jaysire::insert_property(experiment = "choice_rt"),  
+  path = exp_path,
+  on_finish = jaysire::save_locally()
+)
+```
+
+Working version of the experiment [here](../demos/example08/experiment/index.html).
+
+```{r surex96, eval = F, message=FALSE, warning=FALSE}
+finish <- jaysire::trial_html_keyboard_response(
+  stimulus = "All done! Click <a href='../../../articles/experiment01.html'>here</a> to return to the vignette.",
+  choices = jaysire::respond_no_key()
+)
+# write a working copy of the experiment into the docs folder
+jaysire::build_experiment(
+  timeline = jaysire::build_timeline(welcome, instructions, trials, finish),
+  resources = jaysire::build_resources(resources),
+  columns = jaysire::insert_property(experiment = "choice_rt"),  
+  path =  here::here("docs", "demos", "example08")
+)
+```
+
+## Running the experiment{-}
+
+To run the experiment on the local machine (and save the data to the *data* folder) all we have to do is call the `run_locally` function, specifying the location of the experiment to run:
+
+```{r surex97, eval=F}
+jaysire::run_locally(path = exp_path)
+```
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Creating Surveys, Questionnaires, and Experiments in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/surex.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`surex,
+  author = {Schweinberger, Martin},
+  title = {Topic Modeling with r  surex01},
+  note = {https://slcladal.github.io/surex.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+
+# References{-}
+
+
+
+
+

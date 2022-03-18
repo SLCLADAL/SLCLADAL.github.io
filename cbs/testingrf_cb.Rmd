@@ -1,0 +1,52 @@
+---
+title: "How to test if including a random effect is warranted?"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2: 
+    includes:
+      in_header: GoogleAnalytics.html
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+# Introduction{-}
+
+This approach is proposed by  @galwey2007introduction[213-214] but it has been contested and may not be conceptually sound (see this discussion on [StackOverflow](https://stats.stackexchange.com/questions/56150/how-can-i-test-whether-a-random-effect-is-significant)) and it is not included in the second edition of the book [see @galwey2014introduction].
+
+# Generate data{-}
+
+Create a constant and use it as a random effect, then create two models: one model with the constant as a random effect and  another model with variable as random effect. then use `anova` to compare the models (see below).
+
+```{r}
+set.seed(101)
+dataset <- expand.grid(id = factor(seq_len(10)), 
+                       fac1 = factor(c("A", "B"), levels = c("A", "B")), 
+                       trial = seq_len(10))
+dataset$value <- rnorm(nrow(dataset), sd = 0.5) +
+      with(dataset, rnorm(length(levels(id)), sd = 0.5)[id] +
+      ifelse(fac1 == "B", 1.0, 0)) + rnorm(1,.5)
+dataset$idconst <- factor(rep(1, each = length(dataset$value)))
+# inspect data
+head(dataset)
+```
+
+# Generate and compare models{-}
+
+```{r modeling, warning=F, message=F}
+library(lme4)
+fm0 <- lmer(value~fac1+(1|id), 
+            data = dataset, 
+            REML = FALSE)
+fm1 <- lmer(value~fac1+(1|idconst), 
+            data = dataset, 
+            control=lmerControl(check.nlev.gtr.1="ignore"), 
+            REML = FALSE)
+# compare models
+anova(fm1,fm0)
+```
+
+According to the model comparison, the random effect should be included as  the fm0 model has the lower AIC as well as BIC.
+
+# References{-}
+
