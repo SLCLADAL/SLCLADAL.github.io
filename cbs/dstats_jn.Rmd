@@ -1,0 +1,778 @@
+
+![An interactive LADAL notebook](https://slcladal.github.io/images/uq1.jpg)
+
+***
+
+Please copy this Jupyter notebook so that you are able to edit it.
+
+Simply go to: File > Save a copy in Drive.
+
+Once you have done that, you are good to go.
+
+***
+
+# Descriptive Statistics with R
+
+This tutorial is the interactive Jupyter notebook accompanying the [Language Technology and Data Analysis Laboratory (LADAL) tutorial on descriptive statistics](https://slcladal.github.io/dstats.html). 
+
+This tutorial focuses on how to describe and summarize data  (see e.g. Bickel and Lehmann 2012; Thompson 2009). This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to summarize data using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods for summarizing data. 
+
+
+To show why data summaries are useful, think of the following: you are teaching two different classes in the same school, in the same grade, and at the same level. Both classes take the same exam and, after correcting and grading the exams, someone asks you which class performed better. You could of course say something along the lines of *Well, class A had 5 Bs, 10 Cs, 12 Ds, and 2 Fs while class B had 2 As, 8 Bs, 10 Ds, and 4 Fs* but this answer is not really satisfying. Descriptive statistics enable you to summarize complex data sets in very few words and using only very basic, and easy to understand, concepts. And this is what we will be dealing with in the following. 
+
+Before delving deeper into what descriptive statistics is, it is useful to have a general idea of how it can be contextualized. Thus, on a more general note, we will be dealing only with one particular subbranch of statistics. Statistics in general can be defined as a branch of mathematics that deals with data collection, organization, analysis, interpretation, and presentation. As such, statistics can be subdivided into two main areas. *Descriptive statistics* deals with the description of data and their visualization, while *inferential statistics* deals with data analysis and interpretation. Typically, this means testing assumptions about correlations between variables (see for example [here](https://slcladal.github.io/basicstatzregression.html)). As stated above, here, we will be dealing with the description of data, especially with *measures of central tendency*, *measures of variability* and *confidence intervals*.
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, eval = F, message=FALSE, warning=FALSE, class.source='klippy'}
+# install packages
+# create a local folder for the local files to live in
+# [Creates a folder call "R" in your CloudStor home]
+dir.create('/scratch/R', showWarnings = FALSE)
+# add the local folder to R's
+.libPaths(new='/scratch/R')
+# install packages locally
+install.packages("dplyr", lib="/scratch/R")
+install.packages("ggplot2", lib="/scratch/R")
+install.packages("boot", lib="/scratch/R")
+install.packages("DescTools", lib="/scratch/R")
+install.packages("psych", lib="/scratch/R")
+install.packages("Rmisc", lib="/scratch/R")
+install.packages("ggpubr", , lib="/scratch/R")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# activate packages
+library(boot, lib="/scratch/R")
+library(DescTools, lib="/scratch/R")
+library(dplyr, lib="/scratch/R")
+library(ggplot2, lib="/scratch/R")
+library(psych, lib="/scratch/R")
+library(Rmisc, lib="/scratch/R")
+library(ggpubr, lib="/scratch/R")
+```
+
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+
+## Using your own data
+
+While the tutorial uses data from the LADAL website, you can also use your own data. You can see below what you need to do to upload and use your own data.
+
+The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+
+![Colab Folder Symbol](https://slcladal.github.io/images/ColabFolder.png)
+
+Then on the upload symbol.
+
+![Colab Upload Symbol](https://slcladal.github.io/images/ColabUpload.png)
+
+
+Next, upload the files you want to analyze and then the respective files names in the `file` argument of the `scan` function. When you then execute the code (like to code chunk below, you will upload your own data.
+
+```{r owndata, message=FALSE, warning=FALSE}
+mytext1 <- scan(file = "linguistics01.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+mytext2 <- scan(file = "linguistics02.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+# inspect
+mytext1; mytext2
+```
+
+
+To apply the code and functions below to your own data, you will need to modify the code chunks and replace the data we use here with your own data object. 
+
+# Measures of Centrality
+
+In linguistics three measures of centrality or measures of central tendency are of particular relevance: the *mean*, the *median* and the *mode* (Gaddis and Gaddis 1990). In addition, there are two more measures of central tendency, the geometric and the harmonic mean which we will only briefly discuss as they are not that relevant for language research. What measure is appropriate depends on the type of variable scaling, the distribution of the data, and what is the intended aim of the data summary.
+
+```{r ds01, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
+Means <- c("(Arithmetic) mean (average)", "Median (middle value)", "Mode (most frequent value)", "Geometric mean (average factor)", "Harmonic mean (average rate)")
+Use <- c("Description of normally distributed numeric variables (most common measure of central tendency)", "Description of non-normal numeric variables or ordinal variables (skewed data or influential outliers)", "Description of nominal and categorical variables", "Description of dynamic processes such as growth rates", "Description of dynamic processes such as velocities")
+df <- data.frame(Means, Use)
+# inspect data
+df %>%
+  as.data.frame()
+```
+
+In the following we will go over these types of measures of central tendencies, exemplify their use, describe their strengths and weaknesses, and show how to calculate them in R.
+
+## Mean
+
+The mean is used when the data is numeric and normally distributed. The mean is calculated by applying the formula shown below.
+
+\begin{equation}
+  \bar{x}=\frac{1}{n} \sum_{i=1}^n x_i = \frac{x_{1}+x_{2}+ \dots + x_{n}}{n}
+\end{equation}
+
+To calculate the mean, sum up all values and divide by the number of values. See the example below for clarification. 
+
+
+```{r ds03, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
+df <- data.frame(id = rep(1:4, 2),
+           g = c(rep("x1", 4), rep("x2", 4)),
+           freq = c(2, 8, 4, 6, 5, 5, 5, 5)) %>%
+  dplyr::rename(id = 1, g = 2, freq = 3)
+df %>%
+  ggplot(aes(x = id, y = freq, label = freq, fill = g)) +
+  geom_bar(stat = "identity") +
+  facet_grid(~g) +
+  theme_void() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text.x = element_blank()) +
+  ggtitle("(Arithmetic) Mean") +
+  geom_text(vjust=-1.6, color = "black") +
+  coord_cartesian(ylim = c(0, 9)) +
+  scale_fill_manual(breaks = "g", values = c(x1 = "gray80", x2 = "red"))
+```
+
+
+
+Consider, we are interested in the mean length of sentences in a short text, then the first thing we could do would be to list the sentences and their length in a table.
+
+
+```{r ds04, echo=F, message=FALSE, warning=FALSE}
+Sentences <- c("Call me Ishmael", "Some years ago -- never mind how long precisely -- having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world.", "It is a way I have of driving off the spleen, and regulating the circulation.", "Whenever I find myself growing grim about the mouth; whenever it is a damp, drizzly November in my soul; whenever I find myself involuntarily pausing before coffin warehouses, and bringing up the rear of every funeral I meet; and especially whenever my hypos get such an upper hand of me, that it requires a strong moral principle to prevent me from deliberately stepping into the street, and methodically knocking people's hats off--then, I account it high time to get to sea as soon as I can.")
+Words <- c(3, 40, 15, 87)
+df <- data.frame(Sentences, Words)
+# inspect data
+df %>%
+  as.data.frame()
+```
+
+
+To calculate the mean, we need to divide the sum of the number of words per sentence (145) by the number of sentences (7) (see the equation below).
+
+\begin{equation}
+\frac{3+40+15+87}{4} = \frac{145}{4} = 36.25
+\label{eq:mittel2}
+\end{equation}
+
+The mean sentences length in our example is 36.25 words
+
+In R, the *mean* is calculated as follows.
+
+```{r ds06, message=FALSE, warning=FALSE, class.source='klippy'}
+# create numeric vector
+frequencies <- c(3, 40, 15, 87)
+# calculate mean
+mean(frequencies)
+```
+
+The mean is the most common way to summarize numeric variables and it is very easy and intuitive to understand. A disadvantage of the mean is that it is very strongly affected by outliers which is why the median is the preferable measure of centrality when dealing with data that is not normal or that contains outliers.
+
+
+
+## Median
+
+The median can be used for both numeric and ordinal variables. In contract to the mean, it is more robust and not as easily affected by outliers. While the mean is commonly associated with numeric data that is normally distributed, the median is typically used when dealing with non-normal numeric or ordinal variables, i.e. variables that are ordered but not truly numeric. The median is the central value in a de- or increasing ordering of values in a vector. In other words, 50 percent of values are above and 50 percent of values are below the median in a given vector.
+
+If the vector contains an even number of elements, then the two central values are summed up and divided by 2. If the vector contains an uneven number of elements, the median represents the central value.
+
+\begin{equation}
+median_{x}=
+\begin{cases}
+x_{\frac{n+1}{2}} & n\text{ uneven} \\
+\frac{1}{2}\bigl(x_{\frac{n}{2}}+x_{\frac{n+1}{2}}\bigr) & n\text{ even}
+\end{cases}
+\label{eq:median}
+\end{equation}
+
+
+```{r ds07, echo=F, message=FALSE, warning=FALSE}
+data.frame(id = rep(1:9, 2),
+           g = c(rep("x1", 9), rep("x2", 9)),
+           freq = c(5, 2, 9, 7, 1, 3, 8, 4, 6, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+           clr = c(rep("g", 13), "r", rep("g", 4)))  %>%
+  ggplot(aes(x = id, y = freq, label = freq, fill = clr)) +
+  geom_bar(stat = "identity") +
+  facet_grid(~g) +
+  theme_void() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text.x = element_blank()) +
+  ggtitle("Median") +
+  scale_fill_manual(breaks = "clr", values = c(g = "gray80", r = "red")) +
+  geom_text(vjust=-1.6, color = "black") +
+  coord_cartesian(ylim = c(0, 10))
+```
+
+
+Let's have a look at an example. Consider you are interested in the age stratification of speakers in the private dialogue section of the Irish component of the *International Corpus of English* (ICE). When tabulating and plotting the age variable you get the following table and graph.
+
+
+```{r ds08, echo=F, message=FALSE, warning=FALSE}
+Age <- c("0-18", "19-25", "26-33", "34-41", "42-49", "50+")
+Counts <- c(9, 160, 70, 15, 9, 57)
+df <- data.frame(Age, Counts)
+# inspect data
+df  %>%
+  as.data.frame() 
+```
+
+
+```{r ds09, echo=F, message=FALSE, warning=FALSE}
+Age <- c("0-18", "19-25", "26-33", "34-41", "42-49", "50+")
+Counts <- c(9, 160, 70, 15, 9, 57)
+data.frame(Age, Counts) %>%
+  ggplot(aes(Age, Counts, label = Counts)) +
+  geom_bar(stat = "identity") +
+  geom_text(vjust=-1.6, color = "black") +
+  coord_cartesian(ylim = c(0, 200)) +
+  theme_bw() +
+  labs(x = "", y = "Frequency") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
+The age groups represent an order factor which means that there are categories with a natural order (here from old to young or vice versa). If we order speakers according to their age from young to old, we get a vector of length 320. If we then take the central value, i.e. the value of the 160^th^ speaker, we get the median age in the private dialogue section of the Irish component of the *International Corpus of English* (ICE). 
+
+In R, the *median* is calculated as shown below.
+
+```{r ds11, message=FALSE, warning=FALSE}
+# create a vector consisting out of ranks
+ranks <- c(rep(1, 9), rep(2, 160), rep(3, 70), rep(4, 15), rep(5, 9), rep(6, 57))
+# calculate median
+median(ranks)
+```
+In our case, the median age is *19-25* because the 160^th^ speaker belongs to the 2^nd^ age group, i.e. the age group with speakers between 19 and 25 years old.  
+
+
+## Mode
+
+The mode is typically used when dealing with categorical variables and it reports which level of a factor or a categorical variable is the most frequent. 
+
+
+```{r ds13, echo=F, message=FALSE, warning=FALSE}
+data.frame(id = rep(1:9, 2),
+           g = c(rep("x1", 9), rep("x2", 9)),
+           freq = c(5, 2, 9, 7, 1, 3, 8, 4, 6, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+           clr = c(rep("g", 17), "r"))  %>%
+  ggplot(aes(x = id, y = freq, label = freq, fill = clr)) +
+  geom_bar(stat = "identity") +
+  facet_grid(~g) +
+  theme_void() +
+  theme(legend.position = "none",
+        strip.background = element_blank(),
+        strip.text.x = element_blank()) +
+  ggtitle("Mode") +
+  scale_fill_manual(breaks = "clr", values = c(g = "gray80", r = "red")) +
+  geom_text(vjust=-1.6, color = "black") +
+  coord_cartesian(ylim = c(0, 10))
+```
+
+Here is an example to illustrate the mode. Consider you are interested where most speakers in the private dialogue section of the Irish component of the *International Corpus of English* are currently residing and you get the following distribution.
+
+```{r ds14, echo=F, message=FALSE, warning=FALSE}
+CurrentResidence <- c("Belfast", "Down", "Dublin (city)", "Limerick", "Tipperary")
+Speakers <- c(98, 20, 110, 13, 19)
+df <- data.frame(CurrentResidence, Speakers) 
+df  %>%
+  as.data.frame()
+```
+
+
+```{r ds15, echo=F, message=FALSE, warning=FALSE}
+df %>%
+  ggplot(aes(CurrentResidence, Speakers, label = Speakers)) +
+  geom_bar(stat = "identity") +
+  geom_text(vjust=-1.6, color = "black") +
+  coord_cartesian(ylim = c(0, 200)) +
+  theme_bw() +
+  labs(x = "", y = "Frequency") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+The tabulated and visualized data show that the mode is *Dublin (City)*, because the largest group (110 speakers) of speakers in the corpus are speakers from the city of Dublin. This means that the *average* speaker in in the private dialogue section of the Irish component of the *International Corpus of English* (ICE) is from Dublin city.
+
+In R the *mode* is calculated as shown below:
+
+```{r ds16, message=FALSE, warning=FALSE}
+# create a factor with the current residence of speakers
+CurrentResidence <- c(rep("Belfast", 98),         # repeat "Belfast" 98 times
+                      rep("Down", 20),            # repeat "Down" 20 times
+                      rep("Dublin (city)", 110),  # repeat "Dublin (city)" 110 times
+                      rep("Limerick", 13),        # repeat "Limerick" 13 times
+                      rep("Tipperary", 19))       # repeat "Tipperary" 19 times
+# calculate mode
+names(which.max(table(CurrentResidence)))         # extract which level occurs most frequently
+```
+
+A word of warning is in order here as only the first(!) maximal value is provided by R even if several categories have the same frequency. 
+
+## Geometric mean
+
+The geometric mean represents a measure of central tendency that is used when dealing with dynamic processes where the later elements are dependent on the previous elements. The geometric mean is calculated according to the equation below.
+
+\begin{equation}
+\bar{x}_{geometric} = \sqrt[n]{x_1 \times x_{i+1} \times \dots \times x_n}
+\end{equation}
+
+Imagine you have the option to buy two different stock packages and you have to buy one of them. Which one would you buy?
+
+```{r ds17, echo=F, message=FALSE, warning=FALSE}
+Year <- c("Year 1", "Year 2", "Year 3", "Year 4")
+Package1 <- c("+5%", "-5%", "+5%", "-5%")
+Package2 <- c("+20%", "-20%", "+20%", "-20%")
+df <- data.frame(Year, Package1, Package2)
+df %>%
+  as.data.frame()
+```
+
+
+
+Is one package better than the other? Did one package perform better than the other?
+
+
+* Package 1:
+    + Return: $1.05 \times .95 \times 1.05 \times .95  = .995$ (0.5% loss)
+    + Year-over-year average: $.995^{1/4}$ = ~0.125% loss per year
+* Package 2:
+    + Return: $1.2 \times .8 \times 1.2 \times .8 = 0.9216$ (7.84% loss)
+    + Year-over-year average: $.9216^{1/4}$ = ~2% loss per year.
+
+Package 2 performs substantially worse because here, the changes in growth depend on the previous growth rates.
+
+## Harmonic mean
+
+The harmonic mean is a measure of central tendency that provides us with the average rate and is used when dealing with dynamic processes that involve velocities and distances. The harmonic mean is calculated according to the equation below.
+
+\begin{equation}
+\bar{x}_{harmonic} = 
+\frac{n}{\frac{1}{x_i} + \frac{1}{x_{i+1}} + \frac{1}{x_{i+\dots}} + \frac{1}{x_n}}
+\end{equation}
+
+Let's use an example to see what the harmonic mean describes. Imagine you assign group projects to students and you are interested in the average time it takes them to finalize the projects. The crucial thing is that the end state is the same: the finished project.
+
+Let us say there are two groups, group A and group B. It takes group A 30 hours and group B 60 hours to finish their project. What is the average rate at which these two groups have finished their projects? If we used the arithmetic mean, we would say it takes them on average 45 hours to finish their projects but this is not appropriate in the present case.
+
+\begin{equation}
+\bar{x}_{harmonic} = 
+\frac{2}{\frac{1}{30} + \frac{1}{60}} = \frac{2}{\frac{2}{60} + \frac{1}{60}} = \frac{2}{\frac{3}{60}} = \frac{2}{1} \times \frac{60}{3} = \frac{120}{3} = 40
+\end{equation}
+
+The harmonic mean is used when two rates contribute to the same workload (for instance when we download a file). Each installment is in a relay race and contributes the same amount to the issue. For example, we make a round trip to work and back. The way to work is 60 kilometers. On the way to work, we can only travel at 30 kph while we can go 60 kph on the way back. The distance is the same. Half of the results (distance traveled) comes from the first rate (30 kilometers per hour) and the other half from the second rate (60 kilometers per hour). The result is that is takes us 3 hours to get to work and back.
+
+The reason why using the arithmetic mean is inappropriate in such cases is the following: The idea behind the arithmetic mean is that we calculate a single value that can replace all values in a given distribution and the sum of the mean values is identical to the sum of the observed values. So, the average is a single element that replaces each element. In our example, we have to drive at 40 kilometers per hour (instead of 30) to work and 40 kilometers per hour (instead of 60) to get back from work in the same amount of time. If we went with 45 kilometers per hour, then the result would not be 3 hours but 2 hours and 40 minutes so that the result would not be the same.
+
+## Notes on Measures of Centrality
+
+As suggested above, the mean is strongly affected by outliers (which is why in sch cases, the median is the more appropriate measure fo central tendency). To illustrate this, imagine you are interested whether the use of discourse particles differs across two corpora. The two corpora represent the speech of the same five speakers but in different situations and the speech thus represents different registers. In a first step, you calculate the relative frequency of discourse particle use and both corpora have a mean of 13.4 particles per 1,000 words. Given the mean, the two corpora do not seem to differ. However, when tabulating and plotting the use of particles by speaker and across these two corpora, it becomes immediately clear that the mean is not the appropriate measure of  central tendency as the distributions are very dissimilar.  
+
+
+```{r ds18, echo=F, message=FALSE, warning=FALSE}
+# create data
+Corpus <- c(rep("C1", 5), 
+            rep("C2", 5))
+Speaker <- rep(c("A", "B", "C", "D", "E"), 2)  
+Frequency <- c(11.4, 5.2, 27.1, 9.6, 13.7, 0.2, 0.0, 1.1, 65.3, 0.4)  
+particletable <- data.frame(Corpus, Speaker, Frequency)
+# show data
+particletable %>%
+  as.data.frame() 
+```
+
+
+```{r ds20a, echo=F, message=FALSE, warning=FALSE}
+pdat1 <- particletable %>%
+  dplyr::group_by(Corpus) %>%
+  dplyr::mutate(Median = median(Frequency),
+                Mean = mean(Frequency))
+pdat1 %>%
+  ggplot(aes(x = Speaker, y = Frequency, label = Frequency, fill = Corpus)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  theme_bw() +
+  labs(title = "Use of discourse particles across two corpora.", y = "Relative Frequency") +
+  scale_fill_manual(breaks = Corpus, values = c(C1 = "gray80", C2 = "red")) +
+  geom_text(aes(y = -5, label = Frequency), position = position_dodge(0.9)) +
+  coord_cartesian(ylim = c(-10, 80)) +
+  theme(legend.position = "top")
+```
+
+
+```{r ds20b, echo=F, eval = F, message=FALSE, warning=FALSE}
+pdat1 %>%
+  ggplot(aes(x = Speaker, y = Frequency, label = Frequency, fill = Corpus)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  theme_bw() +
+  geom_hline(aes(yintercept = Mean), col = "black", linetype = 2, size = 1) +
+  geom_text(aes(.75, Mean, label = paste0("Mean = ", Mean), vjust = -1)) +
+  geom_hline(data = pdat1 %>% filter(Corpus == "C1"),
+             aes(yintercept = Median), col = "darkgray", linetype = 3, size = 1) +
+  geom_hline(data = pdat1 %>% filter(Corpus == "C2"),
+             aes(yintercept = Median), col = "red", linetype = 3, size = 1) +
+  geom_text(aes(.75, Mean, label = paste0("Mean = ", Mean), vjust = -1)) +
+  geom_text(data = pdat1 %>% filter(Corpus == "C1"),
+             aes(5, Median, label = paste0("Median C1 = ", Median)), vjust = 1) +
+  geom_text(data = pdat1 %>% filter(Corpus == "C2"),
+             aes(5, Median, label = paste0("Median C2 = ", Median)), vjust = 0) +
+  labs(title = "Use of discourse particles across two corpora.", y = "Relative Frequency") +
+  scale_fill_manual(breaks = Corpus, values = c(C1 = "gray80", C2 = "red")) +
+  geom_text(aes(y = -5, label = Frequency), position = position_dodge(0.9)) +
+  coord_cartesian(ylim = c(-10, 80)) +
+  theme(legend.position = "top")
+```
+
+
+The Figure above shows that the use of discourse particles is distributed rather evenly across speakers in Corpus 1 while the distribution is very uneven in corpus 2. In corpus 2, 4 out of 5 speakers use almost no discourse particles and only one speaker, speaker D, makes excessive use of discourse particles in corpus 2. The high usage frequency of discourse particles by speaker D in corpus 2 causes the mean of corpus 2 to be identical to the mean reported for corpus 1 although the distribution of usage rates differs drastically. This means that reporting the median in addition to the mean can be useful if the distribution of values is very uneven (or non-normal or skewed).
+
+To exemplify, we will summarize the distribution of discourse particles in the two corpora: the use of discourse particles in corpus 1 (mean = 13.4, median = 11.4) is substantially different from the use of discourse particles in corpus 2 (mean = 13.4, median = 0.4).
+
+
+# Measures of Variability
+
+Measures of variability provide information about the distribution of values such as whether the data are distributed evenly and do not differ substantially or whether the data are rather heterogeneous and are distributed very unevenly (Thompson 2009). In the following, we will have a look at the *variance* and the *standard deviation*. 
+
+As before, we will use a practical example to see the usefulness of applying measures of variability. Imagine you dealing with two cities, let's say Moscow and Hamburg, that have the same mean temperature per year. However, the variability of temperatures varies differs dramatically between the Moscow and Hamburg.
+
+```{r ds21, echo=F, message=FALSE, warning=FALSE}
+Month <- c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Mean")
+Moscow <- c(-5, -12, 5, 12, 15, 18, 22, 23, 20, 16, 8, 1, 10.25)  
+Hamburg <- c(7, 7, 8, 9, 10, 13, 15, 15, 13, 11, 8, 7, 10.25)  
+temprature <- data.frame(Month, Moscow, Hamburg)
+# show data
+temprature %>%
+  as.data.frame() 
+```
+
+```{r ds22, echo=F, message=FALSE, warning=FALSE}
+Temperature <- c(-5, -12, 5, 12, 15, 18, 22, 23,  20, 16, 8, 1,
+                 7, 7,  8,  9, 10, 13, 15, 15,  13, 11,  8, 7)
+Month <- rep(c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"), 2)
+City = c(rep("Moscow", 12), rep("Hamburg", 12))
+# combine data in data frame
+lineplotdata <- data.frame(City, Month, Temperature) %>%
+  dplyr::mutate(Month = factor(Month, levels = c("January", "February", "March", 
+                                                 "April", "May", "June", "July", "August", 
+                                                 "September", "October", "November", "December")))
+lineplotdata %>%
+  ggplot(aes(x = Month, y = Temperature, group = City, color = City,  linetype = City)) +
+  geom_line(size = 1) +
+  theme_bw() +
+  theme(legend.position = "top", 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "") +
+  scale_color_manual(name = "City",
+                     labels = c("Moscow", "Hamburg"), 
+                     breaks = c("Moscow", "Hamburg"), 
+                     values = c("gray80", "red"))  +
+  scale_linetype_manual(name = "City",
+                     labels = c("Moscow", "Hamburg"), 
+                     breaks = c("Moscow", "Hamburg"), 
+                     values = c("dashed", "solid"))
+```
+
+
+In the following, we will discuss and calculate different measures of variability for the two cities.
+
+## Range
+
+The range is the simplest measure of variability and reports the lowest and highest value of a distribution. That is, the range provides minimum and maximum of a vector to show the span of values within a distribution.
+
+In R, the *range* is extracted as shown below.
+
+```{r ds24, message=FALSE, warning=FALSE}
+# create a numeric vector
+Moscow <- c(-5, -12, 5, 12, 15, 18, 22, 23, 20, 16, 8, 1)
+min(Moscow); max(Moscow) # extract range
+```
+
+The lowest temperature value for Moscow is -12 degrees Celsius and the highest value is 23 degrees Celsius. The range thus spans from -12 to 23. 
+
+## Interquartile range (IQR)
+
+The interquartile range (IQR) denotes the range that encompasses the central 50 percent of data points and thus  informs about how values are distributed. This means that the IQR spans from the first quartile that encompasses 25 percent of the data to the third quartile that encompasses 75 percent of the data. 
+
+The easiest way to extract the IQR in R is to apply the `summary` function to a vector as shown below and then subtract the value of the  1^st^ quartile from the value of the 3^rd^ quartile.
+
+```{r ds25, message=FALSE, warning=FALSE}
+summary(Moscow) # extract IQR
+```
+
+The `summary` function reports that the minimum temperature is -12 degrees Celsius and that the maximum temperature is 23 degrees Celsius. Also, the lower 25 percent of the data fall within -12 and 4 degrees Celsius (from the minimum value to the 1^st^ quartile) and the upper 25 percent fall within 18.5 and 23 degrees Celsius (from the 3^rd^ quartile to the maximum value). The IQR range represents a range that encompasses the central 50% of the data and thus represents the value that can be calculated by subtracting the value of the 1^st^ from the value of the 3^rd^ quartile..
+
+Thus, the IQR is 18.5 - 4 = 14.5 
+
+.
+
+## Variance
+
+The variance is calculated according to the formula below. To calculate the variance, each value is subtracted from the mean and the result is squared. The squared values are then added and the resulting sum is divided by the number of values minus 1.
+
+
+$s = \sigma^2 = \frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^{2}$
+
+
+For our example, the variance of temperatures for Moscow is 123.6591 and 9.477273 for Hamburg.
+
+In R, the *variance* is calculated as shown below.
+
+```{r ds26, message=FALSE, warning=FALSE}
+sd(Moscow)^2
+```
+
+
+## Standard deviation
+
+The standard deviation (abbreviated with capital $sigma$ $\sigma$) is calculated according to first equation shown below or, alternatively, according to second equation shown below and it is the square root of the squared variance.
+
+$\sigma = \sqrt{s} = \sqrt{\frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2}$
+
+$\sigma = \sqrt{\frac{ \sum_{i=1}^{n} (x_i - \bar{x})^2}{n-1}}$
+
+For our example, the first equation shown above provides a standard deviation of 11.12 for Moscow and a standard deviation of 3.08 for Hamburg.
+
+In R, the *standard deviation* is calculated as shown below.
+
+```{r ds28, message=FALSE, warning=FALSE}
+# calculate standard deviation
+sd(Moscow) 
+```
+
+The standard deviation of temperature values of Moscow is 11.12.
+
+
+## Standard Error
+
+The standard error is a measure of variability and it reports the average distance from some parameters (most often from the mean). It is calculated as the standard deviation of the residuals of the parameter in question. To exemplify the standard error, we will have a look at reaction times which show how fast participants realized that a sequence of letters were either existing words or just a sequence of letters. 
+
+```{r ds30, echo = F, message=FALSE, warning=FALSE}
+set.seed(12345)
+RT = c(rnorm(5, 400, 50), rnorm(5, 380, 50), rnorm(5, 450, 50), rnorm(5, 480, 50))
+State = c(rep("Sober", 10), rep("Drunk", 10))
+Gender = rep(c(rep("Male", 5), rep("Female", 5)), 2)
+rts <- data.frame(RT, State, Gender) %>%
+  dplyr::mutate(RT = round(RT, 3))
+# show data
+rts %>%
+  as.data.frame() %>%
+  head(20)
+```
+
+The standard error of the mean is calculated using the equation below.
+
+\begin{equation}
+\sigma~{\bar{x}}~ =\frac{\sigma}{\sqrt{n}} 
+\end{equation}
+
+The standard error can be calculated manually (see below) by implementing the equation from above.
+
+```{r ds31, message=FALSE, warning=FALSE}
+sd(rts$RT, na.rm=TRUE) /  
+   sqrt(length(rts$RT[!is.na(rts$RT)]))  
+```
+
+An easier way to extract standard errors is to use the `describe` function from the `psych` package (see below)
+
+```{r ds32, message=FALSE, warning=FALSE}
+# describe data
+psych::describe(rts$RT, type=2)
+```
+
+# Confidence Intervals
+
+Confidence intervals provide an estimation of in-between which values the reported value would lie in the population with a confidence of, e.g., 95 percent. 
+
+\begin{equation}
+  \bar{x} \mp z \frac{s}{\sqrt{n}}
+\end{equation}
+
+The z-value for 95% probability (a two-tailed) of a normal distribution is 1.96. To check this, we can use the `qnorm` function and extract the z-value for a probability of .975 - we do not use .95 because we want 2.5% of the lower tail (-1.96) and 2.5% of the higher tail (1.96). 
+
+```{r zci, message=FALSE, warning=FALSE}
+qnorm(0.975)   
+```
+This means that for a 95% confidence interval for normally distributed data, we can use the formula shown below.
+
+\begin{equation}
+  \bar{x} \mp 1.96 \frac{s}{\sqrt{n}}
+\end{equation}
+
+If we have a vector of values (e.g., 4,5,2,3,1,4,3,6,3,2,4,1), we can easily calculate the confidence intervals for the mean as follows.
+
+```{r cim1, message=FALSE, warning=FALSE}
+# calculate mean
+m <- mean(c(4,5,2,3,1,4,3,6,3,2,4,1))
+# calculate standard deviation
+s <- sd(c(4,5,2,3,1,4,3,6,3,2,4,1))
+# calculate n
+n <- length(c(4,5,2,3,1,4,3,6,3,2,4,1))
+# calculate lower and upper ci
+lower <- m-1.96*(s/sqrt(n))
+upper <- m+1.96*(s/sqrt(n))
+# show lower ci, mean, and upper ci
+lower; m; upper
+```
+
+
+There are several functions in R to extract confidence intervals. To show how you can do this for different types of elements, we will continue to work with the reaction times data.
+
+
+
+## Confidence Intervals for Simple Vectors
+
+Confidence intervals (CIs) give a range that’s likely to include a population value with a certain degree of confidence. As such, CIs tell us how likely it is to get a value within a certain range if we drew another sample from the same population. 
+
+One easy method for extracting confidence intervals is to apply the `CI` function from the `Rmisc` package.
+
+```{r ds36, message=FALSE, warning=FALSE}
+# extract mean and confidence intervals
+Rmisc::CI(rts$RT, ci=0.95)   
+``` 
+
+
+```{r ds34b, echo = F,  message=FALSE, warning=FALSE}
+# extract mean and confidence intervals
+tt <- Rmisc::CI(rts$RT, ci=0.95)  
+```
+
+
+The ´CI´ function provides the mean reaction time (`r tt[2]`) and the 95 percent confidence band. With 95 percent confidence, the mean reaction time will have a mean between `r round(tt[3], 2)`  and `r round(tt[1], 2)` miliseconds (ms).
+
+Another way to extract the mean and its confidence intervals is by using  `t.test` function.  
+
+```{r ds34,  message=FALSE, warning=FALSE}
+# extract mean and confidence intervals
+stats::t.test(rts$RT, conf.level=0.95)  
+```
+
+
+Another alternative to extract the man ans the confidence interval from a range of values is to use the `MeanCI` function from the `DescTools` package.
+
+```{r ds37, message=FALSE, warning=FALSE}
+# extract mean and confidence intervals
+DescTools::MeanCI(rts$RT, conf.level=0.95)   
+``` 
+
+A very interesting alternative to extract the mean and the confidence intervals from a range of values is to apply the `MeanCI` function from the `DescTools` package. This method is particularly interesting because it uses bootstrapping or resampling the data. As such, it is an empirical method to extract the mean and the confidence intervals. The values will differ given how many samples are drawn and we can get very precise estimates using this method.
+
+
+```{r ds38, message=FALSE, warning=FALSE}
+# extract mean CIs
+DescTools::MeanCI(rts$RT, method="boot", type="norm", R=1000)
+``` 
+
+Because this is a data-driven approach, the results will vary, depending on the characteristics of the resampled data. To illustrate, compare the values provided above to the values generated below.
+
+```{r ds40,  message=FALSE, warning=FALSE}
+# extract mean CIs
+DescTools::MeanCI(rts$RT, method="boot", type="norm", R=1000)
+```
+
+Another method for extracting the mean and the confidence intervals from a range of values using bootstrapping is to use the `boot` function from the `boot` package.
+
+```{r ds42, message=FALSE, warning=FALSE}
+# function to extract values
+BootFunction = function(x, index) {                        
+                  return(c(mean(x[index]),
+                           var(x[index]) / length(index)))
+}
+# apply function to data
+Bootstrapped = boot(data=rts$RT,     
+                    statistic=BootFunction,
+                    R=1000)
+# extract values
+mean(Bootstrapped$t[,1])                                   
+# alternative to extract values
+boot.ci(Bootstrapped, conf=0.95)                           
+```  
+
+
+The advantage of using bootstrapping methods lies in the fact that the data is (frequently) not distributed normally which is not an issue for the bootstrapping and it will thus provide more reliable results as it does not rely on distributional assumptions about the data. 
+
+## Confidence Intervals for Grouped Data
+
+To extract the confidence intervals for grouped data, we can sue the `summarySE` function from the `Rmisc` package.
+
+```{r ds41,  message=FALSE, warning=FALSE}
+# apply summarySE function to data
+Rmisc::summarySE(data=rts,   
+                 # define variable representing frequencies
+                 measurevar="RT", 
+                 # define grouping variabel
+                 groupvars="Gender",
+                 # extract standard deviation, standard error, and confidence intervals
+                 conf.interval = 0.95)   
+```  
+
+
+## Confidence Intervals for Nominal Data
+
+We now turn to confidence intervals for nominal data (see also Thomas and Grunkemeier 1975). When dealing with nominal data, confidence intervals can be determined with the `binom.test` function in the in-built `stats` package. Alternative methods are available via the `BinomCI` and `MultinomCI` functions from the `DescTools` package.  More advanced techniques for confidence intervals on nominal data are available via the `PropCIs` package.
+
+```{r ds44, message=FALSE, warning=FALSE}
+stats::binom.test(2, 20, 0.5,              # binom.test(x, n, p = 0.5, ...)
+                  alternative="two.sided", # define sidedness
+                  conf.level=0.95)         # define confidence level
+```  
+
+Another way to use the `BinomCI` function is shown below.
+ 
+```{r ds48,  message=FALSE, warning=FALSE}
+# extract CIs                  
+BinomCI(2, 20,                        # apply BinomCI function
+        conf.level = 0.95,            # define ci
+        method = "modified wilson")   # define method for ci extraction
+```  
+
+## Confidence Intervals for Multinomial Data
+
+We use the `MultinomCI` function to extract the confidence intervals form multinominal data.
+
+```{r ds50, message=FALSE, warning=FALSE}
+observed = c(35,74,22,69)       # define multinominal vector
+MultinomCI(observed,            # apply MultinomCI function
+           conf.level=0.95,     # define ci
+           method="goodman")    # define method for ci extraction
+```  
+
+# Citation & Session Info 
+
+Schweinberger, Martin. 2022. *Descriptive Statistics with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/dstats.html .
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+
+
+[Take me back to the LADAL start page!](https://slcladal.github.io/index.html)
+
+
+
+
+# References
+
+
+
+Bickel, Peter J., and Erich L. Lehmann. 2012. Descriptive Statistics for Nonparametric Models. IV. Spread. In Erich Leo Lehmann and Javier Rojo (eds.), *Selected Works of E. L. Lehmann*, 519–526. Springer.
+
+Gaddis, Gary M., and Monica L. Gaddis. 1990. Introduction to Biostatistics: Part 2, Descriptive Statistics. *Annals of Emergency Medicine* 19(3): 309–15.
+
+Thomas, David R., and Gary L. Grunkemeier. 1975. Confidence Interval Estimation of Survival Probabilities for Censored Data. *Journal of the American Statistical Association* 70(352): 865–71.
+
+Thompson, Cheryl Bagley. 2009. Descriptive Data Analysis. *Air Medical Journal* 28(2): 56–59.
+
