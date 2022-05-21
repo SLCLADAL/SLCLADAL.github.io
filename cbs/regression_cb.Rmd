@@ -10,17 +10,6 @@ bibliography: bibliography.bib
 link-citations: yes
 ---
 
-<!--html_preserve-->
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'UA-130562131-1');
-</script>
-<!--/html_preserve-->
 
 ```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
@@ -28,7 +17,7 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces regression analyses (also called regression modeling) using R. Regression models are among the most widely used quantitative methods in the language sciences to assess if and how predictors (variables or interactions between variables) correlate with a certain response. 
+This tutorial introduces regression analyses (also called regression modeling) using R.^[I'm extremely grateful to Stefan Thomas Gries who provided very helpful feedback and pointed out many errors in previous versions of this tutorial. All remaining errors are, of course, my own.] Regression models are among the most widely used quantitative methods in the language sciences to assess if and how predictors (variables or interactions between variables) correlate with a certain response. 
 
 ```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
 knitr::include_graphics("https://slcladal.github.io/images/yr_chili.jpg")
@@ -95,20 +84,18 @@ f_{(x)} = \alpha + \beta_{i}x + \epsilon
 To understand what this means, let us imagine that we have collected information about the how tall people are and what they weigh. Now we want to predict the weight of people of a certain height - let's say 180cm.
 
 ```{r intro00a, echo=F, eval = F, message=FALSE, warning=FALSE}
-install.packages("tidyverse")
+install.packages("dplyr")
 install.packages("flextable")
 install.packages("ggpubr")
 install.packages("vip")
-install.packages("kableExtra")
 ```
 
 
 ```{r intro00, echo=F, message=FALSE, warning=FALSE}
-library(tidyverse)
+library(dplyr)
 library(flextable)
 library(ggpubr)
 library(vip)
-library(report)
 Height <- c(173, 169, 176, 166, 161, 164, 160, 158, 180, 187)
 Weight <- c(80, 68, 72, 75, 70, 65, 62, 60, 85, 92) 
 df <- data.frame(Height, Weight)
@@ -163,6 +150,8 @@ p4 <- p3 +
 ggpubr::ggarrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
 ```
 
+Some words about the plots in the figure above: the upper left panel shows the raw observed data (black dots). The upper right panel shows the mean weight (blue line) and the residuals (in red). residuals are the distances from the expected or predicted values to the observed values (in this case the mean is the most most basic model which we use to predict values while the observed values simply represent the actual data points). The lower left panel shows observed values and the regression line, i.e, that line which, when drawn through the data points, will have the lowest sum of residuals. The lower right panel shows the regression line and the residuals, i.e. the distances between the expected or predicted values to the actual observed values (in red). Note that the sum of residuals in the lower right panel is much smaller than the sum of residuals in the upper right panel. This suggest that considering Height is a good idea as it explains a substantive amount of residual error and reduces the sum of residuals (or variance).^[I'm very grateful to Antonio Dello Iacono who pointed out that the plots require additional discussion.]
+
 Now that we are familiar with the basic principle of regression modeling - i.e. finding the line through data that has the smallest sum of residuals, we will apply this to a linguistic example.
 
 **Preparation and session set up**
@@ -170,43 +159,30 @@ Now that we are familiar with the basic principle of regression modeling - i.e. 
 This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 
 ```{r prep0, echo=T, eval = F, warning=F, message=F}
-# install packages
-install.packages("boot")
+# install
 install.packages("Boruta")
 install.packages("car")
-install.packages("caret")
-install.packages("effects")
 install.packages("emmeans")
+install.packages("effects")
 install.packages("flextable")
-install.packages("foreign")
-install.packages("ggfortify")
+install.packages("ggplot2")
 install.packages("ggpubr")
-install.packages("here")
 install.packages("Hmisc")
 install.packages("knitr")
 install.packages("lme4")
 install.packages("MASS")
 install.packages("mclogit")
-install.packages("mlogit")
-install.packages("msm")
 install.packages("MuMIn")
 install.packages("nlme")
 install.packages("ordinal")
-install.packages("performance")
-# install.packages("QuantPsyc")
-install.packages("readxl")
-install.packages("remotes")
-install.packages("report")
-install.packages("reshape2")
 install.packages("rms")
 install.packages("robustbase")
-install.packages("sandwich")
 install.packages("sjPlot")
+install.packages("stringr")
 install.packages("tibble")
-install.packages("tidyverse")
+install.packages("dplyr")
 install.packages("vcd")
 install.packages("vip")
-install.packages("visreg")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -216,45 +192,32 @@ Now that we have installed the packages, we activate them as shown below.
 
 ```{r prep1, echo=T, eval=T, warning=F, message=F}
 # set options
-options(stringsAsFactors = F)         # no automatic data transformation
+options(stringsAsFactors = F)          # no automatic data transformation
 options("scipen" = 100, "digits" = 12) # suppress math annotation
 # load packages
-library(boot)
 library(Boruta)
 library(car)
-library(caret)
 library(effects)
 library(emmeans)
 library(flextable)
-library(foreign)
 library(ggfortify)
+library(ggplot2)
 library(ggpubr)
-library(here)
 library(Hmisc)
 library(knitr)
 library(lme4)
 library(MASS)
 library(mclogit)
-library(mlogit)
-library(msm)
 library(MuMIn)
 library(nlme)
 library(ordinal)
-library(performance)
-# library(QuantPsyc)
-library(readxl)
-library(remotes)
-library(report)
-library(reshape2)
 library(rms)
 library(robustbase)
-library(sandwich)
 library(sjPlot)
+library(stringr)
 library(tibble)
-library(tidyverse)
 library(vcd)
 library(vip)
-library(visreg)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -269,9 +232,9 @@ Before turning to mixed-effects models which are able to represent hierarchical 
 
 ## Simple Linear Regression{-}
  
-This section focuses on a very widely used statistical method which is called regression. Regressions are used when we try to understand how independent variables correlate with a dependent or outcome variable. So, if you want to investigate how a certain factor affects an outcome, then a regression is the way to go. We will have a look at two simple examples to understand what the concepts underlying a regression mean and how a regression works. The R-code, that we will use, is adapted from @field2012discovering  - which is highly recommended for understanding regression analyses! In addition to @field2012discovering, there are various introductions which also focus on regression (among other types of analyses), for example, @gries2021statistics,  @winter2019statistics, @levshina2015linguistics, or @wilcox2009basic. @baayen2008analyzing is also very good but probably not the first book one should read about statistics.
+This section focuses on a very widely used statistical method which is called regression. Regressions are used when we try to understand how independent variables correlate with a dependent or outcome variable. So, if you want to investigate how a certain factor affects an outcome, then a regression is the way to go. We will have a look at two simple examples to understand what the concepts underlying a regression mean and how a regression works. The R code, that we will use, is adapted from many highly recommendable introductions which also focus on regression (among other types of analyses), for example, @gries2021statistics,  @winter2019statistics, @levshina2015linguistics, @winter2019statistics or @wilcox2009basic. @baayen2008analyzing is also very good but probably not the first book one should read about statistics but it is highly recommendable for advanced learners.
 
-Although the basic logic underlying regressions is identical to the conceptual underpinnings of *analysis of variance* (ANOVA), a related method, sociolinguistists have traditionally favored regression analysis in their studies while ANOVAs have been the method of choice in psycholinguistics. The preference for either method is grounded in historical happenstances and the culture of these subdisciplines rather than in methodological reasoning. However, ANOVA are more restricted in that they can only take numeric dependent variables and they have stricter model assumptions that are violated more readily. In addition, a minor difference between regressions and ANOVA lies in the fact that regressions are based on the $t$-distribution while ANOVAs use the F-distribution (however, the F-value is simply the value of t squared or t^2^). Both t- and F-values report on the ratio between explained and unexplained variance.
+Although the basic logic underlying regressions is identical to the conceptual underpinnings of *analysis of variance* (ANOVA), a related method, sociolinguists have traditionally favored regression analysis in their studies while ANOVAs have been the method of choice in psycholinguistics. The preference for either method is grounded in historical happenstances and the culture of these subdisciplines rather than in methodological reasoning. However, ANOVA are more restricted in that they can only take numeric dependent variables and they have stricter model assumptions that are violated more readily. In addition, a minor difference between regressions and ANOVA lies in the fact that regressions are based on the $t$-distribution while ANOVAs use the F-distribution (however, the F-value is simply the value of t squared or t^2^). Both t- and F-values report on the ratio between explained and unexplained variance.
 
 The idea behind regression analysis is expressed formally in the equation below where$f_{(x)}$ is the y-value we want to predict, $\alpha$ is the intercept (the point where the regression line crosses the y-axis at x = 0), $\beta$ is the coefficient (the slope of the regression line). 
 
@@ -475,7 +438,7 @@ ggpubr::ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
 ```
 
 
-The left graph shows the residuals of the model (i.e., the differences between the observed and the values predicted by the regression model). The problem with this plot is that the residuals are not standardized and so they cannot be compared to the residuals of other models. To remedy this deficiency, residuals are normalized by dividing the residuals by their standard deviation. Then, the normalized residuals can be plotted against the observed values (centre panel). In this way, not only are standardized residuals obtained, but the values of the residuals are transformed into z-values, and one can use the z-distribution to find problematic data points. There are three rules of thumb regarding finding problematic data points through standardized residuals [@field2012discovering 268-269]:
+The left graph shows the residuals of the model (i.e., the differences between the observed and the values predicted by the regression model). The problem with this plot is that the residuals are not standardized and so they cannot be compared to the residuals of other models. To remedy this deficiency, residuals are normalized by dividing the residuals by their standard deviation. Then, the normalized residuals can be plotted against the observed values (center panel). In this way, not only are standardized residuals obtained, but the values of the residuals are transformed into z-values, and one can use the z-distribution to find problematic data points. There are three rules of thumb regarding finding problematic data points through standardized residuals [@field2012discovering 268-269]:
 
 * Points with values higher than 3.29 should be removed from the data.
 
@@ -619,7 +582,7 @@ m2.lm <- lm(Score ~ Group, data = slrdata2)
 summary(m2.lm)                             
 ```
 
-The model summary reports that Group B performed significantly better compared with Group A. This is shown by the fact that the p -value (the value in the column with the header (Pr(>|t|)) is smaller than .001 as indicated by the three \* after the p-values). Also, the negative Estimate for Group B indicates that Group B has fewer errors than Group A. We will now generate the diagnostic graphics.
+The model summary reports that Group A performed significantly better compared with Group B. This is shown by the fact that the p-value (the value in the column with the header (Pr(>|t|)) is smaller than .001 as indicated by the three \* after the p-values). Also, the negative Estimate for Group B indicates that Group B has lower scores than Group A. We will now generate the diagnostic graphics.^[I'm very grateful to Antonio Dello Iacono who pointed out that a previous version of this tutorial misinterpreted the results as I erroneously reversed the group results.]
 
 ```{r slr24, message=FALSE, warning=FALSE}
 par(mfrow = c(1, 3))        # plot window: 1 plot/row, 3 plots/column
@@ -682,7 +645,7 @@ f_{(x)} = \alpha + \beta_{1}x_{i} + \beta_{2}x_{i+1} + \dots + \beta_{n}x_{i+n} 
 
 \end{equation}
 
-There exists a wealth of literature focusing on multiple linear regressions and the concepts it is based on.  For instance, there are @achen1982interpreting, @bortz2006statistik, @crawley2005statistics, @faraway2002practical, @field2012discovering (my personal favorite), @gries2021statistics, @levshina2015linguistics,  and @wilcox2009basic to name just a few. Introductions to regression modeling in R are @baayen2008analyzing, @crawley2012r, @gries2021statistics, or @levshina2015linguistics.
+There exists a wealth of literature focusing on multiple linear regressions and the concepts it is based on.  For instance, there are @achen1982interpreting, @bortz2006statistik, @crawley2005statistics, @faraway2002practical, @field2012discovering, @gries2021statistics, @levshina2015linguistics, @winter2019statistics and @wilcox2009basic to name just a few. Introductions to regression modeling in R are @baayen2008analyzing, @crawley2012r, @gries2021statistics, or @levshina2015linguistics.
 
 The model diagnostics we are dealing with here are partly identical to the diagnostic methods discussed in the section on simple linear regression. Because of this overlap, diagnostics will only be described in more detail if they have not been described in the section on simple linear regression.
 
@@ -749,43 +712,25 @@ The data set consist of three variables stored in three columns. The first colum
 
 ```{r mlr3, message=F, warning=F}
 # create plots
-p1 <- ggplot(mlrdata, aes(status, money)) +   # data + x/y-axes
-  geom_boxplot(fill=c("grey30", "grey70")) +  # def. col.
-  theme_bw(base_size = 8)+   # black and white theme
-  labs(x = "") +                              # x-axis label
-  labs(y = "Money spent on present (AUD)", cex = .75) +   # y-axis label
-  coord_cartesian(ylim = c(0, 250)) +         # y-axis range
-  guides(fill = FALSE) +                      # no legend
-  ggtitle("Status")                           # title
+p1 <- ggplot(mlrdata, aes(status, money)) +
+  geom_boxplot() + 
+  theme_bw()
 # plot 2
 p2 <- ggplot(mlrdata, aes(attraction, money)) +
-  geom_boxplot(fill=c("grey30", "grey70")) +
-  theme_bw(base_size = 8) +
-  labs(x = "") +                              # x-axis label
-  labs(y = "Money spent on present (AUD)") +  # y-axis label
-  coord_cartesian(ylim = c(0, 250)) +
-  guides(fill = FALSE) +
-  ggtitle("Attraction")
+  geom_boxplot() +
+  theme_bw()
 # plot 3
 p3 <- ggplot(mlrdata, aes(x = money)) +
-  geom_histogram(aes(y=..density..),          # add density statistic
-                 binwidth = 10,               # def. bin width
-                 colour = "black",            # def. bar edge colour
-                 fill = "white") +            # def. bar col.
-  theme_bw() +                                # black-white theme
-  geom_density(alpha=.2, fill = "gray50") +   # def. col. of overlay
-  labs(x = "Money spent on present (AUD)") +
-  labs(y = "Density of frequency")
+  geom_histogram(aes(y=..density..)) +            
+  theme_bw() +         
+  geom_density(alpha=.2, fill = "gray50") 
 # plot 4
 p4 <- ggplot(mlrdata, aes(status, money)) +
-  geom_boxplot(notch = F, aes(fill = factor(status))) + # create boxplot
-  scale_fill_manual(values = c("grey30", "grey70")) +   # def. col. palette
-  facet_wrap(~ attraction, nrow = 1) +        # separate panels for attraction
-  labs(x = "") +
-  labs(y = "Money spent on present (AUD)") +
-  coord_cartesian(ylim = c(0, 250)) +
-  guides(fill = FALSE) +
-  theme_bw(base_size = 8)
+  geom_boxplot(aes(fill = factor(status))) + 
+  scale_fill_manual(values = c("grey30", "grey70")) + 
+  facet_wrap(~ attraction) + 
+  guides(fill = "none") +
+  theme_bw()
 # show plots
 vip::grid.arrange(grobs = list(p1, p2, p3, p4), widths = c(1, 1), layout_matrix = rbind(c(1, 2), c(3, 4)))
 ```
@@ -802,10 +747,10 @@ We will now start to implement the regression model. In a first step, we create 
 
 ```{r mlr4}
 m1.mlr = lm(                      # generate lm regression object
-  money ~ 1 + attraction*status,  # def. rgression formula (1 = intercept)
+  money ~ 1 + attraction*status,  # def. regression formula (1 = intercept)
   data = mlrdata)                 # def. data
 m1.glm = glm(                     # generate glm regression object
-  money ~ 1 + attraction*status,  # def. rgression formula (1 = intercept)
+  money ~ 1 + attraction*status,  # def. regression formula (1 = intercept)
   family = gaussian,              # def. linkage function
   data = mlrdata)                 # def. data
 ```
@@ -952,7 +897,7 @@ The difference in row in the data set before and after removing data points indi
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>In general, outliers should not simply be removed unless there are good reasons for it (this could be that the outliers represent measurement errors). If a data set contains outliers, one should rather switch to methods that are better at handling outliers, e.g. by using weights to account for data points with high leverage. One alternative would be to switch to a robust regression (see [here](https://slcladal.github.io/regression.html#16_Robust_Regression)). However, here we show how to proceed by removing outliers as this is a common, though potententially problematic, method of dealing with outliers. </p>
+<b>NOTE</b><br><br>In general, outliers should not simply be removed unless there are good reasons for it (this could be that the outliers represent measurement errors). If a data set contains outliers, one should rather switch to methods that are better at handling outliers, e.g. by using weights to account for data points with high leverage. One alternative would be to switch to a robust regression (see [here](https://slcladal.github.io/regression.html#16_Robust_Regression)). However, here we show how to proceed by removing outliers as this is a common, though potentially problematic, method of dealing with outliers. </p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
@@ -1130,10 +1075,10 @@ which(mlrdata$leverage >= (3*mean(mlrdata$leverage)))
 # Durbin-Watson test (optimal: high p-value)
 dwt(m2.mlr)
 
-# 7: test multicolliniarity 1
+# 7: test multicollinearity 1
 vif(m2.mlr)
 
-# 8: test multicolliniarity 2
+# 8: test multicollinearity 2
 1/vif(m2.mlr)
 
 # 9: mean vif should not exceed 1
@@ -1166,22 +1111,22 @@ The function `smplesz` reports that the sample size is insufficient by 9 data po
 
 ```{r mlr25}
 # tabulate model results
-tab_model(m0.glm, m2.glm)
+sjPlot::tab_model(m0.glm, m2.glm)
 ```
 
-
+***
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>The R^2^ values in this report is incorrect! As we have seen above, and is also shown in the table below, the correct R^2^ values are: multiple R^2^ 0.8574, adjusted R^2^ 0.8528.</p>
+<b>NOTE</b><br><br>The R^2^ values in this report is incorrect! As we have seen above, and is also shown in the table below, the correct R^2^ values are: multiple R^2^ 0.8574, adjusted R^2^ 0.8528.<br></p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
 
 <br>
 
-Additionally, we can inspect the summary of the regression model as shown below to extarct additional information. 
+Additionally, we can inspect the summary of the regression model as shown below to extract additional information. 
 
 ```{r mlr25b}
 summary(m2.mlr)
@@ -1291,7 +1236,7 @@ p3 <- ggplot(blrdata, aes(x = bodyheight, y =  relationship)) +
 
 
 # show plot
-ggpubr::ggarrange(p1, p2, p3, nrow = 3)
+ggpubr::ggarrange(p1, p2, p3, nrow = 1)
 ```
 
 The left panel of the Figure above shows that a linear model would predict values for the relationship status, which represents a factor (0 = Single and 1 = In a Relationship), that are nonsensical because values above 1 or below 0 do not make sense. In contrast to a linear regression, which predicts actual values, such as the frequencies of prepositions in a certain text, a logistic regression predicts *probabilities* of events (for example, being in a relationship) rather than actual values. The center panel shows the predictions of a logistic regression and we see that a logistic regression also has an intercept and a (very steep) slope but that the regression line also predicts values that are above 1 and below 0. However, when we log the predicted values we these predicted values are transformed into probabilities with values between 0 and 1. And the logged regression line has a S-shape which reflects the logistic function. Furthermore, we can then find the optimal line (the line with the lowest residual deviance) by comparing the sum of residuals - just as we did for a simple linear model and that way, we find the regression line for a logistic regression. 
@@ -1431,7 +1376,7 @@ ifelse(max(vif(m4.glm)) <= 3,  "vifs ok", "WARNING: high vifs!") # VIFs ok
 anova(m4.glm, m2.glm, test = "Chi")
 ```
 
-The interaction between *Age* and *Gender* is not significant which means that men and women do not behave differently with respect to their use of `EH` as they age. Also, the data does not contain incomplete information and the model does not suffer from multicollinerity - the predictors are not collinear. We can now include if there is a significant interaction between *Age* and *Ethnicity*.
+The interaction between *Age* and *Gender* is not significant which means that men and women do not behave differently with respect to their use of `EH` as they age. Also, the data does not contain incomplete information and the model does not suffer from multicollinearity - the predictors are not collinear. We can now include if there is a significant interaction between *Age* and *Ethnicity*.
 
 ```{r blm13}
 ifelse(min(ftable(blrdata$Age, blrdata$Ethnicity, blrdata$EH)) == 0, "not possible", "possible")
@@ -1508,7 +1453,7 @@ modelChi; chidf; chisq.prob
 
 The code above provides three values: a $\chi$^2^, the degrees of freedom, and a p-value. The p-value is lower than .05 and the results of the Model Likelihood Ratio Test therefore confirm that the final minimal adequate model performs significantly better than the initial minimal base-line model. Another way to extract the model likelihood test statistics is to use an ANOVA to compare the final minimal adequate model to the minimal base-line model.
 
-A handier way to get thses statistics is by performing an ANOVA on the final minimal model which, if used this way, is identical to a Model Likelihood Ratio test.
+A handier way to get these statistics is by performing an ANOVA on the final minimal model which, if used this way, is identical to a Model Likelihood Ratio test.
 
 ```{r blm22}
 anova(m0.glm, lr.glm, test = "Chi") # Model Likelihood Ratio Test
@@ -1655,7 +1600,7 @@ What is multicollinearity?<br>
   
   ```{r prep2, warning=F, message=F}
   # load packages
-  library(tidyverse)
+  library(dplyr)
   library(rms)
   # create data set
   # responses
@@ -1758,7 +1703,7 @@ What is multicollinearity?<br>
   R2.to.VIF(0.784)
   ```
   
-  The function outputs the vif-value of `d`. This shows that the vif-value of `d` represents its predictability from the other predictors in the model matrix which represents the amount of shared variance between ´d´ and the other predictors in the model.
+  The function outputs the vif-value of `d`. This shows that the vif-value of `d` represents its predictability from the other predictors in the model matrix which represents the amount of shared variance between `d` and the other predictors in the model.
   
 </details>
 
@@ -2126,7 +2071,7 @@ The Levene's test indicates that variance homogeneity is also violated. Since bo
 In a next step, we summarize Progression by inspecting the means and standard deviations of the individual variable levels.
 
 ```{r pr7}
-# extract mean and standard devaiation
+# extract mean and standard deviation
 with(poissondata, tapply(Pauses, Language, function(x) {
   sprintf("M (SD) = %1.2f (%1.2f)", mean(x), sd(x))
 }))
@@ -2142,7 +2087,7 @@ ggplot(poissondata, aes(Pauses, fill = Language)) +
 ```
 
 ```{r pr9}
-# calculate poissant regression
+# calculate Poisson regression
 m1.poisson <- glm(Pauses ~ Language + Alcohol, family="poisson", data=poissondata)
 # inspect model
 summary(m1.poisson)
@@ -2173,12 +2118,12 @@ with(m1.poisson, cbind(res.deviance = deviance, df = df.residual,
   p = pchisq(deviance, df.residual, lower.tail=FALSE)))
 ```
 
-Now, we check, if removing Language leads to a significant decreasein model fit.
+Now, we check, if removing Language leads to a significant decrease in model fit.
 
 ```{r pr12}
 # remove Language from the model
 m2.poisson <- update(m1.poisson, . ~ . -Language)
-# check if dropping Language causes a significant decarse in model fit
+# check if dropping Language causes a significant decrease in model fit
 anova(m2.poisson, m1.poisson, test="Chisq")
 ```
 
@@ -2201,7 +2146,7 @@ rexp.est
 # extract predicted values
 (s1 <- data.frame(Alcohol = mean(poissondata$Alcohol),
   Language = factor(1:3, levels = 1:3, labels = names(table(poissondata$Language)))))
-# shpw results
+# show results
 predict(m1.poisson, s1, type="response", se.fit=TRUE)
 ```
 
@@ -2233,7 +2178,7 @@ Robust regression represent an alternative to simple linear models which can han
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>Robust regressions allow us to handle overly influential data points (outliers) by using weights. Thus, robust reressions enalbe us to retain all data points.</p>
+<b>NOTE</b><br><br>Robust regressions allow us to handle overly influential data points (outliers) by using weights. Thus, robust regressions enable us to retain all data points.</p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
@@ -2753,6 +2698,8 @@ effects::predictorEffects(m5.lme)
 sjPlot::tab_model(m5.lme)
 ```
 
+***
+
 <br>
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
@@ -2858,8 +2805,11 @@ summary(m5.lme)
 ```
 
 ```{r lmm28}
-tab_model(m5.lme)
+sjPlot::tab_model(m5.lme)
 ```
+
+***
+
 <br>
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
@@ -2896,7 +2846,7 @@ A mixed-effect linear regression model which contained the genre of texts as ran
 While the number of intercepts, the model reports, and the way how mixed- and fixed-effects arrive at predictions differ, their predictions are extremely similar and almost identical (at least when dealing with a simple random effect structure). Consider the following example where we create analogous fixed and mixed effect models and plot their predicted frequencies of prepositions per genre across the un-centered date of composition. The predictions of the mixed-effects model are plotted as a solid red line, while the predictions of the fixed-effects model are plotted as dashed blue lines.  
 
 ```{r lmm29, message=FALSE, warning=FALSE}
-# creat lm model
+# create lm model
 m5.lmeunweight <- lm(Prepositions ~ DateUnscaled + Genre, data = lmmdata)
 lmmdata$lmePredictions <- fitted(m5.lmeunweight, lmmdata)
 m5.lm <- lm(Prepositions ~ DateUnscaled + Genre, data = lmmdata)
@@ -3522,7 +3472,7 @@ As a final step, we summarize our findings in tabulated form.
 sjPlot::tab_model(mlr.glmer)
 ```
 
-
+***
 
 We can use the `reports` package [@report] to summarize the analysis.
 
@@ -3726,9 +3676,10 @@ The comparison between the observed and the predicted uses of *uhm* becomes some
 The summary of the model can be extracted using the tab_model function from the `sjPlot` package [@sjPlot].
 
 ```{r pmm11c}
-tab_model(m1.glmer)
+sjPlot::tab_model(m1.glmer)
 ```
 
+***
 
 <br>
 
@@ -3845,9 +3796,10 @@ Given that the overdispersion measure of this Quasi-Poisson model is close to 1,
 Finally, we extract the summary table of this model.
 
 ```{r qpmm11c}
-tab_model(m1.glmer)
+sjPlot::tab_model(m1.glmer)
 ```
 
+***
 
 <br>
 
@@ -3898,7 +3850,7 @@ PearsonResiduals <- resid(m1.glmer, type = "pearson")
 NumberOfPredictors <- 2+1+1
 # extract number of cases in model
 Cases <- nrow(countdata)
-# caluculate overdispersion parameter
+# calculate overdispersion parameter
 Overdispersion <- sum(PearsonResiduals^2) / (Cases / NumberOfPredictors)# show overdispersion parameter
 Overdispersion
 ```
@@ -3951,8 +3903,11 @@ The comparison between the observed and the predicted uses of *uhm* becomes some
 And, we extract the summary table of this model.
 
 ```{r nbmm6c}
-tab_model(m1.glmer)
+sjPlot::tab_model(m1.glmer)
 ```
+
+***
+
 <br>
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
@@ -3995,7 +3950,7 @@ m0 <- mblogit(formula = Response ~ 1,
               data = pict)
 ```
 
-In this case, the algorithm did not converge properly - if this were a real analysis, we could ot simply continue but would have to inspect possible causes for this. However, as this is just a showcase, we will ignore this and move on. Next, we add the fixed effects (Gender and Group).
+In this case, the algorithm did not converge properly - if this were a real analysis, we could not simply continue but would have to inspect possible causes for this. However, as this is just a showcase, we will ignore this and move on. Next, we add the fixed effects (Gender and Group).
 
 ```{r mult03, message=F, warning=F}
 m1 <- mblogit(formula = Response ~ Gender + Group, 
@@ -4010,7 +3965,7 @@ Now, we can compare the models to see if including the fixed-effects into the mo
 anova(m0, m1)
 ```
 
-As the second model is significantly better, we are justified to believe that our fixed effects have explanatory power. We can now use the `getSummary.mmblogit` fucntion to get a summary of the model with the fixed effects. 
+As the second model is significantly better, we are justified to believe that our fixed effects have explanatory power. We can now use the `getSummary.mmblogit` function to get a summary of the model with the fixed effects. 
 
 
 ```{r mult05, message=F, warning=F}
@@ -4039,7 +3994,7 @@ Finally, we can extract an alternative summary table produced by the `tab_model`
 sjPlot::tab_model(m1)
 ```
 
-
+***
 
 This is the final step in implementing a a mixed-effects multinomial regression model using the `mblogit` function from the `mclogit` package [see @mclogit]. We are aware that the analysis shown here is supervifial(!) - but please keep in mind that we just wanted to showcase the implementation here rather than providing a properly and carefully done analysis.
 
@@ -4119,6 +4074,7 @@ Finally, we can summarize the model.
 sjPlot::tab_model(m1)
 ```
 
+***
 
 And we can visualize the effects.
 
