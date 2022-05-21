@@ -3,24 +3,10 @@ title: "Lexicography with R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
-  bookdown::html_document2: 
-    includes:
-      in_header: GoogleAnalytics.html
+  bookdown::html_document2: default
 bibliography: bibliography.bib
 link-citations: yes
 ---
-
-<!--html_preserve-->
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=UA-130562131-1"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'UA-130562131-1');
-</script>
-<!--/html_preserve-->
 
 ```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
 knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
@@ -43,20 +29,13 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
 # install packages
-install.packages("tidyverse")
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("udpipe")
 install.packages("tidytext")
-install.packages("textdata")
-install.packages("quanteda")
-install.packages("koRpus")
-koRpus::install.koRpus.lang(lang=c("en", "de"))
-install.packages("hunspell")
 install.packages("coop")
-install.packages("tm")
 install.packages("cluster")
-install.packages("tidyr")
 install.packages("flextable")
-install.packages("here")
-install.packages("plyr")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -64,170 +43,118 @@ remotes::install_github("rlesur/klippy")
 
 In a next step, we load the packages.
 
+
 ```{r prep2, echo=T, message=FALSE, warning=FALSE}
 # load packages
-library(tidyverse)
+library(dplyr)
+library(stringr)
+library(udpipe)
 library(tidytext)
-library(textdata)
-library(quanteda)
-library(koRpus)
-library(koRpus.lang.en)
-library(hunspell)
 library(coop)
-library(tm)
 library(cluster)
-library(tidyr)
 library(flextable)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
 
+
 Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
 
 # Creating dictionaries
 
-In a first step, we load the necessary packages from the library and define the location of the engine which we use for the part-of-speech tagging. In this case, we will use the TreeTagger [see @schmid1994treetagger; @schmid2007enriched,; @schmid2013probabilistic]. How to install and then use the TreeTagger for English as well as for German, French, Spanish, Italian, and Dutch is demonstrated and explained [here](https://slcladal.github.io/tagging.html#TreeTagger:_pos-tagging_languages_other_than_English).
+In a first step, we load a text. In this case, we load George Orwell's *Nineteen Eighty-Four*.
 
-***
-
-<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>You will have to install TreeTagger and change the path used below (`"C:\\TreeTagger\\bin\\tag-english.bat"`) to the location where you have installed TreeTagger on your machine. If you do not know how to install TreeTagger or encounter problems, read [this tutorial](https://slcladal.github.io/tagging.html)!
-<br><br>
-In addition, you can download the pos-tagged text [here](https://slcladal.github.io/data/orwell.txt) so you can simply skip the next code chunk and load the data as shown below.</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<div class="question">` 
-
-</div>`
-
-***
-
-
-```{r lex1, message=FALSE, warning=FALSE}
-# define location of pos-tagger engine
-# WARNING: this needs to be the path to the TreeTagger on YOUR machine!
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-english.bat", lang="en") 
+```{r ld, message=FALSE, warning=FALSE}
+text <- readLines("https://slcladal.github.io/data/orwell.txt") %>%
+  paste0(collapse = " ")
+# show the first 500 characters of the text
+substr(text, start=1, stop=500)
 ```
 
-In a next step, we load and process the data which in this tutorial represents the text from George Orwell's *Nineteen Eighty-Four*. We will not pre-process the data by for instance repairing broken or otherwise compromised words and continue by directly implementing the part-of-speech tagger.
+Next, we download a `udpipe` language model. In this case, we download a `udpipe` language model for English, but you can download `udpipe`  language models for more than 60 languages.
 
-```{r lex3, eval = F, message=FALSE, warning=FALSE}
-# load and pos-tag data
-orwell_pos <- treetag("https://slcladal.github.io/data/orwell.txt")
-# select data frame
-orwell_pos <- orwell_pos@tokens
+
+```{r lex1, eval = F, message=FALSE, warning=FALSE}
+# download language model
+m_eng   <- udpipe::udpipe_download_model(language = "english-ewt")
 ```
 
-```{r lex3b, echo = F, message=FALSE, warning=FALSE}
-orwell_pos <- base::readRDS(url("https://slcladal.github.io/data/orwell_pos.rda", "rb"))
-#orwell_pos <- orwell_pos$tokens
-# inspect data
-orwell_pos %>%
+In my case, I have stored this model in a folder called `udpipemodels` and you can load it (if you have also save the model in a folder called `udpipemodels` within your Rproj folder as shown below.
+)
+```{r lex2, message=FALSE, warning=FALSE}
+# load language model from your computer after you have downloaded it once
+m_eng <- udpipe_load_model(file = here::here("udpipemodels", "english-ewt-ud-2.5-191206.udpipe"))
+```
+
+In a next step, we implement the part-of-speech tagger.
+
+```{r lex3, message=FALSE, warning=FALSE}
+# tokenise, tag, dependency parsing
+text_ann <- udpipe::udpipe_annotate(m_eng, x = text) %>%
+  # convert into a data frame
   as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the orwell_pos data.")  %>%
-  flextable::border_outer()
-```
-If you could not pos-tag the text, you can simply execute the following code chunk which loads the pos-tagged text from the LADAL repository.
-
-```{r lex5, message=FALSE, warning=FALSE}
-# load pos-tagged data
-orwell_pos <- base::readRDS(url("https://slcladal.github.io/data/orwell_pos.rda", "rb"))
+  # remove columns we do not need
+  dplyr::select(-sentence, -paragraph_id, -sentence_id, -feats, 
+                -head_token_id, -dep_rel, -deps, -misc)
+# inspect
+head(text_ann, 10)
 ```
 
 
-We can now use the resulting table to generate a first, basic dictionary that holds information about the word form (*token*), the part-of speech tag (*tag*), the lemmatized word type (*lemma*), the general word category (*wclass*), and the frequency with which the word form is used as that part-of speech.
+We can now use the resulting table to generate a first, basic dictionary that holds information about the word form (*token*), the part-of speech tag (*upos*), the lemmatized word type (*lemma*), and the frequency with which the word form is used as that part-of speech.
 
 ```{r lex7, message=FALSE, warning=FALSE}
 # generate dictionary
-orwell_dic_raw <- orwell_pos %>%
-  dplyr::select(token, tag, lemma, wclass) %>%
-  dplyr::group_by(token, tag, lemma, wclass) %>%
+text_dict_raw <- text_ann %>%
+  # remove non-words
+  dplyr::filter(!stringr::str_detect(token, "\\W")) %>%
+  # filter out numbers
+  dplyr::filter(!stringr::str_detect(token, "[0-9]")) %>%
+  # group data
+  dplyr::group_by(token, lemma, upos) %>%
+  # summarize data
   dplyr::summarise(frequency = dplyr::n()) %>%
-  dplyr::arrange(lemma)
+  # arrange by frequency
+  dplyr::arrange(-frequency)
+# inspect
+head(text_dict_raw, 10)
 ```
 
-```{r lex7b, echo = F, message=FALSE, warning=FALSE}
-orwell_dic_raw %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the orwell_dic_raw data.")  %>%
-  flextable::border_outer()
-```
-
-## Cleaning dictionary entries{-}
-
-However, as the resulting table shows, the data is still very noisy, i.e. it contains a lot of *non-words*, i.e words that may be mis-spelled, broken, or otherwise compromised. In order to get rid of these, we can simply check if the word lemma exists in an existing dictionary. When you aim to identify exactly those words that are not yet part of an established dictionary, you could of course do it the other way around and remove all words that are already present in an existing dictionary.
+The above display is ordered by frequency but it is, of course more common, to arrange dictionaries alphabetically. To do this, we can simply use the `àrrange` function from the `dplyr` package as shown below.
 
 
-```{r lex11, message=FALSE, warning=FALSE}
+```{r lex8, message=FALSE, warning=FALSE}
 # generate dictionary
-orwell_dic_clean <- orwell_dic_raw %>%
-  dplyr::filter(hunspell_check(lemma)) %>%
-  dplyr::filter(!stringr::str_detect(lemma, "\\W\\w{1,}"))
+text_dict <- text_dict_raw %>%
+  # arrange alphabetically
+  dplyr::arrange(token)
+# inspect
+head(text_dict, 10)
 ```
 
-```{r lex11b, echo = F, message=FALSE, warning=FALSE}
-orwell_dic_clean %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the orwell_dic_clean data.")  %>%
-  flextable::border_outer()
-```
+We have now generated a basic dictionary of English but, as you can see above, there are still some errors as the part-of-speech tagging was not perfect. As such, you will still need to check and edit the results manually but you have already a rather clean dictionary based on George Orwell's *Nineteen Eighty-Four* to work with. 
 
 
-We have now checked the entries against an existing dictionary and removed non-word elements. As such, we are left with a clean dictionary based on George Orwell's *Nineteen Eighty-Four*. 
+## Correcting and Extending Dictionaries{-}
 
-
-## Extending dictionaries{-}
-
-Extending dictionaries, that is adding additional layers of information or other types of annotation, e.g. url's to relevant references or sources,  is fortunately very easy in R and can be done without much additional computing. 
+Fortunately, it is very easy in R to correct entries, i.e., changing lemmas or part-of-speech tags, and to extend entries, i.e., adding additional layers of information such as urls or examples. 
 
 We will begin to extend our dictionary by adding an additional column (called `annotation`) in which we will add information.
 
 
 ```{r ext1, message=FALSE, warning=FALSE}
 # generate dictionary
-orwell_dic_ext <- orwell_dic_clean %>%
-  dplyr::mutate(annotation = NA) %>%
-  dplyr::mutate(annotation = ifelse(token == "3rd", "also 3.",
-                                    ifelse(token == "4th", "also 4.", annotation)))
-```
-
-```{r ext1b, echo = F, message=FALSE, warning=FALSE}
-orwell_dic_ext %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the orwell_dic_ext data.")  %>%
-  flextable::border_outer()
+text_dict_ext <- text_dict %>%
+  # removing an entry
+  dplyr::filter(!(lemma == "a" & upos == "NOUN")) %>%
+  # editing entries
+  dplyr::mutate(upos = ifelse(lemma == "aback" & upos == "NOUN", "PREP", upos)) %>%
+  # adding comments 
+  dplyr::mutate(comment = dplyr::case_when(lemma == "a" ~ "also an before vowels",
+                                           lemma == "Aaronson" ~ "Name of someone.", 
+                                           T ~ ""))
+# inspect
+head(text_dict_ext, 10)
 ```
 
 To make it a bit more interesting but also keep this tutorial simple and straight-forward, we will add information about the polarity and emotionally of the words in our dictionary. We can do this by performing a sentiment analysis on the lemmas using the `tidytext` package.
@@ -239,28 +166,16 @@ To be able to use the Word-Emotion Association Lexicon we need to add another co
 
 ```{r ext3, message=FALSE, warning=FALSE}
 # generate dictionary
-orwell_dic_ext <- orwell_dic_ext %>%
+text_dict_snt <- text_dict_ext %>%
   dplyr::mutate(word = lemma) %>%
   dplyr::left_join(get_sentiments("nrc")) %>%
-  tidyr::spread(sentiment, sentiment)
+  dplyr::group_by(token, lemma, upos, comment) %>%
+  dplyr::summarise(sentiment = paste0(sentiment, collapse = ", "))
+# inspect
+head(text_dict_snt, 10) 
 ```
 
-
-```{r ext3b, echo = F, message=FALSE, warning=FALSE}
-orwell_dic_ext %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the orwell_dic_ext data.")  %>%
-  flextable::border_outer()
-```
-
-The resulting extended dictionary now contains not only the token, the pos-tag, the lemma, and the generalized word class, but also the emotional and polarity scores from the Word-Emotion Association Lexicon.
+The resulting extended dictionary now contains not only the token, the lemma, and the pos-tag but also the sentiment from the Word-Emotion Association Lexicon.
 
 ## Generating dictionaries for other languages{-}
 
@@ -269,134 +184,54 @@ As mentioned above, the procedure for generating dictionaries can easily be appl
 We will now briefly create a German dictionary based on a subsection of the fairy tales collected by the brothers Grimm to show how the above procedure can be applied to a language other than English. In a  first step, we load a German text into R. 
 
 
-```{r none1, eval = F, echo = F}
-grimm <- readLines(here::here("data", "GrimmsFairytales.txt"))# %>%
-#  str_replace_all(fixed("u<U+0364>"), "ü") %>%
-#  str_replace_all(fixed("a<U+0364>"), "ä") %>%
-#  str_replace_all(fixed("<U+017F>"), "s") %>%
-#  paste0(sep = " ", collapse = " ") %>%
-#  str_squish() %>%
-#  str_remove(".*Freimund. Vorrede. ")
-str(grimm)
-
-writeLines(grimm, here::here("data", "grimm.txt"))
+```{r none1, message=FALSE, warning=FALSE}
+grimm <- readLines("https://slcladal.github.io/data/GrimmsFairytales.txt",
+                   encoding = "latin1") %>%
+  paste0(collapse = " ")
+# show the first 500 characters of the text
+substr(grimm, start=1, stop=200)
 ```
+
+
+Next, we download a `udpipe` language model. In this case, we download a `udpipe` language model for German, but you can download `udpipe`  language models for more than 60 languages.
+
+
+```{r none2, eval = F, message=FALSE, warning=FALSE}
+# download language model
+udpipe::udpipe_download_model(language = "german-hdt")
+```
+
+In my case, I have stored this model in a folder called `udpipemodels` and you can load it (if you have also save the model in a folder called `udpipemodels` within your Rproj folder as shown below).
+
 ```{r none3, message=FALSE, warning=FALSE}
-# install german language package
-#install.koRpus.lang("de")
-# activate german language package
-library(koRpus.lang.de)
-# define location of pos-tagger engine
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-german.bat", lang="de") 
+# load language model from your computer after you have downloaded it once
+m_ger <- udpipe_load_model(file = here::here("udpipemodels",
+                                             #"german-hdt-ud-2.5-191206.udpipe"))
+                                             "german-gsd-ud-2.5-191206.udpipe"))
 ```
 
+In a next step, we generating the dictionary based on the brothers' Grimm fairy tales. We go through the same steps as for the English dictionary and collapse all the steps into a single code block. 
 
-
-
-***
-
-<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>You would need to adapt the path to the TreeTagger engine (see previous code chunk) as well as the path to the data (see following code chunk)! The paths below are specified to my computer.</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<div class="question">` 
-
-
-</div>`
-
-***
-
-
-
-```{r none5, message=FALSE, warning=FALSE}
-# pos-tag data
-grimm_pos <- koRpus::treetag(file = here::here("data", "grimm.txt"),
-                             lang = "de")
-```
-
-For other languages, you would need to adapt the path to the pos-tagger engine to match the language of your text. The code chunk below shows how you would do that for French, Spanish, Italian, and Dutch. Again note that you would need to adapt the path to the TreeTagger engine as well as the path to the data! The paths below are specified to my computer.
-
-```{r none7, eval = F, message=FALSE, warning=FALSE}
-# French
-# install french language package
-install.koRpus.lang("fr")
-# activate french language package
-library(koRpus.lang.fr)
-# define location of pos-tagger engine
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-french.bat", lang="fr") 
-# pos-tag data
-text_pos <- treetag("PathToFrenchText.txt")
-
-# Spanish
-# install spanish language package
-install.koRpus.lang("es")
-# activate spanish language package
-library(koRpus.lang.es)
-# define location of pos-tagger engine
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-spanish.bat", lang="es") 
-# pos-tag data
-text_pos <- treetag("PathToSpanishText.txt")
-
-# Italian
-# install italian language package
-install.koRpus.lang("it")
-# activate italian language package
-library(koRpus.lang.it)
-# define location of pos-tagger engine
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-italian.bat", lang="it") 
-# pos-tag data
-text_pos <- treetag("PathToItalianText.txt")
-
-# Dutch
-# install dutch language package
-install.koRpus.lang("nl")
-# activate dutch language package
-library(koRpus.lang.nl)
-# define location of pos-tagger engine
-set.kRp.env(TT.cmd="C:\\TreeTagger\\bin\\tag-dutch.bat", lang="nl") 
-# pos-tag data
-text_pos <- treetag("PathToDutchText.txt")
-```
-
-
-We will now continue with generating the dictionary based on the brothers' Grimm fairy tales. We go through the same steps as for the English dictionary and collapse all the steps into a single code block. 
-
-
-```{r none9, message=FALSE, warning=FALSE}
-# select data frame
-grimm_pos <- grimm_pos@tokens
-# generate dictionary
-grimm_dic_raw <- grimm_pos %>%
-  dplyr::select(token, tag, lemma, wclass) %>%
-  dplyr::group_by(token, tag, lemma, wclass) %>%
+```{r none4, message=FALSE, warning=FALSE}
+# tokenise, tag, dependency parsing
+grimm_ann <- udpipe::udpipe_annotate(m_ger, x = grimm) %>%
+  # convert into a data frame
+  as.data.frame() %>%
+  # remove non-words
+  dplyr::filter(!stringr::str_detect(token, "\\W")) %>%
+  # filter out numbers
+  dplyr::filter(!stringr::str_detect(token, "[0-9]")) %>%
+  dplyr::group_by(token, lemma, upos) %>%
   dplyr::summarise(frequency = dplyr::n()) %>%
   dplyr::arrange(lemma)
-# clean dictionary
-grimm_dic_clean <- grimm_dic_raw %>%
-  dplyr::filter(!stringr::str_detect(lemma, "\\W\\w{1,}"),
-                !stringr::str_detect(lemma, "\\W{1,}"),
-                !stringr::str_detect(lemma, "[:digit:]{1,}"),
-                nchar(token) > 1)
+# inspect
+head(grimm_ann, 10)
 ```
 
 
-```{r none9b, echo = F, message=FALSE, warning=FALSE}
-grimm_dic_clean %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the grimm_dic_clean data.")  %>%
-  flextable::border_outer()
-```
+
+
+
 As with the English dictionary, we have created a customized German dictionary based of a subsample of the brothers' Grimm fairy tales holding the word form(*token*), the part-of-speech tag (*tag*), the lemmatized word type (*lemma*), the general word class (*wclass*), ad the frequency with which a word form occurs as a part-of-speech in the data (*frequency*).
 
 # Finding synonyms: creating a thesaurus
@@ -433,21 +268,10 @@ degree_adverbs <- base::readRDS(url("https://slcladal.github.io/data/dad.rda", "
                 adjective = adjs) %>%
   dplyr::filter(degree_adverb != "0",
                 degree_adverb != "well")
+# inspect
+head(degree_adverbs, 10)
 ```
 
-```{r syn1b, echo = F, message=FALSE, warning=FALSE}
-degree_adverbs %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the degree_adverbs data.")  %>%
-  flextable::border_outer()
-```
 
 
 In a next step, we create a matrix from this data frame which maps how often a given amplifier co-occurred with a given adjective. In text mining, this format is called a text-document matrix or tdm (which is a transposed [document-term matrix](https://en.wikipedia.org/wiki/Document-term_matrix) of dtm).
