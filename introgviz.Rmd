@@ -62,6 +62,9 @@ install.packages("spDataLarge",
                  repos = "https://nowosad.github.io/drat/", type = "source")
 install.packages("ggspatial")
 install.packages("rnaturalearth")
+install.packages("ggmap")
+install.packages("leaflet")
+install.packages("maptools")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -80,6 +83,11 @@ library(tmap)
 library(ggplot2)
 library(ggspatial)
 library(rnaturalearth)
+library(ggmap)
+library(leaflet)
+library(maptools)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
 ```
 
 
@@ -170,7 +178,6 @@ plot(world[0], col = "lightgray")
 # overlay countries I have visited in orange 
 plot(sf::st_geometry(visited), add = TRUE, col = "orange")
 ```
-
 
 # Creating maps with ggplot2
 
@@ -285,6 +292,148 @@ ggplot(data = europe) +
   # add text
   geom_sf_text(aes(label = name_long), size=2.5, color = "gray20")
 ```
+
+# Adding external information {-}
+
+While being very useful, displaying basic maps is usually less relevant because, typically, we want to add different layers to a map. In order to add layers to a map, we need to combine the existing data with some data that we would like to lay over the existing map. 
+
+We will now lad external information which contains the locations of Australian airports.
+
+```{r cus1, message=FALSE, warning=FALSE}
+# load data
+airports <- base::readRDS(url("https://slcladal.github.io/data/apd.rda", "rb")) %>%
+  dplyr::mutate(ID = as.character(ID)) %>%
+  dplyr::filter(Country == "Australia")
+# inspect
+head(airports)
+```
+
+Next, we load an additional data set about the route volume of Australian airports (how many routes go in and out of these airports).
+
+
+
+```{r cus7, message=FALSE, warning=FALSE}
+# read in routes data
+routes <- base::readRDS(url("https://slcladal.github.io/data/ard.rda", "rb")) %>%
+  dplyr::rename(ID = destinationAirportID) %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarise(flights = n())
+# inspect
+head(routes)
+```
+
+
+We can now merge the airports and the route volume data sets to combine the information about the location with the information about the number of routes that end at each airport.
+
+```{r cus9, message=FALSE, warning=FALSE}
+# combine tables
+arrivals <- dplyr::left_join(airports, routes, by = "ID") %>%
+  na.omit()
+# inspect
+head(arrivals)
+```
+
+Now that we have that data (which contains geolocations (longitudes and latitudes), we can visualize the location of the airports on a map and add information about the route volume of the airports in the form of, e.g., points that we plot over the airport - the bigger the point, the higher the route volume. In addition, we add the locations as texts and also make these labels correspond to the route volume.
+
+```{r cus11, message=FALSE, warning=FALSE}
+# create a layer of borders
+ggplot(arrivals, aes(x=Longitude, y= Latitude)) +   
+  borders("world", colour="gray20", fill="wheat1")  +
+  geom_point(color="blue", alpha = .3, size = log(arrivals$flights)) +
+  scale_x_continuous(name="Longitude", limits=c(110, 160)) +
+  scale_y_continuous(name="Latitude", limits=c(-45, -10)) +
+  theme(panel.background = element_rect(fill = "azure1", colour = "azure1")) +
+  geom_text(aes(x=Longitude, y= Latitude, label=City),
+            color = "gray20", check_overlap = T, size = log(arrivals$flights))
+```
+
+
+# Creating maps with ggmap {-}
+
+If you simply want to show specific locations on existing maps, then the `ggmap` package is an easy way to take on this talk.
+
+```{r cus14, message=FALSE, warning=FALSE}
+# define box
+sbbox <- ggmap::make_bbox(lon = c(152.8, 153.4), lat = c(-27.1, -27.7), f = .1)
+# get map
+brisbane = ggmap::get_map(location=sbbox, zoom=10, maptype="terrain")
+# create map
+brisbanemap = ggmap::ggmap(brisbane)
+# display map
+brisbanemap +
+  geom_point(data = arrivals, mapping = aes(x = Longitude, y = Latitude), 
+               color = "red", size = 2) +
+  geom_text(data = arrivals, 
+            mapping = aes(x = Longitude+0.1,
+                          y = Latitude,
+                          label = "Brisbane Airport"),
+            size = 3, color = "gray20", 
+            fontface = "bold", 
+            check_overlap = T) +
+  labs(x = "Longitude", y = "Latitude")
+```
+
+
+# Interactive Maps with leaflet and maptools
+
+The `leaflet` package offers very easy-to use options for generating interactive maps. The interactivity is achieved by the `leaflet` function from the `leaflet` package which creates a leaflet-map with html-widgets which can be used, e.g., in html rendered R Notebooks or Shiny applications. The advantage of using this function lies in the fact that it offers very detailed maps which enable zooming in on  specific locations.
+
+```{r map3, message=FALSE, warning=FALSE}
+# generate basic leaflet map
+m <- leaflet() %>% 
+  leaflet::setView(lng = 153.05, lat = -27.45, zoom = 12)%>% 
+  leaflet::addTiles()
+# show map
+m
+```
+
+
+Another option for interactive geospatial visualizations is provided by the `maptools` package which comes with a `SpatialPolygonsDataFrame` of the world and the population by country (in 2005). To make the visualization a bit more appealing, we will calculate the population density, add this variable to the data which underlies the visualization, and then display the information interactively. In this case, this means that you can use *mouse-over* or *hoover* effects so that you see the population density in each country if you put the cursor on that country (given the information is available for that country).
+
+We start by loading the required package from the library, adding population density to the data, and removing data points without meaningful information (e.g. we set values like Inf to NA).
+
+```{r int2, message=F, warning=F}
+# load data
+data(wrld_simpl)
+# calculate population density and add it to the data 
+wrld_simpl@data$PopulationDensity <- round(wrld_simpl@data$POP2005/wrld_simpl@data$AREA,2)
+wrld_simpl@data$PopulationDensity <- ifelse(wrld_simpl@data$PopulationDensity == "Inf", NA, wrld_simpl@data$PopulationDensity)
+wrld_simpl@data$PopulationDensity <- ifelse(wrld_simpl@data$PopulationDensity == "NaN", NA, wrld_simpl@data$PopulationDensity)
+# inspect
+head(wrld_simpl@data, 10)
+```
+
+
+We can now display the data and use color coding to indicate the different population densities.
+
+
+```{r int3, message=F, warning=F}
+# define colors
+qpal <- colorQuantile(rev(viridis::viridis(10)),
+                      wrld_simpl$PopulationDensity, n=10)
+# generate visualization
+l <- leaflet(wrld_simpl, options =
+               leafletOptions(attributionControl = FALSE, minzoom=1.5)) %>%
+  addPolygons(
+    label=~stringr::str_c(
+      NAME, ' ',
+      formatC(PopulationDensity, big.mark = ',', format='d')),
+    labelOptions= labelOptions(direction = 'auto'),
+    weight=1, color='#333333', opacity=1,
+    fillColor = ~qpal(PopulationDensity), fillOpacity = 1,
+    highlightOptions = highlightOptions(
+      color='#000000', weight = 2,
+      bringToFront = TRUE, sendToBack = TRUE)
+    ) %>%
+  addLegend(
+    "topright", pal = qpal, values = ~PopulationDensity,
+    title = htmltools::HTML("Population density <br> (2005)"),
+    opacity = 1 )
+# display visualization
+l
+```
+
+
 
 
 We will end this introduction here but if you want to want to learn more, check out the more advanced LADAL tutorials on visualizing geospatial data visualization.
