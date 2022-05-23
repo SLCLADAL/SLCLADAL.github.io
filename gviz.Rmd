@@ -162,135 +162,87 @@ library(rnaturalearth)
 Once you have installed R and RStudio and also initiated the session by executing the code shown above, you are good to go.
 
 
-# Creating basic maps
-
-We will start by generating maps of the world using a in-build `world` data set that is part of the `spData` package and the `plot` function for generating the map.
-
-```{r}
-plot(world)
-```
-
-We see that the  `world` data set contains information on various factors, such as information about regions (e.g., `continent` or `subregion`), country names (`name_long`),  population size (`pop`) or life expectancy (`lifeExp`). We can use this information to show a specific map as shown below.
-
-```{r}
-plot(world["lifeExp"])
-```
-
-
-We can use the `world` data set and filter for specific features, e.g., we can visualize only a single continent by filtering for the continent we are interested in. In addition, we define the x-axis and y-axis limits so that we zoom in on the region of interest.
-
-
-```{r}
-# extract europe (exclude russia and iceland)
-world_eur <- world %>%
-  dplyr::filter(continent == "Europe", 
-                name_long != "Russian Federation", 
-                name_long != "Iceland") %>%
-  dplyr::select(name_long, geom)
-# plot
-plot(world_eur,
-     xlim = c(5, 10),
-     ylim = c(30, 70),
-     main = "")
-```
-
-
-We can also overlay information such as population size over continents and countries as shown below.
-
-```{r}
-# plot world map
-plot(world["continent"], reset = FALSE)
-# define size bases on population size
-cex <- sqrt(world$pop) / 10000
-# center world map
-world_cents <- sf::st_centroid(world, of_largest = TRUE)
-# plot
-plot(sf::st_geometry(world_cents), 
-     add = TRUE, 
-     cex = cex)
-```
-
-Overlaying is interesting because it allows us to highlight certain regaions or counrties as shown below.
-
-
-```{r}
-# extract map of europe
-world_eur <- world %>%
-  dplyr::filter(continent == "Europe")
-# extract germany
-ger <- world %>%
-  dplyr::filter(name_long == "Germany")
-# plot germany
-plot(sf::st_geometry(ger), expandBB = c(.2, .2, .2, .2), col = "gray", lwd = 3)
-# plot europe
-plot(world_eur[0], add = TRUE)
-```
-
-
-We can also add information to the `world` data set and use the added information to generate customized plots.
-
-```{r}
-# countries I have been to
-countries <- c("United States", "Norway", "France", "United Arab Emirates", 
-             "Qatar", "Sweden", "Poland", "Austria", "Hungary", "Romania", 
-             "Germany", "Bulgaria", "Greece", "Turkey", "Croatia", 
-             "Switzerland", "Belgium", "Netherlands", "Spain", "Ireland", 
-             "Australia", "China", "Italy", "Denmark", "United Kingdom", 
-             "Slovenia", "Finland", "Slovakia", "Czech Republic", "Japan", 
-             "Saudi Arabia", "Serbia")
-# data frame with countries I have visited
-visited <- world %>%
-  dplyr::filter(name_long %in% countries)
-# plot world
-plot(world[0], col = "lightgray")
-# overlay countries I have visited in orange 
-plot(sf::st_geometry(visited), add = TRUE, col = "orange")
-```
-
-
-# Creating maps with ggplot2
-
-So far, we have used the base `plot` function to generate maps. However, it is also possible to use `ggplot2` to generate maps when using `geom_sf` as shown below.
-
-```{r geo1, message=FALSE, warning=FALSE}
-# plot map
-ggplot(data = world) +
-  geom_sf()
-```
-
-The nice thing about `ggplot2` is, of course, that it is very easy to add layers and create very pretty visualizations. 
-
-
-```{r geo1, message=FALSE, warning=FALSE}
-# plot map
-ggplot(data = world) +
-  geom_sf() + 
-  theme_bw() +
-  # adding axes title
-  labs(x = "Longitude", y = "Latitude") +
-  # adding title and subtitle
-  ggtitle("A map of Australia") +
-  # defining coordinates
-  coord_sf(xlim = c(100.00, 160.00), 
-           ylim = c(-45.00, -10.00), 
-           expand = T) +
-  # add distance measure
-  annotation_scale(location = "bl", width_hint = 0.5) +
-  # add compass 
-  annotation_north_arrow(location = "br")
-```
-
 
 
 # Customizing Maps
 
 Displaying basic maps is usually less interesting because, typically, we want to add different layers to a map. In order to add layers to a map, we need to have a shape file, i.e. a file which contains information about borders or locations that can then be displayed in different colors. In other words, we need to have a shape object to add information to the map.
 
+
+
+
+
+
+
+
+
+```{r cus1, message=FALSE, warning=FALSE}
+# load data
+airports <- base::readRDS(url("https://slcladal.github.io/data/apd.rda", "rb")) %>%
+  dplyr::mutate(ID = as.character(ID)) %>%
+  dplyr::filter(Country == "Australia")
+# inspect
+head(airports)
+```
+
+
+
+```{r cus7, message=FALSE, warning=FALSE}
+# read in routes data
+routes <- base::readRDS(url("https://slcladal.github.io/data/ard.rda", "rb")) %>%
+  dplyr::rename(ID = destinationAirportID) %>%
+  dplyr::group_by(ID) %>%
+  dplyr::summarise(flights = n())
+# inspect
+head(routes)
+```
+
+
+We can now merge the airports and the arrival data set to combine the information about the location with the information about the number of routes that end at each airport.
+
+```{r cus9, message=FALSE, warning=FALSE}
+# combine tables
+arrivals <- dplyr::left_join(airports, routes, by = "ID") %>%
+  na.omit()
+# inspect
+head(arrivals)
+```
+
+
+
+
+```{r cus11, message=FALSE, warning=FALSE}
+# create a layer of borders
+ggplot(arrivals, aes(x=Longitude, y= Latitude)) +   
+  borders("world", colour="gray20", fill="wheat1")  +
+  geom_point(color="blue", alpha = .3, size = log(arrivals$flights)) +
+  scale_x_continuous(name="Longitude", limits=c(110, 160)) +
+  scale_y_continuous(name="Latitude", limits=c(-45, -10)) +
+  theme(panel.background = element_rect(fill = "azure1", colour = "azure1")) +
+  geom_text(aes(x=Longitude, y= Latitude, label=City),
+            color = "gray20", check_overlap = T, size = log(arrivals$flights))
+```
+
+
+
+
+
+
+
+
+
+
+
+
 ```{r map_gg3, eval = F, echo = F, message=FALSE, warning=FALSE}
+# load data
+world <- rnaturalearth::ne_countries(returnclass = "sf") 
+# add to prevent errors
+sf::sf_use_s2(FALSE)
 # extract locations
 world_points<- st_centroid(world)
 # extract labels
-world_points <- cbind(world, st_coordinates(st_centroid(world$geometry)))
+world_points <- cbind(world, sf::st_coordinates(sf::st_centroid(world$geometry)))
 # generate annotated world map
 ggplot(data = world) +
   geom_sf(fill= "gray90") +
@@ -527,12 +479,12 @@ In addition, it may be useful to overlay an area with shading to indicate the de
 
 ```{r cus12, message=FALSE, warning=FALSE}
 # create map with density layer
-ggplot(airportA, (aes(x = Longitude, y= Latitude))) +   
+ggplot(arrivals, (aes(x = Longitude, y= Latitude))) +   
   borders("world", colour=NA, fill="antiquewhite")  +
   stat_density2d(aes(fill = ..level..,  alpha = I(.2)),
-                 size = 1, bins = 5, data = airportA,
+                 size = 1, bins = 5, data = arrivals,
                  geom = "polygon") +
-  geom_point(color="red", alpha = .2, size=airportA$flights/100) +
+  geom_point(color="red", alpha = .2, size=arrivals$flights/100) +
   # define color of density polygons
   scale_fill_gradient(low = "grey50", high = "grey20") +
   theme(panel.background = element_rect(fill = "lightblue",
@@ -548,8 +500,8 @@ ggplot(airportA, (aes(x = Longitude, y= Latitude))) +
         axis.title.x=element_blank(),
         axis.title.y=element_blank()) +
   geom_text(aes(x=Longitude, y= Latitude, label=Name),
-            color = "gray20", fontface = "italic", check_overlap = T, size = 2,
-            alpha = sqrt(airportA$flights)/10)
+            color = "gray20", fontface = "italic", check_overlap = T, size = log(arrivals$flights),
+            alpha = sqrt(arrivals$flights)/10)
 ```
 
 
@@ -1203,3 +1155,11 @@ sessionInfo()
 
 # References {-}
 
+```{r map_gg3, eval = F, echo = F, message=FALSE, warning=FALSE}
+# load data
+oz <- rnaturalearth::ne_countries(country = "australia", returnclass = "sf") 
+# plot map
+ggplot(oz) +
+  geom_sf()
+
+```
