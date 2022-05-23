@@ -1,0 +1,273 @@
+---
+title: "Introduction to Geospatial Data Visualization with R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces geo-spatial data visualization in R. 
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to visualize geospatial data, i.e. how to generate maps in R, and how to prepare data for geospatial visualizations using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with generating maps. Very recommendable and detailed resources for geospatial data visualization using R can be found [here](https://keen-swartz-3146c4.netlify.app/) or [here](https://geocompr.robinlovelace.net/index.html). 
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/geoviz.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+***
+
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br><br>The installation of the packages will be relatively data intensive due to some of the required packages containing shape files - which renders these packages to be larger big in comparison to other R packages. It is thus recommendable to be logged into an institutional network that has a decent connectivity and download rate (e.g., a university network). </p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+
+***
+
+```{r prep1, eval = F, message=FALSE, warning=FALSE}
+install.packages("sf")
+install.packages("raster")
+install.packages("dplyr")
+install.packages("spData")
+install.packages("tmap")  
+install.packages("leaflet")
+install.packages("ggplot2")
+install.packages("spDataLarge",
+                 repos = "https://nowosad.github.io/drat/", type = "source")
+install.packages("ggspatial")
+install.packages("rnaturalearth")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+
+```{r pre2, message=F, warning=F}
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(tmap)  
+library(ggplot2)
+library(ggspatial)
+library(rnaturalearth)
+```
+
+
+Once you have installed R and RStudio and also initiated the session by executing the code shown above, you are good to go.
+
+
+# Creating basic maps
+
+We will start by generating maps of the world using a in-build `world` data set that is part of the `spData` package and the `plot` function for generating the map.
+
+```{r geo1, message=F, warning=F}
+plot(world)
+```
+
+We see that the  `world` data set contains information on various factors, such as information about regions (e.g., `continent` or `subregion`), country names (`name_long`),  population size (`pop`) or life expectancy (`lifeExp`). We can use this information to show a specific map as shown below.
+
+```{r geo2, message=F, warning=F}
+plot(world["lifeExp"])
+```
+
+
+We can use the `world` data set and filter for specific features, e.g., we can visualize only a single continent by filtering for the continent we are interested in. In addition, we define the x-axis and y-axis limits so that we zoom in on the region of interest.
+
+
+```{r geo4, message=F, warning=F}
+# extract europe (exclude russia and iceland)
+world_eur <- world %>%
+  dplyr::filter(continent == "Europe", 
+                name_long != "Russian Federation", 
+                name_long != "Iceland") %>%
+  dplyr::select(name_long, geom)
+# plot
+plot(world_eur,
+     xlim = c(5, 10),
+     ylim = c(30, 70),
+     main = "")
+```
+
+
+We can also overlay information such as population size over continents and countries as shown below.
+
+```{r geo6, message=F, warning=F}
+# plot world map
+plot(world["continent"], reset = FALSE)
+# define size bases on population size
+cex <- sqrt(world$pop) / 10000
+# center world map
+world_cents <- sf::st_centroid(world, of_largest = TRUE)
+# plot
+plot(sf::st_geometry(world_cents), 
+     add = TRUE, 
+     cex = cex)
+```
+
+Overlaying is interesting because it allows us to highlight certain regaions or counrties as shown below.
+
+
+```{r geo8, message=F, warning=F}
+# extract map of europe
+world_eur <- world %>%
+  dplyr::filter(continent == "Europe")
+# extract germany
+ger <- world %>%
+  dplyr::filter(name_long == "Germany")
+# plot germany
+plot(sf::st_geometry(ger), expandBB = c(.2, .2, .2, .2), col = "gray", lwd = 3)
+# plot europe
+plot(world_eur[0], add = TRUE)
+```
+
+
+We can also add information to the `world` data set and use the added information to generate customized plots.
+
+```{r geo10, message=F, warning=F}
+# countries I have been to
+countries <- c("United States", "Norway", "France", "United Arab Emirates", 
+             "Qatar", "Sweden", "Poland", "Austria", "Hungary", "Romania", 
+             "Germany", "Bulgaria", "Greece", "Turkey", "Croatia", 
+             "Switzerland", "Belgium", "Netherlands", "Spain", "Ireland", 
+             "Australia", "China", "Italy", "Denmark", "United Kingdom", 
+             "Slovenia", "Finland", "Slovakia", "Czech Republic", "Japan", 
+             "Saudi Arabia", "Serbia")
+# data frame with countries I have visited
+visited <- world %>%
+  dplyr::filter(name_long %in% countries)
+# plot world
+plot(world[0], col = "lightgray")
+# overlay countries I have visited in orange 
+plot(sf::st_geometry(visited), add = TRUE, col = "orange")
+```
+
+
+# Creating maps with ggplot2
+
+So far, we have used the base `plot` function to generate maps. However, it is also possible to use `ggplot2` to generate maps when using `geom_sf` as shown below.
+
+```{r geo12, message=FALSE, warning=FALSE}
+# plot map
+ggplot(data = world) +
+  geom_sf()
+```
+
+The nice thing about `ggplot2` is, of course, that it is very easy to add layers and create very pretty visualizations. 
+
+
+```{r geo14, message=FALSE, warning=FALSE}
+# plot map
+ggplot(data = world) +
+  geom_sf() + 
+  theme_bw() +
+  # adding axes title
+  labs(x = "Longitude", y = "Latitude") +
+  # adding title and subtitle
+  ggtitle("A map of Australia") +
+  # defining coordinates
+  coord_sf(xlim = c(100.00, 160.00), 
+           ylim = c(-45.00, -10.00), 
+           expand = T) +
+  # add distance measure
+  annotation_scale(location = "bl", width_hint = 0.5) +
+  # add compass 
+  annotation_north_arrow(location = "br")
+```
+
+
+Again, we can customize the map according to what we want. In addition, we load a map with a higher resolution using the `ne_countries` function from the `rnaturalearth` package.
+
+```{r geo16, fig.height=5, fig.width=6, message=FALSE, warning=FALSE}
+# load data
+europe <- ne_countries(scale = "medium", continent='europe', returnclass = "sf") 
+# plot map
+ggplot(data = europe) +
+  # add map and define filling
+  geom_sf(mapping = aes(fill = ifelse(name_long == "Germany", "0", "1"))) +
+  # simply black and white background
+  theme_bw() +
+  # adding axes title
+  labs(x = "Longitude", y = "Latitude") +
+  # adding title and subtitle
+  ggtitle("A map of central Europe") +
+  # defining coordinates
+  coord_sf(xlim = c(-10, 30), 
+           ylim = c(40, 60)) +
+  # add distance measure
+  annotation_scale(location = "bl", width_hint = 0.5) +
+  # add compass 
+  annotation_north_arrow(location = "br",
+                         # make compass fancy
+                         style = north_arrow_fancy_orienteering) +
+  theme(legend.position = "none",
+        # add background color
+        panel.background = element_rect(fill = "lightblue"),
+        # remove grid lines
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +
+  # define fill colors
+  scale_fill_manual(name = "Country", values = c("darkgray", "beige")) +
+  # add text
+  geom_sf_text(aes(label = name_long), size=2.5, color = "gray20")
+```
+
+
+We will end this introduction here but if you want to want to learn more, check out the more advanced LADAL tutorials on visualizing geospatial data visualization.
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Introduction to Geospatial Data Visualization with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/introgviz.html  (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`introgviz,
+  author = {Schweinberger, Martin},
+  title = {Introduction to Geospatial Data Visualization with R},
+  note = {https://slcladal.github.io/maps.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+

@@ -1,5 +1,5 @@
 ---
-title: "Displaying Geo-Spatial Data with R"
+title: "Advanced Geo-Spatial Data Visulization with R"
 author: "Martin Schweinberger"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output:
@@ -14,16 +14,40 @@ knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
 
 # Introduction{-}
 
-This tutorial introduces geo-spatial data visualization in R. The entire R markdown document for this tutorial can be downloaded [here](https://slcladal.github.io/maps.Rmd).
+This tutorial introduces geo-spatial data visualization in R. 
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/Intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code.
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
 
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to visualize geospatial data, i.e. how to generate maps in R, and how to prepare data for geospatial visualizations using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with generating maps. Very recommendable and detailed resources for geospatial data visualization using R can be found [here](https://keen-swartz-3146c4.netlify.app/) or [here](https://geocompr.robinlovelace.net/index.html). 
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/geoviz.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+
+
+
+
+
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
 ***
 
 <div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>The installation of the packages may take some time (between 5 and 10 minutes!). The installation will also require data from your plan - it is thus recommendable to be logged into an institutional network that has a decent connectivity and download rate (e.g., a university network). The issue is caused by the fact that some of the required packages contain shape files that are render the packages to be rather over-proportionally big in comparison to other R packages. Also, due to their size, the shape files and the packages that contain them they take time to download.</p>
+<b>NOTE</b><br><br>The installation of the packages will be relatively data intensive due to some of the required packages containing shape files - which renders these packages to be larger big in comparison to other R packages. It is thus recommendable to be logged into an institutional network that has a decent connectivity and download rate (e.g., a university network). </p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
@@ -54,6 +78,12 @@ install.packages("here")
 install.packages("rgdal")
 install.packages("scales")
 install.packages("flextable")
+# update
+install.packages("cowplot")
+install.packages("googleway")
+install.packages("ggrepel")
+#install.packages("libwgeom")
+
 # install package from github
 install.packages("devtools")
 devtools::install_github("dkahle/ggmap", ref = "tidyup")
@@ -63,22 +93,24 @@ remotes::install_github("rlesur/klippy")
 ```
 
 
-```{r prep2, message=FALSE, warning=FALSE}
+```{r prep2, eval = F, message=FALSE, warning=FALSE}
 # set options
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
-op <- options(gvis.plot.tag='chart')  # set gViz options
+#op <- options(gvis.plot.tag='chart')  # set gViz options
 # load package
-library(OpenStreetMap)
+#library(OpenStreetMap)
 library(DT)
 library(RColorBrewer)
-library(mapproj)
+#library(mapproj)
 library(sf)
-library(RgoogleMaps)
-library(scales)
+#library(RgoogleMaps)
+#library(scales)
 library(rworldmap)
 library(maps)
-library(tidyverse)
+library(dplyr)
+library(ggplot2)
+theme_set(theme_bw())
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(rgeos)
@@ -91,145 +123,164 @@ library(here)
 library(rgdal)
 library(scales)
 library(flextable)
+world <- ne_countries(scale = "medium", returnclass = "sf")
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
 
-
-
-
-Depending on the maps that are used in the visualization, it may also be necessary to access other data bases. One very useful data base for maps is, of course, Google Maps. However, to access Google Maps materials, installation and setting up other pieces of software is necessary. How to get access to Google's data is discussed below. In the following section, methods that do not require installation of software other than R.   
-
-# Getting started with maps
-
-The most basic way to display geospatial data is to simply download and display a map. In order to do that, we load the libraries necessary for extracting and plotting the map.
-
-The package `OpenStreetMap` offers a range of maps with different features. To access the `OpenStreetMap` data base, it is necessary to install the package. Once the package is installed, we can simply extract the map and define the region we want to plot by defining the longitude and latitude of the upper left and lower right corner of the region we want to display. The argument `minNumTiles` defines the accuracy of the map, the higher the number of tiles, the higher the resolution. The type of map is defined by the `type` argument. The type argument defines from which server the map is extracted. Once we have extracted a map, we can plot it using the "plot" function. 
-
-```{r map1, message=FALSE, warning=FALSE}
-# extract map
-AustraliaMap <- openmap(c(-8,110),
-	c(-45,160),
-#	type = "osm",
-#	type = "esri",
-	type = "nps",
-	minNumTiles=8)
-# plot map
-plot(AustraliaMap)
+```{r pre2_new, eval = F, message=F, warning=F}
+install.packages("sf")
+install.packages("raster")
+install.packages("dplyr")
+install.packages("spData")
+install.packages("tmap")  
+install.packages("leaflet")
+install.packages("ggplot2")
+install.packages("spDataLarge",
+                 repos = "https://nowosad.github.io/drat/", type = "source")
+install.packages("ggspatial")
+install.packages("rnaturalearth")
 ```
 
-In order to obtain different map types, we change the `type` argument. The following options are available for type: 
+Now that we have installed the packages, we activate them as shown below.
 
-```{r map_options}
-opt <- c("osm", "osm-bw","maptoolkit-topo", "waze", "bing", "stamen-toner", "stamen-terrain", "stamen-watercolor", "osm-german", "osm-wanderreitkarte", "mapbox")
-opt2 <- c("esri", "esri-topo", "nps", "apple-iphoto", "skobbler", "hillshade", "opencyclemap", "osm-transport", "osm-public-transport", "osm-bbike", "osm-bbike-german")
-opt <- data.frame(opt, opt2) %>%
-  dplyr::rename(options = colnames(.)[1],
-                more = colnames(.)[2])
-```
 
-```{r map_options2, message=FALSE, warning=FALSE}
-opt %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "Map display options.")  %>%
-  flextable::border_outer()
+```{r pre2_new, message=F, warning=F}
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(tmap)  
+library(leaflet)
+library(ggplot2)
+library(ggspatial)
+library(rnaturalearth)
 ```
 
 
-Unfortunately, not all options work. If they do not work, then an error message is shown telling us that the number of tiles is not supported.
+Once you have installed R and RStudio and also initiated the session by executing the code shown above, you are good to go.
 
-We can zoom in or out by either changing the "zoom" or the "minNumTiles" arguments - in both cases, the higher the number, the more fine-grained the displayed map. Let's check out some examples for maps of Queensland.
 
-```{r map2, message=FALSE, warning=FALSE}
-# extract map
-queensland1 <- openmap(c(-8,135),
-	c(-30,160),
-	type = "osm",
-	minNumTiles=6)
-queensland2 <- openmap(c(-8,135),
-	c(-30,160),
-	type = "esri",
-	minNumTiles=6)
-# plot maps
-par(mfrow = c(1, 2)) # display plots in 1 row/2 columns
-plot(queensland1); plot(queensland2); par(mfrow = c(1, 1)) # restore original settings
+# Creating basic maps
+
+We will start by generating maps of the world using a in-build `world` data set that is part of the `spData` package and the `plot` function for generating the map.
+
+```{r}
+plot(world)
 ```
 
-## Generating maps with rworldmap and base R{-}
+We see that the  `world` data set contains information on various factors, such as information about regions (e.g., `continent` or `subregion`), country names (`name_long`),  population size (`pop`) or life expectancy (`lifeExp`). We can use this information to show a specific map as shown below.
 
-Another data base that is very useful when certain maps is the `rworldmap` package. The `rworldmap` package contains the shape files for countries but also more fine grained-shape files that display the states of selected countries. The most basic data, however, simply represents the shapes of the countries in the world.
+```{r}
+plot(world["lifeExp"])
+```
 
-Using the `worldmap` package has the advantage that one is not dependent on third parties and their servers but can operate within R without being denied access due to e.g. copy right issues or server maintenance.
 
-```{r map5, message=FALSE, warning=FALSE}
-# load library
-library(rworldmap)
-# get map
-worldmap <- getMap(resolution = "coarse")
+We can use the `world` data set and filter for specific features, e.g., we can visualize only a single continent by filtering for the continent we are interested in. In addition, we define the x-axis and y-axis limits so that we zoom in on the region of interest.
+
+
+```{r}
+# extract europe (exclude russia and iceland)
+world_eur <- world %>%
+  dplyr::filter(continent == "Europe", 
+                name_long != "Russian Federation", 
+                name_long != "Iceland") %>%
+  dplyr::select(name_long, geom)
+# plot
+plot(world_eur,
+     xlim = c(5, 10),
+     ylim = c(30, 70),
+     main = "")
+```
+
+
+We can also overlay information such as population size over continents and countries as shown below.
+
+```{r}
 # plot world map
-plot(worldmap, col = "lightgrey", 
-     fill = T, border = "darkgray",
-     xlim = c(-180, 180), ylim = c(-90, 90),
-     bg = "aliceblue",
-     asp = 1, wrap=c(-180,180))
+plot(world["continent"], reset = FALSE)
+# define size bases on population size
+cex <- sqrt(world$pop) / 10000
+# center world map
+world_cents <- sf::st_centroid(world, of_largest = TRUE)
+# plot
+plot(sf::st_geometry(world_cents), 
+     add = TRUE, 
+     cex = cex)
 ```
 
-The basic map shown above can then be modified and enriched with color coding to convey geospatial data. The following shows how to customize the world map.
+Overlaying is interesting because it allows us to highlight certain regaions or counrties as shown below.
 
-```{r map6, message=FALSE, warning=FALSE}
-# load package
-library(maps)
-# plot maps
-# show map with Latitude 200 as center
-maps::map('world', xlim = c(100, 300))
-# add axes
-maps::map.axes()
+
+```{r}
+# extract map of europe
+world_eur <- world %>%
+  dplyr::filter(continent == "Europe")
+# extract germany
+ger <- world %>%
+  dplyr::filter(name_long == "Germany")
+# plot germany
+plot(sf::st_geometry(ger), expandBB = c(.2, .2, .2, .2), col = "gray", lwd = 3)
+# plot europe
+plot(world_eur[0], add = TRUE)
 ```
 
-```{r map7, message=FALSE, warning=FALSE}
-# show filled map with Latitude 200 as center
-ww2 <- maps::map('world', wrap=c(0,360), plot=FALSE, fill=TRUE)
-maps::map(ww2, xlim = c(100, 300), fill=TRUE)
+
+We can also add information to the `world` data set and use the added information to generate customized plots.
+
+```{r}
+# countries I have been to
+countries <- c("United States", "Norway", "France", "United Arab Emirates", 
+             "Qatar", "Sweden", "Poland", "Austria", "Hungary", "Romania", 
+             "Germany", "Bulgaria", "Greece", "Turkey", "Croatia", 
+             "Switzerland", "Belgium", "Netherlands", "Spain", "Ireland", 
+             "Australia", "China", "Italy", "Denmark", "United Kingdom", 
+             "Slovenia", "Finland", "Slovakia", "Czech Republic", "Japan", 
+             "Saudi Arabia", "Serbia")
+# data frame with countries I have visited
+visited <- world %>%
+  dplyr::filter(name_long %in% countries)
+# plot world
+plot(world[0], col = "lightgray")
+# overlay countries I have visited in orange 
+plot(sf::st_geometry(visited), add = TRUE, col = "orange")
 ```
 
 
-## Generating maps with rnaturalearth and ggplot2{-}
+# Creating maps with ggplot2
 
-We can also use the data provided by the `rnaturalearth` and the `rnaturalearthdata` and use `ggplot` function from the `ggplot2` package as well as the `sf` package to create very nice visualizations of geospatial data. The advantage over using `rworldmap` and base R lies in the fact that the code is easier to interpret and the visualizations are more appealing.
+So far, we have used the base `plot` function to generate maps. However, it is also possible to use `ggplot2` to generate maps when using `geom_sf` as shown below.
 
-```{r map_gg1, message=FALSE, warning=FALSE}
-# load data
-world <- ne_countries(scale = "medium", returnclass = "sf")
-# gene world map
+```{r geo1, message=FALSE, warning=FALSE}
+# plot map
 ggplot(data = world) +
-  geom_sf() +
-  labs( x = "Longitude", y = "Latitude") +
-  ggtitle("World map", subtitle = paste0("(", length(unique(world$admin)), " countries)"))
+  geom_sf()
 ```
 
-We can also easily zoom in on certain areas in the map using the `coord_sf` function and also prettify the map by adding some custom features such as a compass. 
+The nice thing about `ggplot2` is, of course, that it is very easy to add layers and create very pretty visualizations. 
 
-```{r map_gg2, message=FALSE, warning=FALSE}
-# gene world map
+
+```{r geo1, message=FALSE, warning=FALSE}
+# plot map
 ggplot(data = world) +
-  geom_sf() +
-  labs( x = "Longitude", y = "Latitude") +
-  coord_sf(xlim = c(100.00, 160.00), ylim = c(-45.00, -10.00), expand = T) +
+  geom_sf() + 
+  theme_bw() +
+  # adding axes title
+  labs(x = "Longitude", y = "Latitude") +
+  # adding title and subtitle
+  ggtitle("A map of Australia") +
+  # defining coordinates
+  coord_sf(xlim = c(100.00, 160.00), 
+           ylim = c(-45.00, -10.00), 
+           expand = T) +
+  # add distance measure
   annotation_scale(location = "bl", width_hint = 0.5) +
-  annotation_north_arrow(location = "bl", which_north = "true", 
-                         pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
-                         style = north_arrow_fancy_orienteering) +
-  theme_bw()
+  # add compass 
+  annotation_north_arrow(location = "br")
 ```
 
-We will now customize these basic maps and add information to them.
+
 
 # Customizing Maps
 
