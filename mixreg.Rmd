@@ -90,6 +90,7 @@ library(ggplot2)
 library(ggpubr)
 library(Hmisc)
 library(knitr)
+library(dplyr)
 library(lme4)
 library(MASS)
 library(mclogit)
@@ -229,7 +230,7 @@ To explore how to implement a mixed-effects model in R we use data that simulate
 
 ```{r simdat, echo = F, message=F, warning=F}
 set.seed(1234)
-lmmdat <- expand.grid(sex = c("Male", "Female"), 
+lmmdata <- expand.grid(sex = c("Male", "Female"), 
             age = c("Pre", "Junior", "High"), 
             status = c("Mono","Bi"), 
             condition = c("Con","Incon"), 
@@ -269,10 +270,10 @@ lmmdat <- expand.grid(sex = c("Male", "Female"),
   dplyr::relocate(freq, .after = condition) %>%
   dplyr::mutate_if(is.character, factor)
 # save to disc
-base::saveRDS(lmmdat, file = here::here("data", "lmmdat.rda"))
+base::saveRDS(lmmdata, file = here::here("data", "lmmdata.rda"))
   
 # inspect
-head(lmmdat)
+head(lmmdata)
 ```
 
 
@@ -281,14 +282,14 @@ head(lmmdat)
 
 ```{r lmm3, eval = F}
 # load data
-lmmdat  <- base::readRDS(url("https://slcladal.github.io/data/lmmdat.rda", "rb")) %>%
+lmmdata  <- base::readRDS(url("https://slcladal.github.io/data/lmmdat.rda", "rb")) %>%
   # convert date into a numeric variable
   dplyr::mutate(rtime = as.numeric(rtime))
 ```
 
 ```{r lmm3b, echo = F}
 # inspect data
-lmmdat %>%
+lmmdata %>%
   as.data.frame() %>%
   head(15) %>%
   flextable() %>%
@@ -304,17 +305,17 @@ lmmdat %>%
 The data set contains the age (Preschool, Junior, Highschool) and sex (female, male) of the speakers, their status (monolingual vs bilingual), whether the condition was congruent or incongruent, the frequency of the noun (low, medium low, medium high, high), the sentences in which the words occur (item) and the reaction time of the participants in miliseconds. We now plot the data to get a first impression of its structure.
 
 ```{r lmm4, message=FALSE, warning=FALSE}
-p1 <- ggplot(lmmdat, aes(x = status, y = rtime, fill = condition)) +
+p1 <- ggplot(lmmdata, aes(x = status, y = rtime, fill = condition)) +
   geom_boxplot() +
   facet_wrap(~age) +
   theme_bw() +
   labs(y = "Reaction Time\n(ms)")
-p2 <- ggplot(lmmdat, aes(x = reorder(item, -rtime), y = rtime)) +
+p2 <- ggplot(lmmdata, aes(x = reorder(item, -rtime), y = rtime)) +
   geom_boxplot() +
   theme_bw() + 
   theme(axis.text.x = element_text(angle=90)) +
   labs(x = "Item", y = "Reaction Time\n(ms)")
-p3 <- ggplot(lmmdat, aes(rtime)) +
+p3 <- ggplot(lmmdata, aes(rtime)) +
   geom_histogram() +
   theme_bw() + 
   labs(y = "Count", x = "Reaction Time\n(ms)")
@@ -328,14 +329,14 @@ The box plots in the upper panel indicates that the use of prepositions has mode
 Centering or even scaling numeric variables is useful for later interpretation of regression models: if the date variable were not centered, the regression would show the effects of variables at year 0(!). If numeric variables are centered, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centering simply means that the mean of the numeric variable is subtracted from each value.
 
 ```{r lmm7}
-lmmdat$rtimeUnscaled <- lmmdata$rtime
-lmmdat$rtime <- scale(lmmdat$rtime, scale = T)
+lmmdata$rtimeUnscaled <- lmmdata$rtime
+lmmdata$rtime <- scale(lmmdata$rtime, scale = T)
 ```
 
 
 ```{r lmm7b, echo = F}
 # inspect data
-lmmdat %>%
+lmmdata %>%
   as.data.frame() %>%
   head(15) %>%
   flextable() %>%
@@ -344,7 +345,7 @@ lmmdat %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the lmmdat.")  %>%
+  flextable::set_caption(caption = "First 15 rows of the lmmdata.")  %>%
   flextable::border_outer()
 ```
 
@@ -352,8 +353,8 @@ We now set up a fixed-effects model with the `glm` function and a mixed-effects 
 
 ```{r lmm8, message=FALSE, warning=FALSE}
 # generate models
-m0.glm <- glm(rtime ~ 1 + item, family = gaussian, data = lmmdat)
-m0.glmer = glmer(rtime ~ 1 + (1|item), data = lmmdat, family = gaussian)
+m0.glm <- glm(rtime ~ 1 + item, family = gaussian, data = lmmdata)
+m0.glmer = glmer(rtime ~ 1 + (1|item), data = lmmdata, family = gaussian)
 ```
 
 Now that we have created the base-line models, we will test whether including a random effect structure is mathematically justified. It is important to note here that we are not going to test if including a random effect structure is theoretically motivated but simply if it causes a decrease in variance.
@@ -376,9 +377,9 @@ maximum likelihood* (`REML = TRUE` or `method = REML`) rather than maximum likel
 
 ```{r lmm9b, message=F, warning=F}
 # generate models with 2 different random effect structures
-ma.glmer = glmer(rtime ~ 1 + (1|item), family = gaussian, data = lmmdat)
-mb.glmer = glmer(rtime ~ 1 + (1|subject), family = gaussian, data = lmmdat)
-mc.glmer = glmer(rtime ~ 1 + (1|item) + (1|subject), family = gaussian, data = lmmdat)
+ma.glmer = glmer(rtime ~ 1 + (1|item), family = gaussian, data = lmmdata)
+mb.glmer = glmer(rtime ~ 1 + (1|subject), family = gaussian, data = lmmdata)
+mc.glmer = glmer(rtime ~ 1 + (1|item) + (1|subject), family = gaussian, data = lmmdata)
 # compare models
 anova(ma.glmer, mb.glmer, mc.glmer, test = "Chisq", refit = F)
 ```
@@ -389,7 +390,7 @@ The model comparison shows that the model with *item* as a random effect has the
 
 ### Model Fitting{-}
 
-After having determined that including a random effect structure is justified, we can continue by fitting the model. In this case, we will make use of the `glmulti` package [see @calcagno2020glmulti] to select the best model.  The  `glmulti` function computes all possible models (when we choose exhaustive screen by setting the method to `"h"`) and then reports those models that have the best information criterion values, i.e. values which provide information about the most parsimonious models (models that explain a maxi,um amount of variance with a minimum number of predictors). If we want to apply the `glmulti` function to mixed-effects models, we to define a customized function though which specifies the random effect structure. Therefore, before we can start with the odel fitting, we need to write a customized model fitting function for the `glmulti` function.
+After having determined that including a random effect structure is justified, we can continue by fitting the model. In this case, we will make use of the `glmulti` package [see @calcagno2020glmulti] to select the best model.  The  `glmulti` function computes all possible models (when we choose exhaustive screen by setting the method to `"h"`) and then reports those models that have the best information criterion values, i.e. values which provide information about the most parsimonious models (models that explain a maxi,um amount of variance with a minimum number of predictors). If we want to apply the `glmulti` function to mixed-effects models, we to define a customized function though which specifies the random effect structure. Therefore, before we can start with the model fitting, we need to write a customized model fitting function for the `glmulti` function.
 
 
 
@@ -400,18 +401,20 @@ glmer.glmulti <- function(formula, data, random = "", ...){
 }
 ```
 
-Now, we can apply the `glmulti` function to our data.
+Now, we can apply the `glmulti` function to our data. Note that this will exhaustively examine all options, and will take a significant amount of time to run.
 
 ```{r lmm11, message=F, warning=F}
 m.glmer <- glmulti(y = rtime ~ age + condition + status + subject + sex + freq,
                    random = "+ (1|item)",
                    crit = aicc,
-                   data = lmmdat,
+                   data = lmmdata,
                    family = gaussian,
                    method = "h",
                    fitfunc = glmer.glmulti,
                    marginality = F,
-                   level = 2)
+                   level = 2,
+                   plotty = F
+                   )
 # inspect
 print(m.glmer)
 ```
