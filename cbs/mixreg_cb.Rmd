@@ -1,0 +1,1854 @@
+---
+title: "Mixed-Effects Regression Models in R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces mixed-effects regression analyses (also called mixed-models) using R.^[I'm extremely grateful to Stefan Thomas Gries who provided very helpful feedback and pointed out many errors in previous versions of this tutorial. All remaining errors are, of course, my own.] Regression models are among the most widely used quantitative methods in the language sciences to assess if and how predictors (variables or interactions between variables) correlate with a certain response. 
+
+In contrast to fixed-effects regression models, mixed-effects models assume a hierarchical data structure in which data points are grouped or nested in higher order categories (e.g. students within classes). Mixed-effects models are rapidly increasing in use in data analysis because they allow us to incorporate hierarchical or nested data structures. Mixed-effects models are, of course, an extension of fixed-effects regression models and also multivariate and come in different types. 
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/yr_chili.jpg")
+```
+
+This tutorial is aimed at intermediate and advanced users of R with the aim of showcasing how to perform regression analysis using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify common regression types, model diagnostics, and model fitting using R. 
+
+<br>
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/mixreg.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd or the Rproj file. <br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep0, echo=T, eval = F, warning=F, message=F}
+# install
+install.packages("Boruta")
+install.packages("car")
+install.packages("emmeans")
+install.packages("effects")
+install.packages("flextable")
+install.packages("ggplot2")
+install.packages("ggpubr")
+install.packages("Hmisc")
+install.packages("knitr")
+install.packages("lme4")
+install.packages("MASS")
+install.packages("mclogit")
+install.packages("MuMIn")
+install.packages("nlme")
+install.packages("ordinal")
+install.packages("rms")
+install.packages("robustbase")
+install.packages("sjPlot")
+install.packages("stringr")
+install.packages("tibble")
+install.packages("dplyr")
+install.packages("vcd")
+install.packages("vip")
+install.packages("performance")
+install.packages("glmulti")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep1, echo=T, eval=T, warning=F, message=F}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# load packages
+library(Boruta)
+library(car)
+library(effects)
+library(emmeans)
+library(flextable)
+library(ggfortify)
+library(ggplot2)
+library(ggpubr)
+library(Hmisc)
+library(knitr)
+library(lme4)
+library(MASS)
+library(mclogit)
+library(MuMIn)
+library(nlme)
+library(ordinal)
+library(rms)
+library(robustbase)
+library(sjPlot)
+library(stringr)
+library(tibble)
+library(vcd)
+library(vip)
+library(performance)
+library(glmulti)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+
+# Mixed-Effects Regression
+
+
+In the following, we will go over the most relevant and frequently used types of mixed-effect regression models, mixed-effects linear regression models and mixed-effects binomial logistic regression models. 
+
+The major difference between these types of models is that they take different types of dependent variables. While linear models take numeric dependent variables, logistic models take nominal variables.
+
+
+## Linear Mixed-Effects Regression{-}
+
+The following focuses on an extension of ordinary multiple linear regressions: mixed-effects regression linear regression. Mixed-effects models have the following advantages over simpler statistical tests: 
+
+* Mixed-effects models are multivariate, i.e. they test the effect of several predictors simultaneously while controlling for the effect of all other predictors. 
+
+* Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical or nested data structures. This applies if several observations are produced by an individual speaker, for instance.
+
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. (multi-)collinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+
+Major disadvantages of mixed-effects regression modeling are that they are prone to producing high $\beta$-errors [see @johnson2009getting] and that they require rather large data sets. 
+
+### Introduction{-}
+
+So far, the regression models that we have used only had fixed-effects. Having only fixed-effects means that all data points are treated as if they are completely independent and thus on the same hierarchical level. However, it is very common that the data is nested in the sense that data points are not independent because they are, for instance produced by the same speaker or are grouped by some other characteristic. In such cases, the data is considered hierarchical and statistical models should incorporate such structural features of the data they work upon. Fortunately, modeling hierarchical or nested data structures is very easy thanks to the `lme4` package [@lme4].
+
+
+With respect to regression modeling, hierarchical structures are incorporated by what is called *random effects*. When models only have a fixed-effects structure, then they make use of only a single intercept and/or slope (as in the left panel in the figure below), while mixed effects models have intercepts for each level of a random effect. If the random effect structure represents speakers then this would mean that a mixed-model would have a separate intercept and/or slope for each speaker (in addition to the overall intercept that is shown as an orange line in the figure below). 
+
+```{r lmm1, echo=F, eval = T, message=FALSE, warning=FALSE}
+Height <- c(169, 171, 164, 160, 158, 173, 166, 161, 180, 187, 170, 177, 163, 161, 157)
+Weight <- c(68, 67, 65, 66, 64, 80, 75, 70, 85, 92, 86, 87, 85, 82, 80) 
+Group <- c("a", "a", "a", "a", "a", "b", "b", "b", "b", "b", "c", "c", "c", "c", "c")
+# create data sets
+tb <- data.frame(Height,Weight, Group)
+m1 <- lm(Weight ~ Height + Group, data = tb)
+m2 <- lmer(Weight ~ Height + (1|Group), data = tb)
+tb <- tb %>%
+  dplyr::mutate(PWeight = predict(m1, tb),
+                PWeight_lme = predict(m2, tb))
+# plot
+p1 <- ggplot(tb, aes(Height, Weight)) +
+  geom_point(size = 2)
+p2 <- ggplot(tb, aes(Height, Weight)) +
+  geom_abline(intercept = summary(m2)$coefficients[1], slope = summary(m2)$coefficients[2], 
+              color="orange", size = .75) +
+  geom_point(size = 2) +
+  ggtitle("Fixed-effects model \n(with fixed intercept)")
+
+p3 <- ggplot(tb, aes(Height, Weight)) +
+  geom_point(size = 2, aes(shape = Group, color = Group)) +
+  geom_abline(intercept = fixef(m2)[1], slope = fixef(m2)[2], 
+              color="orange", size = .75) +
+  geom_smooth(method = "lm", se = F, aes(x = Height, y = PWeight, color = Group), size = .5) +
+  theme(legend.position = "none") +
+  ggtitle("Mixed-effects model \n (with random intercepts)")
+
+p4 <- ggplot(tb, aes(Height, Weight)) +
+  geom_smooth(se = F, method = "lm", size = .5, aes(shape = Group, color = Group))  +
+  geom_abline(intercept = fixef(m2)[1], slope = fixef(m2)[2], 
+              color="orange", size = .75) +
+  geom_point(size = 2, aes(shape = Group, color = Group)) + 
+  theme(legend.position = "none") +
+  ggtitle("Mixed-effects model \n(with random intercepts + \nrandom slops)")
+# show plot
+ggpubr::ggarrange(p2, p3, p4, ncol = 3)
+```
+
+The idea behind regression analysis is expressed formally in the equation below where$f_{(x)}$ is the y-value we want to predict, $\alpha$ is the intercept (the point where the regression line crosses the y-axis at x = 0), $\beta$ is the coefficient (the slope of the regression line), and x is the value of a predictor (e.g. 180cm - if we would like to predict the weight of a person based on their height). The $\epsilon$ is an error term that reflects the difference between the predicted value and the (actually) observed value ($\epsilon$ is thus a residual that is important as regressions assume that residuals are, e.g., normally distributed). 
+
+\begin{equation}
+f_{(x)} = \alpha + \beta x + \epsilon
+\end{equation}
+
+In other words, to estimate how much some weights who is 180cm tall, we would multiply the coefficient (slope of the line) with 180 ($x$) and add the value of the intercept (point where line crosses the y-axis  at x = 0). 
+
+The equation below represents a formal representation of a mixed-effects regression with varying intercepts [see @winter2019statistics, 235].
+
+\begin{equation}
+f_{(x)} = \alpha_{i} + \beta x + \epsilon
+\end{equation}
+
+In this random intercept model, each level of a random variable has a different intercept. To predict the value of a data point, we would thus take the appropriate intercept value (the model intercept + the intercept of the random effect) and add the product of the predictor coefficient and the value of x. 
+
+Finally, the equation below represents a formal representation of a mixed-effects regression with varying intercepts and varying slopes [see @winter2019statistics, 235].
+
+\begin{equation}
+f_{(x)} = \alpha_{i} + \beta_{i}x + \epsilon
+\end{equation}
+
+In this last model, each level of a random variable has a different intercept and a different slope. To predict the value of a data point, we would thus take the appropriate intercept value (the model intercept + the intercept of the random effect) and add the coefficient of that random effect level multiplied by the value of x. 
+
+### Random Effects{-}
+
+*Random Effects* can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to fixed-effects models, that have only 1 intercept and one slope (left panel in the figure above), mixed-effects models can therefore have various *random intercepts* (center panel) or various *random slopes*, or both, various *random intercepts* and various *random slopes* (right panel). 
+
+What features do distinguish random and fixed effects? 
+
+1) Random effects represent a higher level variable under which data points are grouped. This implies that random effects must be categorical (or nominal but *they a´cannot be continuous*!) [see @winter2019statistics, p. 236].
+
+2) Random effects represent a sample of an infinite number of possible levels. For instance, speakers, trials, items, subjects, or words represent a potentially infinite pool of elements from which many different samples can be drawn. Thus, random effects represent a random sample sample. Fixed effects, on the other hand, typically do not represent a random sample but a fixed set of variable levels (e.g. Age groups, or parts-of-speech).
+
+3) Random effects typically represent many different levels while fixed effects typically have only a few. @zuur2013beginner propose that a variable may be used as a fixed effect if it has less than 5 levels while it should be treated as a random effect if it has more than 10 levels. Variables with 5 to 10 levels can be used as both. However, this is a rule of thumb and ignores the theoretical reasons (random sample and nestedness) for considering something as a random effect and it also is at odds with the way that repeated measures are models (namely as mixed effects) although they typically only have very few levels.  
+
+4) Fixed effects represent an effect that if we draw many samples, the effect would be consistent across samples [@winter2019statistics] while random effects should vary for each new sample that is drawn.
+
+In the following, we will only focus on models with random intercepts because this is the more common method and because including both random intercepts and random slopes requires larger data sets (but have a better fit because intercepts are not forced to be parallel and the lines therefore have a better fit). You should, however, always think about what random effects structure is appropriate for your model - a very recommendable explanation of how to chose which random effects structure is best (and about what the determining factors for this decision are) is give in @winter2019statistics[241-244]. Also, consider the center and the right plots above to understand what is meant by *random intercepts* and *random slopes*.
+
+After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
+
+In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted [@field2012discovering]. We test whether including random effects is warranted by comparing a model, that bases its estimates of the depended variable solely on the base intercept (the mean), with a model, that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the random-effect model explains significantly more variance than the simple model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified if they reduce residual deviance.
+
+### Example: Reaction-Time Experiment{-}
+
+To explore how to implement a mixed-effects model in R we use data that simulates a reaction-time experiment involving male and female mono- and bilingual speakers of different ages and items that are congruent or incongruent.  As a first step, and to prepare our analysis, we load and provide an overview of the data.
+
+```{r simdat, echo = F, message=F, warning=F}
+set.seed(1234)
+lmmdat <- expand.grid(sex = c("Male", "Female"), 
+            age = c("Pre", "Junior", "High"), 
+            status = c("Mono","Bi"), 
+            condition = c("Con","Incon"), 
+            item = c("Item01", "Item02", "Item03", "Item04", "Item05", 
+                     "Item06", "Item07", "Item08", "Item09", "Item10")) %>%
+  dplyr::mutate(rtime = round(rnorm(n = n(), mean = 400, sd = 50), 2),
+                freq = rep(c("Low", "Medium", "High", "Low", 
+                             "Medium", "High", "Low", "Medium", "High", "Low"), each = 24)) %>%
+  dplyr::mutate(rtime = dplyr::case_when(item == "Item01" ~ rtime + 35,
+                                      item == "Item02" ~ rtime + 40,
+                                      item == "Item03" ~ rtime - 15,
+                                      item == "Item04" ~ rtime + 40,
+                                      item == "Item05" ~ rtime - 15,
+                                      item == "Item06" ~ rtime + 20,
+                                      item == "Item07" ~ rtime + 35,
+                                      item == "Item08" ~ rtime - 50,
+                                      item == "Item09" ~ rtime + 60,
+                                      item == "Item10" ~ rtime - 30,
+                                      age == "Preschool" ~ rtime + 100,
+                                      age == "Junior" ~ rtime + 30,
+                                      age == "High" ~ rtime - 30,
+                                      status == "Bi" ~ rtime -60,
+                                      status == "Mono" ~ rtime +50,
+                                      condition == "Con" ~ rtime -45,
+                                      condition == "Incon" ~ rtime +30,
+                                      condition == "Incon" & sex == "Female" ~ rtime -50,
+                                      age == "High" & status == "Bi" ~ rtime -75,
+                                      age == "Pre" & status == "Bi" ~ rtime +75,
+                                      freq == "Low" & sex == "Female" ~ rtime +60,
+                                      freq == "Medium" & sex == "Female" ~ rtime +35,
+                                      freq == "High" & sex == "Female" ~ rtime +25,
+                                      FALSE ~ rtime)) %>%
+  dplyr::mutate(freq = ifelse(freq == "0", 1, freq),
+                subject = rep(paste0("subject", 1:24), 10),
+                id = 1:nrow(.)) %>%
+  dplyr::relocate(id, subject) %>%
+  dplyr::relocate(freq, .after = condition) %>%
+  dplyr::mutate_if(is.character, factor)
+# save to disc
+base::saveRDS(lmmdat, file = here::here("data", "lmmdat.rda"))
+  
+# inspect
+head(lmmdat)
+```
+
+
+
+
+
+```{r lmm3, eval = F}
+# load data
+lmmdat  <- base::readRDS(url("https://slcladal.github.io/data/lmmdat.rda", "rb")) %>%
+  # convert date into a numeric variable
+  dplyr::mutate(rtime = as.numeric(rtime))
+```
+
+```{r lmm3b, echo = F}
+# inspect data
+lmmdat %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the lmmdata.")  %>%
+  flextable::border_outer()
+```
+
+The data set contains the age (Preschool, Junior, Highschool) and sex (female, male) of the speakers, their status (monolingual vs bilingual), whether the condition was congruent or incongruent, the frequency of the noun (low, medium low, medium high, high), the sentences in which the words occur (item) and the reaction time of the participants in miliseconds. We now plot the data to get a first impression of its structure.
+
+```{r lmm4, message=FALSE, warning=FALSE}
+p1 <- ggplot(lmmdat, aes(x = status, y = rtime, fill = condition)) +
+  geom_boxplot() +
+  facet_wrap(~age) +
+  theme_bw() +
+  labs(y = "Reaction Time\n(ms)")
+p2 <- ggplot(lmmdat, aes(x = reorder(item, -rtime), y = rtime)) +
+  geom_boxplot() +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=90)) +
+  labs(x = "Item", y = "Reaction Time\n(ms)")
+p3 <- ggplot(lmmdat, aes(rtime)) +
+  geom_histogram() +
+  theme_bw() + 
+  labs(y = "Count", x = "Reaction Time\n(ms)")
+grid.arrange(grobs = list(p1, p2, p3), widths = c(1, 1), layout_matrix = rbind(c(1, 1), c(2, 3)))
+```
+
+
+The box plots in the upper panel indicates that the use of prepositions has moderately increased over time while the boxplots in the lower left panel show that the genres differ quite substantially with respect to their median frequencies of prepositions per text. Finally, the histogram in the lower right panel show that preposition use is distributed normally with a mean of 132.2 prepositions per text. 
+
+
+Centering or even scaling numeric variables is useful for later interpretation of regression models: if the date variable were not centered, the regression would show the effects of variables at year 0(!). If numeric variables are centered, other variables are variables are considered relative not to 0 but to the mean of that variable (in this case the mean of years in our data). Centering simply means that the mean of the numeric variable is subtracted from each value.
+
+```{r lmm7}
+lmmdat$rtimeUnscaled <- lmmdata$rtime
+lmmdat$rtime <- scale(lmmdat$rtime, scale = T)
+```
+
+
+```{r lmm7b, echo = F}
+# inspect data
+lmmdat %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the lmmdat.")  %>%
+  flextable::border_outer()
+```
+
+We now set up a fixed-effects model with the `glm` function and a mixed-effects model using the `glmer` function from the `lme4` package [@lme4] with Genre as a random effect.
+
+```{r lmm8, message=FALSE, warning=FALSE}
+# generate models
+m0.glm <- glm(rtime ~ 1 + item, family = gaussian, data = lmmdat)
+m0.glmer = glmer(rtime ~ 1 + (1|item), data = lmmdat, family = gaussian)
+```
+
+Now that we have created the base-line models, we will test whether including a random effect structure is mathematically justified. It is important to note here that we are not going to test if including a random effect structure is theoretically motivated but simply if it causes a decrease in variance.
+
+
+### Testing Random Effects{-}
+
+As a first step in the modeling process, we now need to determine whether or not including a random effect structure is justified. We do so by comparing the AIC of the base-line model without random intercepts to the AIC of the model with random intercepts. 
+
+
+```{r lmm9a, message=F, warning=F}
+AIC(logLik(m0.glm))
+AIC(logLik(m0.glmer))
+```
+
+The inclusion of a random effect structure with random intercepts is justified as the AIC of the model with random intercepts is substantially lower than the AIC of the model without random intercepts. 
+
+While I do not how how to *test* if including a random effect is justified, there are often situations, which require to test exactly which random effect structure is best. When doing this, it is important to use *restricted
+maximum likelihood* (`REML = TRUE` or `method = REML`) rather than maximum likelihood [see @pinheiro2000mixedmodels; @winter2019statistics, 226].
+
+```{r lmm9b, message=F, warning=F}
+# generate models with 2 different random effect structures
+ma.glmer = glmer(rtime ~ 1 + (1|item), family = gaussian, data = lmmdat)
+mb.glmer = glmer(rtime ~ 1 + (1|subject), family = gaussian, data = lmmdat)
+mc.glmer = glmer(rtime ~ 1 + (1|item) + (1|subject), family = gaussian, data = lmmdat)
+# compare models
+anova(ma.glmer, mb.glmer, mc.glmer, test = "Chisq", refit = F)
+```
+
+The model comparison shows that the model with *item* as a random effect has the lowest information criterion value. 
+
+
+
+### Model Fitting{-}
+
+After having determined that including a random effect structure is justified, we can continue by fitting the model. In this case, we will make use of the `glmulti` package [see @calcagno2020glmulti] to select the best model.  The  `glmulti` function computes all possible models (when we choose exhaustive screen by setting the method to `"h"`) and then reports those models that have the best information criterion values, i.e. values which provide information about the most parsimonious models (models that explain a maxi,um amount of variance with a minimum number of predictors). If we want to apply the `glmulti` function to mixed-effects models, we to define a customized function though which specifies the random effect structure. Therefore, before we can start with the odel fitting, we need to write a customized model fitting function for the `glmulti` function.
+
+
+
+```{r lmm10, message=F, warning=F}
+glmer.glmulti <- function(formula, data, random = "", ...){
+  glmer(paste(deparse(formula), random),
+        data = data, ...)
+}
+```
+
+Now, we can apply the `glmulti` function to our data.
+
+```{r lmm11, message=F, warning=F}
+m.glmer <- glmulti(y = rtime ~ age + condition + status + subject + sex + freq,
+                   random = "+ (1|item)",
+                   crit = aicc,
+                   data = lmmdat,
+                   family = gaussian,
+                   method = "h",
+                   fitfunc = glmer.glmulti,
+                   marginality = F,
+                   level = 2)
+# inspect
+print(m.glmer)
+```
+
+As the results inform us that there are 4 additional models that perform similarly well (`4 models within 2 IC units.`) we inspect these 4 models.
+
+```{r}
+weightable(m.glmer)[1:4,] %>%
+  regulartable() %>%
+  autofit()
+```
+
+The results show that several models perform equally well. However, we chose the model which contains all terms that are involved in interactions also as main effects as our final minimal adequate model (i.e. `Prepositions ~ 1 + Region + Genre + Genre:Region`).
+
+
+```{r blm11, message=F, warning=F}
+# final minimal adequate model
+m1.glmer <- glmer(Prepositions ~ Region + Genre + Genre:Region + (1 | Text), 
+                 family = gaussian, data = lmmdata)
+# inspect
+summary(m1.glmer)
+```
+
+### Model Diagnostics{-}
+
+We can now evaluate the goodness of fit of the model and check if mathematical requirements and assumptions have been violated. In a first step, we generate diagnostic plots that focus on the random effect structure.
+
+```{r lmm14}
+plot(m1.glmer, Genre ~ resid(.), abline = 0 ) # generate diagnostic plots
+```
+
+The plot shows that there are potentially some outliers (points outside the boxes) and that the variability within letters is greater than in other genres we therefore examine the genres in isolation standardized residuals versus fitted values [@pinheiro2000mixedmodels 175].
+
+```{r lmm15}
+plot(m1.glmer, resid(., type = "pearson") ~ fitted(.) | Genre, id = 0.05, 
+     adj = -0.3, pch = 20, col = "gray40")
+```
+
+The plot shows the standardized residuals (or Pearson's residuals) versus fitted values and suggests that there are outliers in the data (the names elements in the plots). However, to keep things simple, we will ignore this for now ad simply move on.
+
+### Effect Sizes{-}
+
+
+```{r lmm21g}
+sjPlot::tab_model(m1.glmer)
+```
+
+
+
+The effects can be visualized using the `plot_model` function from the `sjPlot` package [@sjPlot].
+
+```{r lmm21d}
+sjPlot::plot_model(m1.glmer, type = "pred") #+
+  # show uncentered date rather than centered date
+  #scale_x_continuous(name = "Date", 
+  #                   breaks = seq(-500, 300, 100), 
+  #                   labels = seq(1150, 1950, 100))
+```
+
+While we have already shown that the effect of *Date* is significant, it is small which means that the number of prepositions per text does not correlate very strongly with time. This suggests that other factors that are not included in the model also impact the frequency of prepositions (and probably more meaningfully, too).
+
+Before turning to the diagnostics, we will use the fitted (or predicted) and the observed values with a regression line for the predicted values. This will not only show how good the model fit the data but also the direction and magnitude of the effect.
+
+```{r lmm21b, message = F, warning=F}
+# extract predicted values
+lmmdata$Predicted <- predict(m1.glmer, lmmdata)
+# plot predicted values
+ggplot(lmmdata, aes(DateUnscaled, Predicted)) +
+  facet_wrap(~Genre) +
+  geom_point(aes(x = DateUnscaled, y = Prepositions), color = "gray80", size = .5) +
+  geom_smooth(aes(y = Predicted), color = "gray20", linetype = "solid", 
+              se = T, method = "lm") +
+  guides(color=guide_legend(override.aes=list(fill=NA))) +  
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="top", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  xlab("Date of composition")
+```
+
+### Model Diagnostics{-}
+
+We now create diagnostic plots. What we wish to see in the diagnostic plots is a cloud of dots in the middle of the window without any structure. What we do not want to see is a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) [@pinheiro2000mixedmodels 182].
+
+```{r lmm22}
+# start plotting
+par(mfrow = c(2, 2))           # display plots in 2 rows and 2 columns
+plot(m1.glmer, pch = 20, col = "black", lty = "dotted"); par(mfrow = c(1, 1))
+```
+
+What a wonderful unstructured cloud - the lack of structure tells us that the model is "healthy" and does not suffer from heteroscedasticity. We will now create more diagnostic plots to find potential problems [@pinheiro2000mixedmodels 21].
+
+```{r lmm23}
+# fitted values by Genre
+plot(m1.glmer, form = resid(., type = "pearson") ~ fitted(.) | Genre, abline = 0, 
+     cex = .5, pch = 20, col = "black")
+```
+
+
+Now, we inspect the observed responses versus the within-group fitted values [@pinheiro2000mixedmodels 178].
+
+```{r lmm26}
+# observed responses versus the within-group fitted values
+plot(m1.glmer, Prepositions ~ fitted(.), id = 0.05, adj = -0.3, 
+     xlim = c(80, 220), cex = .8, pch = 20, col = "blue")
+```
+
+Although some data points are named, the plot does not show any structure, like a funnel, which would have been problematic. 
+
+### Reporting Results {-}
+
+Before we do the write-up, we have a look at the model summary as this will provide us with at least some of the parameters that we want to report. 
+
+```{r lmm27}
+summary(m1.glmer)
+```
+
+```{r lmm28}
+sjPlot::tab_model(m1.glmer)
+```
+
+
+We can use the `reports` package [@report] to summarize the analysis.
+
+
+```{r lme_report, message=F, warning = F}
+report::report(m1.glmer)
+```
+
+We can use this output to write up a final report: 
+
+A mixed-effect linear regression model which contained the genre of texts as random effect was fit to the data in a step-wise-step up procedure. Due to the presence of outliers in the data, weights were included into the model which led to a significantly improved model fit compared to an un-weight model ($\chi$^2^(2): 39.17, p: 0.0006). The final minimal adequate model performed significantly better than an intercept-only base-line model ($\chi$^2^(1): 12.44, p =.0004) and showed that the frequency of prepositions increases significantly but only marginally with the date of composition (Estimate: 0.02, CI: 0.01-0.03, p < .001, marginal R^2^ =  0.0174, conditional R^2^ =  0.4324). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data. 
+
+### Remarks on Prediction{-}
+
+While the number of intercepts, the model reports, and the way how mixed- and fixed-effects arrive at predictions differ, their predictions are extremely similar and almost identical (at least when dealing with a simple random effect structure). Consider the following example where we create analogous fixed and mixed effect models and plot their predicted frequencies of prepositions per genre across the un-centered date of composition. The predictions of the mixed-effects model are plotted as a solid red line, while the predictions of the fixed-effects model are plotted as dashed blue lines.  
+
+```{r lmm29, message=FALSE, warning=FALSE}
+# create lm model
+m5.lmeunweight <- lm(Prepositions ~ DateUnscaled + Genre, data = lmmdata)
+lmmdata$lmePredictions <- fitted(m5.lmeunweight, lmmdata)
+m5.lm <- lm(Prepositions ~ DateUnscaled + Genre, data = lmmdata)
+lmmdata$lmPredictions <- fitted(m5.lm, lmmdata)
+# plot predictions
+ggplot(lmmdata, aes(x = DateUnscaled, y = lmePredictions, group = Genre)) +
+  geom_line(aes(y = lmmdata$lmePredictions), linetype = "solid", color = "red") +
+  geom_line(aes(y = lmmdata$lmPredictions), linetype = "dashed", color = "blue") +
+  facet_wrap(~ Genre, nrow = 4) +
+  theme_bw() +
+  labs(x = "Date of composition") +
+  labs(y = "Prepositions per 1,000 words") +
+  coord_cartesian(ylim = c(0, 220))
+```
+
+The predictions overlap almost perfectly which means that the predictions of both are almost identical - irrespective of whether genre is part of the mixed or the fixed effects structure. 
+
+## Mixed-Effects Logistic Regression{-}
+
+We now turn to an extension of binomial logistic regression: mixed-effects binomial logistic regression. As is the case with linear mixed-effects models logistic mixed effects models have the following advantages over simpler statistical tests: 
+
+* Mixed-effects models are multivariate, i.e. they test the effect of several predictors simultaneously while controlling for the effect of all other predictors. 
+
+* Mixed models allow to statistically incorporate within-speaker variability and are thus fit to model hierarchical or nested data structures. This applies if several observations are produced by an individual speaker, for instance.
+
+* Mixed-models provide a wealth of diagnostic statistics which enables us to control e.g. multicollinearity, i.e. correlations between predictors, and to test whether conditions or requirements are violated (e.g. homogeneity of variance, etc.). 
+
+Major disadvantages of regression modeling are that they are prone to producing high $\beta$-errors [see @johnson2009getting] and that they require rather large data sets. 
+
+### Introduction {-}
+
+As is the case with linear mixed-effects models, binomial logistic mixed-effect models are multivariate analyses that treat data points as hierarchical or grouped in some way. In other words, they take into account that the data is nested in the sense that data points are produced by the same speaker or are grouped by some other characteristics. In mixed-models, hierarchical structures are modelled as *random effects*. If the random effect structure represents speakers then this means that a mixed-model would have a separate intercept and/or slope for each speaker. 
+
+*Random Effects* in linear models can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (center left panel \ref{fig:mem02}) or various *random slopes* (center right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+
+```{r blmm1, echo=F, message=FALSE, warning=FALSE}
+x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
+x2 <- x1-2
+x3 <- x2-2
+x4 <- x3-2
+x5 <- x1+2
+x6 <- x5+2
+x7 <- x6+2
+x11 <- x1-(mean(x1)-x1)
+x12 <- x1-(mean(x1)-x1)*1.5
+x13 <- x1-(mean(x1)-x1)*3
+x14 <- x1-(mean(x1)-x1)^1.5
+x15 <- x1-(mean(x1)-x1)^1.75
+x16 <- x1-(mean(x1)-x1)^.9
+x17 <- x1-(mean(x1)-x1)^.5
+x21 <- x1-(mean(x1)-x1)
+x22 <- x1-(mean(x1)-x1)*1.5
+x23 <- x1-(mean(x1)-x1)*3
+x24 <- x1-(mean(x1)-x1)*1.5
+x25 <- x1-(mean(x1)-x1)*2
+x26 <- x1-(mean(x1)-x1)*.9
+x27 <- x1-(mean(x1)-x1)*.5
+y <- c("A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B", "B")
+yn <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1) 
+logd <- data.frame(x1, x2, x3, x4, x5, x6, x7, y, yn)
+colnames(logd) <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "y", "yn")
+
+p1 <- logd %>%
+  ggplot(aes(y = yn, x = x1)) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), 
+              se = FALSE, color = "red", size = .5) +
+  labs(title = "Fixed-Effects Model:\n1 Intercept + 1 Slope",
+       x = "", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        plot.title = element_text(size=9))
+
+p2 <- logd %>%
+  ggplot(aes(y = yn, x = x1)) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "red", size = .5) +
+  geom_smooth(aes(x = x2), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x3), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x4), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x5), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x6), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x7), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  labs(title = "Mixed-Effects Model:\n1 Intercept per Random Effect Level + 1 Slope",
+       x = "", y = "") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        plot.title = element_text(size=9))
+
+p3 <- logd %>%
+  ggplot(aes(y = yn, x = x1)) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x21), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x22), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x23), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x24), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x25), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x26), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x27), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x24), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "red", size = .5) +
+  labs(title = "Mixed-Effects Model:\n1 Intercept + 1 Slope per Random Effect Level",
+       x = "", y = "Probability") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        plot.title = element_text(size=9))
+
+p4 <- logd %>%
+  ggplot(aes(y = yn, x = x1)) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "red", size = .5) +
+  geom_smooth(aes(x = x11), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x12), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x4), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  geom_smooth(aes(x = x5), method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "gray", size = .5, alpha = .2) +
+  labs(title = "Mixed-Effects Model:\n1 Intercept and 1 Slope per Random Effect Level",
+       x = "", y = "") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        plot.title = element_text(size=9))
+
+ggpubr::ggarrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+```
+
+
+The upper left panel merely shows the logistic curve representing the predictions of a fixed-effects logistic regression with a single intercept and slope. The upper right panel shows the logistic curves representing the predictions of a of a mixed-effects logistic regression with random intercepts for each level of a grouping variable. The lower left panel shows the logistic curves representing the predictions of a mixed-effects logistic regression with one intercept but random slopes for each level of a grouping variable. The lower right panel shows the logistic curves representing the predictions of a mixed-effects logistic regression with random intercepts and random slopes for each level of a grouping variable.
+
+After adding random intercepts, predictors (or fixed effects) are added to the model (just like with multiple regression). So mixed-effects are called mixed-effects because they contain both random and fixed effects.
+
+In terms of general procedure, random effects are added first, and only after we have ascertained that including random effects is warranted, we test whether including fixed-effects is warranted [@field2012discovering]. We test whether including random effects is warranted by comparing a model, that bases its estimates of the dependent variable solely on the base intercept, with a model that bases its estimates of the dependent variable solely on the intercepts of the random effect. If the mixed-effects model explains significantly more variance than the fixed-effects model without random effect structure, then we continue with the mixed-effects model. In other words, including random effects is justified.
+
+### Example: Discourse LIKE in Irish English{-}
+
+In this example we will investigate which factors correlate with the use of *final discourse like* (e.g. "*The weather is shite, like!*") in Irish English. The data set represents speech units in a corpus that were coded for the speaker who uttered a given speech unit, the gender (Gender: Men versus Women) and age of that speaker (Age: Old versus Young), whether the interlocutors were of the same or a different gender (ConversationType: SameGender  versus MixedGender), and whether another *final discourse like* had been used up to three speech units before (Priming: NoPrime versus Prime), whether or not the speech unit contained an *final discourse like* (SUFLike: 1 = yes, 0 = no. To begin with, we load the data and inspect the structure of the data set,
+
+
+```{r blmm3}
+# load data
+mblrdata  <- base::readRDS(url("https://slcladal.github.io/data/mbd.rda", "rb"))
+```
+
+```{r blmm3b, echo = F}
+# inspect data
+mblrdata %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the mblrdata.")  %>%
+  flextable::border_outer()
+```
+
+As all variables except for the dependent variable (`SUFlike`) are character strings, we
+factorize the independent variables.
+
+```{r blmm4}
+# def. variables to be factorized
+vrs <- c("ID", "Age", "Gender", "ConversationType", "Priming")
+# def. vector with variables
+fctr <- which(colnames(mblrdata) %in% vrs)     
+# factorize variables
+mblrdata[,fctr] <- lapply(mblrdata[,fctr], factor)
+# relevel Age (Young = Reference)
+mblrdata$Age <- relevel(mblrdata$Age, "Young")
+# order data by ID
+mblrdata <- mblrdata %>%
+  dplyr::arrange(ID)
+```
+
+```{r blmm4b, echo = F}
+# inspect data
+mblrdata %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the mblrdata arranged by ID.")  %>%
+  flextable::border_outer()
+```
+
+Before continuing, a few words about the minimum number of random effect levels and the minimum number of observations per random effect level are in order.
+
+While many data points per random variable level increases statistical power and thus to more robust estimates of the random effects [@austin2018multilevel], it has been shown that small numbers of observations per random effect variable level do not cause serious bias and it does not negatively affect the estimates of the fixed-effects coefficients  [@bell2008multilevel; @clarke2008can; @clarke2007addressing; @maas2005sufficient]. The minimum number of observations per random effect variable level is therefore 1.
+
+In simulation study, [@bell2008multilevel] tested the impact of random variable levels with only a single observation ranging from 0 to 70 percent. As long as there was a relatively high number of random effect variable levels (500 or more), small numbers of observations had almost no impact on bias and Type 1 error control.
+
+We now plot the data to inspect the relationships within the data set. 
+
+```{r blmm8}
+ggplot(mblrdata, aes(Gender, SUFlike, color = Priming)) +
+  facet_wrap(Age~ConversationType) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+  labs(x = "", y = "Observed Probabilty of discourse like") +
+  scale_color_manual(values = c("gray20", "gray70"))
+```
+
+The upper left panel in the Figure above indicates that men use discourse *like* more frequently than women. The center right panel suggests that priming significantly increases the likelihood of discourse like being used. The center left panel suggests that speakers use discourse like more frequently in mixed-gender conversations.  However, the lower right panel indicates an interaction between gender and conversation type as women appear to use discourse like less frequently in same gender conversations while the conversation type does not seem to have an effect on men. After visualizing the data, we will now turn to the model building process.
+
+### Model Building{-}
+
+In a first step, we set the options.
+
+```{r blmm9}
+# set options
+options(contrasts  =c("contr.treatment", "contr.poly"))
+mblrdata.dist <- datadist(mblrdata)
+options(datadist = "mblrdata.dist")
+```
+
+In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the "glmer" function with a random intercept for ID (a lmer object of the final minimal adequate model will be created later).
+
+```{r blmm10}
+# baseline model glm
+m0.glm = glm(SUFlike ~ 1, family = binomial, data = mblrdata) 
+# base-line mixed-model
+m0.glmer = glmer(SUFlike ~ (1|ID), data = mblrdata, family = binomial) 
+```
+
+### Testing the Random Effect{-}
+
+Now, we check if including the random effect is permitted by comparing the AICs from the glm to AIC from the glmer model. If the AIC of the glmer object is smaller than the AIC of the glm object, then this indicates that including random intercepts is justified.
+
+
+```{r blmm11}
+aic.glmer <- AIC(logLik(m0.glmer))
+aic.glm <- AIC(logLik(m0.glm))
+aic.glmer; aic.glm
+```
+
+The AIC of the glmer object is smaller which shows that including the random intercepts is justified. To confirm whether the AIC reduction is sufficient for justifying the inclusion of a random-effect structure, we also test whether the mixed-effects minimal base-line model explains significantly more variance by applying a Model Likelihood Ratio Test to the fixed- and the mixed effects minimal base-line models.
+
+```{r blmm12}
+# test random effects
+null.id = -2 * logLik(m0.glm) + 2 * logLik(m0.glmer)
+pchisq(as.numeric(null.id), df=1, lower.tail=F) 
+# sig m0.glmer better than m0.glm
+```
+
+The p-value of the Model Likelihood Ratio Test is lower than .05 which shows that the inclusion of the random-effects structure is warranted. We can now continue with the model fitting process.
+
+### Model Fitting{-}
+
+The next step is to fit the model which means that we aim to find the "best" model, i.e. the minimal adequate model. In this case, we will use a manual step-wise step-up, forward elimination procedure.
+Before we begin with the model fitting process we need to add ´control = glmerControl(optimizer = "bobyqa")´ to avoid unnecessary failures to converge.
+
+```{r blmm13}
+m0.glmer <- glmer(SUFlike ~ 1+ (1|ID), 
+                  family = binomial, 
+                  data = mblrdata,
+                  control=glmerControl(optimizer="bobyqa"))
+```
+
+During each step of the fitting procedure, we test whether certain assumptions on which the model relies are violated. To avoid *incomplete information* (a combination of variables does not occur in the data), we tabulate the variables we intend to include and make sure that all possible combinations are present in the data. Including variables although not all combinations are present in the data would lead to unreliable models that report (vastly) inaccurate results. A special case of incomplete information is *complete separation* which occurs if one predictor perfectly explains an outcome (in that case the incomplete information would be caused by a level of the dependent variable). In addition, we make sure that the VIFs do not exceed a maximum of 3 for main effects [@zuur2010protocol] - @booth1994regression suggest that VIFs should ideally be lower than 3 for as higher values would indicate multicollinearity and thus that the model is unstable. The value of 3 should be taken with a pinch of salt because there is no clear consensus about what the maximum VIF for interactions should be or if it should be considered at all. The reason is that we would, of course, expect the VIFs to increase when we are dealing with interactions as the main effects that are part of the interaction are very likely to correlate with the interaction itself. However, if the VIFs are too high, then this will still cause the issues with the attribution of variance. The value of 3 was chosen based on recommendations in the standard literature on multicollinearity [@zuur2009mixedmodels; @neter1990vif]. Only once we have confirmed that the incomplete information, complete separation, and *multicollinearity* are not a major concern, we generate the more saturated model and test whether the inclusion of a predictor leads to a significant reduction in residual deviance. If the predictor explains a significant amount of variance, it is retained in the model while being disregarded in case it does not explain a sufficient quantity of variance.  
+
+
+
+
+```{r}
+glmer.glmulti <- function(formula, data, random = "", ...){
+  glmer(paste(deparse(formula), random),
+        data = data,  ...)
+}
+```
+
+```{r}
+mlrm <- glmulti(SUFlike ~ Gender + Age + ConversationType + Priming,
+                random = "+(1|ID)",
+                data = mblrdata,
+                family = binomial,
+                crit = aicc,
+                method = "h",
+                fitfunc = glmer.glmulti,
+                marginality = F,
+                level = 2)
+```
+
+
+
+
+```{r blmm14}
+# add Priming
+ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m1.glmer <- update(m0.glmer, .~.+Priming)
+anova(m1.glmer, m0.glmer, test = "Chi") 
+```
+
+Since the tests do not show problems relating to incomplete information, because including *Priming* significantly improves the model fit (decrease in AIC and BIC values), and since it correlates significantly with our dependent variable, we include *Priming* into our model.
+
+```{r blmm15}
+# add Age
+ifelse(min(ftable(mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m2.glmer <- update(m1.glmer, .~.+ Age)
+ifelse(max(car::vif(m2.glmer)) <= 3,  "VIFs okay", "VIFs unacceptable") 
+anova(m2.glmer, m1.glmer, test = "Chi")   
+Anova(m2.glmer, test = "Chi")
+```
+
+The ANOVAs show that *Age* is not significant and the first ANOVA also shows that the BIC has increased which indicates that *Age* does not decrease variance. In such cases, the variable should not be included. 
+
+However, if the second ANOVA would report *Age* as being marginally significant, a case could be made for including it but it would be better to change the ordering in which predictors are added to the model. This is, however, just a theoretical issue here as *Age* is clearly not significant.
+
+```{r blmm16}
+# add Gender
+ifelse(min(ftable(mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m3.glmer <- update(m1.glmer, .~.+Gender)
+ifelse(max(car::vif(m3.glmer)) <= 3,  "VIFs okay", "VIFs unacceptable") 
+anova(m3.glmer, m1.glmer, test = "Chi")
+Anova(m3.glmer, test = "Chi")
+```
+
+*Gender* is significant and will therefore be included as a predictor (you can also observe that including Gender has substantially decreased both AIC and BIC).
+
+```{r blmm17}
+# add ConversationType
+ifelse(min(ftable(mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m4.glmer <- update(m3.glmer, .~.+ConversationType)
+ifelse(max(car::vif(m4.glmer)) <= 3,  "VIFs okay", "VIFs unacceptable") 
+anova(m4.glmer, m3.glmer, test = "Chi") 
+Anova(m4.glmer, test = "Chi")
+```
+
+*ConversationType* improves model fit (AIC and BIC decrease and it is reported as being significant) and will, therefore, be included in the model.
+
+```{r blmm18}
+# add Priming*Age
+ifelse(min(ftable(mblrdata$Priming, mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m5.glmer <- update(m4.glmer, .~.+Priming*Age)
+ifelse(max(car::vif(m5.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+anova(m5.glmer, m4.glmer, test = "Chi") 
+```
+
+The interaction between *Priming* and *Age* is not significant and we thus not be included.
+
+```{r blmm19a}
+# add Priming*Gender
+ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m6.glmer <- update(m4.glmer, .~.+Priming*Gender)
+ifelse(max(car::vif(m6.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+We get the warning that the VIFs are high (>= 3) which means that the model suffers from (multi-)collinearity. We thus check the VIFs to determine how to proceed. If the VIFs are > 10, then we definitely cannot use the model as the multicollinearity is excessive. 
+
+```{r blmm19c}
+car::vif(m6.glmer)
+```
+
+The VIFs are below 5 which is not good (VIFs of 5 mean "that column in the model matrix is explainable from the others with an
+R^2^ of 0.8" [@gries2021statistics]) but it is still arguably acceptable and we will thus check if including the interaction between *Priming* and *Gender* significantly improved model fit. 
+
+```{r blmm19d}
+anova(m6.glmer, m4.glmer, test = "Chi") 
+Anova(m6.glmer, test = "Chi")
+```
+
+The interaction between *Priming* and *Gender* improved model fit (AIC and BIC reduction) and significantly correlates with the use of speech-unit final *like*. It will therefore be included in the model.
+
+```{r blmm20}
+# add Priming*ConversationType
+ifelse(min(ftable(mblrdata$Priming, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m7.glmer <- update(m6.glmer, .~.+Priming*ConversationType)
+ifelse(max(car::vif(m7.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+When including the interaction between *Priming* and *ConversationType* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm20b}
+# check VIFs
+car::vif(m7.glmer) 
+```
+
+The VIF of *Priming* is above 5 so we would normally continue without checking if including the interaction between *Priming* and *ConversationType* leads to a significant improvement in model fit. However, given that this is just a practical example, we check if including this interaction significantly improves model fit.
+
+
+```{r blmm20c}
+anova(m7.glmer, m6.glmer, test = "Chi")
+```
+
+
+The interaction between *Priming* and *ConversationType* does not significantly correlate with the use of speech-unit final *like* and it does not explain much variance (AIC and BIC increase). It will be not be included in the model.
+
+```{r blmm21a}
+# add Age*Gender
+ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m8.glmer <- update(m6.glmer, .~.+Age*Gender)
+ifelse(max(car::vif(m8.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+When including the interaction between *Age* and *Gender* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm21b}
+# check VIFs
+car::vif(m8.glmer)
+```
+
+The VIFs are all below 5 so we test if including the interaction between *Gender* and *Age* significantly improves model fit.
+
+```{r blmm21c}
+anova(m8.glmer, m6.glmer, test = "Chi") 
+```
+
+The interaction between *Age* and *Gender* is not significant and will thus continue without it.
+
+```{r blmm22}
+# add Age*ConversationType
+ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m9.glmer <- update(m6.glmer, .~.+Age*ConversationType)
+ifelse(max(car::vif(m9.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+When including the interaction between *Age* and *ConversationType* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm22b}
+# check VIFs
+car::vif(m9.glmer)
+```
+
+The VIFs are all below 5 so we test if including the interaction between *ConversationType* and *Age* significantly improves model fit.
+
+```{r blmm22c}
+anova(m9.glmer, m6.glmer, test = "Chi") 
+```
+
+The interaction between *Age* and *ConversationType* is insignificant and does not improve model fit (AIC and BIC reduction). It will therefore not be included in the model.
+
+```{r blmm23a}
+# add Gender*ConversationType
+ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m10.glmer <- update(m6.glmer, .~.+Gender*ConversationType)
+ifelse(max(car::vif(m10.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!")
+```
+
+When including the interaction between *Gender* and *ConversationType* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm23b}
+# check VIFs
+car::vif(m10.glmer) 
+```
+
+The highest VIF is almost 10 (`r as.vector(car::vif(m10.glmer)[5])`) which is why the interaction between *Gender* and *ConversationType* will not be included in the model.
+
+```{r blmm24a}
+# add Priming*Age*Gender
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m11.glmer <- update(m6.glmer, .~.+Priming*Age*Gender)
+ifelse(max(car::vif(m11.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+
+When including the interaction between *Priming*, *Age*, and *Gender* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm24b}
+# check VIFs
+car::vif(m11.glmer)
+```
+
+There are several VIFs with values greater than 5 and we will thus continue without including the interaction between *Priming*, *Age*, and *Gender* into the model.
+
+```{r blmm25a}
+# add Priming*Age*ConversationType
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m12.glmer <- update(m6.glmer, .~.+Priming*Age*ConversationType)
+ifelse(max(car::vif(m12.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+When including the interaction between *Priming*, *Age*, and *Gender* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm25b}
+# check VIFs
+car::vif(m12.glmer)
+```
+
+The VIF of Priming is very high (`r as.vector(car::vif(m12.glmer)[1])`) which is why we will thus continue without including the interaction between *Priming*, *Age*, and *Gender* in the model.
+
+```{r blmm26}
+# add Priming*Gender*ConversationType
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m13.glmer <- update(m6.glmer, .~.+Priming*Gender*ConversationType)
+ifelse(max(car::vif(m13.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+The VIFs are excessive with a maximum value is `r max(car::vif(m13.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
+
+```{r blmm26b}
+car::vif(m13.glmer)
+```
+
+The VIFs are excessive with a maximum value is `r max(car::vif(m13.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
+
+
+```{r blmm27a}
+# add Age*Gender*ConversationType
+ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+m14.glmer <- update(m6.glmer, .~.+Age*Gender*ConversationType)
+ifelse(max(car::vif(m14.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```
+
+When including the interaction between *Age*, *Gender*, *ConversationType*, we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+
+```{r blmm27b}
+car::vif(m14.glmer)
+```
+
+Again, the VIFs are excessive with a maximum value of `r max(car::vif(m14.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
+
+```{r blmm28, message=FALSE, warning=FALSE}
+# add Priming*Age*Gender*ConversationType
+ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
+```
+
+The model suffers from incomplete information! As this was the last possible model, we have found our final minimal adequate model in m6.glmer.
+
+In a next step, we create an overview of model comparisons which serves as a summary for the model fitting process and provides AIC, BIC, and $\chi$^2^ values.
+
+```{r blmm29}
+source("https://slcladal.github.io/rscripts/ModelFittingSummarySWSU.r") 
+# comparisons of glmer objects
+m1.m0 <- anova(m1.glmer, m0.glmer, test = "Chi") 
+m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi")   
+m3.m1 <- anova(m3.glmer, m1.glmer, test = "Chi")
+m4.m3 <- anova(m4.glmer, m3.glmer, test = "Chi") 
+m5.m4 <- anova(m5.glmer, m4.glmer, test = "Chi") 
+m6.m4 <- anova(m6.glmer, m4.glmer, test = "Chi") 
+m7.m6 <- anova(m7.glmer, m6.glmer, test = "Chi")
+m8.m6 <- anova(m8.glmer, m6.glmer, test = "Chi") 
+m9.m6 <- anova(m9.glmer, m6.glmer, test = "Chi") 
+# create a list of the model comparisons
+mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m6.m4, m7.m6, m8.m6, m9.m6)
+# summary table for model fitting
+mdlft <- mdl.fttng.swsu(mdlcmp)
+mdlft <- mdlft[,-2]
+```
+
+```{r blmm29b, echo = F}
+# inspect data
+mdlft %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the model fitting summary table.")  %>%
+  flextable::border_outer()
+```
+
+We now rename our final minimal adequate model, test whether it performs significantly better than the minimal base-line model, and print the regression summary.
+
+```{r blmm30a}
+# rename final minimal adequate model
+mlr.glmer <- m6.glmer 
+# final model better than base-line model
+sigfit <- anova(mlr.glmer, m0.glmer, test = "Chi") 
+# inspect
+sigfit
+```
+
+```{r blmm30b}
+# inspect final minimal adequate model
+print(mlr.glmer, corr = F)
+```
+
+To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that effect. This can be problematic when checking the effect of main effects that are involved in significant interactions though [@field2012discovering 622].
+
+```{r blmm32a}
+# effect of ConversationType
+ef_conv <- anova(m4.glmer, m3.glmer, test = "Chi") 
+# inspect
+ef_conv
+```
+
+```{r blmm32b}
+# effect of Priming:Gender
+ef_prigen <- anova(m6.glmer, m4.glmer, test = "Chi")
+# inspect
+ef_prigen
+```
+
+### Visualizing Effects{-}
+
+As we will see the effects in the final summary, we visualize the effects here by showing the probability of discourse *like* based on the predicted values.
+
+```{r blmm33}
+# extract predicted values
+mblrdata$Predicted <- predict(m6.glmer, mblrdata, type = "response")
+# plot
+ggplot(mblrdata, aes(ConversationType, Predicted)) +
+  stat_summary(fun = mean, geom = "point") +
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position = "top") +
+    ylim(0, .75) +
+  labs(x = "", y = "Predicted Probabilty of discourse like") +
+  scale_color_manual(values = c("gray20", "gray70"))
+```
+
+A proper visualization of the marginal effects can be extracted using the `sjPlot` package [@sjPlot].
+
+```{r blmm33b}
+plot_model(m6.glmer, type = "pred", terms = c("Priming", "Gender"))
+```
+
+We can see that discourse like is more likely to surface in primed contexts but that in contrast to women and men in same-gender conversations as well as women in mixed-gender conversations, priming appears to affect the use of discourse like by men in mixed-gender conversations only very little. 
+
+### Extracting Model Fit Parameters{-}
+
+We now  extract model fit parameters [@baayen2008analyzing 281].
+
+```{r blmm35}
+probs = 1/(1+exp(-fitted(mlr.glmer)))
+probs = binomial()$linkinv(fitted(mlr.glmer))
+somers2(probs, as.numeric(mblrdata$SUFlike))
+```
+
+The two lines that start with `probs` are simply two different ways to do the same thing (you only need one of these).
+
+The model fit parameters indicate a suboptimal fit. Both the C-value and Somers's D~xy~ show poor fit between predicted and observed occurrences of discourse *like*.  If the C-value is 0.5, the predictions are random, while the predictions are perfect if the C-value is 1. C-values above 0.8 indicate real predictive capacity [@baayen2008analyzing 204]. Somers’ D~xy~ is a value that represents a rank correlation between predicted probabilities and observed responses. Somers’ D~xy~ values range between 0, which indicates complete randomness, and 1, which indicates perfect prediction [@baayen2008analyzing 204]. The C.value of `r as.vector(somers2(probs, as.numeric(mblrdata$SUFlike))[1])` suggests that the model has some predictive and explanatory power, but not at an optimal level. We will now perform the model diagnostics.
+
+### Model Diagnostics{-}
+
+We begin the model diagnostics by generating a diagnostic that plots the fitted or predicted values against the residuals.
+
+```{r blmm38}
+plot(mlr.glmer, pch = 20, col = "black", lty = "dotted")
+```
+
+As a final step, we summarize our findings in tabulated form.
+
+```{r blmm41, message=FALSE, warning=FALSE}
+# summarize final model
+sjPlot::tab_model(mlr.glmer)
+```
+
+***
+
+We can use the `reports` package [@report] to summarize the analysis.
+
+
+```{r blme_report, message=F, warning = F}
+report::report(mlr.glmer)
+```
+
+We can use this output to write up a final report: 
+
+
+A mixed-effect binomial logistic regression model with random intercepts for speakers was fit to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model ($\chi$^2^(`r as.vector(unlist(sigfit))[14][1]`): `r sigfit$Chisq[2]`, p  = `r round(as.vector(unlist(sigfit))[16][1], 5)`) and a good but not optimal fit (C: `r somers2(probs, as.numeric(mblrdata$SUFlike))[1]`, Somers' D~xy~: `r somers2(probs, as.numeric(mblrdata$SUFlike))[2]`). The final minimal adequate model reported that speakers use more discourse *like* in mixed-gender conversations compared to same-gender conversations ($\chi$^2^(`r as.vector(unlist(ef_conv))[14][1]`): `r `r ef_conv$Chisq[2]`, p  = `r round(as.vector(unlist(ef_conv))[16][1], 5)`) and that there is an interaction between priming and gender with men using more discourse *like* in un-primed contexts while this gender difference is not present in primed contexts where speakers more more likely to use discourse *like* regardless of gender ($\chi$^2^(`r as.vector(unlist(ef_prigen))[14][1]`): `r ef_prigen$Chisq[2]`, p  = `r round(as.vector(unlist(ef_prigen))[16][1], 5)`). 
+
+## Mixed-Effects (Quasi-)Poisson and Negative-Binomial Regression{-}
+
+Like fixed-effects Poisson models, mixed-effects Poisson models take counts as dependent variables. The data for this analysis was collected on three separate evenings (Trial). The number of the filler *uhm* (UHM) was counted in two-minute conversations that were either in English, German, Russian, or Mandarin (Language). In addition, the number of shots that speakers drank before they talked was recorded (Shots).
+
+```{r pmm1}
+# load data
+countdata  <- base::readRDS(url("https://slcladal.github.io/data/cld.rda", "rb"))
+```
+
+```{r pmm1b, message=F, warning=F}
+# inspect data
+countdata %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the countdata data.")  %>%
+  flextable::border_outer()
+```
+
+
+
+
+Since the data contains character variables, we need to factorize the data before we can analyse it further and we also remove the ID column.
+
+```{r pmm2}
+# factorize variables
+countdata <- countdata %>%
+  dplyr::select(-ID) %>%
+  dplyr::mutate_if(is.character, factor)
+```
+
+```{r pmm2b, message=F, warning=F}
+# inspect data
+countdata %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 rows of the countdata data.")  %>%
+  flextable::border_outer()
+```
+
+
+After the data is factorized, we can visualize the data.
+
+```{r pmm3, message=F, warning=F}
+countdata %>%
+  # prepare data
+  dplyr::select(Language, Shots) %>%
+  dplyr::group_by(Language) %>%
+  dplyr::mutate(Mean = round(mean(Shots), 1)) %>%
+  dplyr::mutate(SD = round(sd(Shots), 1)) %>%
+  # start plot
+  ggplot(aes(Language, Shots, color = Language, fill = Language)) +
+  geom_violin(trim=FALSE, color = "gray20")+ 
+  geom_boxplot(width=0.1, fill="white", color = "gray20") +
+  geom_text(aes(y=-4,label=paste("mean: ", Mean, sep = "")), size = 3, color = "black") +
+  geom_text(aes(y=-5,label=paste("SD: ", SD, sep = "")), size = 3, color = "black") +
+  scale_fill_manual(values=rep("grey90",4)) + 
+  theme_set(theme_bw(base_size = 10)) +
+  theme(legend.position="none", legend.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) + 
+  ylim(-5, 15) +
+  labs(x = "Language", y = "Shots")
+```
+
+The violin plots show that the English speakers drank more shots than speakers of other languages with Mandarin speakers drinking the fewest shots.
+
+In the present case, we will a Boruta variable selection procedure to streamline the model fitting process. Thus, before fitting the model, we will test which variables have any kind of relationship with the dependent variable and therefore deserve to be evaluated in the regression modeling. As this is just an example, we will only consider variables which are deemed important and disregard both unimportant and tentative variables. We start the Boruta analysis by setting a seed and running an initial Boruta analysis.
+
+```{r pmm4, message=F, warning=F}
+# perform variable selection
+set.seed(20191220)
+boruta <- Boruta(UHM ~.,data=countdata)
+print(boruta)
+```
+
+As only Shots is confirmed as important, we will only check for the effect of Shots and include Language as a random effect in the regression modeling. Including Language as a random effect is probably not justified statistically (given that the Boruta analysis showed that it only has a tentative effect) but for theoretical reasons as the speakers are nested into Languages. Before we start with the modeling, however, we proceed by checking if the data does indeed approximate a Poisson distribution. 
+
+```{r pmm5, message=F, warning=F}
+# output the results
+gf = goodfit(countdata$UHM,type= "poisson", method= "ML")
+plot(gf, main="Count data vs Poisson distribution")
+```
+
+The data does not perfectly match a distribution that would be expected if the data approximated a Poisson distribution. We will use a goodness-of-fit test to check if the data does indeed diverge significantly from being Poisson distributed. If the p-values of the goodness-of-fit test is smaller than .05, then the distribution of the data differs significantly from a Poisson distribution and, given the visualization is likely over-dispersed. 
+
+In case of overdispersion, we may have to use a quasi-Poisson or, even better, a negative binomial model but we will, for now continue with the Poisson model and perform diagnostics later to check if we have to switch to a more robust method. 
+One effect of overdispersion is that the standard errors of a model are biased and quasi-Poisson models scale the standard errors to compensate bias. However, @zuur2013beginner suggest to use negative-binomial model instead. This is so because the scaling of the standard errors performed by quasi-Poisson models only affects the significance of coefficients (the p-values) but it does not affect the coefficients which, however, may be affected themselves by overdispersion. Thus, the coefficients of Poisson as well as quasi-Poisson models (which are identical) may be unreliable when dealing with overdispersion. Negative binomial models, in contrast, include an additional dispersion or heterogeneity parameter which accommodates overdispersion better than merely scaling the standard errors [see @zuur2013beginner 21].
+
+```{r pmm6}
+summary(gf)
+```
+
+The p-value is indeed smaller than .05 which means that we should indeed use a negative-binomial model rather than a Poisson model. We will ignore this, for now, and proceed to fit a Poisson mixed-effects model and check what happens if a Poisson model is fit to over-dispersed data.
+
+### Mixed-Effects Poisson Regression{-}
+
+In a first step, we create mixed-effect intercept-only baseline models and then test if including "Shots" significantly improves model fit and, thus, has a significant impact on the number of *uhms*.
+
+```{r pmm7, message=F, warning=F}
+# base-line mixed-model
+m0.glmer = glmer(UHM ~ 1 + (1 | Language), data = countdata, family = poisson,
+                 control=glmerControl(optimizer="bobyqa"))
+# add Shots
+m1.glmer <- update(m0.glmer, .~.+ Shots)
+Anova(m1.glmer, test = "Chi")           
+```
+
+The ANOVA confirms that Shots have a significant impact on the number of instances of *uhm*. 
+However, we get the warning that the fitted mixed model is (almost / near) singular. In such cases, the model should not be reported. As this is only an example, we will continue by having a look at the model summary.
+
+```{r pmm8}
+summary(m1.glmer)
+```
+
+The model summary confirms that the number of shots does have a significantly positive effect on the number of occurrences of *uhm*. Furthermore, the scaled residuals are distributed very unevenly which suggests overdispersion. Including Language as a random effect is not justified given that they have 0 variance and a standard deviation of 0 (which means that Language does not account for or explain any additional variance). 
+
+We now check if the model suffers from overdispersion following @zuur2013beginner[138].
+
+```{r pmm9}
+# extract pearson residuals
+PearsonResiduals <- resid(m1.glmer, type = "pearson")
+# extract number of cases in model
+Cases <- nrow(countdata)
+# extract number of predictors (plus intercept)
+NumberOfPredictors <- length(fixef(m1.glmer)) +1
+# calculate overdispersion
+Overdispersion <- sum(PearsonResiduals^2) / (Cases-NumberOfPredictors)
+# inspect overdispersion
+Overdispersion
+```
+
+The data is slightly over-dispersed. It would also be advisable to plot the Cook's distance (which should not show data points with values > 1). If there are data points with high Cook's D values, we could exclude them which would, very likely reduce the overdispersion [see @zuur2013beginner 22]. We ignore this, for now, and use diagnostic plots to check if the plots indicate problems.
+
+```{r pmm10}
+diag_data <- data.frame(PearsonResiduals, fitted(m1.glmer)) %>%
+  dplyr::rename(Pearson = 1,
+                Fitted = 2)
+p9 <- ggplot(diag_data, aes(x = Fitted, y = Pearson)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dotted")
+p10 <- ggplot(countdata, aes(x = Shots, y = diag_data$Pearson)) +
+  geom_point()  +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  labs(y = "Pearson")
+p11 <- ggplot(countdata, aes(x = Language, y = diag_data$Pearson)) +
+  geom_boxplot() +
+  labs(y = "Pearson") + 
+  theme(axis.text.x = element_text(angle=90))
+grid.arrange(p9, p10, p11, nrow = 1)
+```
+
+The diagnostic plots show problems as the dots in the first two plots are not random but show a pattern in the lower left corner. In addition, the variance of English (left boxplot) is notable larger than the variance of Russian (right boxplot). As a final step, we plot the predicted vales of the model to check if the predictions make sense.
+
+```{r pmm11b}
+plot_model(m1.glmer, type = "pred", terms = c("Shots"))
+```
+
+The model predicts that the instances of *uhm* increase with the number of shots. Note that the increase is not homogeneous as the y-axis labels indicate! We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+
+```{r pmm11f, warning=F, message=F}
+countdata %>%
+  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  dplyr::rename(Observed = UHM) %>%
+  tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
+  dplyr::mutate(Shots = factor(Shots),
+                Type = factor(Type)) %>%
+  dplyr::group_by(Shots, Type) %>%
+  dplyr::summarize(Frequency = mean(Frequency)) %>%
+  ggplot(aes(Shots, Frequency, group = Type, color = Type, linetype = Type)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = c("orange", "lightblue")) 
+```
+
+The comparison between the observed and the predicted uses of *uhm* becomes somewhat volatile and shows fluctuations after eight shots. We will now summarize the results as if the violations (overdispersion measure > 1 and excessive multicollinearity (singular fit)) had NOT occurred(!) - again: this is only because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
+
+The summary of the model can be extracted using the tab_model function from the `sjPlot` package [@sjPlot].
+
+```{r pmm11c}
+sjPlot::tab_model(m1.glmer)
+```
+
+***
+
+<br>
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br><br>The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package [@MuMIn].</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+
+<br>
+
+```{r pmm11cd, message=F, warning=F}
+r.squaredGLMM(m1.glmer)
+```
+
+
+Also note that our model suffers from a serious problem (near singular fit). If this were not just an example, you should not(!) report this model!
+
+### Mixed-Effects Quasi-Possion Regression{-}
+
+The Quasi-Poisson Regression is a generalization of the Poisson regression and is used when modeling an overdispersed count variable. Poisson models are based on the Poisson distribution which is defined as a distribution where the variance is equal to the mean (which is very restrictive and not often the case). Quasi-Poisson models scale the standard errors which has a positive effect when dealing with overdispersed data. 
+
+Therefore, when the variance is greater than the mean, a Quasi-Poisson model, which assumes that the variance is a linear function of the mean, is more appropriate as it handles over-dispersed data better than normal Poisson-models. 
+
+We begin the model fitting process by creating a mixed- and a fixed-effects intercept-only base-line model. Unfortunately, there is not yet a procedure in place for quasi-Poisson models to test if the inclusion of random effects is justified. However, here the Boruta also provides valuable information: Language was only considered tentative but not important which suggests that it will not explain variance which means that including Language as a random effect may not be justified. This would require further inspection. Because we are only dealing with an example here, we ignore this fact (which you should not do in proper analyses) and continue right away with adding shots. 
+
+
+```{r qpmm1, eval = T, echo=T, message=T, warning=T}
+# base-line mixed-model
+m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
+                   family = quasipoisson(link='log'))
+# add Shots
+m1.glmer <- update(m0.glmer, .~.+ Shots)
+Anova(m1.glmer, test = "Chi")           # SIG! (p<0.0000000000000002 ***)
+```
+
+The ANOVA confirms that Shots have a significant impact on the number of instances of *uhm*. We will now have a look at the model summary.
+
+```{r qpmm2}
+summary(m1.glmer)
+```
+
+The model summary does not provide much information such as,e.g. AIC or BIC values. The coefficient for *Shots* is highly significant (p <.001) and the data is notably over-dispersed (the Standardized Within-Group Residuals deviate substantially from a normal distribution with higher values having a thick tail). Also, in contrast to the Poisson model, Language does explain at least a minimal share of the variance now as the mean and standard deviation are no longer 0. Note also, that the coefficients are identical to the Poisson coefficients but the standard errors and p-values differ (the model provides t- rather than z-values).
+
+In a next step, we will calculate the odds ratios of the coefficient (as we only have one). We will use the coefficients from the fixed-effects model as the coefficients for mixed- and fixed-effects models are identical (the random effect structure only affects the standard error and p-values but not the coefficients; you can check by uncommenting the summary command).
+
+```{r qpmm3}
+m1.glm = glm(UHM ~ Shots, data = countdata, family = quasipoisson(link='log'))
+exp(coef(m1.glm))
+```
+
+The standardized or $\beta$-coefficient tells us that the likelihood of *uhm* increases by 1.26 (or 26.32 percent) with each additional shot.
+
+Before inspecting the relationship between Shots and *uhm*, we will check if the overdispersion was reduced.
+
+```{r qpmm4}
+# extract pearson residuals
+PearsonResiduals <- resid(m1.glmer, type = "pearson")
+# extract number of cases in model
+Cases <- nrow(countdata)
+# extract number of predictors (plus intercept)
+NumberOfPredictors <- length(fixef(m1.glmer)) +1
+# calculate overdispersion
+Overdispersion <- sum(PearsonResiduals^2) / (Cases-NumberOfPredictors)
+# inspect overdispersion
+Overdispersion
+```
+
+The overdispersion has indeed decreased and is not so close to 1 that overdispersion is no longer an issue. 
+
+We continue to diagnose the model by plotting the Pearson's residuals against fitted values. This diagnostic plot should not show a funnel-like structure or patterning as we observed in the case of the Poisson model.
+
+```{r qpmm5}
+# diagnostic plot
+plot(m1.glmer, pch = 20, col = "black", lty= "dotted", ylab = "Pearson's residuals")
+```
+
+Indeed, the plot exhibits a (slight) funnel shape (but not drastically so) and thus indicates heteroscedasticity. However, the patterning that we observed with the Poisson model has disappeared. We continue by plotting the random effect adjustments.
+
+```{r qpmm10}
+# generate diagnostic plots
+plot(m1.glmer, Language ~ resid(.), abline = 0, fill = "gray70") 
+```
+
+The adjustments by "Language" are marginal (which was somewhat expected given that Language was only deemed tentative), which shows that there is very little variation between the languages and that we have no statistical reason to include Language as a random effect. 
+
+In a final step, we plot the fixed-effect of *Shots* using the `predictorEffects` function from the `effects` package [@effects].
+
+```{r qpmm11b}
+plot_model(m1.glmer, type = "pred", terms = c("Shots"))
+```
+
+The effects plot shows that the number of *uhms* increases exponentially with the number of shots a speaker has had. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+
+```{r qpmm11f, warning=F, message=F}
+countdata %>%
+  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  dplyr::rename(Observed = UHM) %>%
+  tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
+  dplyr::mutate(Shots = factor(Shots),
+                Type = factor(Type)) %>%
+  dplyr::group_by(Shots, Type) %>%
+  dplyr::summarize(Frequency = mean(Frequency)) %>%
+  ggplot(aes(Shots, Frequency, group = Type, color = Type, linetype = Type)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = c("orange", "lightblue")) 
+```
+
+Given that the overdispersion measure of this Quasi-Poisson model is close to 1, that the model did not suffer from excessive multicollinearity (singular fit), and because this model shows improvements compared to the Poisson model with respect to the model diagnostics (some adjustments by Language and less patterning in the diagnostic plots), we would choose this quasi-Poisson model over the Poisson model. 
+
+Finally, we extract the summary table of this model.
+
+```{r qpmm11c}
+sjPlot::tab_model(m1.glmer)
+```
+
+***
+
+<br>
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br><br>The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package [@MuMIn].</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+
+<br>
+
+
+
+
+```{r qpmm11d, message=F, warning=F}
+r.squaredGLMM(m1.glmer)
+```
+
+### Mixed-Effects Negative Binomial Regression{-}
+
+Negative binomial regression models are a generalization of Poisson regression which loosens the restrictive assumption that the variance is equal to the mean made by the Poisson model. This is a major advantage as the most common issue that one faces with Poisson regressions is that the data deviate too substantially from the assumed Poisson distribution. 
+
+To implement a Negative-Binomial Mixed-Effects Regression, we first create a mixed-effects intercept-only baseline model and then test if including `Shots` significantly improves model fit and, thus, has a significant impact on the number of *uhms*.
+
+```{r nbmm1}
+# base-line mixed-model
+m0.glmer = glmer.nb(UHM ~ 1 + (1 | Language), data = countdata)
+# add Shots
+m1.glmer <- update(m0.glmer, .~.+ Shots)
+Anova(m1.glmer, test = "Chi")           
+```
+
+The negative-binomial model also reports a significant impact of shots on the number of *uhms*. We will now inspect the summary.
+
+```{r nbmm2}
+# inspect model
+summary(m1.glmer)           
+```
+In a next step, we calculate the overdispersion.
+
+```{r nbmm3}
+# extract pearson residuals
+PearsonResiduals <- resid(m1.glmer, type = "pearson")
+# extract number of betas + predictors + sigma
+NumberOfPredictors <- 2+1+1
+# extract number of cases in model
+Cases <- nrow(countdata)
+# calculate overdispersion parameter
+Overdispersion <- sum(PearsonResiduals^2) / (Cases / NumberOfPredictors)# show overdispersion parameter
+Overdispersion
+```
+
+The overdispersion has increased which is rather suboptimal. In this case, we would report the  Quasi-Poisson Regression rather than the Negative Binomial Model (which is rather rare as Negative Binomial Models typically perform better than (Quasi-)Poisson models. However, this tutorial focuses merely on how to implement a Negative Binomial Mixed-Effects Regression and we thus continue with generating diagnostic plots to check for problems.
+
+```{r nbmm4}
+diag_data <- data.frame(PearsonResiduals, fitted(m1.glmer)) %>%
+  dplyr::rename(Pearson = 1,
+                Fitted = 2)
+p9 <- ggplot(diag_data, aes(x = Fitted, y = Pearson)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dotted")
+p10 <- ggplot(countdata, aes(x = Shots, y = diag_data$Pearson)) +
+  geom_point()  +
+  geom_hline(yintercept = 0, linetype = "dotted") +
+  labs(y = "Pearson")
+p11 <- ggplot(countdata, aes(x = Language, y = diag_data$Pearson)) +
+  geom_boxplot() +
+  labs(y = "Pearson") + 
+  theme(axis.text.x = element_text(angle=90))
+grid.arrange(p9, p10, p11, nrow = 1)
+```
+
+The diagnostics show patterning similar to the one we saw with the Poisson model which suggest that the negative binomial model is also not an optimal model for our data. We continue by plotting the predicted values and, subsequently, summarize the analysis. 
+
+```{r nbmm6b}
+plot_model(m1.glmer, type = "pred", terms = c("Shots"))
+```
+
+The effect plot shows that the predicted number of shots increases exponentially with each shot. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
+
+```{r nbmm6f, warning=F, message=F}
+countdata %>%
+  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  dplyr::rename(Observed = UHM) %>%
+  tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
+  dplyr::mutate(Shots = factor(Shots),
+                Type = factor(Type)) %>%
+  dplyr::group_by(Shots, Type) %>%
+  dplyr::summarize(Frequency = mean(Frequency)) %>%
+  ggplot(aes(Shots, Frequency, group = Type, color = Type, linetype = Type)) +
+  geom_line(size = 1.2) +
+  scale_color_manual(values = c("orange", "lightblue")) 
+```
+
+
+The comparison between the observed and the predicted uses of *uhm* becomes somewhat volatile and shows fluctuations after eight shots. We will now summarize the results as if the violations had NOT occurred(!) - again: this is only because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
+
+And, we extract the summary table of this model.
+
+```{r nbmm6c}
+sjPlot::tab_model(m1.glmer)
+```
+
+***
+
+<br>
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>NOTE</b><br><br>The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package [@MuMIn].</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+
+<br>
+
+```{r nbmm6d}
+r.squaredGLMM(m1.glmer)
+```
+
+***
+
+A mixed-effect negative binomial regression model which contained the language in which the conversation took place as random effect was fit to the data. Prior to the regression modeling, a Boruta analysis was applied to determine whether any of the predictors had a meaningful relationship with the dependent variable (instances of *uhm*). Since the Boruta analysis indicated that only the number of shots a speaker had was important, only "Shots" was tested during model fitting. The final minimal adequate model showed that the number of *uhm* as fillers increases significantly, and near-linearly with the number of shots speakers had ($\chi$^2^(1):83.0, p <.0001, $\beta$: 0.2782). An inspection of the random effect structure conveyed that there was almost no variability between languages and language did not contribute meaningfully to the model fit.
+
+## Mixed-Effects Multinomial Regression{-}
+
+In this section, we will focus on how to implement a mixed-effects multinomial regression model using the `mblogit` function from the `mclogit` package [see @mclogit]. As we have already gone though model fitting and model validation procedures above, we will strictly see how to implement this type of model here - we will not go through all the other steps that a proper regression analysis would require.
+
+We begin the analysis by loading the example data set. The data represents observations gathered during an experiment where speakers had to report what they saw. The responses are categorized into four groups: 
+
+```{r mult01, message=F, warning=F}
+# description data
+pict  <- base::readRDS(url("https://slcladal.github.io/data/pict.rda", "rb"))
+# inspect
+head(pict)
+```
+
+In a first step, we generate a baseline model that we call `m0`. This model only contains the random effect structure and the intercept as the sole predictor.
+
+```{r mult02, message=F, warning=F}
+m0 <- mblogit(formula = Response ~ 1, 
+              random = ~ 1 | Participant, 
+              data = pict)
+```
+
+In this case, the algorithm did not converge properly - if this were a real analysis, we could not simply continue but would have to inspect possible causes for this. However, as this is just a showcase, we will ignore this and move on. Next, we add the fixed effects (Gender and Group).
+
+```{r mult03, message=F, warning=F}
+m1 <- mblogit(formula = Response ~ Gender + Group, 
+              random = ~ 1 | Item, 
+              data = pict)
+```
+
+
+Now, we can compare the models to see if including the fixed-effects into the model has significantly improved the model fit.
+
+```{r mult04, message=F, warning=F}
+anova(m0, m1)
+```
+
+As the second model is significantly better, we are justified to believe that our fixed effects have explanatory power. We can now use the `getSummary.mmblogit` function to get a summary of the model with the fixed effects. 
+
+
+```{r mult05, message=F, warning=F}
+# inspect
+mclogit::getSummary.mmblogit(m1)
+```
+
+The NAs (not available information) is a result of the model having a bad fit to the data and, optimally, we would need to inspect why the model has a bad fit. Again, we ignore this and move on. Next, we check the VIFs to see if the model does not violate multicollinearity assumptions.
+
+```{r mult06, message=F, warning=F}
+car::vif(m1) # maybe use cut-off of 5 (maybe 10)
+```
+
+The VIFs are a bit high - especially the GVIF for Group would be a cause for concern if this was not just a demo analysis! However, as we only want to implement a multinomial mixed-effects model here and not provide a proper, clean analysis, we will ignore this issue here. 
+
+In a next step, we visualize effects to get a better understanding of how the predictors that are part of the fixed-effect structure of the mode affect the outcome (the response variable).
+
+```{r mult08, message=F, warning=F}
+sjPlot::plot_model(m1)
+```
+
+Finally, we can extract an alternative summary table produced by the `tab_model` function from the `sjPlot` package [see @sjPlot].
+
+
+```{r mult09, message=F, warning=F}
+sjPlot::tab_model(m1)
+```
+
+***
+
+This is the final step in implementing a a mixed-effects multinomial regression model using the `mblogit` function from the `mclogit` package [see @mclogit]. We are aware that the analysis shown here is supervifial(!) - but please keep in mind that we just wanted to showcase the implementation here rather than providing a properly and carefully done analysis.
+
+
+## Mixed-Effects Ordinal Regression{-}
+
+In this section, we will strictly focus on how to implement a mixed-effects ordinal regression model using the `clmm` function from the `ordinal` package [see @ordinal]. This type of regression model is extremely useful when dealing with Likert data or other types of questionnaire and survey data where the responses have some kind of hierarchical structure (i.e. responses are not truly independent because they come from different points in time or from different regions).
+load data
+
+```{r}
+# rating experiment data
+ratex  <- base::readRDS(url("https://slcladal.github.io/data/ratex.rda", "rb"))
+# inspect data
+head(ratex)
+```
+
+We now tabulate the data to get a better understanding of the data structure.
+
+```{r}
+ratex %>%
+  dplyr::group_by(Family, Accent) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  tidyr::spread(Accent, Frequency)
+```
+
+Next, we visualize the data to inspect its properties.
+
+```{r}
+ratex %>%
+  ggplot(aes(Family, AccentNumeric, color = Group)) + 
+  stat_summary(fun = mean, geom = "point") +          
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
+  theme_bw() +
+  theme(legend.position = "top") +
+  scale_color_manual(values = c("gray20", "gray70"))
+```
+
+
+An alternative plot shows other properties of the data.
+
+```{r}
+ratex %>%
+  dplyr::group_by(Family, Rater, Group) %>%
+  dplyr::summarise(AccentMean = mean(AccentNumeric)) %>%
+  ggplot(aes(Family, AccentMean, fill = Group)) + 
+  geom_boxplot() +
+  theme_bw() +
+  theme(legend.position = "top") +
+  scale_fill_manual(values = c("gray50", "gray85"))
+```
+
+
+We now start the modeling by generating a model with Family as the sole predictor.
+
+```{r}
+# fit baseline model
+m1 <- clmm(Accent ~ (1|Rater) + Family, link="logit", data = ratex)
+# test for incomplete information
+ifelse(min(ftable(ratex$Accent, ratex$Family)) == 0, "incomplete information", "okay")
+# extract aic
+aic.glmer <- AIC(logLik(m1))
+# inspect aic
+aic.glmer
+# summarize model
+summary(m1)
+```
+
+We can now perform Post-Hoc tests to see which comparisons are significant.
+
+```{r}
+lsmeans(m1, pairwise~Family, adjust="tukey")
+```
+
+Finally, we can summarize the model.
+
+```{r}
+sjPlot::tab_model(m1)
+```
+
+***
+
+And we can visualize the effects.
+
+```{r}
+plot_model(m1, type = "pred", terms = c("Family"))
+```
+
+That's it for this tutorial. We hope that you have enjoyed this tutorial and learned how to perform regression analysis including model fitting and model diagnostics as well as reporting regression results.
+
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Fixed- and Mixed-Effects Regression Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/regression.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`regression,
+  author = {Schweinberger, Martin},
+  title = {Fixed- and Mixed-Effects Regression Models in R},
+  note = {https://slcladal.github.io/regression.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+
+# References{-}
+
+
+
+
