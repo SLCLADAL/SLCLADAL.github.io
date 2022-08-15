@@ -17,7 +17,8 @@ exclude <- list(
 	'webcrawling.Rmd',
 	'todo.Rmd',
 	'txt2rda.Rmd',
-	'speech2text.Rmd'
+	'speech2text.Rmd',
+	'sldata.Rmd'
 )
 
 # Check if we have any command line arguments, otherwise just run on everything.
