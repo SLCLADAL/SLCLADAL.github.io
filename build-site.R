@@ -20,7 +20,8 @@ exclude <- list(
 	'speech2text.Rmd',
 	'sldata.Rmd',
 	'rmd2html.Rmd',
-	'rmd2jupyter.Rmd'
+	'rmd2jupyter.Rmd',
+	'simulatedata.Rmd'
 )
 
 # Check if we have any command line arguments, otherwise just run on everything.
@@ -38,13 +39,10 @@ failure_reasons <- list()
 # Note that we can't just use the render_site functionality, as that doesn't work with bookdowns html_document2 format.
 for (source_file in to_process) {
 	tryCatch(
-		{
-			rmarkdown::render(
-				file.path("content", source_file),
-				output_dir = "built_site",
-				envir = new.env()
-			)
-		},
+		xfun::Rscript_call(
+		  rmarkdown::render,
+		  args = list(file.path("content", source_file), output_dir = "built_site"),
+		),
 		error = function(cond){
 			failed_files <<- append(failed_files, source_file)
 			failure_reasons <<- append(failure_reasons, cond)
