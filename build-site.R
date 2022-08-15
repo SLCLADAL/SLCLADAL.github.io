@@ -7,7 +7,7 @@ library(rmarkdown)
 # just unfinished - I think these are all candidates for deletion from the
 #  repository to avoid confusion.
 
-exclude <- list('etpro.Rmd', 'eyews.Rmd', 'git.Rmd', 'mcol.Rmd', 'mixreg.Rmd', 'mmws.Rmd', 'webcrawling.Rmd', 'todo.Rmd')
+exclude <- list('etpro.Rmd', 'eyews.Rmd', 'git.Rmd', 'mcol.Rmd', 'mixreg.Rmd', 'mmws.Rmd', 'webcrawling.Rmd', 'todo.Rmd', 'txt2rda.Rmd')
 
 # Check if we have any command line arguments, otherwise just run on everything.
 args = commandArgs(trailingOnly=TRUE)
