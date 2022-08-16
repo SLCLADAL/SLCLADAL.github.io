@@ -3710,17 +3710,17 @@ We begin the model fitting process by creating a mixed- and a fixed-effects inte
 
 ```{r qpmm1, eval = T, echo=T, message=T, warning=T}
 # base-line mixed-model
-m0.glmer = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
+m0.qp = glmmPQL(UHM ~ 1, random = ~ 1 | Language, data = countdata, 
                    family = quasipoisson(link='log'))
 # add Shots
-m1.glmer <- update(m0.glmer, .~.+ Shots)
-Anova(m1.glmer, test = "Chi")           # SIG! (p<0.0000000000000002 ***)
+m1.qp <- update(m0.qp, .~.+ Shots)
+Anova(m1.qp, test = "Chi")           # SIG! (p<0.0000000000000002 ***)
 ```
 
 The ANOVA confirms that Shots have a significant impact on the number of instances of *uhm*. We will now have a look at the model summary.
 
 ```{r qpmm2}
-summary(m1.glmer)
+summary(m1.qp)
 ```
 
 The model summary does not provide much information such as,e.g. AIC or BIC values. The coefficient for *Shots* is highly significant (p <.001) and the data is notably over-dispersed (the Standardized Within-Group Residuals deviate substantially from a normal distribution with higher values having a thick tail). Also, in contrast to the Poisson model, Language does explain at least a minimal share of the variance now as the mean and standard deviation are no longer 0. Note also, that the coefficients are identical to the Poisson coefficients but the standard errors and p-values differ (the model provides t- rather than z-values).
@@ -3738,11 +3738,11 @@ Before inspecting the relationship between Shots and *uhm*, we will check if the
 
 ```{r qpmm4}
 # extract pearson residuals
-PearsonResiduals <- resid(m1.glmer, type = "pearson")
+PearsonResiduals <- resid(m1.qp, type = "pearson")
 # extract number of cases in model
 Cases <- nrow(countdata)
 # extract number of predictors (plus intercept)
-NumberOfPredictors <- length(fixef(m1.glmer)) +1
+NumberOfPredictors <- length(fixef(m1.qp)) +1
 # calculate overdispersion
 Overdispersion <- sum(PearsonResiduals^2) / (Cases-NumberOfPredictors)
 # inspect overdispersion
@@ -3755,14 +3755,14 @@ We continue to diagnose the model by plotting the Pearson's residuals against fi
 
 ```{r qpmm5}
 # diagnostic plot
-plot(m1.glmer, pch = 20, col = "black", lty= "dotted", ylab = "Pearson's residuals")
+plot(m1.qp, pch = 20, col = "black", lty= "dotted", ylab = "Pearson's residuals")
 ```
 
 Indeed, the plot exhibits a (slight) funnel shape (but not drastically so) and thus indicates heteroscedasticity. However, the patterning that we observed with the Poisson model has disappeared. We continue by plotting the random effect adjustments.
 
 ```{r qpmm10}
 # generate diagnostic plots
-plot(m1.glmer, Language ~ resid(.), abline = 0, fill = "gray70") 
+plot(m1.qp, Language ~ resid(.), abline = 0, fill = "gray70") 
 ```
 
 The adjustments by "Language" are marginal (which was somewhat expected given that Language was only deemed tentative), which shows that there is very little variation between the languages and that we have no statistical reason to include Language as a random effect. 
@@ -3770,14 +3770,14 @@ The adjustments by "Language" are marginal (which was somewhat expected given th
 In a final step, we plot the fixed-effect of *Shots* using the `predictorEffects` function from the `effects` package [@effects].
 
 ```{r qpmm11b}
-plot_model(m1.glmer, type = "pred", terms = c("Shots"))
+plot_model(m1.qp, type = "pred", terms = c("Shots"))
 ```
 
 The effects plot shows that the number of *uhms* increases exponentially with the number of shots a speaker has had. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
 
 ```{r qpmm11f, warning=F, message=F}
 countdata %>%
-  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  mutate(Predicted = predict(m1.qp, type = "response")) %>%
   dplyr::rename(Observed = UHM) %>%
   tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
   dplyr::mutate(Shots = factor(Shots),
@@ -3794,7 +3794,7 @@ Given that the overdispersion measure of this Quasi-Poisson model is close to 1,
 Finally, we extract the summary table of this model.
 
 ```{r qpmm11c}
-sjPlot::tab_model(m1.glmer)
+sjPlot::tab_model(m1.qp)
 ```
 
 ***
@@ -3816,7 +3816,7 @@ sjPlot::tab_model(m1.glmer)
 
 
 ```{r qpmm11d, message=F, warning=F}
-r.squaredGLMM(m1.glmer)
+r.squaredGLMM(m1.qp)
 ```
 
 ### Mixed-Effects Negative Binomial Regression{-}
@@ -3827,23 +3827,18 @@ To implement a Negative-Binomial Mixed-Effects Regression, we first create a mix
 
 ```{r nbmm1}
 # base-line mixed-model
-m0.glmer = glmer.nb(UHM ~ 1 + (1 | Language), data = countdata)
+m0.nb = glmer.nb(UHM ~ 1 + (1 | Language), data = countdata)
 # add Shots
-m1.glmer <- update(m0.glmer, .~.+ Shots)
-anova(m1.glmer, m0.glmer)           
+m1.nb <- update(m0.nb, .~.+ Shots)
+anova(m1.nb, m0.nb)           
 ```
 
-The negative-binomial model also reports a significant impact of shots on the number of *uhms*. We will now inspect the summary.
-
-```{r nbmm2}
-# inspect model
-summary(m1.glmer)           
-```
+The negative-binomial model also reports a significant impact of shots on the number of *uhms*. 
 In a next step, we calculate the overdispersion.
 
 ```{r nbmm3}
 # extract pearson residuals
-PearsonResiduals <- resid(m1.glmer, type = "pearson")
+PearsonResiduals <- resid(m1.nb, type = "pearson")
 # extract number of betas + predictors + sigma
 NumberOfPredictors <- 2+1+1
 # extract number of cases in model
@@ -3856,7 +3851,7 @@ Overdispersion
 The overdispersion has increased which is rather suboptimal. In this case, we would report the  Quasi-Poisson Regression rather than the Negative Binomial Model (which is rather rare as Negative Binomial Models typically perform better than (Quasi-)Poisson models. However, this tutorial focuses merely on how to implement a Negative Binomial Mixed-Effects Regression and we thus continue with generating diagnostic plots to check for problems.
 
 ```{r nbmm4}
-diag_data <- data.frame(PearsonResiduals, fitted(m1.glmer)) %>%
+diag_data <- data.frame(PearsonResiduals, fitted(m1.nb)) %>%
   dplyr::rename(Pearson = 1,
                 Fitted = 2)
 p9 <- ggplot(diag_data, aes(x = Fitted, y = Pearson)) +
@@ -3876,14 +3871,14 @@ grid.arrange(p9, p10, p11, nrow = 1)
 The diagnostics show patterning similar to the one we saw with the Poisson model which suggest that the negative binomial model is also not an optimal model for our data. We continue by plotting the predicted values and, subsequently, summarize the analysis. 
 
 ```{r nbmm6b}
-plot_model(m1.glmer, type = "pred", terms = c("Shots"))
+plot_model(m1.nb, type = "pred", terms = c("Shots"))
 ```
 
 The effect plot shows that the predicted number of shots increases exponentially with each shot. We now compare the predicted number of *uhm* with the actually observed instances of *uhm* to check if the results of the model make sense.
 
 ```{r nbmm6f, warning=F, message=F}
 countdata %>%
-  mutate(Predicted = predict(m1.glmer, type = "response")) %>%
+  mutate(Predicted = predict(m1.nb, type = "response")) %>%
   dplyr::rename(Observed = UHM) %>%
   tidyr::gather(Type, Frequency, c(Observed, Predicted)) %>%
   dplyr::mutate(Shots = factor(Shots),
@@ -3898,32 +3893,6 @@ countdata %>%
 
 The comparison between the observed and the predicted uses of *uhm* becomes somewhat volatile and shows fluctuations after eight shots. We will now summarize the results as if the violations had NOT occurred(!) - again: this is only because we are practicing here - this would be absolutely unacceptable in a proper write-up of an analysis!
 
-And, we extract the summary table of this model.
-
-```{r nbmm6c}
-sjPlot::tab_model(m1.glmer)
-```
-
-***
-
-<br>
-
-<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package [@MuMIn].</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-
-<br>
-
-```{r nbmm6d}
-r.squaredGLMM(m1.glmer)
-```
-
-***
 
 A mixed-effect negative binomial regression model which contained the language in which the conversation took place as random effect was fit to the data. Prior to the regression modeling, a Boruta analysis was applied to determine whether any of the predictors had a meaningful relationship with the dependent variable (instances of *uhm*). Since the Boruta analysis indicated that only the number of shots a speaker had was important, only "Shots" was tested during model fitting. The final minimal adequate model showed that the number of *uhm* as fillers increases significantly, and near-linearly with the number of shots speakers had ($\chi$^2^(1):83.0, p <.0001, $\beta$: 0.2782). An inspection of the random effect structure conveyed that there was almost no variability between languages and language did not contribute meaningfully to the model fit.
 
@@ -3943,7 +3912,7 @@ head(pict)
 In a first step, we generate a baseline model that we call `m0`. This model only contains the random effect structure and the intercept as the sole predictor.
 
 ```{r mult02, message=F, warning=F}
-m0 <- mblogit(formula = Response ~ 1, 
+m0.mn <- mblogit(formula = Response ~ 1, 
               random = ~ 1 | Participant, 
               data = pict)
 ```
@@ -3951,7 +3920,7 @@ m0 <- mblogit(formula = Response ~ 1,
 In this case, the algorithm did not converge properly - if this were a real analysis, we could not simply continue but would have to inspect possible causes for this. However, as this is just a showcase, we will ignore this and move on. Next, we add the fixed effects (Gender and Group).
 
 ```{r mult03, message=F, warning=F}
-m1 <- mblogit(formula = Response ~ Gender + Group, 
+m1.mn <- mblogit(formula = Response ~ Gender + Group, 
               random = ~ 1 | Item, 
               data = pict)
 ```
@@ -3960,7 +3929,7 @@ m1 <- mblogit(formula = Response ~ Gender + Group,
 Now, we can compare the models to see if including the fixed-effects into the model has significantly improved the model fit.
 
 ```{r mult04, message=F, warning=F}
-anova(m0, m1)
+anova(m0.mn, m1.mn)
 ```
 
 As the second model is significantly better, we are justified to believe that our fixed effects have explanatory power. We can now use the `getSummary.mmblogit` function to get a summary of the model with the fixed effects. 
@@ -3968,13 +3937,13 @@ As the second model is significantly better, we are justified to believe that ou
 
 ```{r mult05, message=F, warning=F}
 # inspect
-mclogit::getSummary.mmblogit(m1)
+mclogit::getSummary.mmblogit(m1.mn)
 ```
 
 The NAs (not available information) is a result of the model having a bad fit to the data and, optimally, we would need to inspect why the model has a bad fit. Again, we ignore this and move on. Next, we check the VIFs to see if the model does not violate multicollinearity assumptions.
 
 ```{r mult06, message=F, warning=F}
-car::vif(m1) # maybe use cut-off of 5 (maybe 10)
+car::vif(m1.mn) # maybe use cut-off of 5 (maybe 10)
 ```
 
 The VIFs are a bit high - especially the GVIF for Group would be a cause for concern if this was not just a demo analysis! However, as we only want to implement a multinomial mixed-effects model here and not provide a proper, clean analysis, we will ignore this issue here. 
@@ -3982,14 +3951,14 @@ The VIFs are a bit high - especially the GVIF for Group would be a cause for con
 In a next step, we visualize effects to get a better understanding of how the predictors that are part of the fixed-effect structure of the mode affect the outcome (the response variable).
 
 ```{r mult08, message=F, warning=F}
-sjPlot::plot_model(m1)
+sjPlot::plot_model(m1.mn)
 ```
 
 Finally, we can extract an alternative summary table produced by the `tab_model` function from the `sjPlot` package [see @sjPlot].
 
 
 ```{r mult09, message=F, warning=F}
-sjPlot::tab_model(m1)
+sjPlot::tab_model(m1.mn)
 ```
 
 ***
@@ -4049,27 +4018,27 @@ We now start the modeling by generating a model with Family as the sole predicto
 
 ```{r}
 # fit baseline model
-m1 <- clmm(Accent ~ (1|Rater) + Family, link="logit", data = ratex)
+m1.or <- clmm(Accent ~ (1|Rater) + Family, link="logit", data = ratex)
 # test for incomplete information
 ifelse(min(ftable(ratex$Accent, ratex$Family)) == 0, "incomplete information", "okay")
 # extract aic
-aic.glmer <- AIC(logLik(m1))
+aic.glmer <- AIC(logLik(m1.or))
 # inspect aic
 aic.glmer
 # summarize model
-summary(m1)
+summary(m1.or)
 ```
 
 We can now perform Post-Hoc tests to see which comparisons are significant.
 
 ```{r}
-lsmeans(m1, pairwise~Family, adjust="tukey")
+lsmeans(m1.or, pairwise~Family, adjust="tukey")
 ```
 
 Finally, we can summarize the model.
 
 ```{r}
-sjPlot::tab_model(m1)
+sjPlot::tab_model(m1.or)
 ```
 
 ***
@@ -4077,7 +4046,7 @@ sjPlot::tab_model(m1)
 And we can visualize the effects.
 
 ```{r}
-plot_model(m1, type = "pred", terms = c("Family"))
+plot_model(m1.or, type = "pred", terms = c("Family"))
 ```
 
 That's it for this tutorial. We hope that you have enjoyed this tutorial and learned how to perform regression analysis including model fitting and model diagnostics as well as reporting regression results.
