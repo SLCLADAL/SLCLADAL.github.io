@@ -21,6 +21,6 @@ right <- rmarkdown:::navbar_links_html(navbar$right)
 template <- rmarkdown:::file_string("_navbar_template.html")
 navbar_html <- sprintf(template, navbar$type, navbar$title, left, right)
 
-f <- file(file.path("content", "_navbar.html")
+f <- file(file.path("content", "_navbar.html"))
 writeLines(navbar_html, f)
 close(f)
