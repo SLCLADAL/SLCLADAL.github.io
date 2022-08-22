@@ -41,7 +41,7 @@ for (source_file in to_process) {
 	tryCatch(
 		xfun::Rscript_call(
 		  rmarkdown::render,
-		  args = list(file.path("content", source_file), output_dir = "built_site"),
+		  args = list(file.path("content", source_file), output_dir = "docs"),
 		),
 		error = function(cond){
 			failed_files <<- append(failed_files, source_file)
