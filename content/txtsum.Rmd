@@ -1,0 +1,227 @@
+---
+title: "Automated Text Summarization with R"
+author: "Martin Schweinberger"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial shows how to summarize texts automatically using R by extracting the most prototypical sentences. 
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to summarize textual data  using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with summarizing texts.
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/txtsum.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# install packages
+install.packages("xml2")
+install.packages("rvest")
+install.packages("lexRankr")
+install.packages("textmineR")
+install.packages("tidyverse")
+install.packages("quanteda")
+install.packages("igraph")
+install.packages("here")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Next we activate the packages.
+
+```{r prep2, echo=T, eval = T, message=FALSE, warning=FALSE}
+# activate packages
+library(xml2)
+library(rvest)
+library(lexRankr)
+library(textmineR)
+library(tidyverse)
+library(quanteda)
+library(igraph)
+library(here)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed RStudio and have also initiated the session by executing the code shown above, you are good to go.
+
+# Basic Text summarization{-}
+
+This section shows an easy to use text summarizing method which extracts the most prototypical sentences from a text. As such, this text summarizer does not generate sentences based on prototypical words but evaluates how prototypical or central sentences are and then orders the sentences in a text according to their prototypicality (or centrality).
+
+For this example, we will download text from a Guardian article about a meeting between Angela Merkel and Donald Trump at the G20 summit in 2017. In a first step, we define the url of the webpage hosting the article.
+
+```{r}
+# url to scrape
+url = "https://www.theguardian.com/world/2017/jun/26/angela-merkel-and-donald-trump-head-for-clash-at-g20-summit"
+```
+
+Next, we extract the text of the article using the`xml2  and the `rvest` packages.
+
+```{r}
+# read page html
+page = xml2::read_html(url)
+# extract text from page html using selector
+page %>%
+  # extract paragraphs
+  rvest::html_nodes("p") %>%
+  # extract text
+  rvest::html_text() %>%
+  # remove empty elements
+  .[. != ""] -> text
+# inspect data
+head(text)
+```
+
+Now that we have the text, we apply the `lexRank` function from the `lexRankr` package to determine the prototypicality (or centrality) and extract the three most central sentences.
+
+```{r}
+# perform lexrank for top 3 sentences
+top3sentences = lexRankr::lexRank(text,
+                          # only 1 article; repeat same docid for all of input vector
+                          docId = rep(1, length(text)),
+                          # return 3 sentences
+                          n = 3,
+                          continuous = TRUE)
+# inspect
+top3sentences
+```
+
+Next, we extract and display the sentences from the table. 
+
+```{r}
+top3sentences$sentence
+```
+
+The output show the three most prototypical (or central) sentences of the article. The articles are already in chronological order - if the sentences were not in chronological order, we could also have ordered them by *sentenceId* before displaying them using `dplyr` and `stringr` package functions as shown below (in our case the order does not change as the prototypicality and the chronological order are identical).
+
+```{r}
+top3sentences %>%
+  dplyr::mutate(sentenceId = as.numeric(stringr::str_remove_all(sentenceId, ".*_"))) %>%
+  dplyr::arrange(sentenceId) %>%
+  dplyr::pull(sentence)
+```
+
+***
+
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>EXERCISE TIME!</b></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<div class="question">` 
+
+
+
+1. Extract the top 10 sentences from every chapter of Charles Darwin's *On the Origin of Species*. You can download the text using this command: `darwin <- base::readRDS(url("https://slcladal.github.io/data/origindarwin.rda", "rb"))`. You will then have to paste the whole text together, split it into chapters, create a list of sentences in each chapter, and then apply text summarization to each element in the list. <br>
+
+<details>
+  <summary>Answer</summary>
+  ```{r ex1_1, class.source = NULL, eval = F}
+  darwin <- base::readRDS(url("https://slcladal.github.io/data/origindarwin.rda", "rb")) %>%
+  # collapse into single document
+  paste0(collapse = " ") %>%
+  # split into chapters
+  stringr::str_split("CHAPTER")
+  
+  # split chapters into sentences
+  chapters <- sapply(darwin, function(x){
+    x <- stringi::stri_split_boundaries(x, type = "sentence")
+  })
+  
+  chapters_clean <- lapply(chapters, function(x){
+    # remove chapter headings
+    x <- stringr::str_remove_all(x, "[A-Z]{2,} {0,1}[0-9]{0,}")
+  })
+
+  # extract top 3 sentences from each chapter
+  top3s <- lapply(chapters_clean, function(x){
+    x <- lexRankr::lexRank(x,
+                          # only 1 article; repeat same docid for all of input vector
+                          #docId = rep(1, length(text)),
+                          # return 3 sentences
+                          n = 3,
+                          continuous = TRUE) %>%
+                          dplyr::pull(sentence) %>%
+    # remove special characters
+    stringr::str_remove_all("[^[:alnum:] ]") %>%
+    # remove superfluous white spaces
+    stringr::str_squish()
+  })
+  
+  # inspect top 3 sentences of first 5 chapters
+  top3s[1:5]
+  ```
+</details>
+
+
+</div>`
+
+***
+
+You can go ahead and play with the text summarization and see if it is useful for you or if you can trust the results based on your data. 
+
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Automated text summarization with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/txtsum.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`txtsum,
+  author = {Schweinberger, Martin},
+  title = {Automated Text Summarization with R},
+  note = {https://slcladal.github.io/txtsum.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+

@@ -1,0 +1,278 @@
+---
+title: "Reinforcement Learning and Text Summarization in R"
+author: "Dattatreya Majumdar"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces the concept of Reinforcement Learning (RL) [see @sutton2018reinforcement; @wu2018study; @paulus2017deep], and how it can be applied in the domain of Natural Language Processing (NLP) and linguistics.
+
+
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how RI works. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with RI. 
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/reinfnlp.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/IntroR_workshop.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts in this tutorial are executed without errors. Before continuing, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+For this tutorial we will be primarily requiring four packages: *tidytext* for text manipulations, *tidyverse* for general tasks, *textrank* for the implementation of the TextRank algorithm and *rvest* to scrape through an article to use as an example. For this analysis an article for Time has been selected.
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)
+# install libraries
+install.packages(c("tidytext","tidyverse","textrank","rvest","ggplot2"))
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# set options
+options(stringsAsFactors = F)          # no automatic data transformation
+options("scipen" = 100, "digits" = 12) # suppress math annotation
+# activate packages
+library(tidytext)
+library(tidyverse)
+library(textrank)
+library(rvest)
+library(ggplot2)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed R and RStudio and also initiated the session by executing the code shown above, you are good to go.
+
+
+# Reinforment Learning{-}
+
+Reinforcement Learning enables a machines and software agents to independently determine the optimal behavior depending on a specific concept to enhance the overall performance. The system requires a reward feedback to learn its behavior which is known as reinforcement signal. The schematic diagram of Reinforcement Learning is provided below: -
+
+```{r reinf, echo=FALSE, out.width= "60%", out.extra='style="float:center; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/Reinforcement.PNG")
+```
+
+Any RL framework comprises of 3 major components:
+
+- *Action* determines all possible moves that the agent can make which is normally expressed as a mathematical function.
+- *State* it is an explicit and quick circumstance that the agent can find itself in posed by the environment or any future circumstance
+- *Reward* it is the feedback input from the environment which measure the achievement or failure of the agent's activities.
+
+The are three broad categories of RL:
+
+- *Value Based* which determines the optimal value function and it is the maximum value achievable under any policy.
+- *Policy Based* which identifies the optimal policy achieving maximum future reward
+- *Model Based* involves a model which predicts attributes or provides representation of the environment
+
+Without going into the mathematical intricacies of RL we will focus on possible applications of deep RL to linguistic data this tutorial. In its current form, RL plays a pivotal role in various Natural Language Processing (NLP) applications some of which are:
+
+- Article Summarisation
+- Question Answering (QA)
+- Dialogue Generation
+- Dialogue System
+- Knowledge-based QA
+- Machine Translation
+- Text Generation
+
+In the following sections we will explore some use cases of RL and interpret how deep RL can implement them.
+
+## Text Summarisation{-}
+
+A deep reinforced model for text summarisation involves sequence of input tokens *x={x~1~,x~2~,...,x~n~}* and produces a sequence of output (summary) tokens. A schematic presentation of the process is shown below:
+
+```{r rlartsumm, echo=FALSE, out.width= "100%", out.extra='style="float:center; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/deeprlartsumm.PNG")
+```
+
+For the article summarisation objective the deep RL has the following components:
+
+- *Action* which involves a function *u~t~* which copies and generates summary output *y~t~*
+- *State* it encapsulates the hidden states of encoder and previous outputs
+- *Reward* which generates a rough score determining the performance of the summarisation
+
+Text summarisation [see @mihalcea2004textrank] is highly critical in extracting important information from large texts. 
+
+In case of text summarisation there are broadly two categories:
+
+- Extractive Summarisation
+- Abstractive Summarisation
+
+In case of *Extractive Summarisation* words and sentences are scored according to a specific metric and then utilizing that information for summarizing based copying or pasting the most informative parts of the text.
+
+On the other hand *Abstractive Summarisation* involves building a semantic representation of the text and then incorporating natural language generation techniques to generate text highlighting the informative parts of the parent text document.
+
+Here, we will be focusing on an extractive summarisation method called *TextRank* which is hinged upon the *PageRank* algorithm which was developed by Google to rank websites based on their importance.
+
+**The TextRank Algorithm**
+
+TextRank is a graph-based ranking algorithm for NLP. Graph-based ranking algorithms evaluate the importance of a vertex within a graph, based on global information extracted recursively from the entire graph. When one vertex is associated with another it is actually casting a vote for that vertex. The higher the number of votes cast for a vertex, the higher importance of that vertex.
+
+In the NLP case it is necessary to define vertices and edges. In this tutorial we will be using sentences as vertices and words as edges. Thus sentences with words present in many other sentences will have higher priority
+
+```{r timeart, message=F, warning=F}
+library(tidyverse)
+library(tidytext)
+library(textrank)
+library(rvest)
+# define url
+url <- "http://time.com/5196761/fitbit-ace-kids-fitness-tracker/"
+# read in data
+article <- read_html(url) %>%
+  html_nodes('div[class="padded"]') %>%
+  html_text()
+```
+
+Next the article is loaded into a tibble. Then tokenisation is implemented according to sentences. Although this tokenisation is fully perfect it has a lower number of dependencies and is suitable for this case. Finally we add column for sentence number and switch the order of the columns. 
+
+```{r datatibble}
+article_sentences <- tibble(text = article) %>%
+  tidytext::unnest_tokens(sentence, text, token = "sentences") %>%
+  dplyr::mutate(sentence_id = row_number()) %>%
+  dplyr::select(sentence_id, sentence)
+article_sentences
+```
+
+Next we will tokenize based on words.
+
+```{r artword,dependson="datatibble"}
+article_words <- article_sentences %>%
+  tidytext::unnest_tokens(word, sentence)
+article_words
+```
+
+We have one last step left is to remove the stop words in *article_words* as they are prone to result in redundancy.
+
+```{r artwordstop,dependson="artword"}
+article_words <- article_words %>%
+  dplyr::anti_join(stop_words, by = "word")
+article_words
+```
+
+Using the textrank package it is really easy to implement the TextRank algorithm. The *textrank_sentences* function requires only 2 inputs:
+
+- A data frame with sentences
+- A data frame with tokens which are part of each sentence
+
+```{r summary,dependson="artwordstop"}
+article_summary <- textrank_sentences(data = article_sentences, 
+                                      terminology = article_words)
+# inspect the summary
+article_summary
+```
+
+Lets have a look where these important sentences appear in the article:
+
+```{r impsent, dependson = "summary", fig.height=6, fig.width=6, fig.cap="Position of Important Sentences in the Article"}
+library(ggplot2)
+article_summary[["sentences"]] %>%
+  ggplot(aes(textrank_id, textrank, fill = textrank_id)) +
+  geom_col() +
+  theme_minimal() +
+  scale_fill_viridis_c() +
+  guides(fill = "none") +
+  labs(x = "Sentence",
+       y = "TextRank score",
+       title = "Most informative sentences appear within first half of sentences",
+       subtitle = 'In article "Fitbits Newest Fitness Tracker Is Just for Kids"',
+       caption = "Source: http://time.com/5196761/fitbit-ace-kids-fitness-tracker/")
+```
+
+## Other Applications of RL{-}
+
+### Dialogue Generation{-}
+
+In today's digital world dialogue generation is a widely used application especially in chatbots. One widely used model in this regard is the Long Short Term Memory (LSTM) sequence-to-sequence (SEQ2SEQ) model. It is a neural generative model that maximizes the probability of generating a response given the previous dialogue. However SEQ2SEQ model has some constraints:
+
+- They tend to generate highly generic responses
+- Often they are stuck in an infinite loop of repetitive responses
+
+This is where deep RL is much more efficient as it can integrate developer-defined rewards which efficiently mimics the true goal of chatbot development. In case of dialogue generation the component:
+
+- *Action* which involves a function that generates sequences of arbitrary lengths
+- *State* it comprises of previous 2 dialogue turns [p~i~,q~i~]
+- *Reward* which determines the ease of answering, information flow and semantic coherence
+
+The schematic diagram highlighting the dialogue simulation between 2 agents using deep RL is shown below:
+
+```{r dlsimrl, echo=FALSE, out.width= "100%", out.extra='style="float:center; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/dlsimrl.PNG")
+```
+
+### Neural Machine Translation{-}
+
+Most of Neural Machine Translation (NMT) models are based encoder-decoder framework with attention mechanism. The encoder initially maps a source sentence *x={x~1~,x~2~,...,x~n~}* to a set of continuous representations *z={z~1~,z~2~,...,z~n~}* . Given *z* the decoder then generates a target sentence *y={y~1~,y~2~,...,y~m~}* of word tokens one by one. RL is used to bridge the gap between training and inference of of NMT by directly optimizing the loss function at training time. In this scenario the NMT model acts as the *agent* which interacts with the *environment* which in this case are the previous words and the context vector *z* available at each step *t*. This is a a policy based RL and in place of a state a policy will be assigned in every iteration. The critical components of the RL for NMT are discussed below:
+
+- *Policy* which is a conditional probability defined by the parameters of the agent
+- *Action* is decided by the agent based on the policy and it will pick up a candidate word from the vocabulary
+- *Reward* is evaluated once the agent generates a complete sequence which in case of machine translation is *Bilingual Evaluation Understudy (BLEU)*.BLEU is defined by comparing the generated sequence with the ground truth sequence.
+
+The schematic of the overall process is depicted below:
+
+```{r nmt, echo=FALSE, out.width= "60%", out.extra='style="float:center; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/NMT.PNG")
+```
+
+
+# Citation & Session Info {-}
+
+Majumdar, Dattatreya. `r format(Sys.time(), '%Y')`. *Reinforcement Learning in NLP*. Brisbane: The University of Queensland. url: https://slcladal.github.io/reinfnlp.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{Majumdar`r format(Sys.time(), '%Y')`ta,
+  author = {Majumdar, Dattatreya},
+  title = {Reinforcement Learning in NLP},
+  note = {https://slcladal.github.io/reinfnlp.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://slcladal.github.io/index.html)
+
+***
+
+# References {-}
+
+
