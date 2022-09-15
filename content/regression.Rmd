@@ -163,6 +163,7 @@ install.packages("car")
 install.packages("emmeans")
 install.packages("effects")
 install.packages("flextable")
+install.packages("glmulti")
 install.packages("ggplot2")
 install.packages("ggpubr")
 install.packages("Hmisc")
@@ -198,6 +199,7 @@ library(car)
 library(effects)
 library(emmeans)
 library(flextable)
+library(glmulti)
 library(ggfortify)
 library(ggplot2)
 library(ggpubr)
@@ -1306,9 +1308,9 @@ As a first step, we need to define contrasts and use the `datadist` function to 
 ```{r blm7, message=F, warning=F}
 # set contrasts
 options(contrasts  =c("contr.treatment", "contr.poly"))
-# create distance matrix
+# extract distribution summaries for all potential variables
 blrdata.dist <- datadist(blrdata)
-# include distance matrix in options
+# store distribution summaries for all potential variables
 options(datadist = "blrdata.dist")
 ```
 
@@ -2878,7 +2880,7 @@ Major disadvantages of regression modeling are that they are prone to producing 
 
 As is the case with linear mixed-effects models, binomial logistic mixed-effect models are multivariate analyses that treat data points as hierarchical or grouped in some way. In other words, they take into account that the data is nested in the sense that data points are produced by the same speaker or are grouped by some other characteristics. In mixed-models, hierarchical structures are modelled as *random effects*. If the random effect structure represents speakers then this means that a mixed-model would have a separate intercept and/or slope for each speaker. 
 
-*Random Effects* in linear models can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable.  *random intercepts* (center left panel \ref{fig:mem02}) or various *random slopes* (center right panel \ref{fig:mem02}), or both, various *random intercepts* and various *random slopes* (right panel \ref{fig:mem02}). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by "random intercepts".
+Random Effects in linear models can be visualized using two parameters: the intercept (the point where the regression line crosses the y-axis at x = 0) and the slope (the acclivity of the regression line). In contrast to linear mixed-effects models, random effects differ in the position and the slope of the logistic function that is applied to the likelihood of the dependent variable. Random intercepts (upper right panel) or various random slopes (lower left panel), or both, various random intercepts and various random slopes (lower right panel). In the following, we will only focus on models with random intercepts because this is the by far more common method and because including both random intercepts and random slopes requires huge amounts of data. Consider the Figure below to understand what is meant by *random intercepts*.
 
 ```{r blmm1, echo=F, message=FALSE, warning=FALSE}
 x1 <- c(62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 72.5, 73.5, 74.5, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86)
@@ -3064,7 +3066,7 @@ The upper left panel in the Figure above indicates that men use discourse *like*
 
 ### Model Building{-}
 
-In a first step, we set the options.
+As a first step, we need to define contrasts and use the `datadist` function to store aspects of our variables that can be accessed later when plotting and summarizing the model. Contrasts define what and how variable levels should be compared and therefore influences how the results of the regression analysis are presented. In this case, we use treatment contrasts which are in-built. Treatment contrasts mean that we assess the significance of levels of a predictor against a baseline which is the reference level of a predictor. @field2012discovering [414-427] and @gries2021statistics provide very good and accessible explanations of contrasts and how to manually define contrasts if you would like to know more.
 
 ```{r blmm9}
 # set options
@@ -3073,7 +3075,7 @@ mblrdata.dist <- datadist(mblrdata)
 options(datadist = "mblrdata.dist")
 ```
 
-In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the "glmer" function with a random intercept for ID (a lmer object of the final minimal adequate model will be created later).
+In a next step, we generate fixed-effects minimal base-line models and a base-line mixed-model using the `glmer` function with a random intercept for ID (a lmer-object of the final minimal adequate model will be created later).
 
 ```{r blmm10}
 # baseline model glm
@@ -3106,288 +3108,51 @@ The p-value of the Model Likelihood Ratio Test is lower than .05 which shows tha
 
 ### Model Fitting{-}
 
-The next step is to fit the model which means that we aim to find the "best" model, i.e. the minimal adequate model. In this case, we will use a manual step-wise step-up, forward elimination procedure.
-Before we begin with the model fitting process we need to add ´control = glmerControl(optimizer = "bobyqa")´ to avoid unnecessary failures to converge.
+The next step is to fit the model which means that we aim to find the *best* model, i.e. the minimal adequate model. In this case, we will use the `glmulti` package to find the model with the lowest Bayesian Information Criterion (BIC) of all possible models. We add ´control = glmerControl(optimizer = "bobyqa")´ to avoid unnecessary failures to converge.
 
-```{r blmm13}
-m0.glmer <- glmer(SUFlike ~ 1+ (1|ID), family = binomial, data = mblrdata, control=glmerControl(optimizer="bobyqa"))
-```
-
-During each step of the fitting procedure, we test whether certain assumptions on which the model relies are violated. To avoid *incomplete information* (a combination of variables does not occur in the data), we tabulate the variables we intend to include and make sure that all possible combinations are present in the data. Including variables although not all combinations are present in the data would lead to unreliable models that report (vastly) inaccurate results. A special case of incomplete information is *complete separation* which occurs if one predictor perfectly explains an outcome (in that case the incomplete information would be caused by a level of the dependent variable). In addition, we make sure that the VIFs do not exceed a maximum of 3 for main effects [@zuur2010protocol] - @booth1994regression suggest that VIFs should ideally be lower than 3 for as higher values would indicate multicollinearity and thus that the model is unstable. The value of 3 should be taken with a pinch of salt because there is no clear consensus about what the maximum VIF for interactions should be or if it should be considered at all. The reason is that we would, of course, expect the VIFs to increase when we are dealing with interactions as the main effects that are part of the interaction are very likely to correlate with the interaction itself. However, if the VIFs are too high, then this will still cause the issues with the attribution of variance. The value of 3 was chosen based on recommendations in the standard literature on multicollinearity [@zuur2009mixedmodels; @neter1990vif]. Only once we have confirmed that the incomplete information, complete separation, and *multicollinearity* are not a major concern, we generate the more saturated model and test whether the inclusion of a predictor leads to a significant reduction in residual deviance. If the predictor explains a significant amount of variance, it is retained in the model while being disregarded in case it does not explain a sufficient quantity of variance.  
-
-```{r blmm14}
-# add Priming
-ifelse(min(ftable(mblrdata$Priming, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m1.glmer <- update(m0.glmer, .~.+Priming)
-anova(m1.glmer, m0.glmer, test = "Chi") 
-```
-
-Since the tests do not show problems relating to incomplete information, because including *Priming* significantly improves the model fit (decrease in AIC and BIC values), and since it correlates significantly with our dependent variable, we include *Priming* into our model.
-
-```{r blmm15}
-# add Age
-ifelse(min(ftable(mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m2.glmer <- update(m1.glmer, .~.+ Age)
-ifelse(max(car::vif(m2.glmer)) <= 3,  "VIFs okay", "VIFs unacceptable") 
-anova(m2.glmer, m1.glmer, test = "Chi")   
-Anova(m2.glmer, test = "Chi")
-```
-
-The ANOVAs show that *Age* is not significant and the first ANOVA also shows that the BIC has increased which indicates that *Age* does not decrease variance. In such cases, the variable should not be included. 
-
-However, if the second ANOVA would report *Age* as being marginally significant, a case could be made for including it but it would be better to change the ordering in which predictors are added to the model. This is, however, just a theoretical issue here as *Age* is clearly not significant.
-
-```{r blmm16}
-# add Gender
-ifelse(min(ftable(mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m3.glmer <- update(m1.glmer, .~.+Gender)
-ifelse(max(car::vif(m3.glmer)) <= 3,  "VIFs okay", "VIFs unacceptable") 
-anova(m3.glmer, m1.glmer, test = "Chi")
-Anova(m3.glmer, test = "Chi")
-```
-
-*Gender* is significant and will therefore be included as a predictor (you can also observe that including Gender has substantially decreased both AIC and BIC).
-
-```{r blmm17}
-# add ConversationType
-ifelse(min(ftable(mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m4.glmer <- update(m3.glmer, .~.+ConversationType)
-ifelse(max(car::vif(m4.glmer)) <= 3,  "VIFs okay", "VIFs unacceptable") 
-anova(m4.glmer, m3.glmer, test = "Chi") 
-Anova(m4.glmer, test = "Chi")
-```
-
-*ConversationType* improves model fit (AIC and BIC decrease and it is reported as being significant) and will, therefore, be included in the model.
-
-```{r blmm18}
-# add Priming*Age
-ifelse(min(ftable(mblrdata$Priming, mblrdata$Age, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m5.glmer <- update(m4.glmer, .~.+Priming*Age)
-ifelse(max(car::vif(m5.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-anova(m5.glmer, m4.glmer, test = "Chi") 
-```
-
-The interaction between *Priming* and *Age* is not significant and we thus not be included.
-
-```{r blmm19a}
-# add Priming*Gender
-ifelse(min(ftable(mblrdata$Priming, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m6.glmer <- update(m4.glmer, .~.+Priming*Gender)
-ifelse(max(car::vif(m6.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-```
-
-We get the warning that the VIFs are high (>= 3) which means that the model suffers from (multi-)collinearity. We thus check the VIFs to determine how to proceed. If the VIFs are > 10, then we definitely cannot use the model as the multicollinearity is excessive. 
-
-```{r blmm19c}
-car::vif(m6.glmer)
-```
-
-The VIFs are below 5 which is not good (VIFs of 5 mean "that column in the model matrix is explainable from the others with an
-R^2^ of 0.8" [@gries2021statistics]) but it is still arguably acceptable and we will thus check if including the interaction between *Priming* and *Gender* significantly improved model fit. 
-
-```{r blmm19d}
-anova(m6.glmer, m4.glmer, test = "Chi") 
-Anova(m6.glmer, test = "Chi")
-```
-
-The interaction between *Priming* and *Gender* improved model fit (AIC and BIC reduction) and significantly correlates with the use of speech-unit final *like*. It will therefore be included in the model.
-
-```{r blmm20}
-# add Priming*ConversationType
-ifelse(min(ftable(mblrdata$Priming, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m7.glmer <- update(m6.glmer, .~.+Priming*ConversationType)
-ifelse(max(car::vif(m7.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-```
-
-When including the interaction between *Priming* and *ConversationType* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
-
-```{r blmm20b}
-# check VIFs
-car::vif(m7.glmer) 
-```
-
-The VIF of *Priming* is above 5 so we would normally continue without checking if including the interaction between *Priming* and *ConversationType* leads to a significant improvement in model fit. However, given that this is just a practical example, we check if including this interaction significantly improves model fit.
-
-
-```{r blmm20c}
-anova(m7.glmer, m6.glmer, test = "Chi")
+```{r blmm13a, message=F, warning=F}
+# wrapper function for linear mixed-models
+glmer.glmulti <- function(formula,data, random="",...){
+  glmer(paste(deparse(formula),random), 
+        family = binomial, 
+        data=data, 
+        control=glmerControl(optimizer="bobyqa"), ...)
+}
+# define formula
+form_glmulti = as.formula(paste("SUFlike ~ Gender + Age + ConversationType + Priming"))
+# multi selection for glmer
+mfit <- glmulti(form_glmulti,random="+(1 | ID)", 
+                data = mblrdata, method = "h", fitfunc = glmer.glmulti,
+                crit = "bic", intercept = TRUE, marginality = FALSE, level = 2)
 ```
 
 
-The interaction between *Priming* and *ConversationType* does not significantly correlate with the use of speech-unit final *like* and it does not explain much variance (AIC and BIC increase). It will be not be included in the model.
+We extract the best 5 models (best is here defined as the models with the lowest BIC).
 
-```{r blmm21a}
-# add Age*Gender
-ifelse(min(ftable(mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m8.glmer <- update(m6.glmer, .~.+Age*Gender)
-ifelse(max(car::vif(m8.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```{r blmm13b, message=F, warning=F}
+# extract best models
+top <- weightable(mfit)
+top <- top[1:5,]
+# inspect top 5 models
+top
 ```
 
-When including the interaction between *Age* and *Gender* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
+The best model is has the formula `SUFlike ~ 1 + Gender + ConversationType + Priming` and we take this to be our final minimal adequate model, i.e. the most parsimonious model (the model which explains the relatively most variance with lowest number of predictors). Hence, we define our final minimal model and check its output.
 
-```{r blmm21b}
-# check VIFs
-car::vif(m8.glmer)
-```
 
-The VIFs are all below 5 so we test if including the interaction between *Gender* and *Age* significantly improves model fit.
-
-```{r blmm21c}
-anova(m8.glmer, m6.glmer, test = "Chi") 
-```
-
-The interaction between *Age* and *Gender* is not significant and will thus continue without it.
-
-```{r blmm22}
-# add Age*ConversationType
-ifelse(min(ftable(mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m9.glmer <- update(m6.glmer, .~.+Age*ConversationType)
-ifelse(max(car::vif(m9.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-```
-
-When including the interaction between *Age* and *ConversationType* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
-
-```{r blmm22b}
-# check VIFs
-car::vif(m9.glmer)
-```
-
-The VIFs are all below 5 so we test if including the interaction between *ConversationType* and *Age* significantly improves model fit.
-
-```{r blmm22c}
-anova(m9.glmer, m6.glmer, test = "Chi") 
-```
-
-The interaction between *Age* and *ConversationType* is insignificant and does not improve model fit (AIC and BIC reduction). It will therefore not be included in the model.
-
-```{r blmm23a}
-# add Gender*ConversationType
-ifelse(min(ftable(mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m10.glmer <- update(m6.glmer, .~.+Gender*ConversationType)
-ifelse(max(car::vif(m10.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!")
-```
-
-When including the interaction between *Gender* and *ConversationType* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
-
-```{r blmm23b}
-# check VIFs
-car::vif(m10.glmer) 
-```
-
-The highest VIF is almost 10 (`r as.vector(car::vif(m10.glmer)[5])`) which is why the interaction between *Gender* and *ConversationType* will not be included in the model.
-
-```{r blmm24a}
-# add Priming*Age*Gender
-ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$Gender, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m11.glmer <- update(m6.glmer, .~.+Priming*Age*Gender)
-ifelse(max(car::vif(m11.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
+```{r blmm13c, message=F, warning=F}
+mlr.glmer <- glmer(SUFlike ~ (1 | ID) + Gender + ConversationType + Priming, 
+                   family = binomial,
+                   control=glmerControl(optimizer="bobyqa"),
+                   data = mblrdata)
+# inspect final minimal adequate model
+summary(mlr.glmer, corr = F)
 ```
 
 
-When including the interaction between *Priming*, *Age*, and *Gender* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
-
-```{r blmm24b}
-# check VIFs
-car::vif(m11.glmer)
-```
-
-There are several VIFs with values greater than 5 and we will thus continue without including the interaction between *Priming*, *Age*, and *Gender* into the model.
-
-```{r blmm25a}
-# add Priming*Age*ConversationType
-ifelse(min(ftable(mblrdata$Priming,mblrdata$Age, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m12.glmer <- update(m6.glmer, .~.+Priming*Age*ConversationType)
-ifelse(max(car::vif(m12.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-```
-
-When including the interaction between *Priming*, *Age*, and *Gender* we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
-
-```{r blmm25b}
-# check VIFs
-car::vif(m12.glmer)
-```
-
-The VIF of Priming is very high (`r as.vector(car::vif(m12.glmer)[1])`) which is why we will thus continue without including the interaction between *Priming*, *Age*, and *Gender* in the model.
-
-```{r blmm26}
-# add Priming*Gender*ConversationType
-ifelse(min(ftable(mblrdata$Priming,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m13.glmer <- update(m6.glmer, .~.+Priming*Gender*ConversationType)
-ifelse(max(car::vif(m13.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-```
-
-The VIFs are excessive with a maximum value is `r max(car::vif(m13.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
-
-```{r blmm26b}
-car::vif(m13.glmer)
-```
-
-The VIFs are excessive with a maximum value is `r max(car::vif(m13.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
-
-
-```{r blmm27a}
-# add Age*Gender*ConversationType
-ifelse(min(ftable(mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-m14.glmer <- update(m6.glmer, .~.+Age*Gender*ConversationType)
-ifelse(max(car::vif(m14.glmer)) <= 3,  "VIFs okay", "WARNING: high VIFs!") 
-```
-
-When including the interaction between *Age*, *Gender*, *ConversationType*, we get a warning that there are high VIFs (multicollinearity) so we inspect the VIFs in more detail.
-
-```{r blmm27b}
-car::vif(m14.glmer)
-```
-
-Again, the VIFs are excessive with a maximum value of `r max(car::vif(m14.glmer))` which shows an unacceptable degree of multicollinearity so that we abort and move on the next model.
-
-```{r blmm28, message=FALSE, warning=FALSE}
-# add Priming*Age*Gender*ConversationType
-ifelse(min(ftable(mblrdata$Priming,mblrdata$Age,mblrdata$Gender, mblrdata$ConversationType, mblrdata$SUFlike)) == 0, "incomplete information", "okay")
-```
-
-The model suffers from incomplete information! As this was the last possible model, we have found our final minimal adequate model in m6.glmer.
-
-In a next step, we create an overview of model comparisons which serves as a summary for the model fitting process and provides AIC, BIC, and $\chi$^2^ values.
-
-```{r blmm29}
-source("https://slcladal.github.io/rscripts/ModelFittingSummarySWSU.r") 
-# comparisons of glmer objects
-m1.m0 <- anova(m1.glmer, m0.glmer, test = "Chi") 
-m2.m1 <- anova(m2.glmer, m1.glmer, test = "Chi")   
-m3.m1 <- anova(m3.glmer, m1.glmer, test = "Chi")
-m4.m3 <- anova(m4.glmer, m3.glmer, test = "Chi") 
-m5.m4 <- anova(m5.glmer, m4.glmer, test = "Chi") 
-m6.m4 <- anova(m6.glmer, m4.glmer, test = "Chi") 
-m7.m6 <- anova(m7.glmer, m6.glmer, test = "Chi")
-m8.m6 <- anova(m8.glmer, m6.glmer, test = "Chi") 
-m9.m6 <- anova(m9.glmer, m6.glmer, test = "Chi") 
-# create a list of the model comparisons
-mdlcmp <- list(m1.m0, m2.m1, m3.m1, m4.m3, m5.m4, m6.m4, m7.m6, m8.m6, m9.m6)
-# summary table for model fitting
-mdlft <- mdl.fttng.swsu(mdlcmp)
-mdlft <- mdlft[,-2]
-```
-
-```{r blmm29b, echo = F}
-# inspect data
-mdlft %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 15 rows of the model fitting summary table.")  %>%
-  flextable::border_outer()
-```
-
-We now rename our final minimal adequate model, test whether it performs significantly better than the minimal base-line model, and print the regression summary.
+We now test whether the final minimal model performs significantly better than the minimal base-line model, and print the regression summary.
 
 ```{r blmm30a}
-# rename final minimal adequate model
-mlr.glmer <- m6.glmer 
 # final model better than base-line model
 sigfit <- anova(mlr.glmer, m0.glmer, test = "Chi") 
 # inspect
@@ -3399,47 +3164,16 @@ sigfit
 print(mlr.glmer, corr = F)
 ```
 
-To extract the effect sizes of the significant fixed effects, we compare the model with that effect to a model without that effect. This can be problematic when checking the effect of main effects that are involved in significant interactions though [@field2012discovering 622].
-
-```{r blmm32a}
-# effect of ConversationType
-ef_conv <- anova(m4.glmer, m3.glmer, test = "Chi") 
-# inspect
-ef_conv
-```
-
-```{r blmm32b}
-# effect of Priming:Gender
-ef_prigen <- anova(m6.glmer, m4.glmer, test = "Chi")
-# inspect
-ef_prigen
-```
 
 ### Visualizing Effects{-}
 
-As we will see the effects in the final summary, we visualize the effects here by showing the probability of discourse *like* based on the predicted values.
+We visualize the effects here by showing the probability of discourse *like* based on the predicted values.
 
 ```{r blmm33}
-# extract predicted values
-mblrdata$Predicted <- predict(m6.glmer, mblrdata, type = "response")
-# plot
-ggplot(mblrdata, aes(ConversationType, Predicted)) +
-  stat_summary(fun = mean, geom = "point") +
-  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +
-  theme_set(theme_bw(base_size = 10)) +
-  theme(legend.position = "top") +
-    ylim(0, .75) +
-  labs(x = "", y = "Predicted Probabilty of discourse like") +
-  scale_color_manual(values = c("gray20", "gray70"))
+plot_model(mlr.glmer, type = "pred", terms = c("Gender", "Priming", "ConversationType"))
 ```
 
-A proper visualization of the marginal effects can be extracted using the `sjPlot` package [@sjPlot].
-
-```{r blmm33b}
-plot_model(m6.glmer, type = "pred", terms = c("Priming", "Gender"))
-```
-
-We can see that discourse like is more likely to surface in primed contexts but that in contrast to women and men in same-gender conversations as well as women in mixed-gender conversations, priming appears to affect the use of discourse like by men in mixed-gender conversations only very little. 
+We can see that discourse *like* is more likely to surface in primed contexts and among males. In conversations with both men and women, speakers use discourse *like* slightly less than in mixed conversations.
 
 ### Extracting Model Fit Parameters{-}
 
@@ -3482,7 +3216,13 @@ report::report(mlr.glmer)
 We can use this output to write up a final report: 
 
 
-A mixed-effect binomial logistic regression model with random intercepts for speakers was fit to the data in a step-wise-step up procedure. The final minimal adequate model performed significantly better than an intercept-only base line model ($\chi$^2^(`r as.vector(unlist(sigfit))[14][1]`): `r sigfit$Chisq[2]`, p  = `r round(as.vector(unlist(sigfit))[16][1], 5)`) and a good but not optimal fit (C: `r somers2(probs, as.numeric(mblrdata$SUFlike))[1]`, Somers' D~xy~: `r somers2(probs, as.numeric(mblrdata$SUFlike))[2]`). The final minimal adequate model reported that speakers use more discourse *like* in mixed-gender conversations compared to same-gender conversations ($\chi$^2^(`r as.vector(unlist(ef_conv))[14][1]`): `r `r ef_conv$Chisq[2]`, p  = `r round(as.vector(unlist(ef_conv))[16][1], 5)`) and that there is an interaction between priming and gender with men using more discourse *like* in un-primed contexts while this gender difference is not present in primed contexts where speakers more more likely to use discourse *like* regardless of gender ($\chi$^2^(`r as.vector(unlist(ef_prigen))[14][1]`): `r ef_prigen$Chisq[2]`, p  = `r round(as.vector(unlist(ef_prigen))[16][1], 5)`). 
+We can use this output to write up a final report:
+
+We fitted a logistic mixed model to predict the use of discourse like. The model included speakers as random effect (formula: ~1 | ID). The model’s total explanatory power is moderate (conditional R2 = 0.15) and the part related to the fixed effects alone (marginal R2) is of 0.13.
+
+Regarding fixed effects, the model reported that * women use discourse like statistically less compared to men (beta = -0.64 [-0.99, -0.30], p < .001; Std. beta = -0.64 [-0.99, -0.30])
+* speakers in conversations with other speakers of the same gender use discourse like significantly less compared to thier use in mixed-gender conversations (beta = -0.54 [-0.83, -0.24], p < .001; Std. beta = -0.54 [-0.83, -0.24])
+* Priming is significantly positively correlated with the use of discourse like (beta = 1.87 [1.55, 2.19], p < .001; Std. beta = 1.87 [1.55, 2.19])
 
 ## Mixed-Effects (Quasi-)Poisson and Negative-Binomial Regression{-}
 
