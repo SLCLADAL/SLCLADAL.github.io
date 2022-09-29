@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Remove current '.Rprofile' in the Binder image. In LADAL, 
+# .Rprofile contains a call to renv,
+# but we need to do a few adjustments to the lock file before 
+# calling renv. However, these adjustments require running R, which will 
+# source the .Rprofile, calling renv prematurely.
+rm -f ~/.Rprofile
+
+# Install 'collostructions' package -- it is only available from the author's
+#page
+R -e 'install.packages(
+    "https://sfla.ch/wp-content/uploads/2021/02/collostructions_0.2.0.tar.gz",
+    repos=NULL,
+    type="source"
+)'
+
+# Remove 'collostructions' from the lockfile -- otherwise, renv will
+# fail trying to install it, and the Binder build will fail as well
+R -e 'install.packages("renv");lock<-renv:::lockfile("renv.lock");lock$remove("collostructions"); lock$write("renv.lock")'
+
+# Install packages from the renv.lock file. Provide repos manually:
+# + CRAN -- point it to the RStudio repository; in this case, binary versions will be 
+# installed whenever possible, speeding up the process
+# + Geocompr -- a repo needed for 'spDataLarge' package. The repo name is arbitrary,
+# What we really need is its address
+R -e 'renv::restore(repos = c(CRAN = "https://packagemanager.rstudio.com/all/latest", Geocompr = "https://nowosad.github.io/drat/"))'
