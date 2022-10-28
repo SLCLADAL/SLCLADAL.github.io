@@ -1,209 +1,56 @@
----
-title: "Converting PDFs to txt files with R"
-author: "Martin Schweinberger"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output:
-  bookdown::html_document2
-bibliography: bibliography.bib
-link-citations: yes
----
+![An interactive LADAL notebook](https://slcladal.github.io/images/uq1.jpg)
 
+***
 
+Please copy this Jupyter notebook so that you are able to edit it.
 
-```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
-```
+Simply go to: File > Save a copy in Drive.
 
-# Introduction{-}
+Once you have done that, you are good to go.
 
-This tutorial shows how to extract text from one or more pdf-files using optical character recognition (OCR) and then saving the text(s) in txt-files on your computer. 
+***
 
+This tutorial is the interactive Jupyter notebook accompanying the [*Language Technology and Data Analysis Laboratory* (LADAL) tutorial *Converting PDFs to txt files with R*](https://ladal.edu.au/pdf2txt.html). 
 
-```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
-knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
-```
-
-This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to convert pdfs into txt files using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with extracting texts from pdfs. 
-
-This tutorial uses two packages for OCR and text extraction: `pdftools` which is very fast and is very recommendable when dealing with very legible and clean pdf-files (such as pdf-files of websites and books that were rendered directly from, e.g., word-documents, and the `tesseract` package which is slower but works much better when the data is unclean and represents, e.g., scans of books, faxes, or reports. In addition, we show how we can combine OCR with spell-checking via the `hunspell` package (see [here](https://cran.r-project.org/web/packages/hunspell/vignettes/intro.html) for more information) when using the `tesseract` package (but this an also be done for any other textual data in R).
-
-<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/pdf2txt.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<br>
-
+***
 
 **Preparation and session set up**
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+If you are using this notebook on Google Colab or your own computer and you have not already installed the R packages listed below, you need to install them. You can install them by running the code chunk below. 
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
-# set options
-options(stringsAsFactors = F)          # no automatic data transformation
-options("scipen" = 100, "digits" = 12) # suppress math annotation
 # install packages
-install.packages("pdftools")
 install.packages("tesseract")
-install.packages("tidyverse")
-install.packages("here")
+install.packages("dplyr")
 install.packages("hunspell")
-install.packages("flextable")
-# install klippy for copy-to-clipboard button in code chunks
-install.packages("remotes")
-remotes::install_github("rlesur/klippy")
+
 ```
 
-Next we activate the packages.
+***
 
 ```{r prep2, echo=T, eval = T, message=FALSE, warning=FALSE}
 # activate packages
-library(pdftools)
 library(tesseract)
-library(tidyverse)
-library(here)
+library(dplyr)
 library(hunspell)
 # set tesseract engine
 eng <- tesseract("eng")
-# activate klippy for copy-to-clipboard button
-klippy::klippy()
 ```
 
-Once you have installed RStudio and have also initiated the session by executing the code shown above, you are good to go.
-
-**How to use the RNotebook for this tutorial**
-
-To follow this tutorial interactively (by using the RNotebook - or Rmd for short), follow the instructions listed below.
-
-**Data and folder set up**
-
-1. Create a folder somewhere on your computer
-2. In that folder create a sub-folder called *data*
-3. In that *data* folder, create a subfolder called *PDFs* 
-4. Download and  save the following pdf-files in that *PDFs* folder: 
-[pdf0](https://slcladal.github.io/data/PDFs/pdf0.pdf), [pdf1](https://slcladal.github.io/data/PDFs/pdf1.pdf), [pdf2](https://slcladal.github.io/data/PDFs/pdf2.pdf), and [pdf3](https://slcladal.github.io/data/PDFs/pdf3.pdf).
-
-**R and RStudio set up**
-
-1. Download the [RNotebook](https://slcladal.github.io//pdf2txt.Rmd) and save it in the folder you have just created
-2. Open RStudio
-3. Click on `File` in the upper left corner of the R Studio interface
-4. Click on `New Project...`
-5. Select `Existing Directory`
-6. Browse to the folder you have just created and click on `Open`
-7. Now click on `Files` above the lower right panel
-8. Click on the file `pdf2txt.Rmd`
-   + The Markdown file of this tutorial should now be open in the upper left panel of RStudio. To execute the code which prepare the session, load the data, create the graphs, and perform the statistics, simply click on the green arrows in the top right corner of the code boxes.
-   + To render a PDF of this tutorial, simply click on `Knit` above the upper left panel in RStudio.
-
-# OCR with pdftools{-}
-
-## Extract text from one pdf{-}
-
-The pdf we will convert is a [pdf of the Wikipedia article about corpus linguistics](https://slcladal.github.io/data/PDFs/pdf0.pdf). The first part of that pdf is shown below.
-
-```{r pdf, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("https://slcladal.github.io/images/pdf0.png")
-```
-
-Given that the pdf contains tables, urls, reference, etc., the text that we will extract from the pdf will be rather messy - cleaning the content of the text would be another matter (it would be data processing rather than extraction) and we will thus only focus on the conversion process here and not focus on the data cleaning and processing aspect. 
-
-We begin the extraction by defining a path to the pdf. Once we have defined a path, i.e. where R is supposed to look for that file, we continue by extracting the text from the pdf.
-
-```{r pconv01, echo=T, eval = T, message=FALSE, warning=FALSE}
-# you can use an url or a path that leads to a pdf document
-pdf_path <- "https://slcladal.github.io/data/PDFs/pdf0.pdf"
-# extract text
-txt_output <- pdftools::pdf_text(pdf_path) %>%
-  paste0(collapse = " ") %>%
-  paste0(collapse = " ") %>%
-  stringr::str_squish() 
-```
-
-```{r pconv02, echo=F, eval = T, message=FALSE, warning=FALSE}
-# show data
-txt_output %>%
-  substr(start=1, stop=1000) %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 1000 characters of the extracted text from a pdf of the wikipedia article on corpus linguistics.")  %>%
-  flextable::border_outer()
-```
+Once you have initiated the session by executing the code shown above, you are good to go.
 
 
-## Extracting text from many pdfs{-}
+# OCR with tesseract
 
-To convert many pdf-files, we write a function that preforms the conversion for many documents.
-
-```{r pconv03, echo=T, eval = T, message=FALSE, warning=FALSE}
-convertpdf2txt <- function(dirpath){
-  files <- list.files(dirpath, full.names = T)
-  x <- sapply(files, function(x){
-  x <- pdftools::pdf_text(x) %>%
-  paste0(collapse = " ") %>%
-  stringr::str_squish()
-  return(x)
-    })
-}
-```
-
-We can now apply the function to the folder in which we have stored the pdf-files we want to convert. In the present case, I have stored 4 pdf-files of Wikipedia articles in a folder called *PDFs* which is located in my *data* folder as described in the section above which detailed how to set up the Rproject folder on your computer). The output is a vector with the texts of the pdf-files. 
-
-```{r pconv05, echo=T, eval = T, message=FALSE, warning=FALSE}
-# apply function
-txts <- convertpdf2txt(here::here("data", "PDFs/"))
-```
-
-
-
-```{r pconv06, echo=F, eval = T, message=FALSE, warning=FALSE}
-# show data
-txts %>%
-  substr(start=1, stop=1000) %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 1000 characters of the extracted texts from pdfs of selected wikipedia articles.")  %>%
-  flextable::border_outer()
-```
-
-The table above shows the first 1000 characters of the texts extracted from 4 pdf-files of Wikipedia articles associated with language technology (*corpus linguistics*, *linguistics*, *natural language processing*, and *computational linguistics*). 
-
-## Saving the texts{-}
-
-To save the texts in txt-files on your disc, you can simply replace the predefined location (the data folder of your Rproject located by the string `here::here("data")` with the folder where you want to store the txt-files and then execute the code below. Also, we will name the texts (or the txt-files if you like) as *pdftext* plus their index number.
-
-```{r pconv07, echo=T, eval = F, message=FALSE, warning=FALSE}
-# add names to txt files
-names(txts) <- paste0(here::here("data","pdftext"), 1:length(txts), sep = "")
-# save result to disc
-lapply(seq_along(txts), function(i)writeLines(text = unlist(txts[i]),
-    con = paste(names(txts)[i],".txt", sep = "")))
-```
-
-If you check the data folder in your Rproject folder, you should find 4 files called *pdftext1*, *pdftext2*, *pdftext3*, *pdftext4*.
-
-# OCR with tesseract{-}
-
-In this section, we use the `tesseract` package for OCR (see [here](https://cran.r-project.org/web/packages/tesseract/vignettes/intro.html) for more information and a more thorough tutorial on usign the `tesseract` package). The `tesseract` package provides R bindings [Tesseract](https://opensource.google/projects/tesseract): a powerful optical character recognition (OCR) engine that supports over 100 languages. The engine is highly configurable in order to tune the detection algorithms and obtain the best possible results.
+In this section, we use the `tesseract` package for optical character recognition (OCR) (see [here](https://cran.r-project.org/web/packages/tesseract/vignettes/intro.html) for more information and a more thorough tutorial on using the `tesseract` package). The `tesseract` package provides powerful OCR engine that supports over 100 languages. 
 
 We start by creating a vector of paths to the pdf-files that we want to extract the text from.
 
 ```{r}
-fls <- list.files(here::here("data/PDFs"), full.names = T)
+pdf0 <- "https://slcladal.github.io/data/PDFs/pdf0.pdf"
+pdf1 <- "https://slcladal.github.io/data/PDFs/pdf1.pdf"
+
+fls <- c(pdf0, pdf1)
 # load
 ocrs <- sapply(fls, function(x){
   # store name
@@ -212,26 +59,15 @@ ocrs <- sapply(fls, function(x){
   x <- tesseract::ocr(x, engine = eng) %>%
     paste0(collapse = " ")
 })
-```
-
-```{r tesout1, echo=F, eval = T, message=FALSE, warning=FALSE}
 # show data
 ocrs %>%
-  substr(start=1, stop=1000) %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 1000 characters of the extracted text from the  wikipedia article on corpus linguistics.")  %>%
-  flextable::border_outer()
+  substr(start=1, stop=500) %>%
+  as.data.frame()
 ```
 
 Although the results already look very promising, we want to see how we can combine automated spell-checking/correction with OCR as this is necessary when dealing with less pristine documents.
 
-## Spell correction{-}
+## Spell correction
 
 In a first step, we write a function that loops over each text and checks which words occur in a English language dictionary (which we do not specify as it is the default). This spell checking makes use of the the `hunspell` package (see [here](https://cran.r-project.org/web/packages/hunspell/vignettes/intro.html) for more information). Hunspell is based on *MySpell* and is backward-compatible with *MySpell* and *aspell* dictionaries. This means that we can import and/or make use of many different language dictionaries and it is quite likely that the dictionaries for other languages may already available on your system!
 
@@ -240,21 +76,10 @@ In a first step, we write a function that loops over each text and checks which 
 tokens_ocr <- sapply(ocrs, function(x){
   x <- hunspell::hunspell_parse(x)
 })
-```
-
-```{r tesout2, echo=F, eval = T, message=FALSE, warning=FALSE}
 # show data
 tokens_ocr %>%
-  substr(start=1, stop=1000) %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 1000 characters of the spell-checked  wikipedia article on corpus linguistics.")  %>%
-  flextable::border_outer()
+  substr(start=1, stop=500) %>%
+  as.data.frame()
 ```
 
 
@@ -269,53 +94,28 @@ clean_ocrtext <- sapply(tokens_ocr, function(x){
               x)
   x <- paste0(x, collapse = " ")
 })
-```
-
-```{r tesout3, echo=F, eval = T, message=FALSE, warning=FALSE}
 # show data
 clean_ocrtext %>%
-  substr(start=1, stop=1000) %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 1000 characters of the processed text from a pdf of the wikipedia article on corpus linguistics.")  %>%
-  flextable::border_outer()
+  substr(start=1, stop=500) %>%
+  as.data.frame()
 ```
 
+## Saving the texts
 
-We have reached the end of this tutorial and we hope that the tutoral helps you in performing OCR on your own pdfs.
+To save the texts in txt-files on your disc, you can simply replace the predefined location (the data folder of your Rproject located by the string `here::here("data")` with the folder where you want to store the txt-files and then execute the code below. Also, we will name the texts (or the txt-files if you like) as *pdftext* plus their index number.
 
-# Citation & Session Info {-}
-
-Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Converting PDFs to txt files with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/pdf2txt.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
-
-
-```
-@manual{schweinberger`r format(Sys.time(), '%Y')`pdf2txt,
-  author = {Schweinberger, Martin},
-  title = {Converting PDFs to txt files with R},
-  note = {https://slcladal.github.io/pdf2txt.html},
-  year = {`r format(Sys.time(), '%Y')`},
-  organization = "The University of Queensland, Australia. School of Languages and Cultures},
-  address = {Brisbane},
-  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
-}
+```{r pconv07, echo=T, eval = F, message=FALSE, warning=FALSE}
+# add names to txt files
+names(txts) <- paste0("txt", 1:length(txts), sep = "")
+# save result to disc
+lapply(seq_along(txts), function(i)writeLines(text = unlist(txts[i]),
+    con = paste(names(txts)[i],".txt", sep = "")))
 ```
 
-```{r fin}
-sessionInfo()
-```
+We have reached the end of this tutorial and we hope that the tutorial helps you in performing OCR on your own pdfs.
 
 
-***
-
-[Back to top](#introduction)
-
-[Back to HOME](https://slcladal.github.io/index.html)
+[Back to LADAL](https://ladal.edu.au/pdf2txt.html)
 
 ***
 
