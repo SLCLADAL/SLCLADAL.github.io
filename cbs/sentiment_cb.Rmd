@@ -20,6 +20,7 @@ If you are using this notebook on Google Colab or your own computer and you have
 
 
 ```{r prep1, eval = F}
+t0 <- Sys.time()
 # install packages
 install.packages("dplyr")
 install.packages("stringr")
@@ -28,7 +29,9 @@ install.packages("ggplot2")
 install.packages("tidytext")
 install.packages("textdata")
 install.packages("Hmisc")
-install.packages("sentimentr")
+# check time
+t1 <- Sys.time()
+cat("The installation took ", round(t1-t0, 1), " minutes.")
 ```
 
 
@@ -43,7 +46,6 @@ library(ggplot2)
 library(tidytext)
 library(textdata)
 library(Hmisc)
-library(sentimentr)
 ```
 
 
@@ -150,15 +152,19 @@ darwin_clean %>%
 
 # Basic Sentiment Analysis
 
-In a next step, we clean the data, convert it to lower case, and split it into individual words. 
+In a next step, download Mohammad and Turney's (2013) *Word-Emotion Association Lexicon*.
 
 ```{r bsa1, message=FALSE, warning=FALSE}
-textdata:::download_functions$nrc(file.path(rappdirs::user_cache_dir("textdata"), "nrc"))
+nrc <- base::readRDS(url("https://slcladal.github.io/data/nrc.rda", "rb"))
+```
 
+Now, we combine the data with the *Word-Emotion Association Lexicon*. 
+
+```{r bsa1b, message=FALSE, warning=FALSE}
 novels_anno <- rbind(darwin_clean, twain_clean, orwell_clean, lovecraft_clean) %>%
   dplyr::group_by(novel) %>%
   dplyr::mutate(words = n()) %>%
-  dplyr::left_join(textdata::lexicon_nrc(manual_download = TRUE)) %>%
+  dplyr::left_join(nrc) %>%
   dplyr::mutate(novel = factor(novel),
          sentiment = factor(sentiment))
 # inspect data
@@ -281,11 +287,17 @@ novels %>%
   dplyr::select(novel, positive, negative) %>%
   dplyr::group_by(novel) %>%
   dplyr::summarise(polarity = positive/negative) %>%
-  ggplot(aes(reorder(novel, polarity, mean), polarity)) +    
-  geom_point(size = 3) + 
+  ggplot(aes(reorder(novel, polarity, mean), polarity, fill = novel)) +    
+  geom_bar(stat = "identity") + 
+  geom_text(aes(y = polarity-0.1, label = round(polarity, 2)), 
+            color = "white", size = 4) + 
   theme_bw() +
-  labs(y = "polarity\n\nmore negative                                more positive\n",
-       x = "novel")
+  labs(y = "Polarity\n(ration of positive to negative emitives)",
+       x = "") +
+  coord_cartesian(y= c(0,2)) +
+  scale_y_continuous(breaks = seq(0,2,1),
+                     labels = c("more negative", "neutral", "more positive")) +
+  theme(legend.position = "none")
 ```
 
 Overall, all books are in the positive range (the polarity score is not negative) and we see that *lovecraft* is the book with the most negative emotion words while *darwin* is the most positive book as it has the highest average polarity ratio.
@@ -309,10 +321,10 @@ novels_bin <- novels_anno %>%
                               sentiment == "positive" ~ 1,
                               TRUE ~ -1),
          id = 1:n(),
-         index = as.numeric(cut2(id, m=100))) %>%
+         index = as.numeric(Hmisc::cut2(id, m=100))) %>%
   dplyr::group_by(novel, index) %>%
   dplyr::summarize(index = unique(index),
-            polarity = mean(sentiment))
+                   polarity = mean(sentiment))
 # inspect data
 novels_bin %>%
   as.data.frame() %>%

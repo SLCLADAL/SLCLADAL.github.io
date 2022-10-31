@@ -1,7 +1,7 @@
 ---
 title: "Sentiment Analysis in R"
 author: "Martin Schweinberger"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
+date: "2022-10-30"
 output:
   bookdown::html_document2
 bibliography: bibliography.bib
@@ -22,14 +22,14 @@ This tutorial introduces sentiment analysis (SA) and shows how to perform a SA i
 knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
 ```
 
-This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to perform SA on textual data  using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with sentiment detection, analysis, and visualization.
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to perform SA on textual data  using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with sentiment detection, analysis, and visualization. The analysis shown here is in parts based on the 2^nd^ chapter of *Text Mining with R* - the e-version of this chapter on [sentiment analysis can be found here](https://www.tidytextmining.com/sentiment.html).
 
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
 The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/sentiment.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
-**[Here](https://colab.research.google.com/drive/125k0oOGFK7zUX8g87YEbZPVVH5_Uw1lP?usp=sharing)** is a **link to an interactive version of this tutorial on Google Colab**. The interactive tutorial is based on a Jupyter notebook of this tutorial. This interactive Jupyter notebook allows you to execute code yourself and - if you copy the Jupyter notebook - you can also change and edit the notebook, e.g. you can change code and upload your own data.<br></p>
+**[Here](https://colab.research.google.com/drive/1oZxHVsyMnwTAFRYS4M25Q404oVFwDkq0?usp=sharing)** is a **link to an interactive version of this tutorial on Google Colab**. The interactive tutorial is based on a Jupyter notebook of this tutorial. This interactive Jupyter notebook allows you to execute code yourself and - if you copy the Jupyter notebook - you can also change and edit the notebook, e.g. you can change code and upload your own data.<br></p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
@@ -45,13 +45,15 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 
 ```{r prep1, echo=T, eval = F}
 # install packages
-install.packages("tidyverse")
-install.packages("readr")
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("tidyr")
+install.packages("tibble")
 install.packages("tidytext")
 install.packages("textdata")
-install.packages("zoo")
 install.packages("Hmisc")
 install.packages("sentimentr")
+install.packages("zoo")
 install.packages("flextable")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
@@ -62,18 +64,16 @@ remotes::install_github("rlesur/klippy")
 Now that we have installed the packages, we activate them as shown below.
 
 ```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
-# set options
-options(stringsAsFactors = F)          # no automatic data transformation
-options("scipen" = 100, "digits" = 12) # suppress math annotation
 # activate packages
 library(dplyr)
 library(stringr)
-library(readr)
+library(tidyr)
+library(tibble)
 library(tidytext)
 library(textdata)
-library(zoo)
 library(Hmisc)
 library(sentimentr)
+library(zoo)
 library(flextable)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
@@ -125,6 +125,7 @@ Write function to clean data
 txtclean <- function(x, title){
   require(dplyr)
   require(stringr)
+  require(tibble)
   x <- x %>%
     iconv(to = "UTF-8") %>%
     base::tolower() %>%
@@ -132,7 +133,7 @@ txtclean <- function(x, title){
     stringr::str_squish()%>%
     stringr::str_split(" ") %>%
     unlist() %>%
-    tibble() %>%
+    tibble::tibble() %>%
     dplyr::select(word = 1, everything()) %>%
     dplyr::mutate(novel = title) %>%
     dplyr::anti_join(stop_words) %>%
@@ -169,20 +170,19 @@ darwin_clean %>%
 
 # Basic Sentiment Analysis{-}
 
-In a next step, we clean the data, convert it to lower case, and split it into individual words. 
+Now, we combine the data with the *Word-Emotion Association Lexicon* [@mohammad2013crowdsourcing]. 
 
-```{r bsa1, message=FALSE, warning=FALSE}
-textdata:::download_functions$nrc(file.path(rappdirs::user_cache_dir("textdata"), "nrc"))
 
+```{r bsa1b, message=FALSE, warning=FALSE}
 novels_anno <- rbind(darwin_clean, twain_clean, orwell_clean, lovecraft_clean) %>%
   dplyr::group_by(novel) %>%
   dplyr::mutate(words = n()) %>%
-  dplyr::left_join(textdata::lexicon_nrc(manual_download = TRUE)) %>%
+  dplyr::left_join(tidytext::get_sentiments("nrc")) %>%
   dplyr::mutate(novel = factor(novel),
          sentiment = factor(sentiment))
 ```
 
-```{r bsa1b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
+```{r bsa1c, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
 novels_anno %>%
   as.data.frame() %>%
@@ -333,11 +333,17 @@ novels %>%
   dplyr::select(novel, positive, negative) %>%
   dplyr::group_by(novel) %>%
   dplyr::summarise(polarity = positive/negative) %>%
-  ggplot(aes(reorder(novel, polarity, mean), polarity)) +    
-  geom_point(size = 3) + 
+  ggplot(aes(reorder(novel, polarity, mean), polarity, fill = novel)) +    
+  geom_bar(stat = "identity") + 
+  geom_text(aes(y = polarity-0.1, label = round(polarity, 2)), 
+            color = "white", size = 4) + 
   theme_bw() +
-  labs(y = "polarity\n\nmore negative                                more positive\n",
-       x = "novel")
+  labs(y = "Polarity\n(ration of positive to negative emitives)",
+       x = "") +
+  coord_cartesian(y= c(0,2)) +
+  scale_y_continuous(breaks = seq(0,2,1),
+                     labels = c("more negative", "neutral", "more positive")) +
+  theme(legend.position = "none")
 ```
 
 Overall, all books are in the positive range (the polarity score is not negative) and we see that *lovecraft* is the book with the most negative emotion words while *darwin* is the most positive book as it has the highest average polarity ratio.
@@ -519,17 +525,17 @@ If you are interested in learning more about SA in R, @silge2017text is highly r
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. `r format(Sys.time(), '%Y.')` *Sentiment Analysis in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/sentiment.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+Schweinberger, Martin. (2022)` *Sentiment Analysis in R*. Brisbane: The University of Queensland. url: https://ladal.edu.au/sentiment.html (Version 2022.10.30).
 
 ```
-@manual{schweinberger`r format(Sys.time(), '%Y')`sentiment,
+@manual{schweinberger2022sentiment,
   author = {Schweinberger, Martin},
   title = {Sentiment Analysis in R},
-  note = {https://slcladal.github.io/sentiment.html},
-  year = {`r format(Sys.time(), '%Y')`},
+  note = {https://ladal.edu.au/sentiment.html},
+  year = {2022},
   organization = {The University of Queensland, School of Languages and Cultures},
   address = {Brisbane},
-  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+  edition = {2022.10.30}
 }
 ```
 
@@ -542,7 +548,7 @@ sessionInfo()
 
 [Back to top](#introduction)
 
-[Back to HOME](https://slcladal.github.io/index.html)
+[Back to HOME](https://ladal.edu.au)
 
 ***
 
