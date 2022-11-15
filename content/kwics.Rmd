@@ -28,7 +28,7 @@ This tutorial is aimed at beginners and intermediate users of R with the aim of 
 <p style='margin-top:1em; text-align:center'>
 The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/kwics.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fkwics_cb.ipynb)<br>
-[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fkwics_cb.ipynb). <br> The interactive tutorial is based on a Jupyter notebook of this tutorial. This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fkwics_cb.ipynb). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
 </p>
 <p style='margin-left:1em;'>
 </p></span>
@@ -84,10 +84,9 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 ```{r prep1, echo=T, eval = F}
 # install packages
 install.packages("quanteda")
-install.packages("tidyverse")
-install.packages("gutenbergr")
+install.packages("dplyr")
+install.packages("stringr")
 install.packages("flextable")
-install.packages("plyr")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -97,13 +96,10 @@ remotes::install_github("rlesur/klippy")
 Now that we have installed the packages, we activate them as shown below.
 
 ```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
-# set options
-options(stringsAsFactors = F)          # no automatic data transformation
-options("scipen" = 100, "digits" = 12) # suppress math annotation
 # activate packages
 library(quanteda)
-library(gutenbergr)
-library(tidyverse)
+library(dplyr)
+library(stringr)
 library(flextable)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
@@ -113,22 +109,15 @@ Once you have installed R and RStudio and also initiated the session by executin
 
 ## Loading and processing textual data{-}
 
-For this tutorial, we will use Charles Darwin's *On the Origin of Species by means of Natural Selection* which we download from the [Project Gutenberg](https://www.gutenberg.org/) archive [see @stroube2003literary]. Thus, Darwin's *Origin of Species* forms the basis of our analysis. You can use the code below to download this text into R (but you have to have access to the internet to do so).
+For this tutorial, we will use Lewis Caroll's  *Alice's Adventures in Wonderland*. You can use the code below to load this text into R (but you have to have access to the internet to do so).
 
 ```{r skwic2, warning=F, message=F}
-origin <- gutenberg_works(
-  # define id of darwin's origin in project gutenberg
-  gutenberg_id == "1228") %>%
-  # download text
-  gutenberg_download(meta_fields = "gutenberg_id", 
-                     mirror = "http://mirrors.xmission.com/gutenberg/") %>%
-  # remove empty rows
-  dplyr::filter(text != "")
+text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb"))
 ```
 
 ```{r skwic2b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-origin %>%
+text %>%
   as.data.frame() %>%
   head(10) %>%
   flextable::flextable() %>%
@@ -137,15 +126,15 @@ origin %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 text elements of Charles Darwin's Origin.")  %>%
+  flextable::set_caption(caption = "First 10 text elements of the example text.")  %>%
   flextable::border_outer()
 ```
 
-The table above shows that Darwin's *Origin of Species* requires formatting so that we can use it. Therefore, we collapse it into a single object (or text) and remove superfluous white spaces.
+The table above shows that the example text requires formatting so that we can use it. Therefore, we collapse it into a single object (or text) and remove superfluous white spaces.
 
 
 ```{r skwic3, message=F, warning=F}
-origin <- origin$text %>%
+text <- text %>%
   # collapse lines into a single  text
   paste0(collapse = " ") %>%
   # remove superfluous white spaces
@@ -154,7 +143,7 @@ origin <- origin$text %>%
 
 ```{r skwic3b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-origin %>%
+text %>%
   substr(start=1, stop=1000) %>%
   as.data.frame() %>%
   flextable() %>%
@@ -163,7 +152,7 @@ origin %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 1000 characters of Charles Darwin's Origin")  %>%
+  flextable::set_caption(caption = "First 1000 characters of of the example text.")  %>%
   flextable::border_outer()
 ```
 
@@ -174,17 +163,17 @@ The result confirms that the entire text is now combined into a single character
 Now that we have loaded the data, we can easily extract concordances using the `kwic` function from the `quanteda` package. The `kwic` function takes the text (`x`) and the search pattern (`pattern`) as it main arguments but it also allows the specification of the context window, i.e. how many words/elements are show to the left and right of the key word (we will go over this later on).
 
 ```{r basekwic2, message=F, warning=F}
-kwic_natural <- kwic(
+kwic_alice <- kwic(
   # define text
-  origin, 
+  text, 
   # define search pattern
-  pattern = "selection")
+  pattern = "Alice")
 ```
 
 
 ```{r basekwic2b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-kwic_natural %>%
+kwic_alice %>%
   as.data.frame() %>%
   head(10) %>%
   flextable::flextable() %>%
@@ -193,24 +182,24 @@ kwic_natural %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for the keyword natural in Charles Darwin's Origin.")  %>%
+  flextable::set_caption(caption = "First 10 concordances for the keyword Alice in our example text.")  %>%
   flextable::border_outer()
 ```
 
 
-You will see that you get a warning stating that you should use `token` f´before extracting concordances. This can be done as shown below. Also, we can specify the package from which we want to use a function by adding the package name plus :: before the function (see below)
+You will see that you get a warning stating that you should use `token` before extracting concordances. This can be done as shown below. Also, we can specify the package from which we want to use a function by adding the package name plus :: before the function (see below)
 
 ```{r basekwic3, message=F, warning=F}
-kwic_natural <- quanteda::kwic(
+kwic_alice <- quanteda::kwic(
   # define and tokenize text
-  quanteda::tokens(origin), 
+  quanteda::tokens(text), 
   # define search pattern
-  pattern = "selection")
+  pattern = "alice")
 ```
 
 ```{r basekwic3b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-kwic_natural %>%
+kwic_alice %>%
   as.data.frame() %>%
   head(10) %>%
   flextable::flextable() %>%
@@ -219,36 +208,36 @@ kwic_natural %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for the keyword natural in Charles Darwin's Origin.")  %>%
+  flextable::set_caption(caption = "First 10 concordances for the keyword *alice* in example text.")  %>%
   flextable::border_outer()
 ```
 
-We can easily extract the frequency of the search term (*selection*) using the `nrow` or the `length` functions which provide the number of rows of a tables (`nrow`) or the length of a vector (`length`).
+We can easily extract the frequency of the search term (*alice*) using the `nrow` or the `length` functions which provide the number of rows of a tables (`nrow`) or the length of a vector (`length`).
 
 ```{r basekwic4}
-nrow(kwic_natural)
+nrow(kwic_alice)
 ```
 
 
 ```{r basekwic5}
-length(kwic_natural$keyword)
+length(kwic_alice$keyword)
 ```
 
-The results show that there are 414 instances of the search term (*selection*) but we can also find out how often different variants (lower case versus upper case) of the search term were found using the `table` function. This is especially useful when searches involve many different search terms (while it is, admittedly, less useful in the present example). 
+The results show that there are 414 instances of the search term (*alice*) but we can also find out how often different variants (lower case versus upper case) of the search term were found using the `table` function. This is especially useful when searches involve many different search terms (while it is, admittedly, less useful in the present example). 
 
 ```{r basekwic6}
-table(kwic_natural$keyword)
+table(kwic_alice$keyword)
 ```
 
 To get a better understanding of the use of a word, it is often useful to extract more context. This is easily done by increasing size of the context window. To do this, we specify the `window` argument of the `kwic` function. In the example below, we set the context window size to 10 words/elements rather than using the default (which is 5 word/elements).
 
 
 ```{r basekwic8, message=F, warning=F}
-kwic_natural_longer <- kwic(
+kwic_alice_longer <- kwic(
   # define text
-  origin, 
+  text, 
   # define search pattern
-  pattern = "selection", 
+  pattern = "alice", 
   # define context window size
   window = 10)
 ```
@@ -256,7 +245,7 @@ kwic_natural_longer <- kwic(
 
 ```{r skwic8b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-kwic_natural_longer %>%
+kwic_alice_longer %>%
   as.data.frame() %>%
   head(10) %>%
   flextable::flextable() %>%
@@ -265,7 +254,7 @@ kwic_natural_longer %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for the keyword natural in Charles Darwin's Origin with extended context (10 elements).")  %>%
+  flextable::set_caption(caption = "First 10 concordances for the keyword *alice* in the example text with extended context (10 elements).")  %>%
   flextable::border_outer()
 ```
 
@@ -283,40 +272,40 @@ kwic_natural_longer %>%
 
 
 
-1. Extract the first 10 concordances for the word *nature*.<br>
+1. Extract the first 10 concordances for the word *confused*.<br>
 
 <details>
   <summary>Answer</summary>
   ```{r ex1_1, class.source = NULL, eval = T}
-  kwic_nature <- kwic(x = origin, pattern = "nature")
+  kwic_confused <- kwic(x = text, pattern = "confused")
   # inspect
-  kwic_natural %>%
+  kwic_alice %>%
   as.data.frame() %>%
   head(10)
   ```
 </details>
 
 
-2. How many instances are there of the word *nature*?<br>
+2. How many instances are there of the word *wondering*?<br>
 
 <details>
   <summary>Answer</summary>
   ```{r ex1_2, class.source = NULL, eval = T}
-  kwic_nature %>%
+  kwic(x = text, pattern = "wondering") %>%
   as.data.frame() %>%
   nrow()
   ```
 </details>
 
 
-3. Extract concordances for the word *origin* and show the first 5 concordance lines.<br>
+3. Extract concordances for the word *strange* and show the first 5 concordance lines.<br>
 
 <details>
   <summary>Answer</summary>
   ```{r  ex1_3, class.source = NULL, eval = T}
-  kwic_origin <- kwic(x = origin, pattern = "origin")
+  kwic_strange <- kwic(x = text, pattern = "strange")
   # inspect
-  kwic_origin %>%
+  kwic_strange %>%
   as.data.frame() %>%
   head(5)
   ```
@@ -333,12 +322,12 @@ kwic_natural_longer %>%
 While extracting single words is very common, you may want to extract more than just one word. To extract phrases, all you need to so is to specify that the pattern you are looking for is a phrase, as shown below.
 
 ```{r multikwic2, message=FALSE, warning=FALSE}
-kwic_naturalselection <- kwic(origin, pattern = phrase("natural selection"))
+kwic_pooralice <- kwic(text, pattern = phrase("poor alice"))
 ```
 
 ```{r multikwic2b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-kwic_naturalselection %>%
+kwic_pooralice %>%
   as.data.frame() %>%
   head(10) %>%
   flextable::flextable() %>%
@@ -347,11 +336,11 @@ kwic_naturalselection %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for the keyphrase natural selection in Charles Darwin's Origin with extended context (10 elements).")  %>%
+  flextable::set_caption(caption = "First 10 concordances for the keyphrase *poor alice* in the example text.")  %>%
   flextable::border_outer()
 ```
 
-Of course you can extend this to longer sequences such as entire sentences. However, you may want to extract more or less concrete patterns rather than words or phrases. To search for patterns rather than words, you need to include regular expressions in your search pattern. 
+You may also want to extract more or less fixed patterns rather than exact words or phrases. To search for patterns that allow variation rather than specific, exactly-defined words, you need to include regular expressions in your search pattern. 
 
 ***
 
@@ -367,40 +356,40 @@ Of course you can extend this to longer sequences such as entire sentences. Howe
 
 
 
-1. Extract the first 10 concordances for the phrase *natural habitat*.<br>
+1. Extract the first 10 concordances for the phrase *the hatter*.<br>
 
 <details>
   <summary>Answer</summary>
   ```{r ex2_1, class.source = NULL, eval = T}
-  kwic_naturalhabitat <- kwic(x = origin, pattern = phrase("natural habitat"))
+  kwic_thehatter <- kwic(x = text, pattern = phrase("the hatter"))
   # inspect
-  kwic_naturalhabitat %>%
+  kwic_thehatter %>%
   as.data.frame() %>%
   head(10)
   ```
 </details>
 
 
-2. How many instances are there of the phrase *natural habitat*?<br>
+2. How many instances are there of the phrase *the hatter*?<br>
 
 <details>
   <summary>Answer</summary>
   ```{r ex2_2, class.source = NULL, eval = T}
-  kwic_naturalhabitat %>%
+  kwic_thehatter %>%
   as.data.frame() %>%
   nrow()
   ```
 </details>
 
 
-3. Extract concordances for the phrase *the origin* and show the first 5 concordance lines.<br>
+3. Extract concordances for the phrase *the cat* and show the first 5 concordance lines.<br>
 
 <details>
   <summary>Answer</summary>
   ```{r  ex2_3, class.source = NULL, eval = T}
-  kwic_theorigin <- kwic(x = origin, pattern = phrase("the origin"))
+  kwic_thecat <- kwic(x = text, pattern = phrase("the cat"))
   # inspect
-  kwic_theorigin %>%
+  kwic_thecat %>%
   as.data.frame() %>%
   head(5)
   ```
@@ -524,14 +513,14 @@ df_regex %>%
   flextable::border_outer()
 ```
 
-To include regular expressions in your KWIC searches, you include them in your search pattern and set the argument `valuetype` to `"regex"`. The search pattern `"\\bnatu.*|\\bselec.*"` retrieves elements that contain `natu` and `selec` followed by any characters and where the `n` in `natu` and the `s` in `selec` are at a word boundary, i.e. where they are the first letters of a word. Hence, our search would not retrieve words like *unnatural* or *deselect*. The `|` is an operator (like `+`, `-`, or `*`) that stands for *or*.
+To include regular expressions in your KWIC searches, you include them in your search pattern and set the argument `valuetype` to `"regex"`. The search pattern `"\\balic.*|\\bhatt.*"` retrieves elements that contain `alic` and `hatt` followed by any characters and where the `a` in `alic` and the `h` in `hatt` are at a word boundary, i.e. where they are the first letters of a word. Hence, our search would not retrieve words like *malice* or *shatter*. The `|` is an operator (like `+`, `-`, or `*`) that stands for *or*.
 
 ```{r rkwic6, message=FALSE, warning=FALSE}
 # define search patterns
-patterns <- c("\\bnatu.*|\\bselec.*")
+patterns <- c("\\balic.*|\\bhatt.*")
 kwic_regex <- kwic(
   # define text
-  origin, 
+  text, 
   # define search pattern
   patterns, 
   # define valuetype
@@ -549,7 +538,7 @@ kwic_regex %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for the regular expression \\bnatu.*.")  %>%
+  flextable::set_caption(caption = "First 10 concordances for the regular expression \\balic.* and \\bhatt.*.")  %>%
   flextable::border_outer()
 ```
 
@@ -573,7 +562,7 @@ kwic_regex %>%
 <details>
   <summary>Answer</summary>
   ```{r ex3_1, class.source = NULL, eval = T}
-  kwic_exu <- kwic(x = origin, pattern = ".*exu.*", valuetype = "regex")
+  kwic_exu <- kwic(x = text, pattern = ".*exu.*", valuetype = "regex")
   # inspect
   kwic_exu %>%
   as.data.frame() %>%
@@ -582,12 +571,12 @@ kwic_regex %>%
 </details>
 
 
-2. How many instances are there of words beginning with *nonet*?<br>
+2. How many instances are there of words beginning with *pit*?<br>
 
 <details>
   <summary>Answer</summary>
   ```{r ex3_2, class.source = NULL, eval = T}
-  kwic_nonet <- kwic(x = origin, pattern = "\\bnonet.*", valuetype = "regex") %>%
+  kwic(x = text, pattern = "\\bpit.*", valuetype = "regex") %>%
   as.data.frame() %>%
   nrow()
   ```
@@ -599,9 +588,7 @@ kwic_regex %>%
 <details>
   <summary>Answer</summary>
   ```{r  ex3_3, class.source = NULL, eval = T}
-  kwic_ption <- kwic(x = origin, pattern = "ption\\b", valuetype = "regex")
-  # inspect
-  kwic_ption %>%
+  kwic(x = text, pattern = "ption\\b", valuetype = "regex")  %>%
   as.data.frame() %>%
   head(5)
   ```
@@ -617,8 +604,8 @@ kwic_regex %>%
 Quite often, we only want to retrieve patterns if they occur in a certain context. For instance, we might be interested in instances of *selection* but only if the preceding word is *natural*. Such conditional concordances could be extracted using regular expressions but they are easier to retrieve by piping. Piping is done using the `%>%` function from the `dplyr` package and the piping sequence can be translated as *and then*. We can then filter those concordances that contain *natural* using the `filter` function from the `dplyr` package. Note the the `$` stands for the end of a string so that *natural$* means that *natural* is the last element in the string that is preceding the keyword.
 
 ```{r pipekwic7, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_pipe <- kwic(x = origin, pattern = "selection") %>%
-  dplyr::filter(stringr::str_detect(pre, "natural$|NATURAL$"))
+kwic_pipe <- kwic(x = text, pattern = "alice") %>%
+  dplyr::filter(stringr::str_detect(pre, "poor$|little$"))
 ```
 
 ```{r pipekwic7b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
@@ -632,7 +619,7 @@ kwic_pipe %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for instances of selection that are preceeded by natural.")  %>%
+  flextable::set_caption(caption = "First 10 concordances for instances of *alice* that are preceeded by *poor* or *little*.")  %>%
   flextable::border_outer()
 ```
 
@@ -642,10 +629,10 @@ Piping is a very useful helper function and it is very frequently used in R - no
 
 When inspecting concordances, it is useful to re-order the concordances so that they do not appear in the order that they appeared in the text or texts but by the context. To reorder concordances, we can use the `arrange` function from the `dplyr` package which takes the column according to which we want to re-arrange the data as it main argument. 
 
-In the example below, we extract all instances of *natural* and then arrange the instances according to the content of the `post` column in alphabetical.
+In the example below, we extract all instances of *alice* and then arrange the instances according to the content of the `post` column in alphabetical.
 
 ```{r orderkwic2, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_ordered <- kwic(x = origin, pattern = "natural") %>%
+kwic_ordered <- kwic(x = text, pattern = "alice") %>%
   dplyr::arrange(post)
 ```
 
@@ -660,7 +647,7 @@ kwic_ordered %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 re-ordered concordances for instances of natural.")  %>%
+  flextable::set_caption(caption = "First 10 re-ordered concordances for instances of alice.")  %>%
   flextable::border_outer()
 ```
 
@@ -678,9 +665,9 @@ Arranging concordances according to alphabetical properties may, however, not be
 ```{r orderkwic4, echo=T, eval = T, message=FALSE, warning=FALSE}
 kwic_ordered_coll <- kwic(
   # define text
-  x = origin, 
+  x = text, 
   # define search pattern
-  pattern = "natural") %>%
+  pattern = "alice") %>%
   # extract word following the keyword
   dplyr::mutate(post_word = str_remove_all(post, " .*")) %>%
   # group following words
@@ -710,32 +697,32 @@ We add more columns according to which we could arrange the concordance followin
 
 ## Ordering by subsequent elements{-}
 
-In this section, we will extract the three words following the keyword (*selection*) and organize the concordances by the frequencies of the following words. We begin by inspecting the first 6 lines of the concordance of *selection*.
+In this section, we will extract the three words following the keyword (*alice*) and organize the concordances by the frequencies of the following words. We begin by inspecting the first 6 lines of the concordance of *selection*.
 
 ```{r, message=FALSE, warning=FALSE}
-head(kwic_natural)
+head(kwic_alice)
 ```
 
 Next, we take the concordances and create a clean post column that is all in lower case and that does not contain any punctuation.
 
 
 ```{r, message=FALSE, warning=FALSE}
-kwic_natural %>%
+kwic_alice %>%
   # convert to data frame
   as.data.frame() %>%
   # create new CleanPost
   dplyr::mutate(CleanPost = stringr::str_remove_all(post, "[:punct:]"),
                 CleanPost = stringr::str_squish(CleanPost),
-                CleanPost = tolower(CleanPost))-> kwic_natural_following
+                CleanPost = tolower(CleanPost))-> kwic_alice_following
 # inspect
-head(kwic_natural_following)
+head(kwic_alice_following)
 ```
 
 In a next step, we extract the 1^st^, 2^nd^, and 3^rd^ words following the keyword.
 
 
 ```{r, message=FALSE, warning=FALSE}
-kwic_natural_following %>%
+kwic_alice_following %>%
   # extract first element after keyword
   dplyr::mutate(FirstWord = stringr::str_remove_all(CleanPost, " .*")) %>%
   # extract second element after keyword
@@ -744,15 +731,15 @@ kwic_natural_following %>%
   # extract third element after keyword
   dplyr::mutate(ThirdWord = stringr::str_remove(CleanPost, ".*? "),
                 ThirdWord = stringr::str_remove(ThirdWord, ".*? "),
-                ThirdWord = stringr::str_remove_all(ThirdWord, " .*")) -> kwic_natural_following
+                ThirdWord = stringr::str_remove_all(ThirdWord, " .*")) -> kwic_alice_following
 # inspect
-head(kwic_natural_following)
+head(kwic_alice_following)
 ```
 
 Next, we calculate the frequencies of the subsequent words and order in descending order from the  1^st^ to the 3^rd^ word following the keyword.
 
 ```{r, message=FALSE, warning=FALSE}
-kwic_natural_following %>%
+kwic_alice_following %>%
   # calculate frequency of following words
   # 1st word
   dplyr::group_by(FirstWord) %>%
@@ -766,9 +753,9 @@ kwic_natural_following %>%
   # ungroup
   dplyr::ungroup() %>%
   # arrange by following words
-  dplyr::arrange(-FreqW1, -FreqW2, -FreqW3) -> kwic_natural_following
+  dplyr::arrange(-FreqW1, -FreqW2, -FreqW3) -> kwic_alice_following
 # inspect results
-head(kwic_natural_following, 10)
+head(kwic_alice_following, 10)
 ```
 
 The results now show the concordance arranged by the frequency of the words following the keyword.
@@ -955,15 +942,15 @@ As R represents a fully-fledged programming environment, we can, of course, also
 mykwic <- function(txts, pattern, context) {
   # activate packages
   require(stringr)
-  require(plyr)
   # list files
+  txts <- txts[stringr::str_detect(txts, pattern)]
   conc <- sapply(txts, function(x) {
     # determine length of text
-    lngth <- as.vector(unlist(nchar(x)))
+        lngth <- as.vector(unlist(nchar(x)))
     # determine position of hits
     idx <- str_locate_all(x, pattern)
     idx <- idx[[1]]
-    ifelse(nrow(idx) >= 1, idx <- idx, return("No hits found"))
+    ifelse(nrow(idx) >= 1, idx <- idx, return(NA))
     # define start position of hit
     token.start <- idx[,1]
     # define end position of hit
@@ -980,12 +967,13 @@ mykwic <- function(txts, pattern, context) {
     PreceedingContext <- substring(x, pre.start, pre.end)
     Token <- substring(x, token.start, token.end)
     SubsequentContext <- substring(x, post.start, post.end)
-    conc <- cbind(PreceedingContext, Token, SubsequentContext)
+    Id <- 1:length(Token)
+    conc <- cbind(Id, PreceedingContext, Token, SubsequentContext)
     # return concordance
     return(conc)
     })
-  concdf <- ldply(conc, data.frame)
-  colnames(concdf)[1]<- "File"
+  concdf <- do.call(rbind, conc) %>%
+    as.data.frame()
   return(concdf)
 }
 ```
@@ -993,60 +981,59 @@ mykwic <- function(txts, pattern, context) {
 We can now try if this function works by searching for the sequence *you know* in the transcripts that we have loaded earlier. One difference between the `kwic` function provided by the `quanteda` package and the customized concordance function used here is that the `kwic` function uses the number of words to define the context window, while the `mykwic` function uses the number of characters or symbols instead (which is why we use a notably higher number to define the context window).
 
 ```{r customkwic4, message=F, warning=F}
-myconcordances <- mykwic(transcripts_collapsed, "you know", 50)
+kwic_youknow <- mykwic(transcripts_collapsed, "you know", 50)
 ```
 
 
 ```{r customkwic4b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-myconcordances %>%
+kwic_youknow %>%
   as.data.frame() %>%
-  head(10) %>%
+  head() %>%
   flextable::flextable() %>%
   flextable::set_table_properties(width = .95, layout = "autofit") %>%
   flextable::theme_zebra() %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for you know extracted using the mykwic function.")  %>%
+  flextable::set_caption(caption = "First 6 concordances for *you know* extracted using the mykwic function.")  %>%
   flextable::border_outer()
 ```
 
-As this concordance function only works for more than one text, we split the text of Darwin's *On the Origin of Species* into chapters and assign each section a name.
+As this concordance function only works for more than one text, we split the text into chapters and assign each section a name.
 
 
 ```{r customkwic6, message=FALSE, warning=FALSE}
 # read in text
-origin_split <- origin %>%
+text_split <- text %>%
   stringr::str_squish() %>%
   stringr::str_split("[CHAPTER]{7,7} [XVI]{1,7}\\. ") %>%
   unlist()
-origin_split <- origin_split[which(nchar(origin_split) > 2000)]
+text_split <- text_split[which(nchar(text_split) > 2000)]
 # add names
-names(origin_split) <- paste0("text", 1:length(origin_split))
+names(text_split) <- paste0("text", 1:length(text_split))
 # inspect data
-nchar(origin_split)
+nchar(text_split)
 ```
-Now that we have named elements, we can search for the pattern *natural selection*. We also need to clean the concordance as some sections do not contain any instances of the search pattern. To clean the data, we select only the columns `File`, `PreceedingContext`, `Token`, and `SubsequentContext` and then remove all rows where information is missing. 
+
+Now that we have named elements, we can search for the pattern *poor alice*. We also need to clean the concordance as some sections do not contain any instances of the search pattern. To clean the data, we select only the columns `File`, `PreceedingContext`, `Token`, and `SubsequentContext` and then remove all rows where information is missing. 
 
 ```{r customkwic8, message=FALSE, warning=FALSE}
-natsel_conc <- mykwic(origin_split, "natural selection", 50) %>%
-  dplyr::select(File, PreceedingContext, Token, SubsequentContext) %>%
-  na.omit()
+mykwic_pooralice <- mykwic(text_split, "poor Alice", 50)
 ```
 
 ```{r customkwic8b, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
 # inspect data
-natsel_conc %>%
+mykwic_pooralice %>%
   as.data.frame() %>%
-  head(10) %>%
+  head() %>%
   flextable::flextable() %>%
   flextable::set_table_properties(width = .95, layout = "autofit") %>%
   flextable::theme_zebra() %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 concordances for you know extracted using the mykwic function.")  %>%
+  flextable::set_caption(caption = "First 6 concordances of *poor alice* extracted using the mykwic function.")  %>%
   flextable::border_outer()
 ```
 
