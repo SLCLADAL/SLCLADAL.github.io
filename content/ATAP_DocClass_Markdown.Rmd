@@ -1,18 +1,16 @@
 ---
-title: "ATAP_DocClass_22"
+title: "Classifying American Speeches"
 author: "Gerold Schneider, Max Lauber"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
+date: "2022-11-15"
 output:
   bookdown::html_document2
 bibliography: bibliography.bib
 link-citations: yes
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
-## Introduction
+
+# Introduction
 
 This tutorial shows how to perform document classification using R. The entire R markdown document for the tutorial can be downloaded [here]("https://slcladal.github.io/content/ATAP_DocClass_Markdown.Rmd").
 
@@ -42,69 +40,47 @@ We extend our thanks to Marco Guerini and his co-authors for the construction of
 
 As mentioned at the outset, this is an introduction to document classification based on R. A rudimentary familiarity with R and RStudio are helpful for getting the most out of this. If you have yet to install R or are new to it, we can recommend [this tutorial to R](https://slcladal.github.io/intror.html), which walks you through the installation and shows a range of its functionalities. In the following, we assume that you have downloaded and installed both R and RStudio and take it from there.
 
-# Packages: Quanteda and Readtext
-
 Although R in its basic version already contains a lot of functionalities, we do need to install some packages for the code below to run without exploding into a bouquet of error messages. If you already have the packages `readtext`, `quanteda` and `quanteda.textmodels` installed, just skip to the next heading. If you don’t have them yet, the first thing you want to do is run these first lines of code:
 
-```{r}
-#install.packages("readtext")
+```{r install, message=F, warning=F}
 #install.packages("quanteda")
 #install.packages("quanteda.textmodels")
+#install.packages("stopwords")
 ```
 
 This may take a minute or three. In most cases, this will work without any hiccups. If you should get an error message, we recommend taking a moment to read what it says, and, if it does not make any sense to you, to google it. If an issue comes up for you, chances are that this has already happened to someone else - and, fortunately, the R community has a pretty good track record of responding to questions about technical issues. Generally, it is also a good idea to use a relatively new version of R. If you have last used R two years ago, do update it.
 
 Once you have installed the packages, you’ll need to load them in the current session. This is done with the following lines of code:
 
-```{r}
-library(readtext)
+```{r act, message=F, warning=F}
 library(quanteda)
 library(quanteda.textmodels)
 ```
 
-The libraries quanteda and readtext are introduced by their developers in @welbers2017text  with brief examples – a useful text to read after our notebook.
 
 With the packages loaded, the stage is set. Now we need to dress up the actors.
 
 ## From Data to Useable Objects
 
-Before we can do anything further, we need to load the data into R. As mentioned earlier, we are working with the CORPS II corpus compiled by @guerini2010new. There are many ways to get the corpus into R, but in keeping with the binary theme of document classification, we walk you through two of them.
+Before we can do anything further, we need to load the data into R. As mentioned earlier, we are working with the CORPS II corpus compiled by @guerini2010new. There are many ways to get the corpus into R, but we are going to download the data from the data directory of the LADAL GitHub repository. By executing the following line of code, you tell R to download the file containing the corpus from github and storing it in the session under the variable name `rt`:
 
-First for the easy version. By executing the following line of code, you tell R to download the CSV file containing the corpus from github and storing it in the session under the variable name `rt`:
-
-```{r}
-#rt = readtext(pointing to github repository)
+```{r loaddat, message=F, warning=F}
+rt <- base::readRDS(url("https://slcladal.github.io/data/SEL_perparty_v2.rda", "rb"))
 ```
-
-In a slightly more complicated approach, you do the downloading manually from here, and then move it to a folder where you have a chance of finding it again. Then, replace the word `filepath` in the line of code below with the file path under which you saved the CSV and add the filename to the end of the file path. Then run the line.
-
-```{r}
-rt = readtext("C:/Users/maxlu/Documents/R/ATAP_ZurichD_DocClass/Data/SEL_perparty_v2.csv", text_field="text")
-```
-
-This is also a typical moment for failure. If you get an error message here, double-check the command. Make sure that you have the quotation marks around the file path, and that you copied the complete file path, including the full document name. Windows users should observe that R uses forward slashes for directories. Potential failure modes here are Umlauts and other symbols beyond the 26 letters and 10 numbers. Either muck around with the file path until you get it right, or revert to the easy version.
 
 In the meantime, we want to draw your attention to the second parameter of the readtext command, namely the specification defining the text field. These specifications are called flags. These are often useful and sometimes necessary. In this case, the flag does exactly what it says: it tells R in which column the text is stored.
 
-Let’s take a look at `rt`, the variable in which we stored the corpus using the `readtext` command. We can do this simply by entering the variable name:
+Let’s take a look at `rt`, the variable in which we stored the corpus. We can do this simply by `str` which returns the structure of the object:
 
-```{r}
-rt
+```{r inspect, message=F, warning=F}
+str(rt)
 ```
 
-The output tells us what we are dealing with: a readtext object consisting of 3247 documents and 3 document variables. We also see the first six rows of the object, which shows that we are dealing with a two dimensional matrix or a table, which in the R context is also called a data frame. What may be surprising is that, although the object is described as having three document variables, the data frame has five columns.
+The output tells us what we are dealing with: a  object consisting of 3247 documents and 3 document variables. We also see the first six rows of the object, which shows that we are dealing with a two dimensional matrix or a table, which in the R context is also called a data frame. What may be surprising is that, although the object is described as having three document variables, the data frame has five columns.
 
-If we look at the CSV file of the corpus, we can see how that comes about. The CSV file contains four columns, labeled `party`, `fileid`, `name` and `text`, respectively. The object `rt` to which we assigned the data created an additional column, labeled `doc_id`.  In this variable, the row number of each row in the CSV file is stored. If we were to load in a second document and append it to the `rt` object, it would be clear which row of data comes from which corpus. So, while it’s great to have this `doc_id`, the output also makes it clear that it is not meaningful information relevant to the text we are interested in.
+If we look at the structure of the corpus, we can see that the file contains four columns, labeled `party`, `fileid`, `name` and `text`, respectively. The object `rt` to which we assigned the data created an additional column, labeled `doc_id`.  In this variable, the row number of each row in the  file is stored. If we were to load in a second document and append it to the `rt` object, it would be clear which row of data comes from which corpus. So, while it’s great to have this `doc_id`, the output also makes it clear that it is not meaningful information relevant to the text we are interested in.
 
-But, going back to the output, we still have on column more than we have document variables. If it is obvious to you why that is: mad props. If not, you can find out more about what the `readtext` command does by entering:
-
-```{r}
-?readtext 
-```
-
-You should see an information page loading in the bottom right window. The short description holds the answer:
-
-Read texts and (if any) associated document-level meta-data from one or more source files. The text source files come from the textual component of the files, and the document-level metadata ("docvars") come from either the file contents or filenames.
+The text source files come from the textual component of the files, and the document-level metadata ("docvars") come from either the file contents or filenames.
 
 So the three document variables are the document-level metadata, which pertain to the texts we are interested in. Depending on the type of analysis or operation you are interested in performing on the data, this is not essential information. For document classification, however, as well as many other analyses, this metadata is essential.
 
@@ -112,13 +88,13 @@ So the three document variables are the document-level metadata, which pertain t
 
 Before we can proceed to the document classification, we need to process the data some more. As a first step, we turn the data frame `rt` into a corpus object. We can do this with one intuitive command:
 
-```{r}
+```{r corpus, message=F, warning=F}
 fulltext = corpus(rt)
 ```
 
 Thereby, we create a new corpus object called `fulltext`. Let’s take a look at it:
 
-```{r}
+```{r inspectc, message=F, warning=F}
 fulltext
 ```
 
@@ -136,13 +112,13 @@ Let’s look again at the output that we got looking at the corpus object `fullt
 
 The first step here is to transform the text in the corpus object into individual tokens. Right now, each text cell in the `fulltext` object contains one whole presidential campaign speech. By tokenizing the corpus, each text entry in fulltext is transformed into a list of words. In order to do this, we define a new variable, `toks`, and use the perfectly descriptive command `tokens()` to tokenize the corpus and assign it to the new variable `toks`:
 
-```{r}
+```{r fulltexttoks}
 toks <- tokens(fulltext, remove_punct = TRUE)
 ```
 
 Sneakily, we also use a flag here to remove punctuation. Let’s look at how this step changed the content of the corpus. Having removed the punctuation, it makes sense to pick a speech which contained punctuation in the beginning, so we choose speech four. We can look at this specific speech by entering the name of the object, `toks`, and adding the row number of choice in square brackets, thus:
 
-```{r}
+```{r checktoks, message=F, warning=F}
 toks[4]
 ```
 
@@ -156,7 +132,7 @@ toks = tokens_tolower(toks)
 
 The command is self explanatory, but we should add: we define the object `toks` as input, replace capital letters with lowercase ones and assign the outcome again to the object `toks`, thus overwriting what was there before. If we now look at row four again, we see the result of this transformation:
 
-```{r}
+```{r toks4, message=F, warning=F}
 toks[4]
 ```
 
@@ -166,19 +142,19 @@ Where before there was *Thank* and *I*, we now have *thank* and *i*. Not much mo
 
 This time round, the transformation is a bit more drastic: we are going to reduce each word in the corpus to its word stem. Take a quick look at the first item of the toks object:
 
-```{r}
+```{r toks1, message=F, warning=F}
 toks[1]
 ```
 
 We have here, among other words, *christians*, *usually* and *obligations*. Keep those in mind as you reduce the corpus to wordstems, again using a fairly intuitive command:
 
-```{r}
+```{r toksstem, message=F, warning=F}
 toks = tokens_wordstem(toks)
 ```
 
 Using the same procedure as with lowercasing, we overwrite the contents of the `toks` object with its latest transformation. We can see how this plays out by again looking at the first item.
 
-```{r}
+```{r toksinspect, message=F, warning=F}
 toks[1]
 ```
 
@@ -188,13 +164,13 @@ Everything is shortened compared to before: *christian*, *usually*, and *oblig*.
 
 The final intrusion into the linguistic source material is the removal of stopwords. These are words which are very common, to a degree that one can assume that they will, on average, be equally distributed between the two classes. They are typically also words that have no meaning on their own, for example *the*, *in*, etc. As they rather regulate the relations between words, they are also called function words (as opposed to content words, which we want to keep). There is no universal list of stopwords - and some methods make do without removing stopwords - but for our purposes, it makes sense to just work with a list that is readily available, which is the one specified in the flag. The command is as follows:
 
-```{r}
-toks = tokens_remove(toks, pattern = stopwords(language = "en", source = "snowball"))
+```{r gentoks, message=F, warning=F}
+toks = tokens_remove(toks, pattern = stopwords::stopwords(language = "en", source = "snowball"))
 ```
 
 Again, the command is very explicit in its function, the input is the tokenized, punctuation-less, lowercased and stemmed version of the toks object, which we overwrite to create a version that is all of the above and additionally does not contain stopwords. We see in row one how that looks:
 
-```{r}
+```{r toks, message=F, warning=F}
 toks[1]
 ```
 
@@ -214,17 +190,9 @@ With the linguistic pre-processing done, we continue to the next step: creating 
 dtm <- dfm(toks)
 ```
 
-This time round, we create a new object with the name `dtm`, and the input to this operation is the latest version of the `toks` object. To see what the command `dfm` does in detail, you can open the help page using the command we used earlier:
+This time round, we create a new object with the name `dtm`, and the input to this operation is the latest version of the `toks` object. In case you are not familiar with this particular type of matrix, you might get a better sense for what we are dealing with is by looking at the object directly:
 
-```{r}
-?dfm
-```
-
-This works for any command, and can come in extremely handy, both with the descriptions at the top of the page and with the list of flags, which gives a great overview over the specifications any given command takes. In this case, however, the description of the command does not tell us that much – unless you arrive with prior knowledge of what a document-feature matrix is: a sparse document-feature matrix, from a character, corpus, tokens, or even other dfm object?
-
-In case you are not familiar with this particular type of matrix, you might get a better sense for what we are dealing with is by looking at the object directly:
-
-```{r}
+```{r firstdtm, message=F, warning=F}
 dtm
 ```
 
@@ -232,7 +200,7 @@ At first glance, you can see that our variable `dtm` is an object similar to the
 
 In this matrix, we can access both the columns and the rows, the way we usually do with data frames in R. To do this, we append a square bracket to the object. We can access rows thusly:
 
-```{r}
+```{r inistialdtm, message=F, warning=F}
 dtm[3,]
 ```
 
@@ -240,19 +208,19 @@ Here, we see that *think* features twelve times in the third speech in the corpu
 
 Accessing the columns works analogously: we simply place the number after the comma:
 
-```{r}
+```{r moredtm, message=F, warning=F}
 dtm[,3]
 ```
 
 We see here that *think* is a frequent feature, at least in the first six speeches in the corpus. By looking at the metadata, or, as we call them here, the document variables, we can see that the first six speeches were all given by the same speaker. To access the document variables and solve the riveting riddle of who this famous thinker is, we can use another one of these intuitively named commands:
 
-```{r}
+```{r docvarsdtm, message=F, warning=F}
 head(docvars(dtm))
 ```
 
 With the `docvars` command, we get a list of the document variables for each document, that is each row, in the `dtm` object. However, we nest this inside of the command `head()` - which is useful for taking a first look at any variable, since it only displays the first six rows of a variable. We do this here because the docvars are not subject to the same behavior protocol that the corpus object is. Your computer is unlikely to overload if you were to accidentally view the whole docvars without taking this `head` precaution. So let’s try it:
 
-```{r}
+```{r docvars, message=F, warning=F}
 docvars(dtm)
 ```
 
@@ -262,13 +230,13 @@ Even though it becomes clear enough which document variable stands in which colu
 
 The next step in our journey toward document classification requires us to count how often each feature appears in the corpus, for reasons which will become apparent shortly. Our trusty friend, the Quanteda package, anticipates this need and furnishes us with the appropriate command, named `docfreq`. We use it to create a new variable, `doc_freq`:
 
-```{r}
+```{r docfreqobj, message=F, warning=F}
 doc_freq = docfreq(dtm)
 ```
 
 The `docfreq` command takes our pre-processed corpus as an argument, in the form of the `dtm` variable. The new variable, `doc_freq` is now a long list of all the features and their frequencies. We can confirm this by looking at the first twenty entries, i.e. words:
 
-```{r}
+```{r chck20, message=F, warning=F}
 head(doc_freq, n=20)
 ```
 
@@ -276,7 +244,7 @@ The output shows us each feature and the number of occurrences. It also shows us
 
 To see which features occur most and least frequently in the corpus, we can sort the variable `doc_freq`. To do this, we use the intuitively named `sort()` function. In order to save ourselves the trouble of scrolling, we nest the `sort()` function inside the head function, which then looks thusly:
 
-```{r}
+```{r headdocfreq, message=F, warning=F}
 head(sort(doc_freq, decreasing=T), n=15)
 ```
 
@@ -286,7 +254,7 @@ In the output, we see many features that we would expect to appear in presidenti
 
 For some insightful contrast, let’s look at the last fifteen features in this ranking. To do this, we use almost exactly the same command as before, but instead of nesting everything under `head()`, we do it under the `tail()` function, like so:
 
-```{r}
+```{r tailsort, message=F, warning=F}
 tail(sort(doc_freq, decreasing=T), n=15)
 ```
 
@@ -294,20 +262,20 @@ It would be possible to go and look at the contexts of these features, but in th
 
 Instead, we return the earlier promise and explain why we created the `doc_freq` variable. As we can still see in the output, the features in the tail are on the one hand extremely rare, and on the other hand not very useful. The latter reason would not be a criteria for exclusion, but the fact that they are extremely rare could muddle up the document classification model we are interested in, the model could learn corpus coincidences, which are often referred to as *noise*, thus blurring the *signal* of frequent words. So, we remove all features from the corpus which occur less frequently than five times. We do this using the following command:
 
-```{r}
+```{r greater5, message=F, warning=F}
 dtm = dtm[,doc_freq >= 5]
 ```
 
 As you can see, we are once again overwriting the `dtm` variable with a specific iteration of the variable. This time, we choose to retain all the features which occur more than five times in the corpus, with the result that the features which occur less frequently drop out. Let’s see how well this worked, using the same set of commands as above. First, we overwrite the `doc_freq` variable with the document frequencies of the latest version, then we check out the `tail`:
 
-```{r}
+```{r tail, message=F, warning=F}
 doc_freq = docfreq(dtm)
 tail(sort(doc_freq, decreasing=T), n=15)
 ```
 
 We now find a new set of random seeming words at the tail of the `doc_freq` variable, but at least they all occur at least five times, which means they won’t distort the model too badly. And just to make sure we didn’t accidentally mess up the frequent features, we can again take a look at the `head`:
 
-```{r}
+```{r headsort, message=F, warning=F}
 head(sort(doc_freq, decreasing=T), n=15)
 ```
 
@@ -319,7 +287,7 @@ Before we continue to the actual document classification (never fear: we are act
 
 Before we apply the tfidf weights, let’s load the first document in the `dtm` object:
 
-```{r}
+```{r insepct_dtma, message=F, warning=F}
 dtm[1,]
 ```
 
@@ -327,13 +295,13 @@ This will save us a lot of scrolling time when we compare the pre- and post-tfid
 
 Once again, quanteda actually furnishes us with a command to easily transform our `dtm` variable to adapt to the tfidf weights. The command is self-explanatorily labeled `dfm_tfidf()`, and we use it to overwrite the current version of the `dtm` variable:
 
-```{r}
+```{r gentfidf, message=F, warning=F}
 dtm = dfm_tfidf(dtm, force=TRUE)
 ```
 
 You can see that the command takes as its argument first the object to be transformed. The second argument, the flag force=TRUE is usually not needed. As a protection to makes sure that one does not tfidf-weight twice, the dfm_tfidf function refuses to accept matrices that are already weighted. Let’s take a look at the first entry of the `dtm` object now, we can see that the weights of the features have changed substantially:
 
-```{r}
+```{r inspect_dtm1, message=F, warning=F}
 dtm[1,]
 ```
 
@@ -341,7 +309,7 @@ Where before we had a simple count of occurrences, we now have the tfidf scores.
 
 Let’s stick with the feature *think* for a second, and look at its tfidf score in the first few speeches. Remember that, since `dtm` is an object containing data and a behavior, we can simply enter the third column of `dtm` and receive six manageable lines of output:
 
-```{r}
+```{r inspect_dtm, message=F, warning=F}
 dtm[,3]
 ```
 
@@ -349,7 +317,7 @@ We see that *think* generally has a relatively low score, but the scores differ 
 
 As an aside, tfidf can be used directly to see which words are most characteristic of a document, i.e. its keywords. We could see the keywords of a document, for example document 1, by considering the words with the highest tfidf values. The simplest way to do so is to sort the tfidf values in decreasing order, from most to least frequent, and the inspect the top of the list.
 
-```{r}
+```{r sdtm_tfidf, message=F, warning=F}
 sdtm_tfidf = dfm_sort(dtm[1,], decreasing=T, margin="features")
 head(sdtm_tfidf)
 ```
@@ -366,21 +334,15 @@ The situation, of course, is as follows: we have a corpus with 3,247 speeches, a
 
 Once again, quanteda holds ready for us a command with the descriptive name `dfm_sample()`. We use it as follows:
 
-```{r}
+```{r train_dtm, message=F, warning=F}
 train_dtm = dfm_sample(dtm, size=2800)
 ```
 
-Or, to put it into words: we create a new object called `train_dtm`, since we are going to train the model with this. The `train_dtm` object contains a sample of 2,800 speeches from the pre-processed and weighted `dtm` corpus.
-
-```{r}
-?dfm_sample
-```
-
-Looking at the description of the dfm_sample command, you can see that we have just taken a random sample with a size corresponding to roughly 85% of the corpus. There are no hard and fast rules as to which percentage of the data should be used for training and which for testing, but if you’re somewhere in the 90% ballpark for training data you should be doing fine.
+Or, to put it into words: we create a new object called `train_dtm`, since we are going to train the model with this. The `train_dtm` object contains a sample of 2,800 speeches from the pre-processed and weighted `dtm` corpus. For this tutorial, we have just taken a random sample with a size corresponding to roughly 85% of the corpus. There are no hard and fast rules as to which percentage of the data should be used for training and which for testing, but if you’re somewhere in the 90% ballpark for training data you should be doing fine.
 
 Let’s take a superficial look at our training data:
 
-```{r}
+```{r, message=F, warning=F}
 train_dtm
 ```
 
@@ -390,7 +352,7 @@ We see in the first row of the output that the object is a document-feature matr
 
 Now, let’s create the necessary counterpart, the testing data. We create a new variable, which we’ll call `test_dtm`, and which contains those speeches which are not part of the training data. The way to do this is by taking the `dtm` object and choosing those documents which constitute the difference between the full `dtm` corpus and the `train_dtm` object. The appropriate function for this is `setdiff()`, which takes as arguments the documents which constitute the full `dtm` corpus and removes the documents named in the `train_dtm` variable. The function setdiff is actually used here as an index of the dtm. Indices cannot only contain numbers, but also variables and entire functions – Python programmers refer to this as list comprehension. Observe that dtm is a two-dimensional object. We constrain the first dimension (the rows, i.e. the documents) to those that are not part of the training set, but the second dimension (the column, i.e. the word features) is just kept. This explains the last letters of the following code, the comma followed by the square bracket.
 
-```{r}
+```{r, message=F, warning=F}
 test_dtm = dtm[setdiff(docnames(dtm), docnames(train_dtm)), ]
 test_dtm
 ```
@@ -403,7 +365,7 @@ The first document classification model we are going to train is of a type calle
 
 Training the model is simple enough, requiring just a single command, aptly titled `textmodel_nb()`:
 
-```{r}
+```{r, message=F, warning=F}
 nb_model = textmodel_nb(train_dtm, y=docvars(train_dtm, "party"))
 ```
 
@@ -411,7 +373,7 @@ You see that we once again created a new variable, this time one called `nb_mode
 
 One way to think about it is this: we have a two dimensional object. On the x-axis, we have the training data. On the y-axis we have the variable we want to predict, in this case the party of the speaker. With Naive Bayes, training the model is basically a question of one simple calculation: given that we see a feature on the x-axis, what is the probability that the corresponding position on the y-axis is Republican. Each feature is thus assigned a probability between 0 and 1, meaning it is associated either more with the Democratic or more with the Republican party. The dividing line for the result suggested is 0.5. Simple as that, one might think. However, looking at the output of the model, you may feel a bit underwhelmed:
 
-```{r}
+```{r, message=F, warning=F}
 nb_model
 ```
 
@@ -427,7 +389,7 @@ pred_nb = predict(nb_model, newdata=test_dtm)
 
 The first argument is the model, on the basis of which the prediction is to be made. In this instance, we are obviously using our Naive Bayes model, stored in the `nb_model` object. The second argument is where we give the new data, which we set aside earlier in the `test_dtm` variable. With that we define a new variable, `pred_nb` which contains the predictions our model generated. Let’s have a look at the first twenty positions:
 
-```{r}
+```{r pred_nb, message=F, warning=F}
 head(pred_nb, n=20)
 ```
 
@@ -441,13 +403,13 @@ you thought this was going to be straightforward: we extend our sincere apologie
 
 The first step for this is constructing the so-called confusion matrix. The confusion matrix is a two-dimensional table which shows the actual party associated with each speech on one axis, and the predictions on the other. We can construct this using the `table()` function:
 
-```{r}
+```{r table, message=F, warning=F}
 confmat_nb = table(prediction = pred_nb, party = docvars(test_dtm, "party"))
 ```
 
 Creating a new object called `confmat_nb`, our confusion matrix for the Naive Bayes model, we assign to it a table. The `table()` function takes as its arguments first the content of the rows, here the values we predicted for the `pred_nb` variable. Then it takes the content of the columns, here the document variable `party` from the test data. As you will see as soon as you look at the `confmat_nb` object, the labels `prediction` and `party` to which we assign the data are exactly that: the labels for the vertical and the horizontal axis. Let’s take a look:
 
-```{r}
+```{r confmat_nb, message=F, warning=F}
 confmat_nb
 ```
 
@@ -459,7 +421,7 @@ On the other diagonal, from bottom left to top right, we have the wrong predicti
 
 Getting from the confusion matrix to a numeric representation of the accuracy is pretty straightforward. First, we take the sum of all correct predictions, then we divide it through the total sum of predictions. One line of code to save this percentage value, then we look at it, easy-peasy:
 
-```{r}
+```{r accuracy_nb, message=F, warning=F}
 accuracy_nb = (confmat_nb[1,1]+confmat_nb[2,2]) / sum(confmat_nb)
 accuracy_nb
 ```
@@ -470,7 +432,7 @@ In my case, I get an accuracy of 94%, which is not at all shabby. You will have 
 
 Let’s start with an obvious one: God. At least, it’s an obvious feature in the American political context. One party is known for heavily pandering to their god-fearing subjects, the other is known for mildly pandering to their more or less god-fearing subjects. You get the idea. Let’s see, then, how God features in our model as a predictor for the two parties. We can see that by accessing the parameters of the `nb_model` and specifying the parameter `god`:
 
-```{r}
+```{r param, message=F, warning=F}
 nb_model$param[,"god"]
 ```
 
@@ -482,13 +444,13 @@ b) how the same feature is differently weighted for the two parties.
 
 But let’s shift our perspective somewhat: instead of assuming that we know how a feature will be differently weighted for the different parties, let’s look at the features which have the strongest weights, to find out what our data says is most typical for the Republican or the Democratic party. To do so, we are again going to use the `sort()` function, this time on the model parameters for the Republican party, and nest it inside the `head()` function to show the top thirty Republican features:
 
-```{r}
+```{r sort_nb_model, message=F, warning=F}
 head(sort(nb_model$param["rep",], decreasing=T), n=30)
 ```
 
 This is where it becomes interesting on a content level: we can see that many of the strongest Republican features directly reflect aspects of Republican policy priorities. There are strong flavors of national security in the top thirty features, among them *terrorist*, *enemi*, *war*, *attack*, *militari*, and several more. There are features pointing to fiscal policy, with *tax* and *money*; former Republican presidents, with *georg* and *bush*; and we can be pretty certain that the feature *11* refers to 9/11. Clearly, there is more to unpack here, but we’ll leave that to you, and carry on by looking at the top features in Democratic speeches:
 
-```{r}
+```{r nb_model, message=F, warning=F}
 head(sort(nb_model$param["dem",], decreasing=T), n=30)
 ```
 
@@ -502,13 +464,13 @@ That being said, there are many ways to mine these feature tables for insight, a
 
 The first weighting we do is very simple: we look at features that are relatively more important for Republicans than for Democrats. They way we do this is by dividing the the weight each feature has for Republicans by the weight the same feature has for the Democrats, like this:
 
-```{r}
+```{r rel_weight_rep_4, message=F, warning=F}
 rel_weight_rep = (nb_model$param["rep",] / nb_model$param["dem",])
 ```
 
 Before looking at the results, a quick sanity check. We saw above that all of the weights are rather small decimal numbers. What happens when you divide a fraction by an even smaller fraction? You get a higher number. So, if a feature has a high weight for Republicans, but a small weight for Democrats, the result of the operation above yields a relatively high number, one that is probably bigger than 1. We save the results of the operation in a new variable, `rel_weight_rep`, a step you’re very familiar with by now. Let’s see how this plays out, by looking at the top 30 entries:
 
-```{r}
+```{r sort_rel, message=F, warning=F}
 head(sort(rel_weight_rep, decreasing=T), n=30)
 ```
 
@@ -518,7 +480,7 @@ Not everything we get in our output is readily interpretable, but there are some
 
 Let’s use the same procedure to generate the equivalent list for the Democrats:
 
-```{r}
+```{r rel_weight_dem}
 rel_weight_dem = (nb_model$param["dem",] / nb_model$param["rep",])
 head(sort(rel_weight_dem, decreasing=T), n=30)
 ```
@@ -529,7 +491,7 @@ Okay, so while there are some insights to be gleaned here that point us to singl
 
 For this next step, take almost exactly the same measure as above, except this time round, we take the Republican weights for the features to the power of two, like this:
 
-```{r}
+```{r rel_weight_rep2_3}
 rel_weight_rep2 = (nb_model$param["rep",]^2 / nb_model$param["dem",])
 ```
 
@@ -537,14 +499,14 @@ So, what are we doing here? Essentially, we are entering the exponential realm, 
 
 Perhaps this becomes clearer with a numeric example. If we take the second power of 0.1, the result is further away from the original number than if we take the second power of 0.01. We can see this by subtracting the second power:
 
-```{r}
+```{r check}
 0.1-(0.1^2)
 0.01-(0.01^2)
 ```
 
 Why does this matter? Because the change to the rare words we saw above, which came out on top of the list because they had higher weights, is bigger than the change to the more frequent words, which did not make the top pick because they had lower weights. Since we are keeping the Democrat weights the way they were, we are basically evening the playing field in our variable `rel_weight_rep2`. Let’s see how that affects the top 30 feature table:
 
-```{r}
+```{r sort}
 head(sort(rel_weight_rep2, decreasing=T), n=30)
 ```
 
@@ -554,7 +516,7 @@ In our case, the relevant new features are *regim*, *iraqi* and *libya*. As ment
 
 Okay, now let’s see how things stand for the Democrats:
 
-```{r}
+```{r rel_weight_dem2}
 rel_weight_dem2 = (nb_model$param["dem",]^2 / nb_model$param["dem",])
 head(sort(rel_weight_dem2, decreasing=T), n=30)
 ```
@@ -563,7 +525,7 @@ In our results, we see a rather pronounced change in the output once we apply th
 
 Let’s look at two more ways of biasing the feature tables in favor of frequent words. The next one is a lot more intuitive: we take the weights, and multiply them by the document frequencies for each feature. The more frequent a feature, the higher the result, and words mentioned particularly frequently, for instance because they were *hot* topics for longer periods of time, are boosted. Easy peasy:
 
-```{r}
+```{r rel_weight_rep3_1}
 rel_weight_rep3 = (nb_model$param["rep",]*doc_freq)
 head(sort(rel_weight_rep3, decreasing=T), n=30)
 ```
@@ -572,7 +534,7 @@ We are really entering mainstream topics now, and the features start to tie in w
 
 Let’s also take a look at the top Democratic features under this weighting scheme:
 
-```{r}
+```{r rel_weight_dem3}
 rel_weight_dem3 = (nb_model$param["dem",]*doc_freq)
 head(sort(rel_weight_dem3, decreasing=T), n=30)
 ```
@@ -585,14 +547,14 @@ One could imagine a research question here: how well can document classification
 
 Let’s look at a final weighting scheme. We use almost the same approach as above, but this time round we multiply the feature weights with the logarithms of the document frequency. This is different compared to the other approaches in that it still somewhat favors frequent words, but the gap between the more and less frequent words becomes relatively small. The danger that generally frequent words, e.g. contractions, move up to the top gets smaller. In case you need convincing of this, just take a quick look at the first few document frequencies and their logarithms:
 
-```{r}
+```{r doc_freq}
 head(doc_freq)
 log(head(doc_freq))
 ```
 
 So far, so good. Now let’s take a look at how this impacts the top thirty features:
 
-```{r}
+```{r rel_weight_rep4_1}
 rel_weight_rep4 = (nb_model$param["rep",]*log(doc_freq))
 head(sort(rel_weight_rep4, decreasing=T), n=30)
 ```
@@ -601,7 +563,7 @@ The changes compared to the earlier weightings are relatively slight here, but t
 
 Finally, let’s see what this weighting yields for the Democrats:
 
-```{r}
+```{r rel_weight_dem4}
 rel_weight_dem4 = (nb_model$param["dem",]*log(doc_freq))
 head(sort(rel_weight_dem4, decreasing=T), n=30)
 ```
@@ -622,7 +584,7 @@ All classification algorithms have their pros and cons, usually resulting in a t
 
 A lot of what we are doing here should look very familiar. First, we create a new variable, called `lr_model`. We assign to it a text model based on the logistic regression algorithm, which we create using one of these aptly named quanteda functions: `textmodel_lr`. The arguments are identical to the arguments in the Naive Bayes approach. First, we throw in the training data, then we specify the document variable we want to train on. We run this command, and take a peek at the `lr_model`:
 
-```{r}
+```{r lr_model}
 lr_model = textmodel_lr(train_dtm, y=docvars(train_dtm, "party"))
 lr_model
 ```
@@ -631,7 +593,7 @@ As with the `nb_model`, just looking at the `lr_model` does not yield terrific i
 
 To see how well the logistic regression model does, we take exactly the same steps as we did for the Naive Bayes model: first, we use the model to predict the party of the speeches in the test data. Then, we create a confusion matrix. We also already draw up the confusion matrix of the `nb_model`, so we can easily compare the two.
 
-```{r}
+```{r confmat_lr}
 pred_lr = predict(lr_model, newdata=test_dtm)
 confmat_lr = table(prediction = pred_lr, PARTY = docvars(test_dtm, "party"))
 confmat_lr
@@ -642,7 +604,7 @@ As above, we will not get exactly the same numbers here, but unless something we
 
 Let’s go a step further and put the proverbial and actual number on it. We discussed earlier how we can calculate the accuracy from the confusion matrix. So, we sum again the number of correct predictions and divide them by the total number of predictions. And for easier comparison, we’ll draw up the accuracy of the Naive Bayes model as well:
 
-```{r}
+```{r accuracy_lra}
 accuracy_lr = (confmat_lr[1,1]+confmat_lr[2,2]) / sum(confmat_lr)
 accuracy_lr
 accuracy_nb
@@ -657,7 +619,7 @@ That we get different results when creating models using different algorithms wi
 
 And you can see for yourself how this works. We are going to repeat the steps from the data sampling to the calculation of the accuracy. The only thing that changes is the set of training data that is sampled initially. You can either just let the code do its thing and check out the results; or you can quickly try to recall for yourself what each line does (and sneak a peek at the descriptions above, in case you can’t reconstruct why we are doing what). For didactic purposes, we obviously recommend the latter, but we can’t hold a grudge against you if you just want to see the results:
 
-```{r}
+```{r train_dtm2}
 train_dtm2 = dfm_sample(dtm, size=2800)
 test_dtm2 = dtm[setdiff(docnames(dtm), docnames(train_dtm2)), ]
 lr_model2 = textmodel_lr(train_dtm2, y=docvars(train_dtm2, "party"))
@@ -669,7 +631,7 @@ confmat_lr
 
 You’ll find that the confusion matrices show a visible difference between the two logistic regression models, trained on two different samples. Constituted by the fact of how we calculate it, this difference is obviously also reflected in the accuracy:
 
-```{r}
+```{r accuracy_lr}
 accuracy_lr2 = (confmat_lr2[1,1]+confmat_lr2[2,2]) / sum(confmat_lr2)
 accuracy_lr2
 accuracy_lr
@@ -695,36 +657,28 @@ Since it’s a bit tedious to run through the whole sequence of commands from sa
 
 First, we construct a new variable. Let’s call it *accuracy*. We’ll be basing our loop on this, so we will make *accuracy* a vector, a list of numbers, whose length corresponds to the number of times we want to run our loop. We can do this as follows:
 
-```{r}
-accuracy = 1:20
+```{r accuracy}
+accuracy = 1:10
 ```
 
 If you look at `accuarcy`, you can see that it’s just a vector containing the integers 1 through 10:
 
-```{r}
+```{r insp_acc}
 accuracy
 ```
 
 Now for the loop. If you’ve never come across this before, it might seem like a bit of an unwieldy construction - in which case, we recommend focusing first on the six lines of code inside the { curly brackets }:
 
-```{r}
+```{r loop, eval = F}
 for (i in accuracy){
   train_dtm = dfm_sample(dtm, size=2800)
   test_dtm = dtm[setdiff(docnames(dtm), docnames(train_dtm)), ]
-  lr_model = textmodel_lr(train_dtm, y=docvars(train_dtm, "party"))
+  lr_model = quanteda.textmodels::textmodel_lr(train_dtm, docvars(train_dtm, "party"))
   pred_lr = predict(lr_model, newdata=test_dtm)
   confmat_lr = table(prediction = pred_lr, PARTY = docvars(test_dtm, "party"))
-  accuracy[i] = (confmat_lr[1,1]+confmat_lr[2,2]) / sum(confmat_lr)
+  #accuracy[i] = (confmat_lr[1,1]+confmat_lr[2,2]) / sum(confmat_lr)
 }
 ```
-
-As a heads up: if you should get an error message here, it is possible that your computer couldn’t handle the number of operations required to train twenty logistic regression models. If this is the case, we recommend rewriting the `accuracy` variable to only contain ten positions, i.e.:
-
-```{r}
-accuracy = 1:10
-```
-
-And then running the loop again.
 
 What you find inside the curly brackets should, for the most part, be familiar. In the first line, we have the sampling of the training data. This is the essential step, which allows us to identify how robust our results are. The second line defines the test data in relation to the training data. In the third line, we train our linear regression model. The fourth line uses the model to predict the parties of the speeches in the test data. The fifth line creates the by now familiar confusion matrix. And finally, in the sixth line, we calculate the accuracy, and save it to our variable, `accuracy`.
 
@@ -764,7 +718,7 @@ What you see in the bottom right quadrant should roughly resemble a normal distr
 
 What you’ll also notice about the graph we just created is that it’s centered around the mean of our distribution. This is great when you want to see what the distribution looks like. If you’ve arrived at the point where you want to brag about how good your results are, we recommend plotting the histogram showing all of the x-axis between 0 and 1. We can do this with the additional specification of `xlim=0:1`. Like so:
 
-```{r}
+```{r hist}
 hist(accuracy, xlim=0:1, breaks=20)
 ```
 
@@ -782,4 +736,35 @@ If you always want to get the same result, you can also force the sampling to al
 
 For a spam filter, the performance of our system would clearly be insufficient (we can see at least one of us biting into his laptop if every 20th spam mail reached our inbox). But as you have seen, there are various ways in which a higher accuracy can be achieved, from the specific pre-processing steps to the choice of algorithms. While there are dozens, if not hundreds, of other parameters that can be tweaked, after working your way through this introduction you should be ready to start your own document classification experiments and do cool stuff! Let’s get on it!
 
-# References
+# Citation & Session Info {-}
+
+Schneider, Gerold  and Max Lauber. 2022. *Classifying American Speeches*. Brisbane: The University of Queensland. url: https://ladal.edu.au/ATAP_DocClass_Markdown.html (Version 2022.11.15).
+
+
+```
+@manual{schneider2022class,
+  author = {Schneider, Gerold  and Lauber, Max},
+  title = {Classifying American Speeches},
+  note = {https://ladal.edu.au/ATAP_DocClass_Markdown.html},
+  year = {2022},
+  organization = "Australian Text Analytics Platform (ATAP)},
+  address = {Brisbane},
+  edition = {2011.11.15}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+***
+
+[Back to top](#introduction)
+
+[Back to LADAL home](https://ladal.edu.au)
+
+***
+
+# References {-}
+
