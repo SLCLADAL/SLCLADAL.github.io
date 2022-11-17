@@ -40,12 +40,13 @@ We extend our thanks to Marco Guerini and his co-authors for the construction of
 
 As mentioned at the outset, this is an introduction to document classification based on R. A rudimentary familiarity with R and RStudio are helpful for getting the most out of this. If you have yet to install R or are new to it, we can recommend [this tutorial to R](https://slcladal.github.io/intror.html), which walks you through the installation and shows a range of its functionalities. In the following, we assume that you have downloaded and installed both R and RStudio and take it from there.
 
-Although R in its basic version already contains a lot of functionalities, we do need to install some packages for the code below to run without exploding into a bouquet of error messages. If you already have the packages `readtext`, `quanteda` and `quanteda.textmodels` installed, just skip to the next heading. If you don’t have them yet, the first thing you want to do is run these first lines of code:
+Although R in its basic version already contains a lot of functionalities, we do need to install some packages for the code below to run without exploding into a bouquet of error messages. If you already have the packages `quanteda`, `quanteda.textmodels`, `stopwords` and `ggplot2` installed, just skip to the next heading. If you don’t have them yet, the first thing you want to do is run these first lines of code:
 
 ```{r install, message=F, warning=F}
 #install.packages("quanteda")
 #install.packages("quanteda.textmodels")
 #install.packages("stopwords")
+#install.packages("ggplot2")
 ```
 
 This may take a minute or three. In most cases, this will work without any hiccups. If you should get an error message, we recommend taking a moment to read what it says, and, if it does not make any sense to you, to google it. If an issue comes up for you, chances are that this has already happened to someone else - and, fortunately, the R community has a pretty good track record of responding to questions about technical issues. Generally, it is also a good idea to use a relatively new version of R. If you have last used R two years ago, do update it.
@@ -55,6 +56,8 @@ Once you have installed the packages, you’ll need to load them in the current 
 ```{r act, message=F, warning=F}
 library(quanteda)
 library(quanteda.textmodels)
+library(stopwords)
+library(ggplot2)
 ```
 
 
@@ -658,10 +661,10 @@ Since it’s a bit tedious to run through the whole sequence of commands from sa
 First, we construct a new variable. Let’s call it *accuracy*. We’ll be basing our loop on this, so we will make *accuracy* a vector, a list of numbers, whose length corresponds to the number of times we want to run our loop. We can do this as follows:
 
 ```{r accuracy}
-accuracy = 1:10
+accuracy = 1:100
 ```
 
-If you look at `accuarcy`, you can see that it’s just a vector containing the integers 1 through 10:
+If you look at `accuarcy`, you can see that it’s just a vector containing the integers 1 through 100:
 
 ```{r insp_acc}
 accuracy
@@ -669,14 +672,14 @@ accuracy
 
 Now for the loop. If you’ve never come across this before, it might seem like a bit of an unwieldy construction - in which case, we recommend focusing first on the six lines of code inside the { curly brackets }:
 
-```{r loop, eval = F}
+```{r loop}
 for (i in accuracy){
   train_dtm = dfm_sample(dtm, size=2800)
   test_dtm = dtm[setdiff(docnames(dtm), docnames(train_dtm)), ]
-  lr_model = quanteda.textmodels::textmodel_lr(train_dtm, docvars(train_dtm, "party"))
+  lr_model = quanteda.textmodels::textmodel_nb(train_dtm, docvars(train_dtm, "party"))
   pred_lr = predict(lr_model, newdata=test_dtm)
   confmat_lr = table(prediction = pred_lr, PARTY = docvars(test_dtm, "party"))
-  #accuracy[i] = (confmat_lr[1,1]+confmat_lr[2,2]) / sum(confmat_lr)
+  accuracy[i] = (confmat_lr[1,1]+confmat_lr[2,2]) / sum(confmat_lr)
 }
 ```
 
@@ -711,7 +714,12 @@ We get several statistics here. On either pole of the output we see the minimum 
 We can also visualize this normal distribution in a histogram, using the `hist()` command. The first argument here is the data, our `accuarcy` vector, and the second argument makes the whole graphic more visually palatable (try it without this specification to see what we’re talking about):
 
 ```{r}
-hist(accuracy, breaks=20)
+accuracy %>%
+  as.data.frame() %>%
+  dplyr::rename(accuracy = 1) %>%
+  ggplot(aes(x = accuracy)) +
+  geom_histogram() +
+  theme_bw()
 ```
 
 What you see in the bottom right quadrant should roughly resemble a normal distribution - although we will add the disclaimer that there is a chance that it doesn’t, on account of the fact that we don’t have that many data points. Once we reach somewhere around a thousand runs, we should more or less reliably arrive at a normal distribution. But be warned: if you do that, it’s probably worth starting the loop and then going to fix yourself a snack. Unless you have a really good computer, this could take a while.
@@ -719,7 +727,13 @@ What you see in the bottom right quadrant should roughly resemble a normal distr
 What you’ll also notice about the graph we just created is that it’s centered around the mean of our distribution. This is great when you want to see what the distribution looks like. If you’ve arrived at the point where you want to brag about how good your results are, we recommend plotting the histogram showing all of the x-axis between 0 and 1. We can do this with the additional specification of `xlim=0:1`. Like so:
 
 ```{r hist}
-hist(accuracy, xlim=0:1, breaks=20)
+accuracy %>%
+  as.data.frame() %>%
+  dplyr::rename(accuracy = 1) %>%
+  ggplot(aes(x = accuracy)) +
+  geom_histogram() +
+  coord_cartesian(xlim = c(0,1)) +
+  theme_bw()
 ```
 
 Now you can see that the results cluster fairly heavily in the far right of the graph, as expected. The final metric we want to draw your attention to, in case it hasn’t sprung to mind yet, is the standard deviation. There is a technical definition that you can look up at your leisure; but in short it describes how widely the data is scattered around the mean. The heuristic is that, the higher the standard deviation, the less robust the results. Let’s take a look at the standard deviations for our accuracies:

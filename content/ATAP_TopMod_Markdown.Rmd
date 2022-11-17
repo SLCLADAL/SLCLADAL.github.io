@@ -70,23 +70,27 @@ library(tidytext)
 library(stm)
 library(dplyr)
 library(tm)
-library(spacyr)
+#library(spacyr)
+library(udpipe)
 ```
 
 # Installing Spacy
 
 Now that all of the packages are loaded, we need to set up the Python environment that we installed with Anaconda earlier, and make it ready to use for R. This only takes a single line of code, but can take some time if your computer already has some years on its back. Enter:
 
-```{r}
-spacy_install()
+```{r dup, eval = F}
+#spacy_install()
+meng <- udpipe::udpipe_download_model(language = "english-ewt")
 ```
 
 The first time you run this, you’ll see a prompt in the console. Choose the option which allows you to initiate the installation. Your console will keep you updated about all the installation steps that are running, which are quite a few over the next couple of minutes. Meet you back here with a cup of coffee (or rather the beverage of your choice, obviously). After installing this, you can mute the command in case you want to run this script again from the top.
 
 Once the installation process is finished, we can initialize the environment which will allow R to use the Python functionalities in a minute. For this, we use:
 
-```{python}
-spacy_intialize(model = "en_core_web_sm")
+```{r}
+m_eng <- udpipe_load_model(file = here::here("udpipemodels", "english-ewt-ud-2.5-191206.udpipe"))
+
+#spacy_intialize(model = "en_core_web_sm")
 ```
 
 With that, we have the computational prerequisites to generate topic models in R. All we need now is data.
@@ -170,7 +174,13 @@ We can see the title of *A Christmas Carol*, with one line per row, but beyond t
 The first step of the pre-processing requires us to transform the texts we stored under `dickens_corpus` into an actual corpus object. The command for this transformation is `corpus()`:
 
 ```{r}
-dickens_corpus <- corpus(dickens_corpus)
+#dickens_corpus <- corpus(dickens_corpus)
+dickens_corpus <- dickens_corpus %>%
+  dplyr::filter(text != "") %>%
+  dplyr::group_by(title) %>%
+  dplyr::summarise(text = paste0(text, collapse = " "))
+# inspect
+head(dickens_corpus)
 ```
 
 Take a look at the transformed `dickens_corpus`:
@@ -196,7 +206,9 @@ The next step is an essential, but also a computationally intense one: we are go
 Before we go into the what and why of parsing, we suggest you initiate the process - it can take a while (depending on how good your device’s computing power is):
 
 ```{r}
-dickens_parsed <- spacy_parse(dickens_corpus)
+dickens_parsed <- udpipe::udpipe_annotate(m_eng, x = dickens_corpus)
+
+#dickens_parsed <- spacy_parse(dickens_corpus)
 ```
 
 As you see, we take the `dickens_corpus`, transform it with the command `spacy_parse` and assign it to a new variable, `dickens_parsed`. What the command does is tokenize and tag the texts, returning a data-table of the result. The corpus is thus transformed from an object that has a sentence in each row, to one where each word has its own row. More importantly, though, each word is assigned a part of speech tag. Parsing text with spacy would also allow for lemmatization and more complex tags like noun phrases, but for our purposes, part of speech tags give enough information.
@@ -204,7 +216,7 @@ As you see, we take the `dickens_corpus`, transform it with the command `spacy_p
 Once the parsing process is finished, we can terminate the Python process that we initiated above, since it uses up a lot of memory in the background:
 
 ```{r}
-spacy_finalize()
+#spacy_finalize()
 ```
 
 Now, let’s take a look at the structure of our new variable, `dickens_parsed`:
