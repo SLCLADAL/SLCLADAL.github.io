@@ -600,69 +600,44 @@ After loading the data, we need to clean it.
 
 ```{r wc3, message=FALSE, warning=FALSE}
 # clean texts
-docs <- Corpus(VectorSource(c(clinton, trump))) %>%
-  # clean text data
-  tm::tm_map(removePunctuation) %>%
-  tm::tm_map(removeNumbers) %>%
-  tm::tm_map(tolower)  %>%
-  tm::tm_map(removeWords, stopwords("english")) %>%
-  tm::tm_map(stripWhitespace) %>%
-  tm::tm_map(PlainTextDocument)
-# create term document matrix
-tdm <- TermDocumentMatrix(docs) %>%
-  as.matrix()
-colnames(tdm) <- c("Clinton","Trump")
+corp_dom <- quanteda::corpus(c(clinton, trump))
+attr(corp_dom, "docvars")$Author = c("Clinton", "Trump")
+corp_dom <- corp_dom  %>%
+    quanteda::tokens(remove_punct = TRUE) %>%
+    quanteda::tokens_remove(stopwords("english")) %>%
+    quanteda::dfm() %>%
+    quanteda::dfm_group(groups = corp_dom$Author) %>%
+    quanteda::dfm_trim(min_termfreq = 200, verbose = FALSE)
 ```
 
-Next, we normalize the absolute frequencies of the terms in the document by converting them into relative frequencies.
-
-```{r wc4,  message=FALSE, warning=FALSE}
-# calculate rel. freq.
-tdm[, 1] <- as.vector(unlist(sapply(tdm[, 1], function(x) round(x/colSums(tdm)[1]*1000, 0) )))
-# calculate rel. freq.
-tdm[, 2] <- as.vector(unlist(sapply(tdm[, 2], function(x) round(x/colSums(tdm)[2]*1000, 0) )))
-```
-
-After processing the data, we can now create word clouds. However, there are different word clouds: 
+After processing the data, we can now create word clouds. However, there are different word clouds and here, we will focus on 2 types of word clouds: 
 
 * (Common) word clouds
 * Comparative clouds
-* Commonality clouds
 
-Common or simple word clouds simply show the frequency of word types while comparative word clouds show which word types are particularly overrepresented in one sub-corpus compared to another sub-corpus. Commonality word clouds show words that are shared and are thus particularly indistinctive for different sub-corpora.
+Common or simple word clouds simply show the frequency of word types while comparative word clouds show which word types are particularly overrepresented in one sub-corpus compared to another sub-corpus. 
 
 Let us first inspect a common word cloud of the corpus.
 
 ```{r wc5, message=FALSE, warning=FALSE}
 # create word cloud
-wordcloud(docs, max.words = 100, 
-          colors = brewer.pal(6, "BrBG"), 
-          random.order = FALSE)
+corp_dom %>%
+    quanteda.textplots::textplot_wordcloud(comparison = FALSE)
 ```
+
 
 The common word cloud shows the frequencies of words regardless of who used them. In contrast, the comparative cloud shown below highlights words that differ most with respect to their frequencies in the sub-corpora under investigation.  
 
 ```{r wc6, message=FALSE, warning=FALSE}
 # create comparison cloud
-comparison.cloud(tdm, 
-                 max.words = 100, 
-                 random.order = FALSE, 
-                 colors = c("blue", "red"), 
-                 title.bg.colors="white",
-                 bg.color = "black")
+corp_dom %>%
+    quanteda.textplots::textplot_wordcloud(comparison = TRUE, color = c("blue", "red"))
 ```
 
-The opposite of comparative clouds are commonality clouds which highlight words that use with similar relative frequencies in the sub-corpora under investigation and that are therefore particularly indistinctive.  
 
-```{r wc7, message=FALSE, warning=FALSE}
-# create commonality cloud
-commonality.cloud(tdm, 
-                  max.words = 100, 
-                  random.order = FALSE, 
-          colors = brewer.pal(6, "Spectral"))
-```
 
-At first, I thought that word clouds are simply a fancy but not very helpful way to inspect language data but I have to admit that word clouds really surprised me as they do appear to possess potential to provide an idea of what groups of people are talking about. The comparative word cloud shows that the Trump uses a lot of contractions ("'re", "'ll", etc.) and stresses concepts linked to the future (*going*) thereby stressing his vision of the US (*great*). In Contrast, Clinton did not use contractions but talked about *Americans*, *work*, the *economy*, and *women*.
+
+At first, I thought that word clouds are simply a fancy but not very helpful way to inspect language data but I have to admit that word clouds really surprised me as they do appear to possess potential to provide an idea of what groups of people are talking about. The comparative word cloud shows that the Trump uses a lot of contractions (*'re*, *'ll*, etc.) and stresses concepts linked to the future (*going*) thereby stressing his vision of the US (*great*). In Contrast, Clinton did not use contractions but talked about *Americans*, *work*, the *economy*, and *women*.
 
 
 # Association plots
