@@ -11,24 +11,17 @@ We set up our session by activating the packages we need for this tutorial.
 
 ```{r prep2, message=FALSE, warning=FALSE}
 # load packages
-library(tree)
-library(dplyr)
-library(grid)
-library(Boruta)
-library(tree)
-library(caret)
-library(cowplot)
-library(tidyverse)
-library(ggparty)
-library(Gmisc)
-library(grid)
-library(Hmisc)
-library(party)
+library(openxlsx)
 library(partykit)
+library(dplyr)
+library(ggparty)
+library(party)
+library(Hmisc)
 library(randomForest)
+library(caret)
 library(pdp)
-library(RCurl)
-library(tidyr)
+library(Boruta)
+library(stringr)
 library(vip)
 ```
 
@@ -56,7 +49,7 @@ Then on the upload symbol.
 
 Next, upload the files you want to analyze and then the respective files names in the file argument of the scan function. When you then execute the code (like to code chunk below, you will upload your own data.
 
-```{r}
+```{r loadown, eval = F}
 mytable1 <- openxlsx::read.xlsx("testdata1.xlsx", sheet = 1)
 # inspect
 mytable1
@@ -74,8 +67,10 @@ mytable1
 Conditional Inference Trees (CITs) are much better at determining the *true* effect of a predictor, i.e. the effect of a predictor if all other effects are simultaneously considered. In contrast to CARTs, CITs use p-values to determine splits in the data. Below is a conditional inference tree which shows how and what factors contribute to the use of discourse *like*. In conditional inference trees predictors are only included if the predictor is significant (i.e. if these predictors are necessary). 
 
 ```{r cit1b, message=FALSE, warning=FALSE}
+# load data
 citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t")
-set.seed(111)        # set.seed
+# set.seed (so the result is reproducible)
+set.seed(111)        
 # apply bonferroni correction (1 minus alpha multiplied by n of predictors)
 control = ctree_control(mincriterion = 1-(.05*ncol(citdata)-1))
 # convert character strings to factors
@@ -84,11 +79,12 @@ citdata <- citdata %>%
 # create initial conditional inference tree model
 citd.ctree <- partykit::ctree(LikeUser ~ Age + Gender + Status,
                     data = citdata)
-plot(citd.ctree, gp = gpar(fontsize = 8)) # plot final ctree
+# plot final ctree
+plot(citd.ctree, gp = gpar(fontsize = 8)) 
 ```
 
 
-## Prettifying your CIT tree{-}
+## Prettifying your CIT tree
 
 The easiest and most common way to visualize CITs is to simply use the `plot` function from `base R`. However, using this function does not allow to adapt and customize the visualization except for some very basic parameters. The `ggparty` function allows to use the `ggplot` syntax to customize CITs which allows more adjustments and is more aesthetically pleasing.
 
@@ -126,6 +122,11 @@ ggparty(citd.ctree) +
     shared_axis_labels = TRUE)
 ```
 
+We  can save the figure using the `ggsave` command as shown below.
+
+```{r ggsave}
+ggsave(here::here("tree.png"))
+```
 
 We can also use `position_dodge` (instead of `position_fill`) to display frequencies rather than probabilities as shown below. 
 
@@ -161,7 +162,7 @@ ggparty(citd.ctree) +
     shared_axis_labels = TRUE)
 ```
 
-## Problems of Conditional Inference Trees{-}
+## Problems of Conditional Inference Trees
 
 Like other tree-based methods, CITs are very intuitive, multivariate, non-parametric, they do not require large data sets, and they are easy to implement. Despite these obvious advantages, they have at least one major short coming compared to other, more sophisticated tree-structure models (in addition to the general issues that tree-structure models exhibit as discussed above: they are prone to **overfitting** which means that they fit the observed data very well but preform much worse when being applied to new data.
 
@@ -179,51 +180,7 @@ Random Forests (RFs) are an extension of Conditional Inference Trees [@breiman20
 
 Therefore, Random Forest analyses are ideal for classification, imputing missing values, and - though to a lesser degree - as a variable selection procedure but they do not lend themselves for drawing inferences about the relationships of predictors and dependent variables. 
 
-**Bootstrapped Data**
-
-Random Forests do not work on one-and-the-same data set (as CITs do) but in Random Forest analyses, many samples (with replacement) are drawn from the original data set. This generation of new data set based on an existing data set is called "bootstrapping". Bootstrapping allows us to produce many trees based on variations of the original data set rather than dealing with only a single, fixed data set that would produce only a single tree. Therefore, because the data is different each time, the individual CITs are also different. 
-
-Imagine, we are dealing with a very small data set to which we want to apply a Random Forest Analysis. The original data set is displayed below. 
-
-```{r tb4, echo = F, warning=F, message=F}
-citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", 
-                      header = T, sep = "\t")
-citdata <- citdata %>%
-  dplyr::mutate(Id = 1:nrow(.)) %>%
-  dplyr::select(Id, Age, Gender, Status, LikeUser)
-# inspect data
-citdata %>%
-  as.data.frame() %>%
-  head(10)
-```
-
-
-
-
-
-
-We now draw a sample from this data set and receive the following data set.
-
-```{r rf2, echo=F, message=FALSE, warning=FALSE}
-citdata <- citdata[c(6, 3, 4, 1, 2, 2),]
-rownames(citdata) <- NULL
-# inspect data
-head(citdata, 10)
-```
-
-As you can see, the bootstrapped data contains the second row twice while the fifth row is missing.
-
-### Out-Of-Bag data{-}
-
-Because the data is reshuffled for every new tree, a part of the data (on average about 30%) remains unused for a given tree. The data that is not used is called Out-Of-Bag data or OOB. The OOB is important because the quality of the overall performance of the random forest can be assessed by applying the resulting tree-model to the data that it was not fit to. The quality of that tree is then measured in the OOB error, which is the error rate of the respective tree if applied to the OOB data.
-
-### Random Variable Selection{-}
-
-Random Forests also differ from simple CITs in that at each step, not all possible variables are considered for a node, but only a subset. For example, we have a data set with five predicting independent variables and one dependent variable. When generating a CIT, all possible variables (variables that do not represent a node further up in the tree) are considered as splitting candidates. In Random Forests, only a fixed number (typically the square-root of the number of independent variables) are considered as candidates for a node. So, at each potential split, a fixed number of randomly selected variables is considered potential node candidates.
-
-## Random Forests in R{-}
-
-This section shows how a Random Forest Analysis can be implemented in R. Ina first step, we load and inspect the data.
+In a first step, we load and inspect the data.
 
 ```{r rf3, echo=T, message=FALSE, warning=FALSE}
 # load random forest data
@@ -231,7 +188,7 @@ rfdata <- read.delim("https://slcladal.github.io/data/mblrdata.txt", header = T,
 # inspect data
 rfdata %>%
   as.data.frame() %>%
-  head(10)
+  str()
 ```
 
 The data consists of four categorical variables (`Gender`, `Age`, `ConversationType`, and `SUFlike`). Our dependent variable is `SUFlike` which stands for speech-unit final *like* (a pragmatic marker that is common in Irish English and is used as in *A wee girl of her age, like*). While Age and Gender are pretty straight forward what they are called, *ConversationType* encodes whether a conversation has taken place between interlocutors of the same or of different genders.
@@ -258,16 +215,7 @@ natest <- rfdata %>%
 nrow(natest) # no NAs present in data (same number of rows with NAs omitted)
 ```
 
-In our case, the data does not contain missing values. Random Forests offer a very nice way to deal with missing data though. If NAs are present, they can either be deleted OR their values for any missing values can be imputed using proximities. In this way, such data points do not have to be removed which can be problematic especially when dealing with relatively small data sets. For imputing values, you could run the code below but as our data does not have NAs, we will skip this step and just show it here so you can have a look at how it is done.
-
-```{r rf5, echo=T, eval = F, message=FALSE, warning=FALSE}
-# replacing NAs with estimates
-data.imputed <- rfImpute(SUFlike ~ ., data = rfdata, iter=6)
-```
-
-The argument `iter` refers to the number of iterations to run. According to [@breiman2001random], 4 to 6 iterations is usually good enough. With this data set (if it had NAs) and when we were to execute the code, the resulting OOB-error rates lie somewhere around 17 and 18 percent. When we were to set `iter` to 20, we get values a little better and a little worse, so doing more iterations doesn't improve the situation.
-
-Also, if you want to customize the `rfImpute` function, you can change the number of trees it uses (the default is 300) and the number of variables that it will consider at each step.
+In our case, the data does not contain missing values. Random Forests offer a very nice way to deal with missing data though. If NAs are present, they can either be deleted OR their values for any missing values can be imputed using proximities. 
 
 We will now generate a first random forest object and inspect its model fit. As random forests rely on re-sampling, we set a seed so that we arrive at the same estimations.
 
@@ -312,9 +260,9 @@ A few words on the parameters of the `randomForest` function: if the thing we're
 # set.seed
 set.seed(2019120205)
 rfmodel2 <- randomForest::randomForest(SUFlike ~ ., 
-                                       data=rfdata, 
+                                       data = rfdata, 
                                        mtry = 2,
-                                       proximity=TRUE)
+                                       proximity = TRUE)
 # inspect model
 rfmodel2 
 ```
@@ -325,7 +273,10 @@ The output tells us that the model explains less than 15 percent of the variance
 # set.seed (to store random numbers and thus make results reproducible)
 set.seed(2019120206)
 # create a new model with fewer trees and that takes 2 variables at a time
-rfmodel3 <- randomForest(SUFlike ~ ., data=rfdata, ntree=30, mtry = 4, proximity=TRUE)
+rfmodel3 <- randomForest(SUFlike ~ ., data=rfdata, 
+                         ntree = 30, 
+                         mtry = 4, 
+                         proximity = TRUE)
 # inspect model
 rfmodel3
 ```
@@ -363,19 +314,7 @@ Using the `vip` package, you can also generate variable importance barplots.
 vip::vip(rfmodel3, horizontal = FALSE)
 ```
 
-A second type of visualization that can provide insights in the `partial` function from the `pdp` package which shows the effects of individual predictors - but remember that this still does not provide information about the way that the predictor interacts with other predictors.
-
-```{r rf18, message=FALSE, warning=FALSE}
-# extract importance of individual variables
-rfmodel3 %>%  # the %>% operator is read as "and then"
-  partial(pred.var = "Age") %>%
-  autoplot(smooth = TRUE, ylab = expression(f(Age))) +
-  theme_light() +
-  ggtitle("Partial Depencence Plot: Age") + 
-  ylim(-20, 0)
-```
-
-You can however use the `partial` function to show how the effect of predictors interacts with other predictors (see below). 
+A second type of visualization that can provide insights in the `partial` function from the `pdp` package which shows how the effect of predictors interacts with other predictors (see below). 
 
 ```{r rf19, message=F, warning=F}
 partial(rfmodel3, pred.var = c("Age", "Gender"), plot = TRUE, plot.engine = "ggplot2")
@@ -383,59 +322,21 @@ partial(rfmodel3, pred.var = c("Age", "Gender"), plot = TRUE, plot.engine = "ggp
 
 
 
-Another common way to evaluate the performance of RFs is to split the data into a test and a training set. the model is then fit to the training set and, after that, applied to the test set. This allows us to evaluate how well the RF performs on data that it was not trained on. This approach is particularly common in machine learning contexts. 
+
 
 # Boruta
 
 Boruta [@kursa2010feature] is a variable selection procedure and it represents an extension of random forest analyses [@breiman2001random]. The name *Boruta* is derived from a demon in Slavic mythology who dwelled in pine forests. Boruta is an alternative to regression modeling that is better equipped to handle small data sets because it uses a distributional approach during which hundreds of (random) forests are grown from permuted data sets. 
-
-## Advantages {-}
-
-Boruta outperforms random forest analyses because:
-
-* Boruta does not provide merely a single value for each predictor but a distribution of values leading to higher reliability. 
-
-* Boruta provides definitive cut-off points for variables that have no meaningful relationship with the dependent variable. This is a crucial difference between RF and Boruta that make Boruta particularly interesting from a variable selection point of view.
-
-## Procedure {-}
-
-The Boruta procedure consists out of five steps. 
-
-* In a first step, the Boruta algorithm copies the data set and adds randomness to the data by (re-)shuffling data points and thereby creating randomized variables. These randomized variables are referred to as shadow features. 
-
-* Secondly, a random forest classifier is trained on the extended data set. 
-
-* In a third step, a feature importance measure (Mean Decrease Accuracy represented by z-scores) is calculated to determine the relative importance of all predictors (both original or real variables and the randomized shadow features). 
-
-* In the next step, it is checked at each iteration of the process whether a real predictor has a higher importance compared with the best shadow feature. The algorithm keeps track of the performance of the original variables by storing whether they outperformed the best shadow feature or not in a vector. 
-
-* In the fifth step, predictors that did not outperform the best shadow feature are removed and the process continues without them. After a set number of iterations, or if all the variables have been either confirmed as outperforming the best shadow feature, the algorithm stops. 
-
-Despite its obvious advantages of Boruta over random forest analyses and regression modeling, it can neither handle multicollinearity not hierarchical data structures where data points are nested or grouped by a given predictor (as is the case in the present analysis as data points are grouped by adjective type). As Boruta is a variable selection procedure, it is also limited in the sense that it provides information on which predictors to include and how good these predictors are (compared to the shadow variables) while it is neither able to take hierarchical data structure into account, nor does it provide information about how one level of a factor compares to other factors. In other words, Boruta shows that a predictor is relevant and how strong it is but it does not provide information on how the likelihood of an outcome being used differs between variable levels, for instance between men and women. 
-
-## Boruta in R{-}
 
 We begin by loading and inspecting the data.
 
 ```{r bo1, message=FALSE, warning=FALSE}
 # load data
 borutadata <- read.delim("https://slcladal.github.io/data/ampaus05_statz.txt", header = T, sep = "\t")
-```
-
-
-```{r bo1b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 borutadata %>%
   as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the borutadata data.")  %>%
-  flextable::border_outer()
+  str()
 ```
 
 
@@ -446,21 +347,10 @@ As the data contains non-factorized character variables, we convert those into f
 borutadata <- borutadata %>%
   dplyr::filter(complete.cases(.)) %>%
   dplyr::mutate_if(is.character, factor)
-```
-
-```{r bo2b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 borutadata %>%
   as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the factorized borutadata data.")  %>%
-  flextable::border_outer()
+  head(10)
 ```
 
 

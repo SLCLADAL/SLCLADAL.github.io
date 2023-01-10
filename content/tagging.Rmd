@@ -26,7 +26,9 @@ This tutorial introduces part-of-speech tagging and syntactic parsing using R. T
 <span>
 <p style='margin-top:1em; text-align:center'>
 The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/tagging.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
-**[Here](https://colab.research.google.com/drive/1dVyl0WwxpPpnzBcklILDLSCGimW22u5L?usp=sharing)** is a **link to an interactive and simplified version of this tutorial on Google Colab**. The interactive tutorial is based on a Jupyter notebook of this tutorial. This interactive Jupyter notebook allows you to execute code yourself and - if you copy the Jupyter notebook - you can also change and edit the notebook, e.g. you can change code and upload your own data.<br></p>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Ftagging_cb.ipynb)<br>
+[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Ftagging_cb.ipynb). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+</p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
@@ -81,7 +83,7 @@ Using such rules has the disadvantage that pos-tags can only be assigned to a re
 This procedure works quite well but there are still better options.The best way to pos-tag a text is to create a manually annotated training set which resembles the language variety at hand. Based on the frequency of the association between a given word and the pos-tags it is assigned in the training data, it is possible to tag a word with the pos-tag that is most often assigned to the given word in the training data.All of the above methods can and should be optimized by combining them and additionally including pos–n–grams, i.e. determining a pos-tag of an unknown word based on which sequence of pos-tags is most similar to the sequence at hand and also most common in the training data.This introduction is extremely superficial and only intends to scratch some of the basic procedures that pos-tagging relies on. The interested reader is referred to introductions on machine learning and pos-tagging such as e.g.https://class.coursera.org/nlp/lecture/149.
 
 
-There are several different R packages that assist with pos-tagging texts [see @kumar2016mastering]. In this tutorial, we will use the `udpipe` [@udpipe] and the `openNLP`  packages [@opennlp]. Each of these has advantages and shortcomings and it is advantageous to try which result best matches one's needs. That said, the `udpipe` package is really great as it is easy to use, covers a wide range of languages, is very flexible, and very accurate.
+There are several different R packages that assist with pos-tagging texts [see @kumar2016mastering]. In this tutorial, we will use the `udpipe` [@udpipe]. The `udpipe` package is really great as it is easy to use, covers a wide range of languages, is very flexible, and very accurate.
 
 **Preparation and session set up**
 
@@ -92,58 +94,24 @@ This tutorial is based on R. If you have not installed R or are new to it, you w
 # install packages
 #install.packages("dplyr") 
 #install.packages("stringr")
-#install.packages("igraph")
-#install.packages("tm")
-#install.packages("NLP")
-#install.packages("openNLP")
-#install.packages("openNLPdata")
 #install.packages("udpipe")
-#install.packages("textplot") 
-#install.packages("ggraph") 
-#install.packages("ggplot2") 
-#install.packages("pacman")
 #install.packages("flextable")
-#install.packages("here")
-#install.packages("http://datacube.wu.ac.at/src/contrib/openNLPmodels.en_1.5-1.tar.gz", repos=NULL, type="source")
-# install phrasemachine
-#phrasemachineurl <- "https://cran.r-project.org/src/contrib/Archive/phrasemachine/phrasemachine_1.1.2.tar.gz"
-#install.packages(phrasemachineurl, repos=NULL, type="source")
-# install parsent
-#pacman::p_load_gh(c("trinker/textshape", "trinker/coreNLPsetup",  "trinker/parsent"))
-# install klippy for copy-to-clipboard button in code chunks
-#install.packages("remotes")
-#remotes::install_github("rlesur/klippy")
+#install.packages("here")# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
 ```
 
 
 Now that we have installed the packages, we activate them as shown below.
 
 ```{r initalisierung, message=FALSE, warning=FALSE}
-# set options
-#options(stringsAsFactors = F)         # no automatic data transformation
-#options("scipen" = 100, "digits" = 4) # suppress math annotation
 # load packages
 library(dplyr)
 library(stringr)
-#library(igraph)
-#library(tm)
-#library(NLP)
-#library(openNLP)
-#library(openNLPdata)
-#library(udpipe)
-#library(textplot) 
-library(udpipe) 
-#library(ggraph) 
-#library(ggplot2) 
-#library(igraph)
-#library(phrasemachine)
+library(udpipe)
 library(flextable)
-# load function for pos-tagging objects in R
-#source("https://slcladal.github.io/rscripts/POStagObject.r") 
-# syntax tree drawing function
-#source("https://slcladal.github.io/rscripts/parsetgraph.R")
 # activate klippy for copy-to-clipboard button
-#klippy::klippy()
+klippy::klippy()
 ```
 
 Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
@@ -316,205 +284,6 @@ dplot
 ```
 
 
-# POS-Tagging with openNLP{-}
-
-In R we can pos–tag large amounts of text not only by using `udpipe` but by various means. This section explores pos-tagging using the `openNLP` package. Using the `openNLP` package for pos-tagging works particularly well when the aim is to pos-tag newspaper texts as the `openNLP` package implements the *Apache OpenNLPMaxent Part of Speech tagger* and it comes with pre-trained models. Ideally, pos-taggers should be trained on data resembling the data to be pos-tagged.However, I do not know how to trained the *Apache openNLP pos-tagger* via R and it would be great if someone would provide a tutorial on how to do that. Using pre-trained models has the advantage that we do not need to train the pos-tagger ourselves. However, it also means that one has to rely on models trained on data that may not really resemble the data a at hand.This implies that using it for texts that differ from newspaper texts, i.e.the language the models have been trained on, does not work as well, as the model applies the probabilities of newspaper language to the language variety at hand. pos-tagging with the `openNLP` requires the `NLP` package and installing the models on which the `openNLP` package is based.
-
-To pos-tag a text, we start by loading an example text into R.
-
-```{r pos1, eval=F, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# load corpus data
-text <- readLines("https://slcladal.github.io/data/testcorpus/linguistics07.txt", skipNul = T)
-# clean data
-text <- text %>%
- str_squish() 
-```
-
-```{r showtext, eval=F, echo=F, warning=F, message=F}
-# inspect data
-text %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "Example text.")  %>%
-  flextable::border_outer()
-```
-
-
-Now that the text data has been read into R, we can proceed with the part-of-speech tagging. To perform the pos-tagging, we load the function for pos-tagging, load the `NLP` and `openNLP` packages.
-
-***
-
-<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br>You need to change the path that is used in the code below and include the path to `en-pos-maxent.bin` on your computer!</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-***
-
-
-```{r op, eval=F}
-POStag <- function(object){
-  require("stringr")
-  require("NLP")
-  require("openNLP")
-  require("openNLPdata")
-  # define paths to corpus files
-  corpus.tmp <- object
-  # define sentence annotator
-  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
-  # define word annotator
-  word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
-  # define pos annotator
-  pos_tag_annotator <- openNLP::Maxent_POS_Tag_Annotator(language = "en", probs = FALSE, model = NULL)
-    # WARNING: YOU NEED TO INCLUDE YOUR OWN PATH HERE!                                            
-    # model = "C:\\Users\\marti\\OneDrive\\Dokumente\\R\\win-library\\4.1\\openNLPdata\\models\\en-pos-maxent.bin")
-  # convert all file content to strings
-  Corpus <- lapply(corpus.tmp, function(x){
-    x <- as.String(x)  }  )
-  # loop over file contents
-  lapply(Corpus, function(x){
-    y1 <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
-    y2<- NLP::annotate(x, pos_tag_annotator, y1)
-    y2w <- subset(y2, type == "word")
-    tags <- sapply(y2w$features, '[[', "POS")
-    r1 <- sprintf("%s/%s", x[y2w], tags)
-    r2 <- paste(r1, collapse = " ")
-    return(r2)  }  )
-  }
-```
-
-We now apply this function to our text.
-
-```{r pos2, eval=F, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# pos tagging data
-textpos <- POStag(object = text)
-```
-
-```{r showtext2, eval=F, echo=F, warning=F, message=F}
-# inspect data
-textpos %>%
-  unlist() %>%
-  as.data.frame() %>%
-  flextable::flextable() %>%
-  flextable::set_header_labels(values = list(".")) %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "Pos-tagged text.")  %>%
-  flextable::border_outer()
-```
-
-The resulting vector contains the part-of-speech tagged text and shows that the function fulfills its purpose in automatically pos-tagging the text. The pos-tagged text could now be processed further, e.g. by extracting all  adjectives in the text or by creating concordances of nouns ending in *ment*.
-
-# Syntactic Parsing with openNLP{-}
-
-Parsing refers to another type of annotation in which either structural information (as in the case of XML documents) or syntactic relations are added to text. As syntactic parsing is commonly more relevant in the language sciences, the following will focus only on syntactic parsing. syntactic parsing builds on pos-tagging and allows drawing syntactic trees or dependencies. Unfortunately, syntactic parsing still has relatively high error rates when dealing with language that is not very formal. However, syntactic parsing is very reliable when dealing with written language.
-
-```{r pars1, eval=F, message=F, warning=F}
-text <- readLines("https://slcladal.github.io/data/english.txt")
-# convert character to string
-s <- as.String(text)
-# define sentence and word token annotator
-sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
-word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
-# apply sentence and word annotator
-a2 <- NLP::annotate(s, list(sent_token_annotator, word_token_annotator))
-# define syntactic parsing annotator
-parse_annotator <- openNLP::Parse_Annotator()
-# apply parser
-p <- parse_annotator(s, a2)
-# extract parsed information
-ptexts <- sapply(p$features, '[[', "parse")
-ptexts
-```
-
-```{r pars2, eval=F, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# read into NLP Tree objects.
-ptrees <- lapply(ptexts, Tree_parse)
-# show frist tree
-ptrees[[1]]
-```
-
-These trees can, of course, also be shown visually, for instance, in the form of a syntax trees (or tree dendrogram). 
-
-```{r pars3, eval=F, echo=T, message=FALSE, warning=FALSE, fig.height=8, fig.width=8}
-# load function
-source("https://slcladal.github.io/rscripts/parsetgraph.R")
-# generate syntax tree
-parse2graph(ptexts[1], leaf.color='red',
-            # to put sentence in title (not advisable for long sentences)
-            #title = stringr::str_squish(stringr::str_remove_all(ptexts[1], "\\(\\,{0,1}[A-Z]{0,4}|\\)")), 
-            margin=-0.05,
-            vertex.color=NA,
-            vertex.frame.color=NA, 
-            vertex.label.font=2,
-            vertex.label.cex=.75,  
-            asp=.8,
-            edge.width=.5, 
-            edge.color='gray', 
-            edge.arrow.size=0)
-```
-
-Syntax trees are very handy because the allow us to check how reliable the parser performed. 
-
-We can use the `get_phrase_type_regex` function from the `parsent` package written by Tyler Rinker
-to extract phrases from the parsed tree.
-
-```{r nps, eval=F, message=F, warning=F}
-pacman::p_load_gh(c("trinker/textshape", "trinker/parsent"))
-nps <- get_phrase_type_regex(ptexts[1], "NP") %>%
-  unlist()
-# inspect
-nps
-```
-
-We can now extract the leaves from the text to get the parsed object.
-
-```{r extr, eval=F, message=F, warning=F}
-nps_text <- stringr::str_squish(stringr::str_remove_all(nps, "\\(\\,{0,1}[A-Z]{0,4}|\\)"))
-# inspect
-nps_text
-```
-Unfortunately, we can only extract top level phrases (the NPs with the NPs are not extracted separately).
-
-In order to extract all phrases, we can use the `phrasemachine` from the CRAN archive. 
-
-We now load the  `phrasemachine` package and pos-tag the text(s) (we will simply re-use the English text we pos-tagged before.)
-
-```{r phr1, eval=F, message=F, warning=F}
-# pos tag text
-tagged_documents <- phrasemachine::POS_tag_documents(text)
-# inspect
-tagged_documents
-```
-
-
-In a next step, we can use the `extract_phrases` function to extract phrases.
-
-```{r phr2, eval=F, message=F, warning=F}
-#extract phrases
-phrases <- phrasemachine::extract_phrases(tagged_documents,
-                                          regex = "(A|N)*N(PD*(A|N)*N)*",
-                                          maximum_ngram_length = 8,
-                                          minimum_ngram_length = 1)
-# inspect
-phrases
-```
-
-Now, we have all noun phrases that occur in the English sample text.
-
-
-That's it for this tutorial. We hope that you have enjoyed this tutorial and learned how to annotate texts using language models and perform pos-tagging and dependency parsing of English texts as well as texts in other languages.
 
 # Citation & Session Info {-}
 
