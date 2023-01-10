@@ -1,157 +1,19 @@
----
-title: "Tree-Based Models in R"
-author: "Martin Schweinberger"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output:
-  bookdown::html_document2
-bibliography: bibliography.bib
-link-citations: yes
----
+![An interactive LADAL notebook](https://slcladal.github.io/images/uq1.jpg)
 
 
-```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
-```
+# Tree-Based Models in R
 
-# Introduction{-}
-
-This tutorial focuses on tree-based models and their implementation in R. For the more advanced, a recommendable resource for tree-based modeling is @prasad2006newer, @strobl2009tree and @breiman2001modeling. A very good paper dealing with many critical issues related to tree-based models is @gries2021statistics.
-
-
-```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
-knitr::include_graphics("https://slcladal.github.io/images/yr_chili.jpg")
-```
-
-This tutorial is aimed at intermediate and advanced users of R with the aim of showcasing how to perform tree-based modeling and classification using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify how to implement and perform basic tree-based modeling and classification using R. 
-
-<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/tree.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. <br></p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<br>
-
-Tree-structure models  fall into the machine-learning rather than the inference statistics category as they are commonly used for classification and prediction tasks rather than explanation of relationships between variables. The tree structure represents recursive partitioning of the data to minimize residual deviance that is based on iteratively splitting the data into two subsets. 
-
-The most basic type of tree-structure model is a decision tree which is a type of classification and regression tree (CART). A more elaborate version of a CART is called a Conditional Inference Tree (CIT). The difference between a CART and a CIT is that CITs use significance tests, e.g. the p-values, to select and split variables rather than some information measures like the Gini coefficient [@gries2021statistics].
-
-Like random forests, inference trees are non-parametric and thus do not rely on distributional requirements (or at least on fewer).
-
-
-## Advantages {-}
-
-Several advantages have been associated with using tree-based models:
-
-1. Tree-structure models are very useful because they are **extremely flexible** as they can deal with different types of variables and provide a very good understanding of the structure in the data. 
-
-2. Tree-structure models have been deemed particularly interesting for linguists because they can handle **moderate sample sizes** and many high-order interactions better then regression models. 
-
-3. Tree-structure models are (supposedly) better at detecting **non-linear or non-monotonic relationships** between predictors and dependent variables. This also means that they are better at finding and displaying interaction sinvolving many predictors. 
-
-4. Tree-structure models are **easy** to implement in R and do not require the model selection, validation, and diagnostics associated with regression models.
-
-5. Tree-structure models can be used as **variable-selection** procedure which informs about which variables have any sort of significant relationship with the dependent variable and can thereby inform model fitting.
-
-## Problems {-}
-
-Despite these potential advantages, a word of warning is in order: @gries2021statistics admits that tree-based models can be very useful but there are some issues that but some serious short-comings of tree-structure models remain under-explored. For instance, 
-
-1. Forest-models (Random Forests and Boruta) only inform about the **importance** of a variable but not if the variable is important as a main effect or as part of interactions (or both)! The importance only shows that there is some important connection between the predictor and the dependent variable. While partial dependence plots (see [here](https://christophm.github.io/interpretable-ml-book/pdp.html) for more information) offer a remedy for this shortcoming to a certain degree, regression models are still much better at dealing with this issue. 
-
-2. Simple tree-structure models have been shown to fail in detecting the correct predictors if the variance is solely determined by a **single interaction** [@gries2021statistics, chapter 7.3]. This failure is caused by the fact that the predictor used in the first split of a tree is selected as the one with the strongest main effect [@boulesteix2015interaction, 344]. This issue can, however, be avoided by hard-coding the interactions as predictors plus using ensemble methods such as random forests rather than individual trees [see @gries2021statistics, chapter 7.3]. 
-
-3. Another shortcoming is that tree-structure models partition the data (rather than "fitting a line" through the data which can lead to more **coarse-grained predictions** compared to regression models when dealing with numeric dependent variables [again, see @gries2021statistics, chapter 7.3]. 
-
-4. @boulesteix2015interaction[341] state that high correlations between predictors can hinder the **detection of interactions** when using small data sets. However, regression do not fare better here as they are even more strongly affected by (multi-)collinearity [see @gries2021statistics, chapter 7.3].
-
-5. Tree-structure models are bad a detecting interactions when the variables have **strong main effects** which is, unfortunately, common when dealing with linguistic data [@wrigt2016interac].
-
-6. Tree-structure models cannot handle **factorial variables** with many levels (more than 53 levels) which is very common in linguistics where individual speakers or items are variables.
-
-7. Forest-models (Random Forests and Boruta) have been deemed to be better at dealing with small data sets. However, this is only because the analysis is based on **permutations** of the original small data set. As such, forest-based models only appear to be better at handling small data sets because they "blow up" the data set rather than really being better at analyzing the original data.
-
-
-Before we implement a conditional inference tree in R, we will have a look at how decision trees work. We will do this in more detail here as random forests and Boruta analyses are extensions of inference trees and are therefore based on the same concepts.
-
-
-## Classification And Regression Trees
-
-Below is an example of a decision tree which shows what what response to expect - in this case whether a speaker uses discourse *like* or not. Decision trees, like all CARTs and CITs, answer a simple question, namely *How do we best classify elements based on the given predictors?*. The answer that decision trees provide is the classification of the elements based on the levels of the predictors. In simple decision trees, all predictors, even those that are not significant are included in the decision tree. The decision tree shows that the best (or most important) predictor for the use of discourse *like* is age as it is the highest node. Among young speakers, those with high status use *like* more compared with speakers of lower social status. Among old speakers, women use discourse *like* more than men.
-
-
-```{r cit1a, echo = F, message=FALSE, warning=FALSE}
-# install.packages("tree")
-# install.packages("dplyr")
-# install.packages("grid")
-library(tree)
-library(dplyr)
-library(grid)
-# load data
-citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t") %>%
-  # convert character strings to factors
-  dplyr::mutate_if(is.character, factor)
-# set.seed
-set.seed(111)        
-dtree <- tree::tree(LikeUser ~ Age + Gender + Status, data = citdata, split = "gini")
-# display decision tree
-plot(dtree, gp = gpar(fontsize = 8))
-# add annotation
-text(dtree, pretty = 0, all = F)
-```
-
-
-The *yes* and *no* at the bottom show if the speaker should be classified as a user of discourse *like* (*yes* or *no*). Each split can be read as *true* to the left and *false* to the right. So that, at the first split, if the person is between the ages of 15 and 40, we need to follow the branch to the left while we need to follow to the right if the person is not 15 to 40.
-
-Before going through how this conditional decision tree is generated, let us first go over some basic concepts. The top of the decision tree is called *root* or *root node*, the categories at the end of branches are called *leaves* or *leaf nodes*. Nodes that are in-between the root and leaves are called *internal nodes* or just *nodes*. The root node has only arrows or lines pointing away from it, internal nodes have lines going to and from them, while leaf nodes only have lines pointing towards them.
-
-How to prune and evaluate the accuracy of decision trees is not shown here. If you are interested in this, please check out chapter 7 of @gries2021statistics which is a highly recommendable resource that provide a lot of additional information about decision trees and CARTs. 
-
-
-# Tree-Based Models in R {-}
-
-We will now focus on how to implement tree-based models in R and continue with getting a more detaled understanding og how tree-based methods work.
+This tutorial is the interactive Jupyter notebook accompanying the [*Language Technology and Data Analysis Laboratory* (LADAL) tutorial *Tree-Based Models in R*](https://ladal.edu.au/tree.html). 
 
 **Preparation and session set up**
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
-
-```{r prep1, eval = F, message=FALSE, warning=FALSE}
-# install packages
-install.packages("Boruta")
-install.packages("tree")
-install.packages("caret")
-install.packages("cowplot")
-install.packages("tidyverse")
-install.packages("ggparty")
-install.packages("Gmisc")
-install.packages("grid")
-install.packages("Hmisc")
-install.packages("party")
-install.packages("partykit")
-install.packages("randomForest")
-install.packages("pdp")
-install.packages("tidyr")
-install.packages("RCurl")
-install.packages("vip")
-install.packages("flextable")
-# install klippy for copy-to-clipboard button in code chunks
-install.packages("remotes")
-remotes::install_github("rlesur/klippy")
-```
-
-
-Now that we have installed the packages, we can activate them as shown below.
-
+We set up our session by activating the packages we need for this tutorial. 
 
 ```{r prep2, message=FALSE, warning=FALSE}
-# set options
-options(stringsAsFactors = F)
-options(scipen = 999)
-options(max.print=10000)
 # load packages
+library(tree)
+library(dplyr)
+library(grid)
 library(Boruta)
 library(tree)
 library(caret)
@@ -168,386 +30,43 @@ library(pdp)
 library(RCurl)
 library(tidyr)
 library(vip)
-library(flextable)
-# activate klippy for copy-to-clipboard button
-klippy::klippy()
 ```
 
 
-Once you have installed R, RStudio, and have also initiated the session by executing the code shown above, you are good to go.
+Once you have initiated the session by executing the code shown above, you are good to go.
 
-## How Tree-Based Methods Work {-}
-
-
-Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. 
-
-Let us now go over the process by which the decision tree above is generated. In our example, we want to predict whether a person makes use of discourse *like* given their age, gender, and social status. 
-
-In a first step, we load and inspect the data that we will use in this tutorial. As tree-based models require either numeric or factorized data, we factorize the "character" variables in our data.
+If you are using this notebook on your own computer and you have not already installed the R packages listed above, you need to install them. You can install them by replacing the `library` command with `install.packages` and putting the name of the package into quotation marks like this: `install.packages("dplyr")`. Then, you simply run this command and R will install the package you specified.
 
 
-```{r cit4c,  message=FALSE, warning=FALSE}
-# load data
-citdata <- read.delim("https://slcladal.github.io/data/treedata.txt", header = T, sep = "\t") %>%
-  dplyr::mutate_if(is.character, factor)
-```
 
-```{r cit4d,  echo = F, message=FALSE, warning=FALSE}
-# inspect data
-citdata %>%
-  as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the citdata data")  %>%
-  flextable::border_outer()
+***
+
+## Using your own data
+
+While the tutorial uses data from the LADAL website, you can also use your own data. You can see below what you need to do to upload and use your own data.
+
+The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+
+![Binder Folder Symbol](https://slcladal.github.io/images/binderfolder.JPG)
+
+
+Then on the upload symbol.
+
+![Binder Upload Symbol](https://slcladal.github.io/images/binderupload.JPG)
+
+Next, upload the files you want to analyze and then the respective files names in the file argument of the scan function. When you then execute the code (like to code chunk below, you will upload your own data.
+
+```{r}
+mytable1 <- openxlsx::read.xlsx("testdata1.xlsx", sheet = 1)
+# inspect
+mytable1
 ```
 
 
-The data now consists of factors which two levels each. 
+**Keep in mind though that you need to adapt the names of the texts in the code chunks below so that the code below work on your own texts!**
 
-The first step in generating a decision tree consists in determining, what the root of the decision tree should be. This means that we have to determine which of the variables represents the root node. In order to do so, we tabulate for each variable level, how many speakers of that level have used discourse *like* (LikeUsers) and how many have not used discourse *like* (NonLikeUsers).
+***
 
-
-```{r cit5, echo=T, message=FALSE, warning=FALSE}
-# tabulate data
-table(citdata$LikeUser, citdata$Gender)
-
-table(citdata$LikeUser, citdata$Age)
-
-table(citdata$LikeUser, citdata$Status)
-```
-
-None of the predictors is perfect (the predictors are therefore referred to as *impure*). To determine which variable is the root, we will calculate the degree of "impurity" for each variable - the variable which has the lowest impurity value will be the root.
-
-The most common measure of impurity in the context of conditional inference trees is called *Gini* (an alternative that is common when generating regression trees is the deviance). The Gini value or gini index was introduced by Corrado Gini as a measure for income inequality. In our case we seek to maximize inequality of distributions of leave nodes which is why the gini index is useful for tree based models. For each level we apply the following equation to determine the gini impurity value:
-
-\begin{equation}
-
-G_{x} = 1 - ( p_{1} )^{2} - ( p_{0} )^{2}
-
-\end{equation}
-
-For the node for men, this would mean the following:
-
-\begin{equation}
-
-G_{men} = 1-(\frac{42} {42+75})^{2} - (\frac{75} {42+75})^{2} = 0.4602235
-
-\end{equation}
-
-For women, we calculate G or Gini as follows:
-
-\begin{equation}
-
-G_{women} = 1-(\frac{91} {91+43})^{2} - (\frac{43} {91+43})^{2} = 0.4358432
-
-\end{equation}
-
-To calculate the Gini value of Gender, we need to calculate the weighted average leaf node impurity (weighted because the number of speakers is different in each group). We calculate the weighted average leaf node impurity using the equation below. 
-
-\begin{equation}
-
-G_{Gender} = \frac{N_{men}} {N_{Total}} \times G_{men} +  \frac{N_{women}} {N_{Total}} \times G_{women}
-
-G_{Gender} = \frac{159} {303} \times 0.4602235 +  \frac{144} {303} \times 0.4358432 = 0.4611915
-
-\end{equation}
-
-We will now perform the gini-calculation for gender (see below).
-
-```{r cit7, echo=T, message=FALSE, warning=FALSE}
-# calculate Gini for men
-gini_men <- 1-(42/(42+75))^2 - (75/(42+75))^2
-# calculate Gini for women
-gini_women <- 1-(91/(91+43))^2 - (43/(91+43))^2
-# calculate weighted average of Gini for Gender
-gini_gender <- 42/(42+75)* gini_men +  91/(91+43) * gini_women
-gini_gender
-```
-
-The gini for gender is 0.4612. In a next step, we revisit the age distribution and we continue to calculate the gini value for age.
-
-```{r cit9, echo=T, message=FALSE, warning=FALSE}
-# calculate Gini for age groups
-gini_young <- 1-(92/(92+34))^2 - (34/(92+34))^2  # Gini: young
-gini_old <- 1-(41/(41+84))^2 - (84/(41+84))^2    # Gini: old
-# calculate weighted average of Gini for Age
-gini_age <- 92/(92+34)* gini_young +  41/(41+84) * gini_old
-gini_age
-
-```
-
-The gini for age is .4323 and we continue by revisiting the status distribution and we continue to calculate the gini value for status.
-
-```{r cit11, echo=T, message=FALSE, warning=FALSE}
-gini_high <- 1-(73/(33+73))^2 - (33/(33+73))^2   # Gini: high
-gini_low <- 1-(60/(60+85))^2 - (85/(60+85))^2    # Gini: low
-# calculate weighted average of Gini for Status
-gini_status <- 73/(33+73)* gini_high +  60/(60+85) * gini_low
-gini_status
-```
-
-The gini for status is .4961 and we can now compare the gini values for age, gender, and status.
-
-```{r cit12, echo=T, message=FALSE, warning=FALSE}
-# compare age, gender, and status ginis
-gini_age; gini_gender; gini_status
-```
-
-Since age has the lowest gini (impurity) value, our first split is by age and age, thus, represents our root node. Our manually calculated conditional inference tree right now looks as below.
-
-```{r cit13, echo=F, message=FALSE, warning=FALSE}
-# plot tree we have so far!
-grid.newpage()
-# set some parameters to use repeatedly
-leftx <- .25
-midx <- .5
-rightx <- .75
-width <- .4
-gp <- gpar(fill = "lightgrey")
-# create boxes
-(rando <- boxGrob("Age", 
-                  x=midx, y=.9, box_gp = gp, width = width))
-# connect boxes like this
-(g1 <- boxGrob("15-40\n NonLikeUsers  LikeUsers \n 34                  92", 
-               x=leftx, y=.5, box_gp = gp, width = width))
-(g2 <- boxGrob("41-80\n  NonLikeUsers  LikeUsers \n 84                 41", 
-               x=rightx, y=.5, box_gp = gp, width = width))
-connectGrob(rando, g1, "N")
-connectGrob(rando, g2, "N")
-```
-
-
-In a next step, we need to find out which of the remaining variables best separates the speakers who use discourse *like* from those that do not under the first node. In order to do so, we calculate the Gini values for *Gender* and *SocialStatus* for the *15-40* node.
-
-We thus move on and test if and how to split this branch. 
-
-```{r cit19, echo=T, message=FALSE, warning=FALSE}
-# 5TH NODE
-# split data according to first split (only young data)
-young <- citdata %>%
-  dplyr::filter(Age == "15-40")
-# inspect distribution
-tbyounggender <- table(young$LikeUser, young$Gender)
-tbyounggender
-```
-
-```{r cit19b, echo=T, message=FALSE, warning=FALSE}
-# calculate Gini for Gender
-# calculate Gini for men
-gini_youngmen <- 1-(tbyounggender[2,2]/sum(tbyounggender[,2]))^2 - (tbyounggender[1,2]/sum(tbyounggender[,2]))^2
-# calculate Gini for women
-gini_youngwomen <- 1-(tbyounggender[2,1]/sum(tbyounggender[,1]))^2 - (tbyounggender[1,1]/sum(tbyounggender[,1]))^2
-# # calculate weighted average of Gini for Gender
-gini_younggender <- sum(tbyounggender[,2])/sum(tbyounggender)* gini_youngmen +  sum(tbyounggender[,1])/sum(tbyounggender) * gini_youngwomen
-gini_younggender
-```
-
-The gini value for gender among young speakers is 0.3886.
-
-We continue by inspecting the status distribution.
-
-```{r cit20, echo=T, message=FALSE, warning=FALSE}
-# calculate Gini for Status
-# inspect distribution
-tbyoungstatus <- table(young$LikeUser, young$Status)
-tbyoungstatus
-```
-
-We now calculate the gini value for status.
-
-```{r cit20b, echo=T, message=FALSE, warning=FALSE}
-# calculate Gini for status
-# calculate Gini for low
-gini_younglow <- 1-(tbyoungstatus[2,2]/sum(tbyoungstatus[,2]))^2 - (tbyoungstatus[1,2]/sum(tbyoungstatus[,2]))^2
-# calculate Gini for high
-gini_younghigh <- 1-(tbyoungstatus[2,1]/sum(tbyoungstatus[,1]))^2 - (tbyoungstatus[1,1]/sum(tbyoungstatus[,1]))^2
-# # calculate weighted average of Gini for status
-gini_youngstatus <- sum(tbyoungstatus[,2])/sum(tbyoungstatus)* gini_younglow +  sum(tbyoungstatus[,1])/sum(tbyoungstatus) * gini_younghigh
-gini_youngstatus
-```
-
-Since the gini value for status (0.3667) is lower than the gini value for gender (0.3886), we  split by status. 
-
-We would continue to calculate the gini values and always split at the lowest gini levels until we reach a leaf node. Then, we would continue doing the same for the remaining branches until the entire data is binned into different leaf nodes.
-
-
-In addition to plotting the decision tree, we can also check its accuracy. To do so, we predict the use of *like* based on the decision tree and compare them to the observed uses of *like*. Then we use the `confusionMatrix` function from the `caret` package to get an overview of the accuracy statistics.
-
-```{r cit24, eval = F, echo=T, message=FALSE, warning=FALSE}
-dtreeprediction <- as.factor(ifelse(predict(dtree)[,2] > .5, "yes", "no"))
-confusionMatrix(dtreeprediction, citdata$LikeUser)
-```
-
-The conditional inference tree has an accuracy of 72.9 percent which is significantly better than the base-line accuracy of 53.0 percent (No Information Rate $*$ 100). To understand what the other statistics refer to and how they are calculated, run the command `?confusionMatrix`. 
-
-## Splitting numeric, ordinal, and true categorical variables{-}
-
-While it is rather straight forward to calculate the Gini values for categorical variables, it may not seem quite as apparent how to calculate splits for numeric or ordinal variables. To illustrate how the algorithm works on such variables, consider the example data set shown below.
-
-```{r citn1, echo=F, message=FALSE, warning=FALSE}
-Age <- c(15, 37, 63, 42, 22, 27)
-LikeUser <- c("yes", "no", "no", "yes", "yes", "yes")
-citdata2 <- data.frame(Age, LikeUser)
-```
-
-```{r tb1, echo = F, warning=F, message=F}
-# inspect data
-citdata2 %>%
-  as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the citdata2 data.")  %>%
-  flextable::border_outer()
-```
-
-
-
-In a first step, we order the numeric variable so that we arrive at the following table.
-
-```{r citn2, echo=F, message=FALSE, warning=FALSE}
-citdata2 <- citdata2 %>%
-  arrange(Age)
-```
-
-
-```{r tb2, echo = F, warning=F, message=F}
-# inspect data
-citdata2 %>%
-  as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the citdata2 data arranged by age.")  %>%
-  flextable::border_outer()
-```
-
-Next, we calculate the means for each level of "Age".
-
-```{r citn3, echo=F, message=FALSE, warning=FALSE}
-Age <- c(15, ((15+22)/2), 22, ((22+27)/2), 27, ((27+37)/2), 37, ((37+42)/2), 42, ((42+63)/2), 63)
-LikeUser <- c("yes", "", "yes", "", "yes", "", "no", "", "yes", "", "no")
-citdata3 <- data.frame(Age, LikeUser)
-```
-
-```{r citn3b, echo = F, warning=F, message=F}
-# inspect data
-citdata3 %>%
-  as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the citdata3 data arranged by age.")  %>%
-  flextable::border_outer()
-```
-
-Now, we calculate the Gini values for each average level of age. How this is done is shown below for the first split.
-
-\begin{equation}
-
-G_{x} = 1 - ( p_{1} )^{2} - ( p_{0} )^{2}
-
-\end{equation}
-
-For an age smaller than 18.5 this would mean:
-
-\begin{equation}
-
-G_{youngerthan18.5} = 1-(\frac{1} {1+0})^{2} - (\frac{0} {1+0})^{2} = 0.0
-
-\end{equation}
-
-For an age greater than 18.5, we calculate G or Gini as follows:
-
-\begin{equation}
-
-G_{olerthan18.5} = 1-(\frac{2} {2+3})^{2} - (\frac{3} {2+3})^{2} = 0.48
-
-\end{equation}
-
- Now, we calculate the Gini for that split as we have done above.
- 
-\begin{equation}
-
-G_{split18.5} = \frac{N_{youngerthan18.5}} {N_{Total}} \times G_{youngerthan18.5} +  \frac{N_{olderthan18.5}} {N_{Total}} \times G_{olderthan18.5}
-
-G_{split18.5} = \frac{1} {6} \times 0.0 +  \frac{5} {6} \times 0.48 = 0.4
-
-\end{equation}
-
-We then have to calculate the gini values for all possible age splits which yields the following results:
-
-```{r citn4, eval = F, echo=T, message=FALSE, warning=FALSE}
-# 18.5
-1-(1/(1+0))^2 - (0/(1+0))^2
-1-(2/(2+3))^2 - (3/(2+3))^2
-1/6 * 0.0 +  5/6 * 0.48
-# 24.4
-1-(2/(2+0))^2 - (0/(2+0))^2
-1-(3/(3+1))^2 - (2/(3+1))^2
-2/6 * 0.0 +  4/6 * 0.1875
-# 32
-1-(3/(3+0))^2 - (0/(3+0))^2
-1-(1/(1+2))^2 - (2/(1+2))^2
-3/6 * 0.0 +  3/6 * 0.4444444
-# 39.5
-1-(3/(3+1))^2 - (1/(3+1))^2
-1-(1/(1+1))^2 - (1/(1+1))^2
-4/6 * 0.375 +  2/6 * 0.5
-# 52.5
-1-(4/(4+1))^2 - (1/(4+1))^2
-1-(0/(0+1))^2 - (1/(0+1))^2
-5/6 * 0.32 +  1/6 * 0.0
-```
-
-
-```{r citn5, echo=F, message=FALSE, warning=FALSE}
-AgeSplit <- c(((15+22)/2), ((22+27)/2), ((27+37)/2), ((37+42)/2), ((42+63)/2))
-Gini <- c(0.4, 0.5,0.444, 0.41, 0.267)
-citdata3 <- data.frame(AgeSplit, Gini)
-```
-
-```{r tb3, echo = F, warning=F, message=F}
-# inspect data
-citdata3 %>%
-  as.data.frame() %>%
-#  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the citdata3 data with Gini coefficients.")  %>%
-  flextable::border_outer()
-```
-
-The split at 52.5 years of age has the lowest Gini value. Accordingly, we would split the data between speakers who are younger than 52.5 and speakers who are older than 52.5 years of age. The lowest Gini value for any age split would also be the Gini value that would be compared to other variables. 
-
-The same procedure that we have used to determine potential splits for a numeric variable would apply to an ordinal variable with only two differences:
-
-* The Gini values are calculated for the actual levels and not the means between variable levels. 
-* The Gini value is nor calculated for the lowest and highest level as the calculation of the Gini values is impossible for extreme values. Extreme levels can, therefore, not serve as a potential split location. 
-
-When dealing with categorical variables with more than two levels, the situation is slightly more complex as we would also have to calculate the Gini values for combinations of variable levels. While the calculations are, in principle, analogous to the ones performed for binary of nominal categorical variables, we would also have to check if combinations would lead to improved splits. For instance, imagine we have a variable with categories A, B, and C. In such cases we would not only have to calculate the Gini scores for A, B, and C but also for A plus B, A plus C, and B plus C. Note that we ignore the combination A plus B plus C as this combination would include all other potential combinations. 
 
 
 # Conditional Inference Trees
@@ -675,15 +194,7 @@ citdata <- citdata %>%
 # inspect data
 citdata %>%
   as.data.frame() %>%
-#  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the citdata data.")  %>%
-  flextable::border_outer()
+  head(10)
 ```
 
 
@@ -717,21 +228,10 @@ This section shows how a Random Forest Analysis can be implemented in R. Ina fir
 ```{r rf3, echo=T, message=FALSE, warning=FALSE}
 # load random forest data
 rfdata <- read.delim("https://slcladal.github.io/data/mblrdata.txt", header = T, sep = "\t")
-```
-
-```{r rf3b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 rfdata %>%
   as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the rfdata data.")  %>%
-  flextable::border_outer()
+  head(10)
 ```
 
 The data consists of four categorical variables (`Gender`, `Age`, `ConversationType`, and `SUFlike`). Our dependent variable is `SUFlike` which stands for speech-unit final *like* (a pragmatic marker that is common in Irish English and is used as in *A wee girl of her age, like*). While Age and Gender are pretty straight forward what they are called, *ConversationType* encodes whether a conversation has taken place between interlocutors of the same or of different genders.
@@ -743,21 +243,10 @@ Before going any further, we need to factorize the variables as tree-based model
 rfdata <- rfdata %>%
   dplyr::mutate_if(is.character, factor) %>%
   dplyr::select(-ID)
-```
-
-```{r rf4b,  echo = F, message=FALSE, warning=FALSE}
 # inspect data
 rfdata %>%
   as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 10 rows of the factorized rfdata data.")  %>%
-  flextable::border_outer()
+  head(10) 
 ```
 
 We now check if the data contains missing values and remove those (if necessary).
@@ -1033,38 +522,11 @@ ggplot(borutadf, aes(x = reorder(Variable, Importance, mean), y = Importance, fi
 
 Of the remaining variables, adjective frequency and adjective type have the strongest effect and are confirmed as being important while syntactic function fails to perform better than the best shadow variable. All other variables have only a marginal effect on the use of really as an adjective amplifier.
 
-
-# Citation & Session Info {-}
-
-Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Tree-Based Models in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/tree.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
-
-```
-@manual{schweinberger`r format(Sys.time(), '%Y')`tree,
-  author = {Schweinberger, Martin},
-  title = {Tree-Based Models in R},
-  note = {https://slcladal.github.io/tree.html},
-  year = {`r format(Sys.time(), '%Y')`},
-  organization = "The University of Queensland, Australia. School of Languages and Cultures},
-  address = {Brisbane},
-  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
-}
-```
-
-```{r fin}
-sessionInfo()
-```
-
-
 ***
 
-[Back to top](#introduction)
-
-[Back to HOME](https://slcladal.github.io/index.html)
+[Back to LADAL](https://ladal.edu.au/tree.html)
 
 ***
-
-
-# References{-}
 
 
 
