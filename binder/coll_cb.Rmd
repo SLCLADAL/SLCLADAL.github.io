@@ -36,20 +36,20 @@ If you are using this notebook on your own computer and you have not already ins
 
 Collocations are terms that co-occur (significantly) more often together than would be expected by chance. A typical example of a collocation is *Merry Christmas* because the words *merry* and *Christmas* occur together more frequently together than would be expected, if words were just randomly stringed together.  
 
-N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the Charles Darwin's *On the Origin of Species by Means of Natural Selection* as a data source and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
+N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use Lewis Caroll's  *Alice's Adventures in Wonderland* as an example text and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
 
 ```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # read in text
-darwin <- base::readRDS(url("https://slcladal.github.io/data/cdo.rda", "rb")) %>%
+text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb")) %>%
   paste0(collapse = " ") %>%
   stringr::str_squish() %>%
   stringr::str_remove_all("- ")
 # split text into words
-darwin_split <- darwin %>% 
+text_split <- text %>% 
   as_tibble() %>%
   tidytext::unnest_tokens(words, value)
 # inspect
-head(darwin_split)  
+head(text_split)  
 ```
 
 
@@ -105,12 +105,12 @@ The `quanteda` package offers excellent and very fast functions for extracting b
 
 ```{r coll3m, message=FALSE, warning=FALSE, paged.print=FALSE}
 #clean corpus
-darwin_clean <- darwin %>%
+text_clean <- text %>%
   stringr::str_to_title()
 # tokenize corpus
-darwin_tokzd <- quanteda::tokens(darwin_clean)
+text_tokzd <- quanteda::tokens(text_clean)
 # extract bigrams
-BiGrams <- darwin_tokzd %>% 
+BiGrams <- text_tokzd %>% 
        quanteda::tokens_remove(stopwords("en")) %>% 
        quanteda::tokens_select(pattern = "^[A-Z]", 
                                valuetype = "regex",
@@ -125,13 +125,13 @@ head(BiGrams)
 We can also extract bigrams very easily using the `tokens_compound` function which understands that we are looking for two-word expressions.
 
 ```{r coll3o, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-ngram_extract <- quanteda::tokens_compound(darwin_tokzd, pattern = BiGrams)
+ngram_extract <- quanteda::tokens_compound(text_tokzd, pattern = BiGrams)
 ```
 
 We can now generate concordances (and clean the resulting kwic table - the keyword-in-context table).
 
 ```{r coll3px, echo = F, message=FALSE, warning=FALSE}
-ngram_kwic <- kwic(ngram_extract, pattern = c("Natural_Selection", "South_America")) %>%
+ngram_kwic <- kwic(ngram_extract, pattern = c("Red_Queen", "White_Rabbit")) %>%
   as.data.frame() %>%
   dplyr::select(-to, -from, -pattern)
 # inspect
@@ -144,11 +144,11 @@ The disadvantage here is that we are strictly speaking only extracting N-Grams b
 
 Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
 
-In the following, we will extract collocations from Charles Darwin's *On the Origin of Species by Means of Natural Selection*. In a first step, we will split the Origin into individual sentences.
+In the following, we will extract collocations from Lewis Caroll's  *Alice's Adventures in Wonderland*. In a first step, we will split the text into individual sentences.
 
 ```{r coll4, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # read in and process text
-darwinsentences <- darwin %>%
+textsentences <- text %>%
   stringr::str_squish() %>%
   tokenizers::tokenize_sentences(.) %>%
   unlist() %>%
@@ -156,14 +156,14 @@ darwinsentences <- darwin %>%
   stringr::str_replace_all("\\W", " ") %>%
   stringr::str_squish()
 # inspect data
-head(darwinsentences)
+head(textsentences)
 ```
 
 The first element does not represent a full sentence because we selected a sample of the text which began in the middle of a sentence rather than at its beginning. In a next step, we will create a matrix that shows how often each word co-occurred with each other word in the data.
 
 ```{r coll5, message=FALSE, warning=FALSE, paged.print=FALSE}
 # convert into corpus
-darwincorpus <- Corpus(VectorSource(darwinsentences))
+textcorpus <- Corpus(VectorSource(textsentences))
 # create vector with words to remove
 extrawords <- c("the", "can", "get", "got", "can", "one", 
                 "dont", "even", "may", "but", "will", 
@@ -171,22 +171,22 @@ extrawords <- c("the", "can", "get", "got", "can", "one",
                 "many", "less", "now", "well", "like", 
                 "often", "every", "said", "two")
 # clean corpus
-darwincorpusclean <- darwincorpus %>%
+textcorpusclean <- textcorpus %>%
   tm::tm_map(removePunctuation) %>%
   tm::tm_map(removeNumbers) %>%
   tm::tm_map(tolower) %>%
   tm::tm_map(removeWords, stopwords()) %>%
   tm::tm_map(removeWords, extrawords)
 # create document term matrix
-darwindtm <- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
+textdtm <- DocumentTermMatrix(textcorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
 
 # convert dtm into sparse matrix
-darwinsdtm <- Matrix::sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
-                           x = darwindtm$v, 
-                           dims = c(darwindtm$nrow, darwindtm$ncol),
-                           dimnames = dimnames(darwindtm))
+textsdtm <- Matrix::sparseMatrix(i = textdtm$i, j = textdtm$j, 
+                           x = textdtm$v, 
+                           dims = c(textdtm$nrow, textdtm$ncol),
+                           dimnames = dimnames(textdtm))
 # calculate co-occurrence counts
-coocurrences <- t(darwinsdtm) %*% darwinsdtm
+coocurrences <- t(textsdtm) %*% textsdtm
 # convert into matrix
 collocates <- as.matrix(coocurrences)
 # inspect
@@ -206,20 +206,20 @@ The `ncol` function reports that the data represents 8,638 words and that the mo
 
 # Visualizing Collocations
 
-We will now use an example of one individual word (*selection*) to show, how collocation strength for individual terms is calculated and how it can be visualized. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) written by Gregor Wiedemann and Andreas Niekler (see also Wiedemann and Niekler 2017).
+We will now use an example of one individual word (*alice*) to show, how collocation strength for individual terms is calculated and how it can be visualized. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) written by Gregor Wiedemann and Andreas Niekler (see also Wiedemann and Niekler 2017).
 
 ```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
 # load function for co-occurrence calculation
 source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # define term
-coocTerm <- "selection"
+coocTerm <- "alice"
 # calculate co-occurrence statistics
-coocs <- calculateCoocStatistics(coocTerm, darwinsdtm, measure="LOGLIK")
+coocs <- calculateCoocStatistics(coocTerm, textsdtm, measure="LOGLIK")
 # inspect results
 coocs[1:20]
 ```
 
-The output shows that the word most strongly associated with *selection* in Charles Darwin's *Origin* is unsurprisingly *natural* - given the substantive strength of the association between *natural* and *selection* these term are definitely collocates and almost - if not already - a lexicalized construction (at least in this text).
+The output shows that the word most strongly associated with *alice* in the text is  *thought*.
 
 There are various visualizations options for collocations. Which visualization method is appropriate depends on what the visualizations should display. 
 
@@ -232,7 +232,7 @@ coocdf <- coocs %>%
   as.data.frame() %>%
   dplyr::mutate(CollStrength = coocs,
                 Term = names(coocs)) %>%
-  dplyr::filter(CollStrength > 30)
+  dplyr::filter(CollStrength > 10)
 # inspect
 coocdf %>%
   as.data.frame() %>%
@@ -251,14 +251,14 @@ ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
   labs(y = "")
 ```
 
-The dot chart shows that *natural* is collocating more strongly with *selection* compared to any other term. This confirms that *natural* and *selection* form a collocation in Darwin's *Origin*.
+The dot chart shows that *alice* is collocating more strongly with *thought* compared to any other term. 
 
 ## Dendrograms
 
 Another method for visualizing collocations are dendrograms. Dendrograms (also called tree-diagrams) show how similar elements are based on one or many features. As such, dendrograms are used to indicate groupings as they show elements (words) that are notably similar or different with respect to their association strength. To use this method, we first need to generate a distance matrix from our co-occurrence matrix.
 
 ```{r coll7,message=FALSE, warning=FALSE, paged.print=FALSE}
-coolocs <- c(coocdf$Term, "selection")
+coolocs <- c(coocdf$Term, "alice")
 # remove non-collocating terms
 collocates_redux <- collocates[rownames(collocates) %in% coolocs, ]
 collocates_redux <- collocates_redux[, colnames(collocates_redux) %in% coolocs]
@@ -270,7 +270,7 @@ clustertexts <- hclust(    # hierarchical cluster object
   method="ward.D2")        # ward.D as linkage method
 
 ggdendrogram(clustertexts) +
-  ggtitle("Terms strongly collocating with *selection*")
+  ggtitle("Terms strongly collocating with *alice*")
 ```
 
 ## Network Graphs
@@ -295,11 +295,10 @@ Next, we use the `textplot_network` function from the `quanteda.textplots` to ge
 
 
 ```{r}
-quanteda.textplots::textplot_network(romeo_fcm, 
-                                     min_freq = .5, 
+quanteda.textplots::textplot_network(romeo_fcm,  
                                      edge_alpha = 0.8, 
                                      edge_color = "gray",
-                                     vertex_labelsize = log(rowSums(romeo_fcm))/2,
+                                     vertex_labelsize = log(rowSums(romeo_fcm)),
                                      edge_size = 2)
 ```
 
@@ -307,9 +306,9 @@ quanteda.textplots::textplot_network(romeo_fcm,
 
 # Determining Significance
 
-In order to identify which words occur together significantly more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *selection*.
+In order to identify which words occur together significantly more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *alice*.
 
-To determine which terms collocate significantly with the key term (*selection*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
+To determine which terms collocate significantly with the key term (*alice*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
 
 * a = Number of times `coocTerm` occurs with term j
 
@@ -351,14 +350,14 @@ cooctb <- coocdf %>%
 head(cooctb)
 ```
 
-We now select the key term (*selection*). If we wanted to find all collocations that are present in the data, we would use the entire data rather than only the subset that contains  *selection*. 
+We now select the key term (*alice*). If we wanted to find all collocations that are present in the data, we would use the entire data rather than only the subset that contains  *alice*. 
 
 ```{r coll_01_23, message=FALSE, warning=FALSE}
 cooctb_redux <- cooctb %>%
   dplyr::filter(Term == coocTerm)
 ```
 
-Next, we calculate which terms are (significantly) over- and under-proportionately used with *selection*. It is important to note that this procedure informs about both: over- and under-use! This is especially crucial when analyzing if specific words are attracted o repelled by certain constructions. Of course, this approach is not restricted to analyses of constructions and it can easily be generalized across domains and has also been used in machine learning applications.
+Next, we calculate which terms are (significantly) over- and under-proportionately used with *alice*. It is important to note that this procedure informs about both: over- and under-use! This is especially crucial when analyzing if specific words are attracted o repelled by certain constructions. Of course, this approach is not restricted to analyses of constructions and it can easily be generalized across domains and has also been used in machine learning applications.
 
 ```{r coll_01_25, message=FALSE, warning=FALSE}
 coocStatz <- cooctb_redux %>%
@@ -394,7 +393,7 @@ coocStatz <- coocStatz %>%
   dplyr::mutate(CorrSignificance = dplyr::case_when(p <= corr001 ~ "p<.001",
                                                     p <= corr01 ~ "p<.01",
                                                     p <= corr05 ~ "p<.05", 
-                                                    FALSE ~ "n.s.")) %>%
+                                                    TRUE ~ "n.s.")) %>%
   dplyr::mutate(p = round(p, 6)) %>%
   dplyr::mutate(x2 = round(x2, 1)) %>%
   dplyr::mutate(phi = round(phi, 2)) %>%
@@ -405,7 +404,7 @@ coocStatz <- coocStatz %>%
 head(coocStatz)
 ```
 
-The results show that *selection* collocates significantly with *selection* (of course) but also, as expected, with *natural*. The corrected p-values shows that after Benjamini-Hochberg correction for multiple/repeated testing (see Field, Miles, and Field 2012) these are the only significant collocates of *selection*. Corrections are necessary when performing multiple tests because otherwise, the reliability of the test result would be strongly impaired as repeated testing causes substantive $\alpha$-error inflation. The Benjamini-Hochberg correction that has been used here is preferable over the more popular Bonferroni correction because it is less conservative and therefore less likely to result in $\beta$-errors (see again Field, Miles, and Field 2012).
+The results show that *alice* collocates significantly with *alice* (of course) but also, as expected, with *thought*. The corrected p-values shows that after Benjamini-Hochberg correction for multiple/repeated testing (see Field, Miles, and Field 2012) these are the only significant collocates of *alice*. Corrections are necessary when performing multiple tests because otherwise, the reliability of the test result would be strongly impaired as repeated testing causes substantive $\alpha$-error inflation. The Benjamini-Hochberg correction that has been used here is preferable over the more popular Bonferroni correction because it is less conservative and therefore less likely to result in $\beta$-errors (see again Field, Miles, and Field 2012).
 
 
 ***
