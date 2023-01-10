@@ -1,45 +1,172 @@
 ![An interactive LADAL notebook](https://slcladal.github.io/images/uq1.jpg)
 
-***
 
-Please copy this Jupyter notebook so that you are able to edit it.
-
-Simply go to: File > Save a copy in Drive.
-
-Once you have done that, you are good to go.
-
-***
-
-This tutorial is the interactive Jupyter notebook accompanying the [Language Technology and Data Analysis Laboratory (LADAL) tutorial on part-of-speech tagging and dependency parsing with R](https://ladal.edu.au/postag.html). 
+# Part-of-speech tagging and syntactic parsing with R
 
 
-
-***
+This tutorial is the interactive Jupyter notebook accompanying the [*Language Technology and Data Analysis Laboratory* (LADAL) tutorial *POS-Tagging and Syntactic Parsing with R*](https://ladal.edu.au/postag.html). 
 
 
 **Preparation and session set up**
 
-If you are using this notebook on Google Colab or your own computer and you have not already installed the R packages listed below, you need to install them. You can install them by running the code chunk below. 
+We set up our session by activating the packages we need for this tutorial. 
 
-
-```{r prep1, echo=T, eval = F}
-# install packages
-install.packages("dplyr") 
-install.packages("stringr")
-install.packages("udpipe")
-```
-
-***
-
-
-```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+```{r prep2, message=FALSE, warning=FALSE}
 # activate packages
 library(dplyr)
-library(stringr) 
+library(stringr)
 library(udpipe) 
+library(flextable)
 ```
 
 Once you have initiated the session by executing the code shown above, you are good to go.
+
+If you are using this notebook on your own computer and you have not already installed the R packages listed above, you need to install them. You can install them by replacing the `library` command with `install.packages` and putting the name of the package into quotation marks like this: `install.packages("dplyr")`. Then, you simply run this command and R will install the package you specified.
+
+
+# Part-Of-Speech Tagging
+
+Many analyses of language data require that we distinguish different parts of speech. In order to determine the word class of a certain word, we use a procedure which is called part-of-speech tagging (commonly referred to as pos-, pos-, or PoS-tagging). 
+
+Parts-of-speech, or word categories, refer to the grammatical nature or category of a lexical item, e.g. in the sentence *Jane likes the girl* each lexical item can be classified according to whether it belongs to the group of determiners, verbs, nouns, etc.  
+
+When pos–tagged, the example sentence could look like the example below.
+
+1. Jane/NNP likes/VBZ the/DT girl/NN
+
+In the example above, `NNP` stands for proper noun (singular), `VBZ` stands for 3rd person singular present tense verb, `DT` for determiner, and `NN` for noun(singular or mass). The pos-tags used by the `openNLPpackage` are the [Penn English Treebank pos-tags](https://dpdearing.com/posts/2011/12/opennlp-part-of-speech-pos-tags-penn-english-treebank/). A more elaborate description of the tags can be found here which is summarized below:
+
+Tag | Description | Examples
+----|-------------|---------
+CC | Coordinating conjunction | and, or, but
+CD | Cardinal number | one, two, three
+DT | Determiner | a, the
+EX | Existential there | There/EX was a party in progress
+FW | Foreign word | persona/FW non/FW grata/FW
+IN | Preposition or subordinating con | uh, well, yes
+JJ | Adjective | good, bad, ugly
+JJR | Adjective, comparative | better, nicer
+JJS | Adjective, superlative | best, nicest
+LS | List item marker | a., b., 1., 2.
+MD | Modal | can, would, will
+NN | Noun, singular or mass | tree, chair
+NNS | Noun, plural | trees, chairs
+NNP | Proper noun, singular | John, Paul, CIA
+NNPS | Proper noun, plural | Johns, Pauls, CIAs
+PDT | Predeterminer | all/PDT this marble, many/PDT a soul
+POS | Possessive ending | John/NNP 's/POS, the parents/NNP '/POS distress
+PRP | Personal pronoun | I, you, he
+PRP\$ | Possessive pronoun | mine, yours
+RB | Adverb | every, enough, not
+RBR | Adverb, comparative | later
+RBS | Adverb, superlative | latest
+RP | Particle | RP
+SYM | Symbol | CO2
+TO | to | to
+UH | Interjection | uhm, uh
+VB | Verb, base form | go, walk
+VBD | Verb, past tense | walked, saw
+VBG | Verb, gerund or present part. | walking, seeing
+VBN | Verb, past participle | walked, thought
+VBP | Verb, non-3rd person singular pr | walk, think
+VBZ | Verb, 3rd person singular present | walks, thinks
+WDT | Wh-determiner | which, that
+WP | Wh-pronoun | what, who, whom (wh-pronoun)
+WP\$ | Possessive wh-pronoun | whose, who (wh-words)
+WRB | Wh-adverb | how, where, why (wh-adverb)
+
+There are several different R packages that assist with pos-tagging texts [see @kumar2016mastering]. In this tutorial, we will use the `udpipe` [@udpipe]. The `udpipe` package is really great as it is easy to use, covers a wide range of languages, is very flexible, and very accurate.  It is particularly handy because it addresses and remedies major shortcomings that previous methods for pos-tagging had, namely
+
+* it offers a wide range of language models (64 languages at this point)
+* it does not rely on external software (like, e.g., TreeTagger, that had to be installed separately and could be challenging when using different operating systems)
+* it is really easy to implement as one only need to install and load the `udpipe` package and download and activate the language model one is interested in
+* it allows to train and tune one's own models rather easily
+
+The available pre-trained language models in UDPipe are:
+
+Languages | Models 
+----------|-------
+Afrikaans | afrikaans-afribooms
+Ancient Greek | ancient_greek-perseus, ancient_greek-proiel
+Arabic | arabic-padt
+Armenian | armenian-armtdp
+Basque | basque-bdt
+Belarusian | belarusian-hse
+Bulgarian | bulgarian-btb
+Buryat | buryat-bdt
+Catalan | catalan-ancora
+Chinese | chinese-gsd, chinese-gsdsimp, classical_chinese-kyoto
+Coptic | coptic-scriptorium
+Croatian | croatian-set
+Czech | czech-cac, czech-cltt, czech-fictree, czech-pdt
+Danish | danish-ddt
+Dutch | dutch-alpino, dutch-lassysmall
+English | english-ewt, english-gum, english-lines, english-partut
+Estonian | estonian-edt, estonian-ewt
+Finnish | finnish-ftb, finnish-tdt
+French | french-gsd, french-partut, french-sequoia, french-spoken
+Galician | galician-ctg, galician-treegal
+German | german-gsd, german-hdt
+Gothic | gothic-proiel
+Greek | greek-gdt
+Hebrew | hebrew-htb
+Hindi | hindi-hdtb
+Hungarian | hungarian-szeged
+Indonesian | indonesian-gsd
+Irish Gaelic | irish-idt
+Italian | italian-isdt, italian-partut, italian-postwita, italian-twittiro, italian-vit
+Japanese | japanese-gsd
+Kazakh | kazakh-ktb
+Korean | korean-gsd, korean-kaist
+Kurmanji | kurmanji-mg
+Latin | latin-ittb, latin-perseus, latin-proiel
+Latvian | latvian-lvtb
+Lithuanian | lithuanian-alksnis, lithuanian-hse
+Maltese | maltese-mudt
+Marathi | marathi-ufal
+North Sami | north_sami-giella
+Norwegian | norwegian-bokmaal, norwegian-nynorsk, norwegian-nynorsklia
+Old Church Slavonic | old_church_slavonic-proiel
+Old French | old_french-srcmf
+Old Russian | old_russian-torot
+Persian | persian-seraji
+Polish | polish-lfg, polish-pdb, polish-sz
+Portugese | portuguese-bosque, portuguese-br, portuguese-gsd
+Romanian | romanian-nonstandard, romanian-rrt
+Russian | russian-gsd, russian-syntagrus, russian-taiga
+Sanskrit | sanskrit-ufal
+Scottish Gaelic | scottish_gaelic-arcosg
+Serbian | serbian-set
+Slovak | slovak-snk
+Slovenian | slovenian-ssj, slovenian-sst
+Spanish | spanish-ancora, spanish-gsd
+Swedish | swedish-lines, swedish-talbanken
+Tamil | tamil-ttb
+Telugu | telugu-mtg
+Turkish | turkish-imst
+Ukrainian | ukrainian-iu
+Upper Sorbia | upper_sorbian-ufal
+Urdu | urdu-udtb
+Uyghur | uyghur-udt
+Vietnamese | vietnamese-vtb
+Wolof | wolof-wtb
+
+
+ 
+
+To download any of these models, we can use the `udpipe_download_model` function. For example, to download the `english-ewt` model, we would use the call: `m_eng	<- udpipe::udpipe_download_model(language = "english-ewt")`. 
+
+We start by loading  a text
+
+```{r udi1a, message=FALSE, warning=FALSE}
+# load text
+text <- readLines("https://slcladal.github.io/data/testcorpus/linguistics06.txt", skipNul = T)
+# clean data
+text <- text %>%
+ str_squish() 
+```
+
+
 
 ***
 
@@ -49,15 +176,17 @@ While the tutorial uses data from the LADAL website, you can also use your own d
 
 The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
 
-![Colab Folder Symbol](https://slcladal.github.io/images/ColabFolder.png)
+![Binder Folder Symbol](https://slcladal.github.io/images/binderfolder.JPG)
+
 
 Then on the upload symbol.
 
-![Colab Upload Symbol](https://slcladal.github.io/images/ColabUpload.png)
+![Binder Upload Symbol](https://slcladal.github.io/images/binderupload.JPG)
 
 Next, upload the files you want to analyze and then the respective files names in the file argument of the scan function. When you then execute the code (like to code chunk below, you will upload your own data.
 
-```{r}
+
+```{r owndata, eval = F}
 mytext1 <- scan(file = "linguistics01.txt",
             what = "char", 
             sep = "", 
@@ -78,26 +207,12 @@ mytext1; mytext2
 ```
 
 
+
+
 **Keep in mind though that you need to adapt the names of the texts in the code chunks below so that the code below work on your own texts!**
 
 ***
 
-# POS-Tagging with UDPipe
-
-UDPipe allows you to access numerous language models for 64 languages (for an overview of the supported languages and language models see [here](https://ladal.edu.au/postag.html#POS-Tagging_with_UDPipe)). 
-
-To download any of these models, we can use the `udpipe_download_model` function. For example, to download the `english-ewt` model, we would use the call: `m_eng	<- udpipe::udpipe_download_model(language = "english-ewt")`. 
-
-We start by loading  a text
-
-```{r udi1a, message=FALSE, warning=FALSE}
-# load text
-text <- readLines("https://slcladal.github.io/data/testcorpus/linguistics06.txt", skipNul = T) %>%
- str_squish() %>%
-  .[1]
-# inspect
-text
-```
 
 Now that we have a text that we can work with, we will download a pre-trained language model.
 
@@ -106,12 +221,11 @@ Now that we have a text that we can work with, we will download a pre-trained la
 m_eng	<- udpipe::udpipe_download_model(language = "english-ewt")
 ```
 
+If you have downloaded a model once, you can also load the model directly. Here, we have downloaded it into the main directory so we can acll it directly with only the file name.
 
-We now load language model.
-
-```{r udi1b, eval = F, message=FALSE, warning=FALSE}
-# load language model
-m_eng <- udpipe_load_model(file = "/content/english-ewt-ud-2.5-191206.udpipe")
+```{r udi1c, message=FALSE, warning=FALSE}
+# load language model from your computer after you have downloaded it once
+m_eng <- udpipe_load_model(file = "english-ewt-ud-2.5-191206.udpipe")
 ```
 
 We can now use the model to annotate out text.
@@ -133,7 +247,7 @@ tagged_text <- paste(text_anndf$token, "/", text_anndf$xpos, collapse = " ", sep
 tagged_text
 ```
 
-# POS-Tagging non-English texts
+# POS-Tagging non-English texts 
 
 We can apply the same method for annotating, e.g. adding pos-tags, to other languages. For this, we could train our own model, or, we can use one of the many pre-trained language models that `udpipe` provides.
 
@@ -163,8 +277,8 @@ Or we load them from our machine (if we have downloaded and saved them before).
 
 ```{r udi_mod4, message=FALSE, warning=FALSE}
 # load language model from your computer after you have downloaded it once
-m_ger	<- udpipe::udpipe_load_model(file = "/content/german-gsd-ud-2.5-191206.udpipe")
-m_dut	<- udpipe::udpipe_load_model(file = "/content/dutch-alpino-ud-2.5-191206.udpipe")
+m_ger	<- udpipe::udpipe_load_model(file = "german-gsd-ud-2.5-191206.udpipe")
+m_dut	<- udpipe::udpipe_load_model(file = "dutch-alpino-ud-2.5-191206.udpipe")
 ```
 
 
@@ -172,6 +286,7 @@ Now, pos-tag the German text.
 
 
 ```{r pos_ger, warning=F, message=F}
+# tokenise, tag, dependency parsing of german text
 ger_pos <- udpipe::udpipe_annotate(m_ger, x = gertext) %>%
   as.data.frame() %>%
   dplyr::summarise(postxt = paste(token, "/", xpos, collapse = " ", sep = "")) %>%
@@ -184,6 +299,7 @@ And finally, we also pos-tag the Dutch text.
 
 
 ```{r pos_nl, warning=F, message=F}
+# tokenise, tag, dependency parsing of german text
 nl_pos <- udpipe::udpipe_annotate(m_dut, x = duttext) %>%
    as.data.frame() %>%
   dplyr::summarise(postxt = paste(token, "/", xpos, collapse = " ", sep = "")) %>%
@@ -204,33 +320,19 @@ sent <- udpipe::udpipe_annotate(m_eng, x = "Linguistics is the scientific study 
 head(sent)
 ```
 
-Before we can generate the plot, we need to install additional packages.
-
-```{r udi5, message=FALSE, warning=FALSE}
-# install and activate necessary packages
-install.packages("igraph")
-install.packages("ggraph")
-install.packages("textplot")
-```
-
 We now generate the plot.
 
-```{r udi6, message=FALSE, warning=FALSE}
-# load package
-library(textplot)
+```{r udi5, fig.width=5, message=FALSE, warning=FALSE}
 # generate dependency plot
-dplot <- textplot_dependencyparser(sent, size = 5) 
+dplot <- textplot::textplot_dependencyparser(sent, size = 3) 
 # show plot
 dplot
 ```
 
 
 
-That's it for this tutorial. We hope that you have enjoyed this tutorial and learned how to annotate texts using language models and perform pos-tagging and dependency parsing.
-
-
+***
 
 [Back to LADAL](https://ladal.edu.au/postag.html)
 
-
-
+***
