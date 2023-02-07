@@ -1,0 +1,218 @@
+---
+title: "Spell checking with R"
+author: "Martin Schweinberger"
+date: "2023-02-07"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+
+```{r uq1, echo=F, eval = T, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial focuses on spell checking and shows how to perform spell checking in R. 
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to perform spell checking of textual data  using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful aspects of spell checking. 
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/spellcheck.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fspellcheck_cb.ipynb)<br>
+[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fspellcheck_cb.ipynb). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+# What is spell checking? {-}
+
+Spell checking is the process of checking for and identifying spelling errors in a piece of text. It works by comparing each word in the text against a dictionary of correctly spelled words, and marking any words that are not found in the dictionary as potentially misspelled.
+
+Spell checking is used in a variety of applications, including word processors, email clients, and online text editors, to help users produce error-free written material. The goal of spell checking is to improve the accuracy and readability of written text by catching and correcting spelling errors before they are published or sent.
+
+Spell checking of textual data consists of the following steps:
+
+* First, the text in a document is tokenized, i.e. the text is broken down into individual words.
+* Each word is then broken down in it’s root (stemming) and affix(es)
+* Next, it i checked if the word (plus affix combination) occurs in a dictionary
+* Optionally, for words (or combinations), corrections are suggested based on similar words in the dictionary
+
+# Spell checking in R with hunspell {-}
+
+The `hunspell` package provides access to Hunspell which is a spell checker library used in various software applications such as OpenOffice, Mozilla Firefox, or RStudio. In addition to simple spell checking, the `hunspell` package also provides additional funtionalities like tokenization or stemming and and its spell checking capabilities encompass almost any language or alphabet. Tokenization and stemming are part of the `hunspell` package in order to split texts into individual words but also to extract text from several file formats such as basic text, html, pdf, or xml.
+
+The `hunspell` package checks if words occur in a given dictionary with  the (default) dictionary being "en_US". However each function can be used in another language by setting a custom dictionary in the `dict` parameter. 
+
+**Preparation and session set up** {-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F}
+# install packages
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("tidyr")
+install.packages("hunspell")
+install.packages("flextable")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+
+Now that we have installed the packages, we activate them as shown below.
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# activate packages
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(hunspell)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+
+Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.
+
+In the following, we will perform spell checking and explore several useful functions associated with spell checking in the `hunspell` package.
+
+## Checking individual words {-}
+
+We start by checking a vector of individual words.
+
+
+```{r sp1, message=FALSE, warning=FALSE}
+words <- c("analyze", "langauge", "data")
+correct <- hunspell_check(words)
+print(correct)
+```
+
+The output shows that the second word was not found in the dictionary, i.e., it is identified as being incorrect. Next, we can ask for suggestions, i.e. the correct form of the word.
+
+```{r sp3, echo=F, message=FALSE, warning=FALSE, class.source='klippy'}
+hunspell_suggest(words[!correct])
+```
+
+## Checking documents {-}
+
+Since we rarely want to check individual words, we will now focus on spell checking full texts rather than individual vectors with words.
+
+First, we load a text (in this case an explanation of what grammer is that is taken from Wikipedia).
+
+
+```{r sp5, cmessage=FALSE, warning=FALSE}
+# read in text
+exampletext  <- base::readRDS(url("https://slcladal.github.io/data/tx1.rda", "rb"))
+# inspect
+exampletext
+```
+
+We now use the `hunspell` function to find incorrect words (or, more precisely, words that are not in the default dictionary).
+
+
+```{r sp7, cmessage=FALSE, warning=FALSE}
+errors <- hunspell(exampletext)
+errors[[1]]
+```
+
+We check what suggestions we get for these words.
+
+```{r sa7, message=FALSE, warning=FALSE}
+hunspell_suggest(errors[[1]])
+```
+
+In our case, the words are not errors but simply terms that do not occur in the dictionary so we will not replace them.
+
+## Setting a Language {-}
+
+By default, the `hunspell` package includes dictionaries for `en_US` and `en_GB` which means that you can easily switch from US American to British English spelling.
+
+The default `hunspell` uses the `en_US` dictionary as shown below.
+
+```{r sp11, message=FALSE, warning=FALSE}
+hunspell("At LADAL we like to analyse language and colours.")
+```
+
+But we can easily switch to British English instead as shown below.
+
+```{r sp11, message=FALSE, warning=FALSE}
+hunspell("At LADAL we like to analyse language and colours.", dict = 'en_GB')
+```
+
+```{r installlanguages, echo=FALSE, out.width= "50%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/InstallLanguages.png")
+```
+
+If you want to use another language you need to make sure that the dictionary is available from your system. In RStudio, this is easily done. Simply go to `Tools` > `Global options` > `Spelling` and then under `Main dictionary language` select `Install More Languages` from the drop-down menu. Once the additional languages are installed, their dictionaries are available to the `hunspell` package in RStudio.
+
+```{r sp15, message=FALSE, warning=FALSE}
+hunspell("Im LADAL analysieren wir Sprachen und Farben.", dict = 'de')
+```
+
+## Custom Dictionaries {-}
+
+If your system does not provide standard dictionaries you need to download them yourself. There are a lot of places that provide quality dictionaries.
+
+* SCOWL  
+* OpenOffice  
+* LibreOffice  
+* titoBouzout  
+* wooorm
+
+On OS-X it is recommended to put the files in `~/Library/Spelling/` or `/Library/Spelling/`. However you can also put them in your project working directory, or any of the other standard locations. If you wish to store your dictionaries somewhere else, you can make hunspell find them by setting the DICPATH environment variable. The `hunspell:::dicpath()`  shows which locations your system searches:
+
+```{r sa7, message=FALSE, warning=FALSE}
+#Sys.setenv(DICPATH = "/my/custom/hunspell/dir")
+hunspell:::dicpath()
+```
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. (2022)` *Sentiment Analysis in R*. Brisbane: The University of Queensland. url: https://ladal.edu.au/sentiment.html (Version 2022.10.30).
+
+```
+@manual{schweinberger2022sentiment,
+  author = {Schweinberger, Martin},
+  title = {Sentiment Analysis in R},
+  note = {https://ladal.edu.au/sentiment.html},
+  year = {2022},
+  organization = {The University of Queensland, School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2022.10.30}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://ladal.edu.au)
+
+***
+
+
+# References{-}
+
+
+
