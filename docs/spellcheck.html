@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Martin Schweinberger" />
+
+<meta name="date" content="2023-02-07" />
+
+<title>Spell checking text data with R</title>
+
+<script src="site_libs/header-attrs-2.16/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<script src="site_libs/clipboard-1.7.1/clipboard.min.js"></script>
+<link href="site_libs/primer-tooltips-1.4.0/build.css" rel="stylesheet" />
+<link href="site_libs/klippy-0.0.0.9500/css/klippy.min.css" rel="stylesheet" />
+<script src="site_libs/klippy-0.0.0.9500/js/klippy.min.js"></script>
+<link href="site_libs/tabwid-1.1.2/tabwid.css" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-VSGK4KYDQZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-VSGK4KYDQZ');
+</script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+<style type="text/css">
+/* for pandoc --citeproc since 2.11 */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}
+</style>
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  
+  <!-- Added by SKC - LADAL image and thicker top with   -->
+  <div class="container-fluid navbar-top" >
+    <a href="index.html"> <!-- Make entire top row and text clickable home link  -->
+        <div class="row">
+            <div class="navbar-brand col-md-12">
+              <img src="/content/ladal_icon_cas_tran_white_trimed.png" class="navbar-icon" alt="LADAL"/>
+              <span class="navbar-title-note navbar-collapse collapse" >Language Technology and Data Analysis Laboratory</span>
+            </div>
+        </div>
+    </a>
+  </div>
+  
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <!-- SKC removed  navbar brand -->
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">HOME</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    ABOUT LADAL
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="people.html">People | Collabs</a>
+    </li>
+    <li>
+      <a href="news.html">News</a>
+    </li>
+  </ul>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    EVENTS
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="workshops.html">Workshops</a>
+    </li>
+    <li>
+      <a href="compthinking.html">Computational Thinking in HASS</a>
+    </li>
+    <li>
+      <a href="webinars2022.html">LADAL Webinar Series 2022</a>
+    </li>
+    <li>
+      <a href="opening.html">LADAL Webinar Series 2021</a>
+    </li>
+    <li>
+      <a href="atapevents.html">ATAP Events</a>
+    </li>
+  </ul>
+</li>
+<li>
+  <a href="tutorials.html">TUTORIALS</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    RESOURCES
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="links.html">Links</a>
+    </li>
+    <li>
+      <a href="base.html">Tutorial stylesheet</a>
+    </li>
+  </ul>
+</li>
+<li>
+  <a href="contact.html">CONTACT</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Spell checking text data with R</h1>
+<h4 class="author">Martin Schweinberger</h4>
+<h4 class="date">2023-02-07</h4>
+
+</div>
+
+
+<p><img src="https://slcladal.github.io/images/uq1.jpg" width="100%" /></p>
+<div id="introduction" class="section level1 unnumbered">
+<h1 class="unnumbered">Introduction</h1>
+<p>This tutorial focuses on spell checking and shows how to perform
+spell checking in R. This tutorial builds heavily on (the documentation
+site of the <code>hunspell</code> package)[<a
+href="https://cran.r-project.org/web/packages/hunspell/vignettes/intro.html"
+class="uri">https://cran.r-project.org/web/packages/hunspell/vignettes/intro.html</a>]
+<span class="citation">(<a href="#ref-hunspell"
+role="doc-biblioref">Ooms 2020</a>)</span>.</p>
+<p><img src="https://slcladal.github.io/images/gy_chili.jpg" width="15%" style="float:right; padding:10px" /></p>
+<p>This tutorial is aimed at beginners and intermediate users of R with
+the aim of showcasing how to perform spell checking of textual data
+using R. The aim is not to provide a fully-fledged analysis but rather
+to show and exemplify selected useful aspects of spell checking.</p>
+<div class="warning"
+style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
+<span>
+<p style="margin-top:1em; text-align:center">
+The entire R Notebook for the tutorial can be downloaded <a
+href="https://slcladal.github.io/content/spellcheck.Rmd"><strong>here</strong></a>.
+If you want to render the R Notebook on your machine, i.e. knitting the
+document to html or a pdf, you need to make sure that you have R and
+RStudio installed and you also need to download the <a
+href="https://slcladal.github.io/content/bibliography.bib"><strong>bibliography
+file</strong></a> and store it in the same folder where you store the
+Rmd file. <br><br> <a
+href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fspellcheck_cb.ipynb"><img
+src="https://mybinder.org/badge_logo.svg" alt="Binder" /></a><br> <a
+href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fspellcheck_cb.ipynb"><strong>Click
+this link to open an interactive version of this tutorial on
+MyBinder.org</strong></a>. <br> This interactive Jupyter notebook allows
+you to execute code yourself and you can also change and edit the
+notebook, e.g. you can change code and upload your own data. <br>
+</p>
+<p style="margin-left:1em;">
+</p>
+<p></span></p>
+</div>
+<p><br></p>
+</div>
+<div id="what-is-spell-checking" class="section level1 unnumbered">
+<h1 class="unnumbered">What is spell checking?</h1>
+<p>Spell checking is the process of checking for and identifying
+spelling errors in a piece of text. It works by comparing each word in
+the text against a dictionary of correctly spelled words, and marking
+any words that are not found in the dictionary as potentially
+misspelled.</p>
+<p>Spell checking is used in a variety of applications, including word
+processors, email clients, and online text editors, to help users
+produce error-free written material. The goal of spell checking is to
+improve the accuracy and readability of written text by catching and
+correcting spelling errors before they are published or sent.</p>
+<p>Spell checking of textual data consists of the following steps:</p>
+<ul>
+<li>First, the text in a document is tokenized, i.e. the text is broken
+down into individual words.</li>
+<li>Each word is then broken down in it’s root (stemming) and
+affix(es)</li>
+<li>Next, it i checked if the word (plus affix combination) occurs in a
+dictionary</li>
+<li>Optionally, for words (or combinations), corrections are suggested
+based on similar words in the dictionary</li>
+</ul>
+</div>
+<div id="spell-checking-in-r-with-hunspell"
+class="section level1 unnumbered">
+<h1 class="unnumbered">Spell checking in R with hunspell</h1>
+<p>The <code>hunspell</code> package provides access to Hunspell which
+is a spell checker library used in various software applications such as
+OpenOffice, Mozilla Firefox, or RStudio. In addition to simple spell
+checking, the <code>hunspell</code> package also provides additional
+funtionalities like tokenization or stemming and and its spell checking
+capabilities encompass almost any language or alphabet. Tokenization and
+stemming are part of the <code>hunspell</code> package in order to split
+texts into individual words but also to extract text from several file
+formats such as basic text, html, pdf, or xml.</p>
+<p>The <code>hunspell</code> package checks if words occur in a given
+dictionary with the (default) dictionary being “en_US”. However each
+function can be used in another language by setting a custom dictionary
+in the <code>dict</code> parameter.</p>
+<p><strong>Preparation and session set up</strong></p>
+<p>This tutorial is based on R. If you have not installed R or are new
+to it, you will find an introduction to and more information how to use
+R <a href="https://slcladal.github.io/intror.html">here</a>. For this
+tutorials, we need to install certain <em>packages</em> from an R
+<em>library</em> so that the scripts shown below are executed without
+errors. Before turning to the code below, please install the packages by
+running the code below this paragraph. If you have already installed the
+packages mentioned below, then you can skip ahead and ignore this
+section. To install the necessary packages, simply run the following
+code - it may take some time (between 1 and 5 minutes to install all of
+the packages so you do not need to worry if it takes some time).</p>
+<pre class="r"><code># install packages
+install.packages(&quot;dplyr&quot;)
+install.packages(&quot;stringr&quot;)
+install.packages(&quot;quanteda&quot;)
+install.packages(&quot;hunspell&quot;)
+install.packages(&quot;flextable&quot;)
+# install klippy for copy-to-clipboard button in code chunks
+install.packages(&quot;remotes&quot;)
+remotes::install_github(&quot;rlesur/klippy&quot;)</code></pre>
+<p>Now that we have installed the packages, we activate them as shown
+below.</p>
+<pre class="r klippy"><code># activate packages
+library(dplyr)
+library(stringr)
+library(quanteda)
+library(hunspell)
+library(flextable)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()</code></pre>
+<script>
+  addClassKlippyTo("pre.r, pre.markdown");
+  addKlippy('left', 'top', 'auto', '1', 'Copy code', 'Copied!');
+</script>
+<p>Once you have installed R and RStudio and initiated the session by
+executing the code shown above, you are good to go.</p>
+<p>In the following, we will perform spell checking and explore several
+useful functions associated with spell checking in the
+<code>hunspell</code> package.</p>
+<div id="checking-individual-words" class="section level2 unnumbered">
+<h2 class="unnumbered">Checking individual words</h2>
+<p>We start by checking a vector of individual words.</p>
+<pre class="r"><code>words &lt;- c(&quot;analyze&quot;, &quot;langauge&quot;, &quot;data&quot;)
+correct &lt;- hunspell_check(words)
+print(correct)</code></pre>
+<pre><code>## [1]  TRUE FALSE  TRUE</code></pre>
+<p>The output shows that the second word was not found in the
+dictionary, i.e., it is identified as being incorrect. Next, we can ask
+for suggestions, i.e. the correct form of the word.</p>
+<pre><code>## [[1]]
+## [1] &quot;language&quot; &quot;melange&quot;</code></pre>
+<p>In this case, there are two words that are deemed as potential
+alternatives.</p>
+</div>
+<div id="checking-documents" class="section level2 unnumbered">
+<h2 class="unnumbered">Checking documents</h2>
+<p>Since we rarely want to check individual words, we will now focus on
+spell checking full texts rather than individual vectors with words.</p>
+<p>First, we load a text (in this case an explanation of what grammer is
+that is taken from Wikipedia).</p>
+<pre class="r"><code># read in text
+exampletext  &lt;- base::readRDS(url(&quot;https://slcladal.github.io/data/tx1.rda&quot;, &quot;rb&quot;))
+# inspect
+exampletext</code></pre>
+<pre><code>## [1] &quot;Grammar is a system of rules which governs the production and use of utterances in a given language. These rules apply to sound as well as meaning, and include componential subsets of rules, such as those pertaining to phonology (the organisation of phonetic sound systems), morphology (the formation and composition of words), and syntax (the formation and composition of phrases and sentences). Many modern theories that deal with the principles of grammar are based on Noam Chomsky&#39;s framework of generative linguistics.&quot;</code></pre>
+<p>We now use the <code>hunspell</code> function to find incorrect words
+(or, more precisely, words that are not in the default dictionary).</p>
+<pre class="r"><code>errors &lt;- hunspell(exampletext)
+errors[[1]]</code></pre>
+<pre><code>## [1] &quot;componential&quot; &quot;organisation&quot; &quot;Noam&quot;</code></pre>
+<p>We check what suggestions we get for these words.</p>
+<pre class="r"><code>hunspell_suggest(errors[[1]])</code></pre>
+<pre><code>## [[1]]
+## [1] &quot;component&quot;   &quot;exponential&quot; &quot;continental&quot;
+## 
+## [[2]]
+## [1] &quot;organization&quot; &quot;organist&quot;     &quot;sanitation&quot;  
+## 
+## [[3]]
+## [1] &quot;Nam&quot;   &quot;Roam&quot;  &quot;Loam&quot;  &quot;Noah&quot;  &quot;Foam&quot;  &quot;No am&quot; &quot;No-am&quot; &quot;Moan&quot;  &quot;Norm&quot;</code></pre>
+<p>In our case, the words are not errors but simply terms that do not
+occur in the dictionary so we will not replace them.</p>
+</div>
+<div id="stemming-words" class="section level2 unnumbered">
+<h2 class="unnumbered">Stemming Words</h2>
+<p>The <code>hunspell_stem</code> looks up words from the dictionary
+which match the root of the given word (sometimes multiple items are
+returned if there are multiple matches in the dictionary).</p>
+<pre class="r"><code>toks &lt;- c(&quot;love&quot;, &quot;loving&quot;, &quot;lovingly&quot;, &quot;loved&quot;, &quot;lover&quot;, &quot;lovely&quot;)
+hunspell_stem(toks)</code></pre>
+<pre><code>## [[1]]
+## [1] &quot;love&quot;
+## 
+## [[2]]
+## [1] &quot;loving&quot; &quot;love&quot;  
+## 
+## [[3]]
+## [1] &quot;loving&quot;
+## 
+## [[4]]
+## [1] &quot;loved&quot; &quot;love&quot; 
+## 
+## [[5]]
+## [1] &quot;lover&quot; &quot;love&quot; 
+## 
+## [[6]]
+## [1] &quot;lovely&quot; &quot;love&quot;</code></pre>
+<p>The <code>hunspell_stem</code> function can be very useful when
+trying to find the stems of words in a corpusto see, e.g., how many word
+types a text contains.</p>
+</div>
+<div id="working-with-texts" class="section level2 unnumbered">
+<h2 class="unnumbered">Working with texts</h2>
+<p>It is quite common that we work with texts rather than individual
+word vectors. As such, in the following, we will go through a workflow
+that resembles what one might use spell checking for in their
+research.</p>
+<pre class="r"><code>texttable &lt;- quanteda::tokens(&quot;Noam said he loves to analyze langauge and collors.&quot;) %&gt;%
+  unlist() %&gt;%
+  as.data.frame() %&gt;%
+  dplyr::rename(words = 1) %&gt;%
+  dplyr::mutate(id = 1:nrow(.),
+                error = hunspell::hunspell_check(words)) %&gt;%
+  dplyr::relocate(id)</code></pre>
+<template id="80f7bf8c-5c61-4b00-b8b1-fd0c94c4c441"><style>
+.tabwid table{
+  border-spacing:0px !important;
+  border-collapse:collapse;
+  line-height:1;
+  margin-left:auto;
+  margin-right:auto;
+  border-width: 0;
+  border-color: transparent;
+  caption-side: top;
+}
+.tabwid-caption-bottom table{
+  caption-side: bottom;
+}
+.tabwid_left table{
+  margin-left:0;
+}
+.tabwid_right table{
+  margin-right:0;
+}
+.tabwid td, .tabwid th {
+    padding: 0;
+}
+.tabwid a {
+  text-decoration: none;
+}
+.tabwid thead {
+    background-color: transparent;
+}
+.tabwid tfoot {
+    background-color: transparent;
+}
+.tabwid table tr {
+background-color: transparent;
+}
+.katex-display {
+    margin: 0 0 !important;
+}
+</style><div class="tabwid"><style>.cl-42442a40{table-layout:auto;width:95%;}.cl-42367cb0{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-42367cc4{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-423b6176{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-423b6180{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-423b9772{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b977c{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b977d{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b9786{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b9787{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b9790{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b9791{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b9792{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b979a{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b979b{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b979c{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-423b979d{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-42442a40'><caption><span></span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-423b9772"><p class="cl-423b6176"><span class="cl-42367cb0">id</span></p></th><th class="cl-423b977c"><p class="cl-423b6180"><span class="cl-42367cb0">words</span></p></th><th class="cl-423b977d"><p class="cl-423b6176"><span class="cl-42367cb0">error</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-423b9786"><p class="cl-423b6176"><span class="cl-42367cc4">1</span></p></td><td class="cl-423b9787"><p class="cl-423b6180"><span class="cl-42367cc4">Noam</span></p></td><td class="cl-423b9790"><p class="cl-423b6176"><span class="cl-42367cc4">FALSE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9791"><p class="cl-423b6176"><span class="cl-42367cc4">2</span></p></td><td class="cl-423b9792"><p class="cl-423b6180"><span class="cl-42367cc4">said</span></p></td><td class="cl-423b979a"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9786"><p class="cl-423b6176"><span class="cl-42367cc4">3</span></p></td><td class="cl-423b9787"><p class="cl-423b6180"><span class="cl-42367cc4">he</span></p></td><td class="cl-423b9790"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9791"><p class="cl-423b6176"><span class="cl-42367cc4">4</span></p></td><td class="cl-423b9792"><p class="cl-423b6180"><span class="cl-42367cc4">loves</span></p></td><td class="cl-423b979a"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9786"><p class="cl-423b6176"><span class="cl-42367cc4">5</span></p></td><td class="cl-423b9787"><p class="cl-423b6180"><span class="cl-42367cc4">to</span></p></td><td class="cl-423b9790"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9791"><p class="cl-423b6176"><span class="cl-42367cc4">6</span></p></td><td class="cl-423b9792"><p class="cl-423b6180"><span class="cl-42367cc4">analyze</span></p></td><td class="cl-423b979a"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9786"><p class="cl-423b6176"><span class="cl-42367cc4">7</span></p></td><td class="cl-423b9787"><p class="cl-423b6180"><span class="cl-42367cc4">langauge</span></p></td><td class="cl-423b9790"><p class="cl-423b6176"><span class="cl-42367cc4">FALSE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9791"><p class="cl-423b6176"><span class="cl-42367cc4">8</span></p></td><td class="cl-423b9792"><p class="cl-423b6180"><span class="cl-42367cc4">and</span></p></td><td class="cl-423b979a"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b9786"><p class="cl-423b6176"><span class="cl-42367cc4">9</span></p></td><td class="cl-423b9787"><p class="cl-423b6180"><span class="cl-42367cc4">collors</span></p></td><td class="cl-423b9790"><p class="cl-423b6176"><span class="cl-42367cc4">FALSE</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-423b979b"><p class="cl-423b6176"><span class="cl-42367cc4">10</span></p></td><td class="cl-423b979c"><p class="cl-423b6180"><span class="cl-42367cc4">.</span></p></td><td class="cl-423b979d"><p class="cl-423b6176"><span class="cl-42367cc4">TRUE</span></p></td></tr></tbody></table></div></template>
+<div class="flextable-shadow-host" id="0919d3c2-f98b-426b-ac34-b2d90838f939"></div>
+<script>
+var dest = document.getElementById("0919d3c2-f98b-426b-ac34-b2d90838f939");
+var template = document.getElementById("80f7bf8c-5c61-4b00-b8b1-fd0c94c4c441");
+var fantome = dest.attachShadow({mode: 'open'});
+var templateContent = template.content;
+fantome.appendChild(templateContent);
+</script>
+
+<p>The output shows the original word and if it was identified as an
+errors (i.e., it did not occur in the dictionary). Next, we extract
+suggestions for the words that were identified as errors.</p>
+<pre class="r"><code>texttable2 &lt;- texttable %&gt;%
+  # add suggestions
+  dplyr::mutate(suggestions = ifelse(error == F, 
+                                     paste0(hunspell_suggest(words), &quot;, &quot;), 
+                                     &quot;&quot;),
+                # clean suggestions
+                suggestions = stringr::str_remove_all(suggestions, fixed(&quot;c(&quot;)),
+                suggestions = stringr::str_remove_all(suggestions, fixed(&quot;)&quot;)),
+                suggestions = stringr::str_remove_all(suggestions, &quot;, {0,1}$&quot;)
+                )</code></pre>
+<template id="8ce62f09-95eb-4c5e-88b3-8330c4a6e4fb"><style>
+.tabwid table{
+  border-spacing:0px !important;
+  border-collapse:collapse;
+  line-height:1;
+  margin-left:auto;
+  margin-right:auto;
+  border-width: 0;
+  border-color: transparent;
+  caption-side: top;
+}
+.tabwid-caption-bottom table{
+  caption-side: bottom;
+}
+.tabwid_left table{
+  margin-left:0;
+}
+.tabwid_right table{
+  margin-right:0;
+}
+.tabwid td, .tabwid th {
+    padding: 0;
+}
+.tabwid a {
+  text-decoration: none;
+}
+.tabwid thead {
+    background-color: transparent;
+}
+.tabwid tfoot {
+    background-color: transparent;
+}
+.tabwid table tr {
+background-color: transparent;
+}
+.katex-display {
+    margin: 0 0 !important;
+}
+</style><div class="tabwid"><style>.cl-427c2a3a{table-layout:auto;width:95%;}.cl-426f5116{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-426f5134{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-427458dc{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-427458f0{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-4274812c{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748136{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748137{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748140{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748141{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748142{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748143{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4274814a{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4274814b{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4274814c{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748154{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748155{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748156{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42748157{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4274815e{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4274815f{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-427c2a3a'><caption><span></span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-4274812c"><p class="cl-427458dc"><span class="cl-426f5116">id</span></p></th><th class="cl-42748136"><p class="cl-427458f0"><span class="cl-426f5116">words</span></p></th><th class="cl-42748137"><p class="cl-427458dc"><span class="cl-426f5116">error</span></p></th><th class="cl-42748140"><p class="cl-427458f0"><span class="cl-426f5116">suggestions</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-42748141"><p class="cl-427458dc"><span class="cl-426f5134">1</span></p></td><td class="cl-42748142"><p class="cl-427458f0"><span class="cl-426f5134">Noam</span></p></td><td class="cl-42748143"><p class="cl-427458dc"><span class="cl-426f5134">FALSE</span></p></td><td class="cl-4274814a"><p class="cl-427458f0"><span class="cl-426f5134">"Nam", "Roam", "Loam", "Noah", "Foam", "No am", "No-am", "Moan", "Norm"</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-4274814b"><p class="cl-427458dc"><span class="cl-426f5134">2</span></p></td><td class="cl-4274814c"><p class="cl-427458f0"><span class="cl-426f5134">said</span></p></td><td class="cl-42748154"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-42748155"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42748141"><p class="cl-427458dc"><span class="cl-426f5134">3</span></p></td><td class="cl-42748142"><p class="cl-427458f0"><span class="cl-426f5134">he</span></p></td><td class="cl-42748143"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-4274814a"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-4274814b"><p class="cl-427458dc"><span class="cl-426f5134">4</span></p></td><td class="cl-4274814c"><p class="cl-427458f0"><span class="cl-426f5134">loves</span></p></td><td class="cl-42748154"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-42748155"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42748141"><p class="cl-427458dc"><span class="cl-426f5134">5</span></p></td><td class="cl-42748142"><p class="cl-427458f0"><span class="cl-426f5134">to</span></p></td><td class="cl-42748143"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-4274814a"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-4274814b"><p class="cl-427458dc"><span class="cl-426f5134">6</span></p></td><td class="cl-4274814c"><p class="cl-427458f0"><span class="cl-426f5134">analyze</span></p></td><td class="cl-42748154"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-42748155"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42748141"><p class="cl-427458dc"><span class="cl-426f5134">7</span></p></td><td class="cl-42748142"><p class="cl-427458f0"><span class="cl-426f5134">langauge</span></p></td><td class="cl-42748143"><p class="cl-427458dc"><span class="cl-426f5134">FALSE</span></p></td><td class="cl-4274814a"><p class="cl-427458f0"><span class="cl-426f5134">"language", "melange"</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-4274814b"><p class="cl-427458dc"><span class="cl-426f5134">8</span></p></td><td class="cl-4274814c"><p class="cl-427458f0"><span class="cl-426f5134">and</span></p></td><td class="cl-42748154"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-42748155"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42748141"><p class="cl-427458dc"><span class="cl-426f5134">9</span></p></td><td class="cl-42748142"><p class="cl-427458f0"><span class="cl-426f5134">collors</span></p></td><td class="cl-42748143"><p class="cl-427458dc"><span class="cl-426f5134">FALSE</span></p></td><td class="cl-4274814a"><p class="cl-427458f0"><span class="cl-426f5134">"colors", "collars", "collators", "color's", "color"</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42748156"><p class="cl-427458dc"><span class="cl-426f5134">10</span></p></td><td class="cl-42748157"><p class="cl-427458f0"><span class="cl-426f5134">.</span></p></td><td class="cl-4274815e"><p class="cl-427458dc"><span class="cl-426f5134">TRUE</span></p></td><td class="cl-4274815f"><p class="cl-427458f0"><span class="cl-426f5134"></span></p></td></tr></tbody></table></div></template>
+<div class="flextable-shadow-host" id="3e3af199-75ea-4939-b7d9-a33fb69ee762"></div>
+<script>
+var dest = document.getElementById("3e3af199-75ea-4939-b7d9-a33fb69ee762");
+var template = document.getElementById("8ce62f09-95eb-4c5e-88b3-8330c4a6e4fb");
+var fantome = dest.attachShadow({mode: 'open'});
+var templateContent = template.content;
+fantome.appendChild(templateContent);
+</script>
+
+<p>We now want to replace the errors with the correct words but aso
+retain words that are erroneously regraded as errors.</p>
+<pre class="r"><code>texttable3 &lt;- texttable2 %&gt;%
+  # replace errors with the first suggestion
+  dplyr::mutate(corrected = dplyr::case_when(error == T ~ words,
+                                             error == F ~ stringr::str_remove_all(suggestions, &#39;\\&quot;, .*&#39;),
+                                             T ~ words)) %&gt;%
+  # clean the corrected words
+  dplyr::mutate(corrected = stringr::str_remove_all(corrected, &#39;^\\&quot;&#39;)) %&gt;%
+  # insert words where we do not want the suggestions but the original word
+  dplyr::mutate(corrected = dplyr::case_when(words == &quot;Noam&quot; ~ words,
+                                             T ~ corrected))</code></pre>
+<template id="fcba5aa2-b662-4240-a489-1da7f1c8c942"><style>
+.tabwid table{
+  border-spacing:0px !important;
+  border-collapse:collapse;
+  line-height:1;
+  margin-left:auto;
+  margin-right:auto;
+  border-width: 0;
+  border-color: transparent;
+  caption-side: top;
+}
+.tabwid-caption-bottom table{
+  caption-side: bottom;
+}
+.tabwid_left table{
+  margin-left:0;
+}
+.tabwid_right table{
+  margin-right:0;
+}
+.tabwid td, .tabwid th {
+    padding: 0;
+}
+.tabwid a {
+  text-decoration: none;
+}
+.tabwid thead {
+    background-color: transparent;
+}
+.tabwid tfoot {
+    background-color: transparent;
+}
+.tabwid table tr {
+background-color: transparent;
+}
+.katex-display {
+    margin: 0 0 !important;
+}
+</style><div class="tabwid"><style>.cl-42a082f4{table-layout:auto;width:95%;}.cl-4294f308{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-4294f312{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-429954c0{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-429954ca{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-42997180{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4299718a{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4299718b{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4299718c{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42997194{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42997195{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4299719e{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-4299719f{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971a8{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971a9{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971aa{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971ab{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971b2{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971b3{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971b4{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-429971b5{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-42a082f4'><caption><span></span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-42997180"><p class="cl-429954c0"><span class="cl-4294f308">id</span></p></th><th class="cl-4299718a"><p class="cl-429954ca"><span class="cl-4294f308">words</span></p></th><th class="cl-4299718b"><p class="cl-429954c0"><span class="cl-4294f308">error</span></p></th><th class="cl-4299718a"><p class="cl-429954ca"><span class="cl-4294f308">suggestions</span></p></th><th class="cl-4299718c"><p class="cl-429954ca"><span class="cl-4294f308">corrected</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-42997194"><p class="cl-429954c0"><span class="cl-4294f312">1</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">Noam</span></p></td><td class="cl-4299719e"><p class="cl-429954c0"><span class="cl-4294f312">FALSE</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">"Nam", "Roam", "Loam", "Noah", "Foam", "No am", "No-am", "Moan", "Norm"</span></p></td><td class="cl-4299719f"><p class="cl-429954ca"><span class="cl-4294f312">Noam</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-429971a8"><p class="cl-429954c0"><span class="cl-4294f312">2</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312">said</span></p></td><td class="cl-429971aa"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-429971ab"><p class="cl-429954ca"><span class="cl-4294f312">said</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42997194"><p class="cl-429954c0"><span class="cl-4294f312">3</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">he</span></p></td><td class="cl-4299719e"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-4299719f"><p class="cl-429954ca"><span class="cl-4294f312">he</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-429971a8"><p class="cl-429954c0"><span class="cl-4294f312">4</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312">loves</span></p></td><td class="cl-429971aa"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-429971ab"><p class="cl-429954ca"><span class="cl-4294f312">loves</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42997194"><p class="cl-429954c0"><span class="cl-4294f312">5</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">to</span></p></td><td class="cl-4299719e"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-4299719f"><p class="cl-429954ca"><span class="cl-4294f312">to</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-429971a8"><p class="cl-429954c0"><span class="cl-4294f312">6</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312">analyze</span></p></td><td class="cl-429971aa"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-429971ab"><p class="cl-429954ca"><span class="cl-4294f312">analyze</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42997194"><p class="cl-429954c0"><span class="cl-4294f312">7</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">langauge</span></p></td><td class="cl-4299719e"><p class="cl-429954c0"><span class="cl-4294f312">FALSE</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">"language", "melange"</span></p></td><td class="cl-4299719f"><p class="cl-429954ca"><span class="cl-4294f312">language</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-429971a8"><p class="cl-429954c0"><span class="cl-4294f312">8</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312">and</span></p></td><td class="cl-429971aa"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-429971a9"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-429971ab"><p class="cl-429954ca"><span class="cl-4294f312">and</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-42997194"><p class="cl-429954c0"><span class="cl-4294f312">9</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">collors</span></p></td><td class="cl-4299719e"><p class="cl-429954c0"><span class="cl-4294f312">FALSE</span></p></td><td class="cl-42997195"><p class="cl-429954ca"><span class="cl-4294f312">"colors", "collars", "collators", "color's", "color"</span></p></td><td class="cl-4299719f"><p class="cl-429954ca"><span class="cl-4294f312">colors</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-429971b2"><p class="cl-429954c0"><span class="cl-4294f312">10</span></p></td><td class="cl-429971b3"><p class="cl-429954ca"><span class="cl-4294f312">.</span></p></td><td class="cl-429971b4"><p class="cl-429954c0"><span class="cl-4294f312">TRUE</span></p></td><td class="cl-429971b3"><p class="cl-429954ca"><span class="cl-4294f312"></span></p></td><td class="cl-429971b5"><p class="cl-429954ca"><span class="cl-4294f312">.</span></p></td></tr></tbody></table></div></template>
+<div class="flextable-shadow-host" id="ebb8da15-b2b4-43fb-bbfe-b010ea25025b"></div>
+<script>
+var dest = document.getElementById("ebb8da15-b2b4-43fb-bbfe-b010ea25025b");
+var template = document.getElementById("fcba5aa2-b662-4240-a489-1da7f1c8c942");
+var fantome = dest.attachShadow({mode: 'open'});
+var templateContent = template.content;
+fantome.appendChild(templateContent);
+</script>
+
+<p>We can now check how many errors there are in our text.</p>
+<pre class="r"><code>texttable4 &lt;- texttable3 %&gt;%
+  dplyr::summarise(tokens = nrow(.),
+                   types = length(names(table(tolower(words)))),
+                   errors_n = sum(ifelse(corrected == words, 0, 1)),
+                   errors_percent = errors_n/tokens*100
+                   )</code></pre>
+<template id="570b5a32-4c75-46b8-9cfb-55ddec7c7a3a"><style>
+.tabwid table{
+  border-spacing:0px !important;
+  border-collapse:collapse;
+  line-height:1;
+  margin-left:auto;
+  margin-right:auto;
+  border-width: 0;
+  border-color: transparent;
+  caption-side: top;
+}
+.tabwid-caption-bottom table{
+  caption-side: bottom;
+}
+.tabwid_left table{
+  margin-left:0;
+}
+.tabwid_right table{
+  margin-right:0;
+}
+.tabwid td, .tabwid th {
+    padding: 0;
+}
+.tabwid a {
+  text-decoration: none;
+}
+.tabwid thead {
+    background-color: transparent;
+}
+.tabwid tfoot {
+    background-color: transparent;
+}
+.tabwid table tr {
+background-color: transparent;
+}
+.katex-display {
+    margin: 0 0 !important;
+}
+</style><div class="tabwid"><style>.cl-42c37ea8{table-layout:auto;width:95%;}.cl-42b5206a{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-42b5207e{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-42bb0408{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-42bb230c{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42bb2316{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42bb2320{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42bb2321{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42bb2322{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-42bb232a{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-42c37ea8'><caption><span></span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-42bb230c"><p class="cl-42bb0408"><span class="cl-42b5206a">tokens</span></p></th><th class="cl-42bb2316"><p class="cl-42bb0408"><span class="cl-42b5206a">types</span></p></th><th class="cl-42bb2316"><p class="cl-42bb0408"><span class="cl-42b5206a">errors_n</span></p></th><th class="cl-42bb2320"><p class="cl-42bb0408"><span class="cl-42b5206a">errors_percent</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-42bb2321"><p class="cl-42bb0408"><span class="cl-42b5207e">10</span></p></td><td class="cl-42bb2322"><p class="cl-42bb0408"><span class="cl-42b5207e">10</span></p></td><td class="cl-42bb2322"><p class="cl-42bb0408"><span class="cl-42b5207e">2</span></p></td><td class="cl-42bb232a"><p class="cl-42bb0408"><span class="cl-42b5207e">20</span></p></td></tr></tbody></table></div></template>
+<div class="flextable-shadow-host" id="36fab9d8-c511-4a02-b48d-97a863d7f3a0"></div>
+<script>
+var dest = document.getElementById("36fab9d8-c511-4a02-b48d-97a863d7f3a0");
+var template = document.getElementById("570b5a32-4c75-46b8-9cfb-55ddec7c7a3a");
+var fantome = dest.attachShadow({mode: 'open'});
+var templateContent = template.content;
+fantome.appendChild(templateContent);
+</script>
+
+<p>Finally, we can put the corrected text back together.</p>
+<pre class="r"><code>correctedtext &lt;- paste0(texttable3$corrected, collapse = &quot; &quot;) %&gt;%
+  stringr::str_replace_all(&quot; \\.&quot;, &quot;.&quot;)
+correctedtext</code></pre>
+<pre><code>## [1] &quot;Noam said he loves to analyze language and colors.&quot;</code></pre>
+</div>
+<div id="setting-a-language" class="section level2 unnumbered">
+<h2 class="unnumbered">Setting a Language</h2>
+<p>By default, the <code>hunspell</code> package includes dictionaries
+for <code>en_US</code> and <code>en_GB</code> which means that you can
+easily switch from US American to British English spelling.</p>
+<p>The default <code>hunspell</code> uses the <code>en_US</code>
+dictionary as shown below.</p>
+<pre class="r"><code>hunspell(&quot;At LADAL we like to analyse language and colours.&quot;)</code></pre>
+<pre><code>## [[1]]
+## [1] &quot;LADAL&quot;   &quot;analyse&quot; &quot;colours&quot;</code></pre>
+<p>But we can easily switch to British English instead as shown
+below.</p>
+<pre class="r"><code>hunspell(&quot;At LADAL we like to analyse language and colours.&quot;, dict = &#39;en_GB&#39;)</code></pre>
+<pre><code>## [[1]]
+## [1] &quot;LADAL&quot;</code></pre>
+<p><img src="https://slcladal.github.io/images/InstallLanguages.png" width="40%" style="float:right; padding:10px" /></p>
+<p>If you want to use another language you need to make sure that the
+dictionary is available in your system so that RStudio can access the
+dictionary. You can install dictionaries very easily in RStudio. Simply
+go to <code>Tools</code> &gt; <code>Global options</code> &gt;
+<code>Spelling</code> and then under
+<code>Main dictionary language</code> select
+<code>Install More Languages</code> from the drop-down menu. Once the
+additional languages are installed, their dictionaries are available to
+the <code>hunspell</code> package in RStudio.</p>
+<p>However, you may want to install dictionaries directly, e.g., into
+your working directory so that you can use the dictionary when working
+with text data either on your computer or in a cloud environment. In
+this case, you can go to the <a
+href="https://github.com/wooorm/dictionaries">wooorm dictionary GitHub
+repository</a>, which has dict and aff files (i.e., the files that are
+needed to create a dictionary) for many different languages, and install
+the dict and aff files manually. In our case, I downloaded the dict and
+aff files from the German dictionary, stored them together with the
+other dictionary files in the <code>hunspell</code> package library, and
+renamed the files as <code>de.dict</code> and <code>de.aff</code>.</p>
+<p>If you then want to use the dictionary, you simply specify the
+<code>dict</code> argument as shown below for a German sentence.</p>
+<pre class="r"><code>hunspell(&quot;Im LADAL analysieren wir Sprachen und Farben.&quot;, dict = &#39;de&#39;)</code></pre>
+<pre><code>## [[1]]
+## [1] &quot;LADAL&quot;</code></pre>
+<p>This is the end of this short tutorial on spell checking with R. If
+you want to go deeper, please check out the documentation site of the
+<code>hunspell</code> package)[<a
+href="https://cran.r-project.org/web/packages/hunspell/vignettes/intro.html"
+class="uri">https://cran.r-project.org/web/packages/hunspell/vignettes/intro.html</a>]
+<span class="citation">(<a href="#ref-hunspell"
+role="doc-biblioref">Ooms 2020</a>)</span>.</p>
+</div>
+</div>
+<div id="citation-session-info" class="section level1 unnumbered">
+<h1 class="unnumbered">Citation &amp; Session Info</h1>
+<p>Schweinberger, Martin. (2023)` <em>Spell checking text data with
+R</em>. Brisbane: The University of Queensland. url: <a
+href="https://ladal.edu.au/spellcheck.html"
+class="uri">https://ladal.edu.au/spellcheck.html</a> (Version
+2023.02.08).</p>
+<pre><code>@manual{schweinberger2023spellcheck,
+  author = {Schweinberger, Martin},
+  title = {Spell checking text data with R},
+  note = {https://ladal.edu.au/spellcheck.html},
+  year = {2022},
+  organization = {The University of Queensland, School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2023.02.08}
+}</code></pre>
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>## R version 4.2.1 RC (2022-06-17 r82510 ucrt)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 19045)
+## 
+## Matrix products: default
+## 
+## locale:
+## [1] LC_COLLATE=German_Germany.utf8  LC_CTYPE=German_Germany.utf8   
+## [3] LC_MONETARY=German_Germany.utf8 LC_NUMERIC=C                   
+## [5] LC_TIME=German_Germany.utf8    
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+## [1] flextable_0.8.3 hunspell_3.0.1  quanteda_3.2.4  stringr_1.5.0  
+## [5] dplyr_1.0.10   
+## 
+## loaded via a namespace (and not attached):
+##  [1] zip_2.2.0          Rcpp_1.0.9         pillar_1.8.1       bslib_0.4.0       
+##  [5] compiler_4.2.1     jquerylib_0.1.4    highr_0.9          base64enc_0.1-3   
+##  [9] stopwords_2.3      tools_4.2.1        uuid_1.1-0         digest_0.6.29     
+## [13] jsonlite_1.8.0     evaluate_0.16      lifecycle_1.0.3    tibble_3.1.8      
+## [17] lattice_0.20-45    pkgconfig_2.0.3    rlang_1.0.6        fastmatch_1.1-3   
+## [21] Matrix_1.5-3       cli_3.6.0          DBI_1.1.3          rstudioapi_0.14   
+## [25] yaml_2.3.5         xfun_0.32          fastmap_1.1.0      xml2_1.3.3        
+## [29] officer_0.4.4      knitr_1.40         systemfonts_1.0.4  gdtools_0.2.4     
+## [33] generics_0.1.3     vctrs_0.5.1        sass_0.4.2         grid_4.2.1        
+## [37] tidyselect_1.1.2   data.table_1.14.2  glue_1.6.2         R6_2.5.1          
+## [41] fansi_1.0.3        rmarkdown_2.16     purrr_0.3.4        magrittr_2.0.3    
+## [45] ellipsis_0.3.2     htmltools_0.5.3    assertthat_0.2.1   utf8_1.2.2        
+## [49] klippy_0.0.0.9500  stringi_1.7.8      RcppParallel_5.1.5 cachem_1.0.6</code></pre>
+<hr />
+<p><a href="#introduction">Back to top</a></p>
+<p><a href="https://ladal.edu.au">Back to HOME</a></p>
+<hr />
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-hunspell" class="csl-entry">
+Ooms, Jeroen. 2020. <em>Hunspell: High-Performance Stemmer, Tokenizer,
+and Spell Checker</em>. <a
+href="https://CRAN.R-project.org/package=hunspell">https://CRAN.R-project.org/package=hunspell</a>.
+</div>
+</div>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
