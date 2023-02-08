@@ -1,75 +1,81 @@
----
-title: "Analyzing learner language using R"
-author: "Martin Schweinberger"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output:
-  bookdown::html_document2
-bibliography: bibliography.bib
-link-citations: yes
----
+![An interactive LADAL notebook](https://slcladal.github.io/images/uq1.jpg)
 
-```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
-knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
-```
-
-# Introduction{-}
-
-This tutorial focuses on learner language and how to analyze differences between learners and L1 speakers of English using R. The aim of this tutorial is to showcase how to extract information from essays from learners and L1 speakers of English and how to analyze these essays. The aim is not to provide a fully-fledged analysis but rather to show and exemplify some common methods for data extraction, processing, and analysis.
+# Analyzing learner language using R
 
 
-<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/llr.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
-**[Here](https://colab.research.google.com/drive/1qgAA8iPZDjh0nmqPNtgr2HC71Y9qAuEC?usp=sharing)** is a **link to an interactive version of this tutorial on Google Colab**. The interactive tutorial is based on a Jupyter notebook of this tutorial. This interactive Jupyter notebook allows you to execute code yourself and - if you copy the Jupyter notebook - you can also change and edit the notebook, e.g. you can change code and upload your own data.<br></p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
+This tutorial is the interactive Jupyter notebook accompanying the [*Language Technology and Data Analysis Laboratory* (LADAL) tutorial *Analyzing learner language using R*](https://ladal.edu.au/llr.html). The tutorial provides more details and background information while this interactive notebook focuses strictly on practical aspects.
 
-<br>
+***
 
 
 **Preparation and session set up**
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+We set up our session by activating the packages we need for this tutorial.
 
-```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
-# install packages
-install.packages("quanteda")
-install.packages("flextable")
-install.packages("quanteda.textstats")
-install.packages("quanteda.textplots")
-install.packages("tidyverse")
-install.packages("tm")
-install.packages("tidytext")
-install.packages("tidyr")
-install.packages("NLP")
-install.packages("openNLP")
-install.packages("openNLPdata")
-install.packages("koRpus")
-install.packages("stringi")
-install.packages("hunspell")
-install.packages("wordcloud2")
-install.packages("pacman")
-# install the language support package
-koRpus::install.koRpus.lang("en")
-# install klippy for copy-to-clipboard button in code chunks
-install.packages("remotes")
-remotes::install_github("rlesur/klippy")
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# activate packages
+library(quanteda)
+library(dplyr)
+library(koRpus)
+library(tidyr)
+library(stringr)
+library(hunspell)
+library(udpipe)
+library(wordcloud2)
+library(tokenizers)
 ```
 
-Now that we have installed the packages, we can activate them as shown below.
+Once you have initiated the session by executing the code shown above, you are good to go.
+
+If you are using this notebook on your own computer and you have not already installed the R packages listed above, you need to install them. You can install them by replacing the `library` command with `install.packages` and putting the name of the package into quotation marks like this: `install.packages("quanteda")`. Then, you simply run this command and R will install the package you specified.
+
+***
+
+## Using your own data
+
+While the tutorial uses data from the LADAL website, you can also use your own data. You can see below what you need to do to upload and use your own data.
+
+The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+
+![Binder Folder Symbol](https://slcladal.github.io/images/binderfolder.JPG)
+
+
+Then on the upload symbol.
+
+![Binder Upload Symbol](https://slcladal.github.io/images/binderupload.JPG)
+
+Next, upload the files you want to analyze and then the respective files names in the file argument of the scan function. When you then execute the code (like to code chunk below, you will upload your own data.
+
+```{r}
+mytext1 <- scan(file = "linguistics01.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+mytext2 <- scan(file = "linguistics02.txt",
+            what = "char", 
+            sep = "", 
+            quote = "", 
+            quiet = T, 
+            skipNul = T) %>%
+            paste0(collapse = " ")
+# inspect
+mytext1; mytext2
+
+```
+
+
+**Keep in mind though that you need to adapt the names of the texts in the code chunks below so that the code below work on your own texts!**
+
+***
+
 
 ```{r prep2, message=FALSE} 
-# set options
-options(stringsAsFactors = F)
-options(scipen = 999)
-options(max.print=1000)
-options(java.parameters = c("-XX:+UseConcMarkSweepGC", "-Xmx8192m"))
-#gc()
 # load packages
 library(tidyverse)
-library(flextable)
 library(tm)
 library(tidytext)
 library(tidyr)
@@ -85,8 +91,6 @@ library(hunspell)
 library(wordcloud2)
 library(pacman)
 pacman::p_load_gh("trinker/entity")
-# activate klippy for copy-to-clipboard button
-klippy::klippy()
 ```
 
 Once you have installed R and RStudio and once you have also initiated the session by executing the code shown above, you are good to go.
@@ -111,7 +115,7 @@ ru %>%
   # remove header
   stringr::str_remove(., "<[A-Z]{4,4}.*") %>%
   # remove empty elements
-  na_if("") %>%
+  dplyr::na_if("") %>%
   na.omit %>%
   #show first 3 elements
   head(3)
@@ -121,7 +125,7 @@ The data inspection shows the first 3 text elements from the essay written a Rus
 
 Now that we have loaded some data, we can go ahead and extract information from the texts and process the data to analyze differences between L1 speakers and learners of English.
 
-# Concordancing{-}
+# Concordancing
 
 Concordancing refers to the extraction of words or phrases from a given text or texts [@lindquist2009corpus]. Commonly, concordances are displayed in the form of key-word in contexts (KWIC) where the search term is shown with some preceding and following context. Thus, such displays are referred to as key word in context concordances. A more elaborate tutorial on how to perform concordancing with R is available [here](https://slcladal.github.io/kwics.html).
 
@@ -131,8 +135,6 @@ Concordancing is helpful for seeing how a given term or phrased is used in the d
 We begin by creating KWIC displays of the term *problem* as shown below. To extract the kwic concordances, we use the `kwic` function from the `quanteda` package [cf. @benoit2018quanteda]. 
 
 ```{r conc1, message=FALSE, warning=FALSE}
-# combine data from l1 speakers
-l1 <- c(ns1, ns2)
 # combine data from learners
 learner <- c(de, es, fr, it, pl, ru)
 # extract kwic for term "problem" in learner data
@@ -191,24 +193,11 @@ kwic <- quanteda::kwic(learner,                              # data
                        valuetype = "regex") %>%              # type of pattern
   # convert into a data frame
   as.data.frame()
-```
-
-```{r conc6, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-kwic %>%
-  as.data.frame() %>%
-  head(5) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 rows of the concordance for very + any other word in the learner data.")  %>%
-  flextable::border_outer()
+head(kwic)
 ```
 
-# Frequency lists{-}
+# Frequency lists
 
 A useful procedure when dealing with texts is to extract frequency information. To exemplify how to extract frequency lists from texts, we will do this here using the L1 data.
 
@@ -284,7 +273,7 @@ wordcloud2(ftb_wosw[1:100,],    # define data to use
 
 
 
-# Splitting texts into sentences{-}
+# Splitting texts into sentences
 
 It can be every useful to split texts into individual sentences. This can be done, e.g., to extract the average sentence length or simply to inspect or annotate individual sentences. To split a text into sentences, we clean the data by removing file identifiers and html tags as well as quotation marks within sentences. As we are dealing with several texts, we write a function that performs this task and that we can then apply to the individual texts.
 
@@ -312,27 +301,14 @@ fr_sen <- cleanText(fr)
 it_sen <- cleanText(it)
 pl_sen <- cleanText(pl)
 ru_sen <- cleanText(ru)
-```
-
-```{r split2, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-ru_sen %>%
-  as.data.frame() %>%
-  head(5) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 sentences of the Russian learner data.")  %>%
-  flextable::border_outer()
+head(ru_sen)
 ```
 
 
 Now that we have split the texts into individual sentences, we can easily extract and visualize the average sentence lengths of L1 speakers and learners of English.
 
-# Sentence length{-}
+# Sentence length
 
 The most basic complexity measure is average sentence length. In the following, we will extract the average sentence length for L1-speakers and learners of English with different language backgrounds.
 
@@ -359,22 +335,8 @@ sl_df <- data.frame(c(ns1_sl, ns2_sl, de_sl, es_sl, fr_sl, it_sl, pl_sl, ru_sl))
                        rep("it", length(it_sl)),
                        rep("pl", length(pl_sl)),
                        rep("ru", length(ru_sl))))
-```
-
-
-```{r senl7, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-sl_df %>%
-  as.data.frame() %>%
-  head() %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .75, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 rows of the table holding the sentences lengths and the L1 of the speakers that produced them.")  %>%
-  flextable::border_outer()
+head(sl_df)
 ```
 
 Now, we can use the resulting table to create a box plot showing the results.
@@ -399,7 +361,7 @@ sl_df %>%
   theme(legend.position = "none")
 ```
 
-# Extracting N-grams{-}
+# Extracting N-grams
 
 In a next step, we extract n-grams using the `tokens_ngrams` function from the `quanteda` package. In a first step, we take the sentence data, convert it to lower case and remove punctuation. Then we apply the `tokens_ngrams` function to extract the n-grams (in this case 2-grams).
 
@@ -538,7 +500,7 @@ ngram_rel %>%
   head()
 ```
 
-# Differences in ngram use{-}
+# Differences in ngram use
 
 Next, we will set out to identify differences in n-gram frequencies between learners and L1 speakers. In a first step, we transform the table so that we have separate columns for learners and L1-speakers. In addition, we also add columns containing all the information we need to perform Fisher's exact test to check if learners use certain n-grams significantly  more or less frequently compared to L1-speakers. 
 
@@ -581,7 +543,7 @@ head(sdif_ngram)
 In our case, there are no n-grams that differ significantly in their use by learners and L1-speakers once we have corrected for repeated testing as indicated by the *n.s.* (not significant) in the column called *sig_corr*.
 
 
-# Finding collocations{-}
+# Finding collocations
 
 There are various techniques for identifying collocations. To identify collocations without having a pre-defined target term, we can use the `textstat_collocations` function from the `quanteda.textstats` package [cf. @benoit2021package].
 
@@ -590,22 +552,8 @@ However, before we can apply that function and start identifying collocations, w
 ```{r coll5}
 ns_sen <- c(ns1_sen, ns2_sen) %>%
   tolower()
-```
-
-
-```{r coll6b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-ns_sen %>%
-  as.data.frame() %>%
-  head() %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 sentences in L1 data.")  %>%
-  flextable::border_outer()
+head(ns_sen)
 ```
 
 
@@ -619,29 +567,15 @@ ns_tokens <- quanteda::tokens(ns_sen, remove_punct = TRUE)# %>%
 #  tokens_remove(stopwords("english"))
 # extract collocations
 ns_coll <- quanteda.textstats::textstat_collocations(ns_tokens, size = 2, min_count = 20)
-```
-
-
-```{r coll8b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-ns_coll %>%
-  as.data.frame() %>%
-  head() %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "Top 6 collocations in teh L1 data.")  %>%
-  flextable::border_outer()
+head(ns_coll)
 ```
 
 
 
 The resulting table shows collocations in L1 data descending by collocation strength.
 
-## Visualizing collocation networks{-}
+## Visualizing collocation networks
 
 Network graphs are a very useful and flexible tool for visualizing relationships between elements such as words, personas, or authors. This section shows how to generate a network graph for collocations of the term *transport* using the `quanteda` package.
 
@@ -651,24 +585,9 @@ In a first step, we generate a document-feature matrix based on the sentences in
 ```{r dfm1, message=F, warning=F}
 # create document-feature matrix
 ns_dfm <- ns_sen %>% 
-  #quanteda::dfm(remove_punct = TRUE) %>%
-    quanteda::dfm(remove = stopwords('english'), remove_punct = TRUE)# %>%
-    #quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE)
-```
-
-```{r dfm1b, echo = F, message=FALSE, warning=FALSE}
+  quanteda::dfm(remove = stopwords('english'), remove_punct = TRUE)
 # inspect data
-ns_dfm[1:6, 1:6] %>%
-  as.data.frame() %>%
-  head() %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 rows and columns of the document-feature matrix.")  %>%
-  flextable::border_outer()
+ns_dfm[1:6, 1:6]
 ```
 
 
@@ -693,23 +612,8 @@ We now reduce the document-feature matrix to contain only the top 20 collocates 
 ```{r dfm4}
 redux_dfm <- dfm_select(ns_dfm, 
                         pattern = c(names(coocs)[1:10], "transport"))
-```
-
-
-
-```{r dfm4b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-redux_dfm[1:6, 1:6] %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 rows and columns of the reduced feature co-occurrence matrix.")  %>%
-  flextable::border_outer()
+redux_dfm[1:6, 1:6]
 ```
 
 
@@ -719,22 +623,8 @@ Now, we can transform the document-feature matrix into a feature-co-occurrence m
 
 ```{r dfm6}
 tag_fcm <- fcm(redux_dfm)
-```
-
-
-```{r dfm6b, echo = F, message=FALSE, warning=FALSE}
 # inspect data
-tag_fcm[1:6, 1:6] %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "First 6 rows and columns of the feature co-occurrence matrix.")  %>%
-  flextable::border_outer()
+tag_fcm[1:6, 1:6]
 ```
 
 
@@ -752,50 +642,26 @@ quanteda.textplots::textplot_network(tag_fcm,
 ```
 
 
-# Part-of-speech tagging{-}
+# Part-of-speech tagging
 
 Part-of-speech tagging is a very useful procedure for many analyses. Here, we automatically identify parts of speech (word classes) in the text which, for a well-studied language like English, is approximately 95% accurate.
 
-The code chunk below defines a function which applies this kind of tagging to any text fed into the function.
-
-```{r pos1, message=F, warning=F}
-POStag <- function(x){
-  # load necessary packages
-  require("stringr")
-  require("NLP")
-  require("openNLP")
-  # define annotators
-  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
-  word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
-  pos_tag_annotator <- openNLP::Maxent_POS_Tag_Annotator(language = "en", probs = FALSE)
-  # convert all file content to strings
-  strings <- lapply(x, function(x){
-    x <- as.String(x)  })
-  # loop over file contents
-  sapply(strings, function(x){
-    a <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
-    p <- NLP::annotate(x, pos_tag_annotator, a)
-    w <- subset(p, type == "word")
-    tags <- sapply(w$features, '[[', "POS")
-    as <- sprintf("%s/%s", x[w], tags)
-    at <- paste(as, collapse = " ")
-    return(at)  
-    })
-  }
-```
-
-We now apply this function to a test sentence to see if the function does what we want it to and to check the output format.
+Here, we use the `udpipe` package to pos-tag text. We test this by pos-tagging a simple sentence to see if the function does what we want it to and to check the output format.
 
 ```{r pos2, message=F, warning=F}
 # generate test text
 text <- "It is now a very wide spread opinion, that in the modern world there is no place for dreaming and imagination."
+# download language model (for english) 
+m_eng   <- udpipe::udpipe_download_model(language = "english-ewt")
+m_eng <- udpipe_load_model(file = here::here("english-ewt-ud-2.5-191206.udpipe"))
 # apply pos-tag function to test text
-tagged_text <- POStag(text)
-# inspect result
+tagged_text <- udpipe::udpipe_annotate(m_eng, x = text) %>%
+  paste(text_anndf$token, "/", text_anndf$xpos, collapse = " ", sep = "")
+# inspect tagged text
 tagged_text
 ```
 
-The tags which you see here are from the tag set developed for the *Penn Treebank*, a corpus of English text with syntactic annotations. The tags are not always transparent, and this is very much the case for the word class we will be looking at - the tag for an adjective is `/JJ`!
+The tags are not always transparent, and this is very much the case for the word class we will be looking at - the tag for an adjective is `/JJ`!
 
 The next step, we write a function that will clean our texts by removing tags and quotation marks as well as superfluous white spaces.
 
@@ -811,6 +677,9 @@ comText <- function(x,...){
   x <- stringr::str_squish(x)
   # remove empty elements
   x <- x[!x==""]
+  # postag text
+  x <- udpipe::udpipe_annotate(m_eng, x) %>%
+  paste(text_anndf$token, "/", text_anndf$xpos, collapse = " ", sep = "")
 }
 ```
 
@@ -819,38 +688,25 @@ Now we apply the text cleaning function to the texts.
 
 ```{r pos5, message=F, warning=F}
 # combine texts
-ns1_com <- comText(ns1_sen)
-ns2_com <- comText(ns2_sen)
-de_com <- comText(de_sen)
-es_com <- comText(es_sen)
-fr_com <- comText(fr_sen)
-it_com <- comText(it_sen)
-pl_com <- comText(pl_sen)
-ru_com <- comText(ru_sen)
-```
-
-
-Now we apply the pos-tagging function to the texts.
-
-```{r pos7, message=F, warning=F}
-# apply pos-tag function to data
-ns1_pos <- as.vector(unlist(POStag(ns1_com)))
-ns2_pos <- as.vector(unlist(POStag(ns2_com)))
-de_pos <- as.vector(unlist(POStag(de_com)))
-es_pos <- as.vector(unlist(POStag(es_com)))
-fr_pos <- as.vector(unlist(POStag(fr_com)))
-it_pos <- as.vector(unlist(POStag(it_com)))
-pl_pos <- as.vector(unlist(POStag(pl_com)))
-ru_pos <- as.vector(unlist(POStag(ru_com)))
+ns1_pos <- comText(ns1_sen)
+ns2_pos <- comText(ns2_sen)
+de_pos <- comText(de_sen)
+es_pos <- comText(es_sen)
+fr_pos <- comText(fr_sen)
+it_pos <- comText(it_sen)
+pl_pos <- comText(pl_sen)
+ru_pos <- comText(ru_sen)
 # inspect
-head(ns1_pos)
+ns1_pos
 ```
+
+
 
 We end up with pos-tagged texts where the pos-tags are added to each word (or symbol).
 
 In the following section, we will use these pos-tags to identify potential differences between learners and L1-speakers of English.
 
-# Differences in pos-sequences{-}
+# Differences in pos-sequences
 
 To analyze differences in part-of-speech sequences between L1-speakers and learners of English,, we write a function that extracts pos-tag bigrams from the tagged texts. 
 
@@ -984,7 +840,7 @@ head(PRP_VBZ_l2)
 ```
 
 
-# Lexical diversity{-}
+# Lexical diversity
 
 Another common measure used to asses the development of language learns is vocabulary size. Vocabulary size can be assessed with various measures that represent lexical diversity. In the present case, we will extract
 
@@ -1117,7 +973,7 @@ cttr %>%
   theme(legend.position = "none")
 ```
 
-# Readability{-}
+# Readability
 
 Another measure to assess text quality or text complexity is *readability*. As with lexical diversity scores, the `textstat_readability` function from the `quanteda.textstats` package provides a multitude of different measures (see [here](https://quanteda.io/reference/textstat_readability.html) for the entire list of readability scores that can be extracted). In the following, we will focus on Flesch's Reading Ease Score exclusively [cf. @flesch1948new] (see below; ALS = average sentence length).
 
@@ -1179,7 +1035,7 @@ read_l1 %>%
   theme(legend.position = "none")
 ```
  
-# Spelling errors{-}
+# Spelling errors
 
 We can also determine the number of spelling errors in L1 and learner texts by checking if words in a given text occur in a dictionary or not. To do this, we can use the `hunspell` function from the `hunspell` package. We can choose between different dictionaries (use `list_dictionaries()` to see which dictionaries are available) and we can specify words to ignore via the `ignore` argument.
 
@@ -1275,37 +1131,9 @@ err_tb %>%
   theme(legend.position = "none")
 ```
 
-# Citation & Session Info {-}
-
-Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Analyzing learner language using R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/llr.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
-
-```
-@manual{schweinberger`r format(Sys.time(), '%Y')`llr,
-  author = {Schweinberger, Martin},
-  title = {Analyzing learner language using R},
-  note = {https://slcladal.github.io/pwr.html},
-  year = {`r format(Sys.time(), '%Y')`},
-  organization = "The University of Queensland, Australia. School of Languages and Cultures},
-  address = {Brisbane},
-  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
-}
-```
-
-
-```{r fin}
-sessionInfo()
-```
-
-
-
 
 ***
 
-[Back to top](#introduction)
-
-[Back to HOME](https://slcladal.github.io/index.html)
+[Back to LADAL](https://ladal.edu.au/llr.html)
 
 ***
-
-# References {-}
-
