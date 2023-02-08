@@ -71,6 +71,7 @@ install.packages("scales")
 install.packages("maps")
 install.packages("here")
 install.packages("rgeos")
+install.packages("oz")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -95,6 +96,7 @@ library(maptools)
 library(rgdal)
 library(scales)
 library(rgeos)
+library(oz)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -188,6 +190,14 @@ visited <- world %>%
 plot(world[0], col = "lightgray")
 # overlay countries I have visited in orange 
 plot(sf::st_geometry(visited), add = TRUE, col = "orange")
+```
+
+If you want to plot Australia, you can also simply use the `oz` package.
+
+
+```{r oz, echo = F, eval = F}
+# show map
+oz::oz(states=TRUE, col="darkgreen")
 ```
 
 # Creating Maps with ggplot2 {-}
@@ -378,30 +388,7 @@ ggplot(arrivals, aes(x=Longitude, y= Latitude)) +
 ```
 
 
-# Creating Maps with ggmap {-}
 
-If you simply want to show specific locations on existing maps, then the `ggmap` package is an easy way to take on this talk.
-
-```{r cus14, message=FALSE, warning=FALSE}
-# define box
-sbbox <- ggmap::make_bbox(lon = c(152.8, 153.4), lat = c(-27.1, -27.7), f = .1)
-# get map
-brisbane = ggmap::get_map(location=sbbox, zoom=10, maptype="terrain")
-# create map
-brisbanemap = ggmap::ggmap(brisbane)
-# display map
-brisbanemap +
-  geom_point(data = arrivals, mapping = aes(x = Longitude, y = Latitude), 
-               color = "red", size = 2) +
-  geom_text(data = arrivals, 
-            mapping = aes(x = Longitude+0.1,
-                          y = Latitude,
-                          label = "Brisbane Airport"),
-            size = 3, color = "gray20", 
-            fontface = "bold", 
-            check_overlap = T) +
-  labs(x = "Longitude", y = "Latitude")
-```
 
 
 # Interactive Maps with leaflet and maptools {-}
@@ -466,23 +453,14 @@ l
 
 # Adding Shapes to Maps {-}
 
-The following code will download a shape file and associated metadata to a temporary directory. Note that just downloading the `.shp` is not enough, the associated `.shx` and `.dbf` files are also needed.
+In order to work with shape files, you need to download the shape file(s) first. You can download the shape file we will be using from the shapes directory in the data folder of the LADAL GitHub repository. 
+
+I stored the shape file in my `data` folder which then allows me to access the shape file and use it for further visualizations.
+
 
 ```{r shp1, message=F, warning=F}
-# Download shapefile to a temporary location so we can read it in
-tmpdir <- tempdir()
-urls <- list(
-  'https://slcladal.github.io/data/shapes/AshmoreAndCartierIslands.shp',
-  'https://slcladal.github.io/data/shapes/AshmoreAndCartierIslands.shx',
-  'https://slcladal.github.io/data/shapes/AshmoreAndCartierIslands.dbf'
-)
-
-for (url in urls) {
-  dest <- paste(tmpdir, "/", basename(url), sep="")
-  download.file(url, dest)
-}
-
-australia <- rgdal::readOGR(tmpdir, layer='AshmoreAndCartierIslands', stringsAsFactors = F)
+australia <- rgdal::readOGR(here::here("data/shapes", "AshmoreAndCartierIslands.shp"),
+                            layer='AshmoreAndCartierIslands', stringsAsFactors = F)
 ```
 
 We can now generate a first map based on the shape file we downloaded.
@@ -579,91 +557,6 @@ p +
                     label = "My Polygon Area", 
                     colour="white", 
                     size=3)
-```
-
-
-```{r oz, echo = F, eval = F}
-# install library
-#install.packages("oz")
-# activate library
-library(oz)
-# show map
-oz::oz( states=TRUE, col="orange")
-
-```
-
-
-
-```{r flag, eval = F, echo = F}
-# DOES NOT WORK: dependency (rnaturalearthhires) not available for R>=4.2
-# install package
-#install.packages("devtools")
-devtools::install_github("RobertMyles/flag_fillr")
-# activate package
-library(flagfillr)
-# map of europe
-flag_fillr_continent("Asia")
-```
-
-
-
-```{r flag3, eval = F, echo = F}
-# Development version of ggspatial
-# devtools::install_github("paleolimbot/ggspatial")
-library(ggspatial)
-library(ggplot2)
-library(giscoR)
-library(dplyr)
-library(rasterpic)
-
-# For country names
-library(countrycode)
-
-world <- gisco_get_countries(epsg = 3857)
-europe <- gisco_get_countries(region = "Europe", epsg = 3857)
-
-# Base map of Africa
-plot <- ggplot(world) +
-  geom_sf(fill = "grey90") +
-  theme_minimal() +
-  theme(panel.background = element_rect(fill = "lightblue"))
-
-plot +
-  # Zoom on Europe
-  coord_sf(
-    xlim = c(-2000000, 5000000),
-    ylim = c(3500000, 8000000)
-  )
-```
-
-
-```{r eur2, eval= F, echo = F}
-# We paste the ISO2 code to each african country
-europe$iso2 <- countrycode(europe$ISO3_CODE, "iso3c", "iso2c")
-
-# Get flags from repo - low quality to speed up the code
-flagrepo <- "https://raw.githubusercontent.com/hjnilsson/country-flags/master/png250px/"
-
-# Loop and add
-for (iso in europe$iso2) {
-  # Download pic and plot
-  imgurl <- paste0(flagrepo, tolower(iso), ".png")
-  tmpfile <- tempfile(fileext = ".png")
-  download.file(imgurl, tmpfile, quiet = TRUE, mode = "wb")
-
-  # Raster
-  x <- europe %>% filter(iso2 == iso)
-  x_rast <- rasterpic_img(x, tmpfile, crop = TRUE, mask = TRUE)
-  plot <- plot + layer_spatial(x_rast)
-}
-
-plot +
-  geom_sf(data = europe, fill = NA) +
-  # Zoom on Africa
-  coord_sf(
-    xlim = c(-2000000, 5000000),
-    ylim = c(3500000, 8000000)
-  )
 ```
 
 
