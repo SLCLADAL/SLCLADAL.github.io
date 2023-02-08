@@ -21,7 +21,9 @@ This tutorial focuses on learner language and how to analyze differences between
 <span>
 <p style='margin-top:1em; text-align:center'>
 The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/llr.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
-**[Here](https://colab.research.google.com/drive/1qgAA8iPZDjh0nmqPNtgr2HC71Y9qAuEC?usp=sharing)** is a **link to an interactive version of this tutorial on Google Colab**. The interactive tutorial is based on a Jupyter notebook of this tutorial. This interactive Jupyter notebook allows you to execute code yourself and - if you copy the Jupyter notebook - you can also change and edit the notebook, e.g. you can change code and upload your own data.<br></p>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fdllr_cb.ipynb)<br>
+[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks/main?labpath=notebooks%2Fllr_cb.ipynb). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+</p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
@@ -44,8 +46,7 @@ install.packages("tm")
 install.packages("tidytext")
 install.packages("tidyr")
 install.packages("NLP")
-install.packages("openNLP")
-install.packages("openNLPdata")
+install.packages("udpipe")
 install.packages("koRpus")
 install.packages("stringi")
 install.packages("hunspell")
@@ -60,7 +61,7 @@ remotes::install_github("rlesur/klippy")
 
 Now that we have installed the packages, we can activate them as shown below.
 
-```{r prep2, message=FALSE} 
+```{r prep2, message=FALSE, warning=F} 
 # set options
 options(stringsAsFactors = F)
 options(scipen = 999)
@@ -74,7 +75,7 @@ library(tm)
 library(tidytext)
 library(tidyr)
 library(NLP)
-library(openNLP)
+library(udpipe)
 library(quanteda)
 library(quanteda.textstats)
 library(quanteda.textplots)
@@ -756,48 +757,27 @@ quanteda.textplots::textplot_network(tag_fcm,
 
 Part-of-speech tagging is a very useful procedure for many analyses. Here, we automatically identify parts of speech (word classes) in the text which, for a well-studied language like English, is approximately 95% accurate.
 
-The code chunk below defines a function which applies this kind of tagging to any text fed into the function.
-
-```{r pos1, message=F, warning=F}
-POStag <- function(x){
-  # load necessary packages
-  require("stringr")
-  require("NLP")
-  require("openNLP")
-  # define annotators
-  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
-  word_token_annotator <- openNLP::Maxent_Word_Token_Annotator()
-  pos_tag_annotator <- openNLP::Maxent_POS_Tag_Annotator(language = "en", probs = FALSE)
-  # convert all file content to strings
-  strings <- lapply(x, function(x){
-    x <- as.String(x)  })
-  # loop over file contents
-  sapply(strings, function(x){
-    a <- NLP::annotate(x, list(sent_token_annotator, word_token_annotator))
-    p <- NLP::annotate(x, pos_tag_annotator, a)
-    w <- subset(p, type == "word")
-    tags <- sapply(w$features, '[[', "POS")
-    as <- sprintf("%s/%s", x[w], tags)
-    at <- paste(as, collapse = " ")
-    return(at)  
-    })
-  }
-```
-
-We now apply this function to a test sentence to see if the function does what we want it to and to check the output format.
+Here, we use the `udpipe` package to pos-tag text. We test this by pos-tagging a simple sentence to see if the function does what we want it to and to check the output format.
 
 ```{r pos2, message=F, warning=F}
 # generate test text
 text <- "It is now a very wide spread opinion, that in the modern world there is no place for dreaming and imagination."
-# apply pos-tag function to test text
-tagged_text <- POStag(text)
-# inspect result
+# download language model (for english) 
+#m_eng   <- udpipe::udpipe_download_model(language = "english-ewt")
+m_eng <- udpipe_load_model(file = here::here("udpipemodels",  "english-ewt-ud-2.5-191206.udpipe"))
+# pos-tag  text
+tagged_text <- udpipe::udpipe_annotate(m_eng, x = text) %>%
+  as.data.frame() %>%
+  dplyr::select(-sentence) 
+# collapse into text
+tagged_text <- paste0(tagged_text$token, "/", tagged_text$xpos, collapse = " ")
+# inspect tagged text
 tagged_text
 ```
 
-The tags which you see here are from the tag set developed for the *Penn Treebank*, a corpus of English text with syntactic annotations. The tags are not always transparent, and this is very much the case for the word class we will be looking at - the tag for an adjective is `/JJ`!
+The tags are not always transparent, and this is very much the case for the word class we will be looking at - the tag for an adjective is `/JJ`!
 
-The next step, we write a function that will clean our texts by removing tags and quotation marks as well as superfluous white spaces.
+The next step, we write a function that will clean our texts by removing tags and quotation marks as well as superfluous white spaces. In addition, we also pos-tag the texts.
 
 ```{r pos4, message=F, warning=F}
 comText <- function(x,...){
@@ -811,6 +791,11 @@ comText <- function(x,...){
   x <- stringr::str_squish(x)
   # remove empty elements
   x <- x[!x==""]
+  # postag text
+  x <- udpipe::udpipe_annotate(m_eng, x) %>%
+  as.data.frame() %>%
+  dplyr::select(-sentence) 
+  x <- paste0(x$token, "/", x$xpos, collapse = " ")
 }
 ```
 
@@ -819,32 +804,19 @@ Now we apply the text cleaning function to the texts.
 
 ```{r pos5, message=F, warning=F}
 # combine texts
-ns1_com <- comText(ns1_sen)
-ns2_com <- comText(ns2_sen)
-de_com <- comText(de_sen)
-es_com <- comText(es_sen)
-fr_com <- comText(fr_sen)
-it_com <- comText(it_sen)
-pl_com <- comText(pl_sen)
-ru_com <- comText(ru_sen)
-```
-
-
-Now we apply the pos-tagging function to the texts.
-
-```{r pos7, message=F, warning=F}
-# apply pos-tag function to data
-ns1_pos <- as.vector(unlist(POStag(ns1_com)))
-ns2_pos <- as.vector(unlist(POStag(ns2_com)))
-de_pos <- as.vector(unlist(POStag(de_com)))
-es_pos <- as.vector(unlist(POStag(es_com)))
-fr_pos <- as.vector(unlist(POStag(fr_com)))
-it_pos <- as.vector(unlist(POStag(it_com)))
-pl_pos <- as.vector(unlist(POStag(pl_com)))
-ru_pos <- as.vector(unlist(POStag(ru_com)))
+ns1_pos <- comText(ns1_sen)
+ns2_pos <- comText(ns2_sen)
+de_pos <- comText(de_sen)
+es_pos <- comText(es_sen)
+fr_pos <- comText(fr_sen)
+it_pos <- comText(it_sen)
+pl_pos <- comText(pl_sen)
+ru_pos <- comText(ru_sen)
 # inspect
-head(ns1_pos)
+substr(ns1_pos, 1, 300)
 ```
+
+
 
 We end up with pos-tagged texts where the pos-tags are added to each word (or symbol).
 
@@ -858,10 +830,9 @@ To analyze differences in part-of-speech sequences between L1-speakers and learn
 # tokenize and extract pos tags
 posngram <- function(x,...){
   x <- x %>%
-  stringr::str_remove_all("\\w*/") %>%
-  quanteda::tokens(remove_punct = TRUE)  %>%
-    quanteda::tokens_ngrams(n = 2) %>%
-    stringr::str_remove_all("-")
+    stringr::str_remove_all("\\w*/") %>%
+    quanteda::tokens(remove_punct = T) %>%
+    quanteda::tokens_ngrams(n = 2)
   return(x)
 }
 ```
