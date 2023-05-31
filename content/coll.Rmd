@@ -28,15 +28,27 @@ This tutorial is aimed at beginners and intermediate users of R with the aim of 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/coll.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fcoll_cb.ipynb%26branch%3Dmain)<br>
-[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fcoll_cb.ipynb%26branch%3Dmain). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+To be able to follow this tutorial, we suggest you check out and familiarize yourself with the content of the following **R Basics** tutorials:<br>
+</p>
+<p style='margin-top:1em; text-align:left'>
+<ul>
+  <li>[Getting started with R](https://ladal.edu.au/intror.html) </li>
+  <li>[Loading, saving, and generating data in R](https://ladal.edu.au/load.html) </li>
+  <li>[String Processing in R](https://ladal.edu.au/string.html) </li>
+  <li>[Regular Expressions in R](https://ladal.edu.au/regex.html) </li>
+</ul>
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click [**here**](https://ladal.edu.au/content/coll.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fcoll_cb.ipynb%26branch%3Dmain)<br>
+Click [**here**](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fcoll_cb.ipynb%26branch%3Dmain) to open an interactive Jupyter notebook that allows you to execute, change, and edit the code as well as to upload your own data. <br>
 </p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
 
 <br>
+
 
 Parts of this tutorial build on and use materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) on co-occurrence analysis with R by Andreas Niekler and Gregor Wiedemann [see @WN17].
 
@@ -80,6 +92,7 @@ install.packages("network")
 install.packages("Matrix")
 install.packages("quanteda")
 install.packages("quanteda.textstats")
+install.packages("quanteda.textplots")
 install.packages("dplyr")
 install.packages("stringr")
 install.packages("tm")
@@ -108,9 +121,12 @@ library(igraph)
 library(network)
 library(Matrix)
 library(quanteda)
+library(quanteda.textstats)
+library(quanteda.textplots)
 library(dplyr)
 library(stringr)
 library(tm)
+library(sna)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -131,14 +147,12 @@ darwin <- base::readRDS(url("https://slcladal.github.io/data/cdo.rda", "rb")) %>
   paste0(collapse = " ") %>%
   stringr::str_squish() %>%
   stringr::str_remove_all("- ")
-# further processing
-darwin_split <- darwin %>% 
-  as_tibble() %>%
-  tidytext::unnest_tokens(words, value)
 ```
 
 ```{r coll1b, echo = F, message=FALSE, warning=FALSE}
-darwin_split %>%
+darwin %>%
+  substr(start=1, stop=200) %>%
+  as.data.frame()%>%
   as.data.frame() %>%
   head(15) %>%
   flextable() %>%
@@ -147,91 +161,12 @@ darwin_split %>%
   flextable::fontsize(size = 12) %>%
   flextable::fontsize(size = 12, part = "header") %>%
   flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
+  flextable::set_caption(caption = "First 200 characters of Darwin's Origin of Species.")  %>%
   flextable::border_outer()
 ```
 
 
-We can create bi-grams (N-grams consisting of two elements) by pasting every word together with the word that immediately follows it. To do this, we could use a function that is already available but we can also very simply do this manually. The first step in creating bigrams manually consists in creating a table which holds every word in a corpus and the word that immediately precedes it. 
-
-```{r coll2, message=FALSE, warning=FALSE, paged.print=FALSE}
-# create data frame
-darwin_words <- darwin_split %>%
-  dplyr::rename(word1 = words) %>%
-  dplyr::mutate(word2 = c(word1[2:length(word1)], NA)) %>%
-  na.omit()
-```
-
-
-
-```{r coll2b, echo = F, message=FALSE, warning=FALSE}
-darwin_words %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-We can the paste the elements in these two columns together and also inspect the frequency of each bigram.
-
-```{r coll3a, message=FALSE, warning=FALSE, paged.print=FALSE}
-darwin2grams <- darwin_words %>%
-  dplyr::mutate(bigram = paste(word1, word2, sep = " ")) %>%
-  dplyr::group_by(bigram) %>%
-  dplyr::summarise(frequency = n()) %>%
-  dplyr::arrange(-frequency)
-```
-
-```{r coll3b, echo = F, message=FALSE, warning=FALSE}
-darwin2grams %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-
-The table show that among the 15 most frequent bigrams, there is only a single bi-gram (*natural selection*) which does not involve stop words (words that do not have referential but only relational meaning). 
-
-We can remove bigrams that include stops words rather easily as shown below.
-
-```{r coll3c, message=FALSE, warning=FALSE, paged.print=FALSE}
-# define stopwords
-stps <- paste0(tm::stopwords(kind = "en"), collapse = "\\b|\\b")
-# clean bigram table
-darwin2grams_clean <- darwin2grams %>%
-  dplyr::filter(!str_detect(bigram, stps))
-```
-
-```{r coll3d, echo = F, message=FALSE, warning=FALSE}
-darwin2grams_clean %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-## Extracting N-Grams with quanteda{-}
-
-The `quanteda` package [see @quanteda] offers excellent and very fast functions for extracting bigrams.
+We could create bi-grams (N-grams consisting of two elements) by manually pasting every word together with the word that immediately follows but we use the `quanteda` package [see @quanteda] which offers excellent and very fast functions for extracting bigrams.
 
 ```{r coll3m, message=FALSE, warning=FALSE, paged.print=FALSE}
 #clean corpus
@@ -312,73 +247,50 @@ darwinsentences <- darwin %>%
 head(darwinsentences)
 ```
 
-The first element does not represent a full sentence because we selected a sample of the text which began in the middle of a sentence rather than at its beginning. In a next step, we will create a matrix that shows how often each word co-occurred with each other word in the data.
+The first element does not represent a full sentence because we selected a sample of the text which began in the middle of a sentence rather than at its beginning. In a next step, we can tokenize these sentences and apply the `textstat_collocations` function which identifies collocations.
 
-```{r coll5, message=FALSE, warning=FALSE, paged.print=FALSE}
-# convert into corpus
-darwincorpus <- Corpus(VectorSource(darwinsentences))
-# create vector with words to remove
-extrawords <- c("the", "can", "get", "got", "can", "one", 
-                "dont", "even", "may", "but", "will", 
-                "much", "first", "but", "see", "new", 
-                "many", "less", "now", "well", "like", 
-                "often", "every", "said", "two")
-# clean corpus
-darwincorpusclean <- darwincorpus %>%
-  tm::tm_map(removePunctuation) %>%
-  tm::tm_map(removeNumbers) %>%
-  tm::tm_map(tolower) %>%
-  tm::tm_map(removeWords, stopwords()) %>%
-  tm::tm_map(removeWords, extrawords)
-# create document term matrix
-darwindtm <- DocumentTermMatrix(darwincorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
-
-# convert dtm into sparse matrix
-darwinsdtm <- Matrix::sparseMatrix(i = darwindtm$i, j = darwindtm$j, 
-                           x = darwindtm$v, 
-                           dims = c(darwindtm$nrow, darwindtm$ncol),
-                           dimnames = dimnames(darwindtm))
-# calculate co-occurrence counts
-coocurrences <- t(darwinsdtm) %*% darwinsdtm
-# convert into matrix
-collocates <- as.matrix(coocurrences)
+```{r}
+# create a token object
+text_tokens <- tokens(darwinsentences, remove_punct = TRUE) %>%
+  tokens_remove(stopwords("english"))
+# extract collocations
+text_coll <- textstat_collocations(text_tokens, size = 2, min_count = 20)
+# inspect
+text_coll[1:6, 1:6]
 ```
 
-```{r coll4p, echo = F, message=FALSE, warning=FALSE}
-collocates[1:10, 1:10] %>%
-  as.data.frame() %>%
-   tibble::rownames_to_column("Word") %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::bold(i = 1:10, j = 1, bold = TRUE, part = "body") %>%
-  flextable::border_outer()
+The resulting table shows collocations in the example text descending by collocation strength.
+
+
+## Visualizing Collocation Networks
+
+Network graphs are a very useful and flexible tool for visualizing relationships between elements such as words, personas, or authors. This section shows how to generate a network graph for collocations of the term alice using the quanteda package.
+
+In a first step, we generate a document-feature matrix based on the sentences in the example text. A document-feature matrix shows how often elements (here these elements are the words that occur in the the example text) occur in a selection of documents (here these documents are the sentences in the example text).
+
+```{r}
+text_dfm <- darwinsentences %>% 
+  quanteda::tokens(remove_punct = TRUE)  %>%
+  dfm() %>%
+  quanteda::dfm_remove(stopwords('english')) %>%
+  quanteda::dfm_remove(c("will", "h", "m")) %>%
+  quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE)
+# inspect
+text_dfm[1:6, 1:6]
 ```
 
-We can inspect this co-occurrence matrix and check how many terms (words or elements) it represents using the `ncol` function from base R. We can also check how often terms occur in the data using the `summary` function from base R. The output of the `summary` function tells us that the minimum frequency of a word in the data is 1 with a maximum of 25,435. The difference between the median (36.00) and the mean (74.47) indicates that the frequencies are distributed very non-normally - which is common for language data. 
 
-```{r coll6, message=FALSE, warning=FALSE, paged.print=FALSE}
-# inspect size of matrix
-ncol(collocates)
-summary(rowSums(collocates))
-```
-The `ncol` function reports that the data represents 8,638 words and that the most frequent word occurs 25,435 times in the text.
+# Create document-feature matrix
 
-# Visualizing Collocations
+As we want to generate a network graph of words that collocate with the term organism, we use the `calculateCoocStatistics` function to determine which words most strongly collocate with our target term (organism).
 
-We will now use an example of one individual word (*selection*) to show, how collocation strength for individual terms is calculated and how it can be visualized. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) [see also @WN17].
-
-```{r coll10, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r}
 # load function for co-occurrence calculation
 source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # define term
 coocTerm <- "selection"
 # calculate co-occurrence statistics
-coocs <- calculateCoocStatistics(coocTerm, darwinsdtm, measure="LOGLIK")
+coocs <- calculateCoocStatistics(coocTerm, text_dfm, measure="LOGLIK")
 # inspect results
 coocs[1:20]
 ```
@@ -431,13 +343,26 @@ The dot chart shows that *natural* is collocating more strongly with *selection*
 
 Another method for visualizing collocations are dendrograms. Dendrograms (also called tree-diagrams) show how similar elements are based on one or many features. As such, dendrograms are used to indicate groupings as they show elements (words) that are notably similar or different with respect to their association strength. To use this method, we first need to generate a distance matrix from our co-occurrence matrix.
 
+
+We now reduce the document-feature matrix that we generated above to contain only the top 20 collocates of organism.
+
+```{r}
+redux_dfm <- dfm_select(text_dfm, 
+                        pattern = c(names(coocs)[1:20], "selection"))
+```
+
+Now, we can transform the document-feature matrix into a feature-co-occurrence matrix as shown below. A feature-co-occurrence matrix shows how often each element in that matrix co-occurs with every other element in that matrix.
+
+```{r}
+tag_fcm <- fcm(redux_dfm)
+# inspect
+tag_fcm[1:6, 1:6]
+```
+
+
 ```{r coll7,message=FALSE, warning=FALSE, paged.print=FALSE}
-coolocs <- c(coocdf$Term, "selection")
-# remove non-collocating terms
-collocates_redux <- collocates[rownames(collocates) %in% coolocs, ]
-collocates_redux <- collocates_redux[, colnames(collocates_redux) %in% coolocs]
 # create distance matrix
-distmtx <- dist(collocates_redux)
+distmtx <- dist(tag_fcm)
 
 clustertexts <- hclust(    # hierarchical cluster object
   distmtx,                 # use distance matrix as data
@@ -451,78 +376,17 @@ ggdendrogram(clustertexts) +
 
 Network graphs are a very useful tool to show relationships (or the absence of relationships) between elements. Network graphs are highly useful when it comes to displaying the relationships that words have among each other and which properties these networks of words have.
 
-### Basic Network Graphs{-}
+Using the feature-co-occurrence matrix we generated above, we can generate the network graph which shows the terms that collocate with the target term *selection* with the edges representing the co-occurrence frequency. To generate this network graph, we use the `textplot_network` function from the `quanteda.textplots` package.
 
-In order to display a network, we need to create a network graph by using the `network` function from the `network` package. 
-
-```{r net1, warning=F, message=F}
-net = network::network(collocates_redux, 
-                       directed = FALSE,
-                       ignore.eval = FALSE,
-                       names.eval = "weights")
-# vertex names
-network.vertex.names(net) = rownames(collocates_redux)
-# inspect object
-net
+```{r}
+# generate network graph
+textplot_network(tag_fcm, 
+                 min_freq = 5, 
+                 edge_alpha = 0.1, 
+                 edge_size = 5,
+                 edge_color = "purple",
+                 vertex_labelsize = log(colSums(tag_fcm)))
 ```
-
-Now that we have generated a network object, we visualize the network.
-
-```{r net2, warning=F, message=F}
-ggnet2(net, 
-       label = TRUE, 
-       label.size = 4,
-       alpha = 0.2,
-       size.cut = 3,
-       edge.alpha = 0.3) +
-  guides(color = FALSE, size = FALSE)
-```
-
-
-The network is already informative but we will customize the network object so that the visualization becomes more appealing and informative. To add information, we create vector of words that contain different groups, e.g. terms that rarely, sometimes, and frequently collocate with *selection* (I used the dendrogram which displayed the cluster analysis as the basis for  the categorization). 
-
-Based on these vectors, we can then change or adapt the default values of certain attributes or parameters of the network object (e.g. weights. linetypes, and colors).
-
-```{r net3}
-# create vectors with collocation occurrences as categories
-mid <- c("theory", "variations", "slight", "variation")
-high <- c("natural", "selection")
-infreq <- colnames(collocates_redux)[!colnames(collocates_redux) %in% mid & !colnames(collocates_redux) %in% high]
-# add color by group
-net %v% "Collocation" = ifelse(network.vertex.names(net) %in% infreq, "weak", 
-                   ifelse(network.vertex.names(net) %in% mid, "medium", 
-                   ifelse(network.vertex.names(net) %in% high, "strong", "other")))
-# modify color
-net %v% "color" = ifelse(net %v% "Collocation" == "weak", "gray60", 
-                  ifelse(net %v% "Collocation" == "medium", "orange", 
-                  ifelse(net %v% "Collocation" == "strong", "indianred4", "gray60")))
-# rescale edge size
-network::set.edge.attribute(net, "weights", ifelse(net %e% "weights" < 1, 0.1, 
-                                   ifelse(net %e% "weights" <= 2, .5, 1)))
-# define line type
-network::set.edge.attribute(net, "lty", ifelse(net %e% "weights" <=.1, 3, 
-                               ifelse(net %e% "weights" <= .5, 2, 1)))
-```
-
-We can now display the network object and make use of the added information.
-
-```{r net4}
-ggnet2(net, 
-       color = "color", 
-       label = TRUE, 
-       label.size = 4,
-       alpha = 0.2,
-       size = "degree",
-       edge.size = "weights",
-       edge.lty = "lty",
-       edge.alpha = 0.2) +
-  guides(color = FALSE, size = FALSE)
-```
-
-
-
-
-
 
 
 ## Biplots{-}
@@ -531,7 +395,7 @@ An alternative way to display co-occurrence patterns are bi-plots which are used
 
 ```{r coll8, message=FALSE, warning=FALSE, paged.print=FALSE}
 # perform correspondence analysis
-res.ca <- CA(collocates_redux, graph = FALSE)
+res.ca <- CA(as.matrix(tag_fcm), graph = FALSE)
 # plot results
 fviz_ca_row(res.ca, repel = TRUE, col.row = "gray20")
 ```
@@ -557,7 +421,7 @@ In a first step, we create a table which holds these quantities.
 
 ```{r coll_01_15, message=FALSE, warning=FALSE}
 # convert to data frame
-coocdf <- as.data.frame(as.matrix(collocates))
+coocdf <- as.data.frame(as.matrix(tag_fcm))
 # reduce data
 diag(coocdf) <- 0
 coocdf <- coocdf[which(rowSums(coocdf) > 10),]
@@ -1043,17 +907,17 @@ The results show if words are significantly attracted or repelled by a modifier 
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2022. *Analyzing Co-Occurrences and Collocations in R*. Brisbane: The University of Queensland. url: https://ladal.edu.au/coll.html (Version 2022.11.18).
+Schweinberger, Martin. 2023. *Analyzing Co-Occurrences and Collocations in R*. Brisbane: The University of Queensland. url: https://ladal.edu.au/coll.html (Version 2023.05.31).
 
 ```
-@manual{schweinberger`2022coll,
+@manual{schweinberger`2023coll,
   author = {Schweinberger, Martin},
   title = {Analyzing Co-Occurrences and Collocations in R},
   note = {https://ladal.edu.au/coll.html},
-  year = {2022},
+  year = {2023},
   organization = {The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2022.11.18}
+  edition = {2023.05.31}
 }
 ```
 
