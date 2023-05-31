@@ -1,7 +1,7 @@
 ---
 title: "Practical Overview of Selected Text Analytics Methods"
 author: "Martin Schweinberger"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
+date: "31 May, 2023"
 output:
   bookdown::html_document2
 bibliography: bibliography.bib
@@ -23,12 +23,24 @@ knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
 This tutorial introduces Text Analysis [see @bernard1998text; @kabanoff1997introduction; @popping2000computer], i.e. computer-based analysis of language data or the (semi-)automated extraction of information from text. This tutorial shows beginner and intermediate users of R how to perform basic text analytic procedures. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with text analysis and distant reading. 
 
 
+
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/textanalysis.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file.  <br><br>
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftextanalysis_cb.ipynb%26branch%3Dmain)<br>
-[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftextanalysis_cb.ipynb%26branch%3Dmain). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+To be able to follow this tutorial, we suggest you check out and familiarize yourself with the content of the following **R Basics** tutorials:<br>
+</p>
+<p style='margin-top:1em; text-align:left'>
+<ul>
+  <li>[Getting started with R](https://ladal.edu.au/intror.html) </li>
+  <li>[Loading, saving, and generating data in R](https://ladal.edu.au/load.html) </li>
+  <li>[String Processing in R](https://ladal.edu.au/string.html) </li>
+  <li>[Regular Expressions in R](https://ladal.edu.au/regex.html) </li>
+</ul>
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click [**here**](https://ladal.edu.au/content/kwics.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://ladal.edu.au/content/bibliography.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftextanalysis_cb.ipynb%26branch%3Dmain)<br>
+Click [**here**](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftextanalysis_cb.ipynb%26branch%3Dmain) to open an interactive Jupyter notebook that allows you to execute, change, and edit the code as well as to upload your own data. <br>
 </p>
 <p style='margin-left:1em;'>
 </p></span>
@@ -58,6 +70,7 @@ install.packages("tidytext")
 install.packages("wordcloud2")
 install.packages("quanteda.textstats")
 install.packages("quanteda.textplots")
+install.packages("ggraph")
 install.packages("flextable")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
@@ -66,7 +79,7 @@ remotes::install_github("rlesur/klippy")
 
 Now that we have installed the packages, we can activate them as shown below.
 
-```{r prep2, message=FALSE} 
+```{r prep2, message=FALSE, warning=FALSE} 
 # load packages
 library(dplyr)
 library(stringr)
@@ -80,6 +93,7 @@ library(wordcloud2)
 library(flextable)
 library(quanteda.textstats)
 library(quanteda.textplots)
+library(ggraph)
 library(tidyr)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
@@ -370,7 +384,9 @@ text %>%
   quanteda::tokens(remove_punct = TRUE) %>%
   quanteda::tokens_remove(stopwords("english")) %>%
   quanteda::dfm() %>%
-  quanteda.textplots::textplot_wordcloud()
+  quanteda.textplots::textplot_wordcloud(
+    max_words = 50, 
+    color = scales::viridis_pal(option = "A")(10))
 ```
 
 
@@ -386,7 +402,7 @@ orwell <- orwell_sep %>%
 melville_sep <- base::readRDS(url("https://slcladal.github.io/data/melville.rda", "rb"))
 melville <- melville_sep %>%
   paste0(collapse = " ")
-darwin_sep <- base::readRDS(url("https://slcladal.github.io/data/melville.rda", "rb"))
+darwin_sep <- base::readRDS(url("https://slcladal.github.io/data/darwin.rda", "rb"))
 darwin <- darwin_sep %>%
   paste0(collapse = " ")
 ```
@@ -394,20 +410,24 @@ darwin <- darwin_sep %>%
 Now, we generate a corpus object from these texts and create a variable with the author name.
 
 ```{r wc3, message=FALSE, warning=FALSE}
-corp_dom <- quanteda::corpus(c(darwin, orwell, melville)) 
-attr(corp_dom, "docvars")$Author = c("Darwin", "Orwell", "Melville")
+corp_dom <- quanteda::corpus(c(darwin, melville, orwell)) 
+attr(corp_dom, "docvars")$Author = c("Darwin", "Melville", "Orwell")
 ```
 
 Now, we can remove so-called *stopwords* (non-lexical function words) and punctuation and generate the comparison cloud.
 
 ```{r wc4, message=FALSE, warning=FALSE}
 corp_dom  %>%
-    quanteda::tokens(remove_punct = TRUE) %>%
+    quanteda::tokens(remove_punct = TRUE,
+                     remove_symbols = TRUE,
+                     remove_numbers = TRUE) %>%
     quanteda::tokens_remove(stopwords("english")) %>%
     quanteda::dfm() %>%
     quanteda::dfm_group(groups = corp_dom$Author) %>%
-    quanteda::dfm_trim(min_termfreq = 200, verbose = FALSE) %>%
-    quanteda.textplots::textplot_wordcloud(comparison = TRUE)
+    quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE) %>%
+    quanteda.textplots::textplot_wordcloud(comparison = TRUE, 
+                                           color = c("darkgray", "orange", "purple"),
+                                           max_words = 150)
 ```
 
 
@@ -1103,17 +1123,17 @@ Dependency parsing cane be used, e.g. to study who is the agent versus who is th
 
 # Citation & Session Info {-}
 
-Schweinberger, Martin. 2022. *Practical Overview of Selected Text Analytics Methods*. Brisbane: The University of Queensland. url: https://ladal.edu.au/textanalysis.html (Version 2022.11.15).
+Schweinberger, Martin. 2023. *Practical Overview of Selected Text Analytics Methods*. Brisbane: The University of Queensland. url: https://ladal.edu.au/textanalysis.html (Version 2023.05.31).
 
 ```
-@manual{schweinberger2022ta,
+@manual{schweinberger2023ta,
   author = {Schweinberger, Martin},
   title = {Practical Overview of Selected Text Analytics Methods},
   note = {https://ladal.edu.au/textanalysis.html},
-  year = {2022},
+  year = {2023},
   organization = "The University of Queensland, Australia. School of Languages and Cultures},
   address = {Brisbane},
-  edition = {2022.11.15}
+  edition = {2023.05.31}
 }
 ```
 
