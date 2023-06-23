@@ -27,6 +27,8 @@ library(quanteda.textstats)
 library(udpipe)
 library(ggplot2)
 library(textplot)
+library(openxlsx)
+library(viridis)
 ```
 
 Once you have initiated the session by executing the code shown above, you are good to go.
@@ -36,7 +38,7 @@ If you are using this notebook on your own computer and you have not already ins
 
 ## Loading and processing textual data
 
-For this tutorial, the default data represents the text of Lewis Caroll's  *Alice's Adventures in Wonderland* which we download from the [GitHub data repository of the *Language Technology and Data Analysis Laboratory* (LADAL)](https://slcladal.github.io/data). 
+For this tutorial, the default data represents the text of Lewis Caroll's  *Alice's Adventures in Wonderland* which we download from the [GitHub data repository of the *Language Technology and Data Analysis Laboratory* (LADAL)](https://slcladal.github.io/data). **See [here](https://ladal.edu.au/load.html) for a LADAL tutorial on how to load and save different types of data.**  
 
 ## Using your own data
 
@@ -65,7 +67,7 @@ Select and upload the files you want to analyze (**IMPORTANT: here, we assume th
 myfiles <- list.files(here::here("MyData"), # path to the corpus data
                           # full paths - not just the names of the files
                           full.names = T) 
-# load colt files
+# load files
 mytext <- sapply(myfiles, function(x){
   x <- scan(x, 
             what = "char", 
@@ -121,13 +123,15 @@ text_chapters %>%
   head()
 ```
 
+## Concordancing
+
 Once we have split the data into chapters, we perform the concordancing and extract the KWICs. To create these kwics, we use the `kwic` function from the `quanteda` package. This function takes the data (x), the search pattern (pattern), and the window size as its main arguments. 
 
 To start with, we generate kwics for the term *alice* as shown below. 
 
 ```{r conc3, message=FALSE, warning=FALSE}
 # create kwic
-kwic_alice <- quanteda::kwic(x = text_chapters, # define text(s) 
+kwic_alice <- quanteda::kwic(x = tokens(text_chapters), # define and tokenise text(s) 
                          # define pattern
                           pattern = "alice",
                          # define window size
@@ -141,15 +145,27 @@ kwic_alice %>%
   head()
 ```
 
+## Exporting data
+
+Commonly, researchers would now save the kwics on their own computer to annotate or code instances of the keyword or phrase manually. To export a data frame as a Microsoft Excel spreadsheet, we can use the `write.xlsx` from the `openxlsx` package as shown below. This function has the basic form `write.xlsx(x, file, asTable = FALSE, overwrite = TRUE, ...)` and thus takes two main arguments:
+
++ x = the data frame you want to save 
++ file = the location/path where you want to store the file.
 
 
+In our case, we save the data frame in the working directory (the base directory called `interactive-notebooks`) - from there you can simply download it to your own computer.
 
+```{r}
+write.xlsx(kwic_alice, here::here("kwic_alice.xlsx"))
+```
+
+## More on concordancing
 
 We can also use regular expressions in our search to extract not only *alice* but also more complex and even vague patterns. Vague means that only part of the pattern is specified. For instance, maybe only *walk* is specified and now we want all words containing this sequence including *walking*, *walker*, *walked*, and *walks*. To retrieve such vague patterns, we need to use so-called *regular expressions*. Also, when using a regular expression in the `pattern` argument, we need to specify the `valuetype` as `regex` (as shown below).
 
 ```{r conc5, message=FALSE, warning=FALSE}
 # create kwic
-kwic_walk <- quanteda::kwic(x = text_chapters, 
+kwic_walk <- quanteda::kwic(x = tokens(text_chapters), 
                           pattern = "walk.*",
                           window = 5,
                           valuetype = "regex") %>%
@@ -167,7 +183,7 @@ When search for expressions that represent phrase and that consists out of sever
 
 ```{r conc7, message=FALSE, warning=FALSE}
 # create kwic
-kwic_pooralice <- quanteda::kwic(x = text_chapters, 
+kwic_pooralice <- quanteda::kwic(x = tokens(text_chapters), 
                           pattern = quanteda::phrase("poor alice"),
                           window = 5) %>%
   # convert into a data frame
@@ -182,7 +198,9 @@ kwic_pooralice %>%
 
 We could now continue and analyze how the phrase *poor alice* is used or perform similar analyses.
 
-# Word Frequency
+
+
+## Word Frequency
 
 Almost all methods used in text analytics rely on frequency information. Thus, fending out out frequent words are in a text is a fundamental technique in text analytics. In fact, frequency information lies at the very core of Text Analysis. Such frequency information often comes in the form of word frequency lists, i.e. lists of word forms and their frequency in a given text or collection of texts.  
 
@@ -242,9 +260,13 @@ wfreq_wostop %>%
   ggplot(aes(x = reorder(word, -frequency, mean), y = frequency)) +
   geom_bar(stat = "identity") +
   labs(title = "10 most frequent non-stop words in \n the example text ",
-       x = "") +
-  theme(axis.text.x = element_text(angle = 45, size = 12, hjust = 1))
+       x = "",
+       y = "Frequency") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
+
+
+To save the visualization, you can simply right-click and select `Copy Output to Clipboard` (the top most option) and then paste the graph, e.g.,  into a Word document.
 
 ## Wordclouds
 
@@ -257,8 +279,11 @@ text %>%
   quanteda::tokens(remove_punct = TRUE) %>%
   quanteda::tokens_remove(stopwords("english")) %>%
   quanteda::dfm() %>%
-  quanteda.textplots::textplot_wordcloud()
+  quanteda.textplots::textplot_wordcloud(max_words = 100, # show 100 most frequent words
+                                         # add nice colors and end function
+                                         color = viridis_pal(option = "A")(8)) 
 ```
+
 
 
 Another variant of word clouds, so-called *comparison clouds*, Word lists can be used to determine differences between texts. For instance, we can load different texts and check whether they differ with respect to word frequencies. To show this, we load Herman Melville's *Moby Dick*, George Orwell's *1984*, and we also use  in the example text . 
@@ -281,8 +306,8 @@ melville <- melville_sep %>%
 Now, we generate a corpus object from these texts and create a variable with the author name.
 
 ```{r wc3, message=FALSE, warning=FALSE}
-corp_dom <- quanteda::corpus(c(darwin, orwell, melville)) 
-attr(corp_dom, "docvars")$Author = c("Darwin", "Orwell", "Melville")
+corp_dom <- quanteda::corpus(c(darwin, melville, orwell)) 
+attr(corp_dom, "docvars")$Author = c("Darwin", "Melville", "Orwell")
 ```
 
 Now, we can remove so-called *stopwords* (non-lexical function words) and punctuation and generate the comparison cloud.
@@ -294,7 +319,10 @@ corp_dom  %>%
     quanteda::dfm() %>%
     quanteda::dfm_group(groups = corp_dom$Author) %>%
     quanteda::dfm_trim(min_termfreq = 200, verbose = FALSE) %>%
-    quanteda.textplots::textplot_wordcloud(comparison = TRUE)
+    quanteda.textplots::textplot_wordcloud(comparison = TRUE,
+                                           labeloffset = -0.05, 
+                                           color = c("darkgray", "orange", "purple"),
+                                           max_words = 150)
 ```
 
 
@@ -347,8 +375,8 @@ We can now visualize the relative frequencies of our search word per chapter.
 ```{r wf18, echo=T, eval = T, message=FALSE, warning=FALSE}
 # create plot
 ggplot(tb, aes(x = Chapters, y = Frequency, group = 1)) + 
-  geom_smooth(color = "purple") +
-  geom_line(color = "darkgray") +         
+  geom_smooth(color = "orange") +
+  geom_line(color = "purple") +         
   guides(color=guide_legend(override.aes=list(fill=NA))) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
@@ -365,77 +393,23 @@ names(text_chapters) <- Chapters
 # generate corpus from chapters
 text_corpus <- quanteda::corpus(text_chapters)
 # generate dispersion plots
-quanteda.textplots::textplot_xray(kwic(text_corpus, pattern = "alice"),
-                                  kwic(text_corpus, pattern = "hatter"),
-                                  sort = T)
-```
-
-We can modify the plot by saving it into an object and then use `ggplot` to modify it appearance.
-
-```{r dp2, warning=F, message=F}
-# generate and save dispersion plots
-dp <- quanteda.textplots::textplot_xray(kwic(text_corpus, pattern = "alice"),
-                                        kwic(text_corpus, pattern = "cat"))
-# modify plot
-dp + aes(color = keyword) + 
-  scale_color_manual(values = c('red', 'blue')) +
+quanteda.textplots::textplot_xray(kwic(tokens(text_corpus), pattern = "alice"),
+                                  kwic(tokens(text_corpus), pattern = "hatter"),
+                                  sort = T) + 
+  # add color
+  aes(color = keyword) + 
+  # define color
+  scale_color_manual(values = c('orange', 'darkgrey')) +
+  # suppress legend
   theme(legend.position = "none")
 ```
 
-## Over- and underuse
 
-Frequency information can also tell us something about the nature of a text. For instance, private dialogues will typically contain higher rates of second person pronouns compared with more format text types, such as, for instance, scripted monologues like speeches. For this reason, word frequency lists can be used in text classification and to determine the formality of texts.
+## Collocations
 
-As an example, below you find the number of the second person pronouns *you* and *your* and the number of all words except for these second person pronouns in private dialogues compared with scripted monologues in the Irish component of the *International Corpus of English* (ICE). In addition, the tables shows  the percentage of second person pronouns in both text types to enable seeing  whether private dialogues contain more of these second person pronouns than scripted monologues (i.e. speeches).
+Collocation refers to the co-occurrence of words. A typical example of a collocation is *Merry Christmas* because the words merry and Christmas occur together more frequently together than would be expected by chance, if words were just randomly stringed together.
 
-```{r ou1, eval=T, echo=F, message=FALSE, warning=FALSE, paged.print=FALSE}
-numbers <- matrix(c("you, your", "6761", "659", "Other words",	"259625",	
-                    "105295", "Percent",	"2.60",	"0.63"), byrow = T, nrow = 3)
-colnames(numbers) <- c("", "Private dialogues", "Scripted monologues")
-# inspect data
-ndf <- numbers %>%
-  as.data.frame()
-colnames(ndf)[1] <- "."
-ndf
-```
-
-
-
-This simple example shows that second person pronouns make up 2.6 percent of all words that are used in private dialogues while they only amount to 0.63 percent in scripted speeches. A handy way to present such differences visually are association and mosaic plots.
-
-```{r ou2, message=FALSE, warning=FALSE, paged.print=FALSE}
-d <- matrix(c(6761, 659, 259625, 105295), nrow = 2, byrow = T)
-colnames(d) <- c("D", "M")
-rownames(d) <- c("you, your", "Other words")
-assocplot(d)
-```
-
-Bars above the dashed line indicate relative overuse while bars below the line suggest relative under-use. Therefore, the association plot indicates under-use of *you* and *your* and overuse of *other words* in monologues while the opposite trends holds true for dialogues, i.e. overuse of *you* and *your* and under-use of *Other words*. 
-
-# N-grams, Collocations, and  Keyness
-
-Collocation refers to the co-occurrence of words. A typical example of a collocation is *Merry Christmas* because the words merry and Christmas occur together more frequently together than would be expected by chance, if words were just randomly stringed together.  
-
-N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the example text to create a bi-gram list. We can simply take each word and combine it with the following word.
-
-```{r coll2, message=FALSE, warning=FALSE, paged.print=FALSE}
-# create data frame
-text_bigrams <- data.frame(text_words[1:length(text_words)-1], 
-                       text_words[2:length(text_words)]) %>%
-  dplyr::rename(Word1 = 1,
-                Word2 = 2) %>%
-  dplyr::mutate(Bigram = paste0(Word1, " ", Word2)) %>%
-  dplyr::group_by(Bigram) %>%
-  dplyr::summarise(Frequency = n()) %>%
-  dplyr::arrange(-Frequency)
-# inspect data
-text_bigrams %>%
-  head()
-```
-
-Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots which makes it harder to retrieve of collocates that are not adjacent- We will find out how to identify non-adjacent collocates in the next section.
-
-## Finding collocations
+Collocations are fundamental in text analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots which makes it harder to retrieve of collocates.
 
 There are various techniques for identifying collocations. To identify collocations without having a pre-defined target term, we can use the `textstat_collocations` function from the `quanteda.textstats` package.
 
@@ -481,19 +455,21 @@ Network graphs are a very useful and flexible tool for visualizing relationships
 In a first step, we generate a document-feature matrix based on the sentences  in the example text. A document-feature matrix shows how often elements (here these elements are the words that occur in the *Origin*) occur in a selection of documents (here these documents are the sentences in the example text).
 
 
-```{r dfm1, message=F, warning=F}
+```{r dfm1}
 # create document-feature matrix
-text_dfm <- text_sentences %>% 
-    quanteda::dfm(remove = stopwords('english'), remove_punct = TRUE) %>%
-    quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE)
+text_dfm <- tokens(text_sentences, remove_punct = TRUE) %>%
+  quanteda::dfm() %>%
+  quanteda::dfm_remove(stopwords('english')) %>%
+  quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE)
 # inspect data
 text_dfm[1:6, 1:6]
 ```
 
+We now reduce the document-feature matrix to contain only the top 20 collocates of *alice* (plus our target word *alice*).
 
-As we want to generate a network graph of words that collocate with the term *organism*, we use the `calculateCoocStatistics` function to determine which words most strongly collocate with our target term (*organism*).  
+To do this, we use the `calculateCoocStatistics` function to determine which words most strongly collocate with our target term (organism).
 
-```{r dfm3, message=F, warning=F}
+```{r}
 # load function for co-occurrence calculation
 source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
 # define term
@@ -504,20 +480,13 @@ coocs <- calculateCoocStatistics(coocTerm, text_dfm, measure="LOGLIK")
 coocs[1:20]
 ```
 
-We now reduce the document-feature matrix to contain only the top 20 collocates of *organism* (plus our target word *organism*).
+
+In addition to selecting only the 20 strongest collocates of *alice*, we transform the document-feature matrix into a feature-co-occurrence matrix as shown below. A feature-co-occurrence matrix shows how often each element in that matrix co-occurs with every other element in that matrix.
 
 
 ```{r dfm4}
 redux_dfm <- dfm_select(text_dfm, 
                         pattern = c(names(coocs)[1:20], "alice"))
-# inspect data
-redux_dfm[1:6, 1:6]
-```
-
-
-Now, we can transform the document-feature matrix into a feature-co-occurrence matrix as shown below. A feature-co-occurrence matrix shows how often each element in that matrix co-occurs with every other element in that matrix.
-
-```{r dfm6}
 tag_fcm <- fcm(redux_dfm)
 # inspect data
 tag_fcm[1:6, 1:6] 
@@ -590,147 +559,8 @@ ggplot(freq_weight, aes(nrow(freq_weight):1, frequency)) +
      labs(x = NULL, y = "Relative frequency")
 ```
 
-# Text Classification
 
-Text classification refers to methods that allow to classify a given text to a predefined set of languages, genres, authors, or the like. Such classifications are typically based on the relative frequency of word classes, key words, phonemes, or other linguistic features such as average sentence length, words per line, etc.
-
-As with most other methods that are used in text analysis, text classification typically builds upon a training set that is already annotated with the required tags. Training sets and the features that are derived from these training sets can be created by oneself or one can use build in training sets that are provided in the respective software packages or tools. 
-
-In the following, we will use the frequency of phonemes to classify a text. In a first step, we read in a German text, and split it into phonemes.
-
-```{r tc1, message=FALSE, warning=FALSE}
-# read in German text
-German <- readLines("https://slcladal.github.io/data/phonemictext1.txt") %>%
-  stringr::str_remove_all(" ") %>%
-  stringr::str_split("") %>%
-  unlist()
-# inspect data
-head(German, 20)
-```
-
-We now do the same for three other texts - an English and a Spanish text as well as one text in a language that we will determine using classification.
-
-```{r tc2, message=FALSE, warning=FALSE}
-# read in texts
-English <- readLines("https://slcladal.github.io/data/phonemictext2.txt")
-Spanish <- readLines("https://slcladal.github.io/data/phonemictext3.txt")
-Unknown <- readLines("https://slcladal.github.io/data/phonemictext4.txt")
-# clean, split texts into phonemes, unlist and convert them into vectors
-English <- as.vector(unlist(strsplit(gsub(" ", "", English), "")))
-Spanish <- as.vector(unlist(strsplit(gsub(" ", "", Spanish), "")))
-Unknown <- as.vector(unlist(strsplit(gsub(" ", "", Unknown), "")))
-# inspect data
-head(English, 20)
-```
-We will now create a table that represents the phonemes and their frequencies in each of the 4 texts. In addition, we will add the language and simply the column names.
-
-```{r tc3, echo=T, eval = T, message=FALSE, warning=FALSE}
-# create data tables
-German <- data.frame(names(table(German)), as.vector(table(German)))
-English <- data.frame(names(table(English)), as.vector(table(English)))
-Spanish <- data.frame(names(table(Spanish)), as.vector(table(Spanish)))
-Unknown <- data.frame(names(table(Unknown)), as.vector(table(Unknown)))
-# add column with language
-German$Language <- "German"
-English$Language <- "English"
-Spanish$Language <- "Spanish"
-Unknown$Language <- "Unknown"
-# simplify column names
-colnames(German)[1:2] <- c("Phoneme", "Frequency")
-colnames(English)[1:2] <- c("Phoneme", "Frequency")
-colnames(Spanish)[1:2] <- c("Phoneme", "Frequency")
-colnames(Unknown)[1:2] <- c("Phoneme", "Frequency")
-# combine all tables into a single table
-classdata <- rbind(German, English, Spanish, Unknown) 
-# inspect data
-classdata %>%
-  as.data.frame() %>%
-  head() 
-```
-
-
-Now, we group the data so that we see, how often each phoneme is used in each language.
-
-```{r tc5, echo=T, eval = T, message=FALSE, warning=FALSE}
-# convert into wide format
-classdw <- classdata %>%
-  tidyr::spread(Phoneme, Frequency) %>%
-  replace(is.na(.), 0)
-# inspect data
-classdw[, 1:6] %>%
-  as.data.frame() %>%
-  head() 
-```
-
-
-
-Now, we need to transform the data again, so that we have the frequency of each phoneme by language as the classifier will use "Language" as the dependent variable and the phoneme frequencies as predictors.
-
-```{r tc8, echo=T, eval = T, message=FALSE, warning=FALSE}
-numvar <- colnames(classdw)[2:length(colnames(classdw))]
-classdw[numvar] <- lapply(classdw[numvar], as.numeric)
-# function for normalizing numeric variables
-normalize <- function(x) { (x-min(x))/(max(x)-min(x))   }
-# apply normalization
- classdw[numvar] <- as.data.frame(lapply(classdw[numvar], normalize))
-# inspect data
-classdw[, 1:6] %>%
-  as.data.frame() %>%
-  head() 
-```
-
-
-Before turning to the actual classification, we will use a cluster analysis to see which texts the unknown text is most similar with.
-
-```{r tc10, echo=T, eval = T, message=FALSE, warning=FALSE}
-# remove language column
-textm <- classdw[,2:ncol(classdw)]
-# add languages as row names
-rownames(textm) <- classdw[,1]
-# create distance matrix
-distmtx <- dist(textm)
-# perform clustering
-clustertexts <- hclust(distmtx, method="ward.D")  
-# visualize cluster result
-plot(clustertexts, hang = .25,main = "")           
-```
-
-According to the cluster analysis, the unknown text clusters together with the English texts which suggests that the unknown text is likely to be English.
-
-Before we begin with the actual classification, we will split the data so that we have one data set without "Unknown" (this is our training set) and one data set with only "Unknown" (this is our test set).
-
-```{r tc11, echo=T, eval = T, message=FALSE, warning=FALSE}
-# create training set
-train <- classdw %>%
-  filter(Language != "Unknown")
-# create test set
-test <- classdw %>%
-  filter(Language == "Unknown")
-# inspect data
-classdw[, 1:6] %>%
-  as.data.frame() %>%
-  head()
-```
-
-
-Finally, we can apply our classifier to our data. The classifier we use is a k-nearest neighbor classifier as the underlying function will classify an unknown element given its proximity to the clusters in the training set.
-
-```{r message=FALSE, warning=FALSE}
-# set seed for reproducibility
-set.seed(12345)
-# apply k-nearest-neighbor (knn) classifier
-prediction <- class::knn(train[,2:ncol(train)], 
-                         test[,2:ncol(test)], 
-                         cl = train[, 1], 
-                         k = 3)
-# inspect the result
-prediction
-```
-
-Based on the frequencies of phonemes in the unknown text, the knn-classifier predicts that the unknown text is English. This is in fact true as the text is a subsection of the Wikipedia article for Aldous Huxley's *Brave New World*. The training texts were German, English, and Spanish translations of a subsection of Wikipedia's article for Hermann Hesse's *Steppenwolf*. 
-
-
-# Part-of-Speech tagging
+## Part-of-Speech tagging
 
 A very common procedure to add information to texts is to part-of-speech tag the data, which means to determine to what type of word a specific word belongs. Below, we will add pos-tags to a short English text.
 
@@ -780,7 +610,7 @@ substr(tagged_text, 1, 200)
 
 We could use the pos-tagged data to study differences in the distribution of word classes across different registers. or to find certain syntactic patterns in a collection of texts. 
 
-# Names Entity Recognition 
+## Names Entity Recognition 
 
 Named Entity Recognition (NER) (also referred to as *named entity extraction* or simply as *entity extraction*) is a text analytic method which allows us to automatically identify or extract named entities from text(s) such as persons, locations, brands, etc. 
 
@@ -799,7 +629,7 @@ head(ner_df)
 
 The results would now have to be processed further and could be categorized into person, location, dates, entities, for example. However, this should already give you an idea and get you started.
 
-# Dependency Parsing Using UDPipe
+## Dependency Parsing Using UDPipe
 
 In addition to pos-tagging, we can also generate plots showing the syntactic dependencies of the different constituents of a sentence. For this, we generate an object that contains a sentence (in this case, the sentence *John gave Mary a kiss*), and we then plot (or visualize) the dependencies using the `textplot_dependencyparser` function.  
 
