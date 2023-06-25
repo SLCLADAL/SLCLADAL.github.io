@@ -11,11 +11,10 @@
 
 <meta name="author" content="Martin Schweinberger" />
 
-<meta name="date" content="2023-04-05" />
 
 <title>Handling tables in R</title>
 
-<script src="site_libs/header-attrs-2.14/header-attrs.js"></script>
+<script src="site_libs/header-attrs-2.21/header-attrs.js"></script>
 <script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
@@ -41,8 +40,8 @@
 <link href="site_libs/primer-tooltips-1.4.0/build.css" rel="stylesheet" />
 <link href="site_libs/klippy-0.0.0.9500/css/klippy.min.css" rel="stylesheet" />
 <script src="site_libs/klippy-0.0.0.9500/js/klippy.min.js"></script>
-<link href="site_libs/tabwid-1.0.0/tabwid.css" rel="stylesheet" />
-<link href="site_libs/tabwid-1.0.0/scrool.css" rel="stylesheet" />
+<link href="site_libs/tabwid-1.1.3/tabwid.css" rel="stylesheet" />
+<script src="site_libs/tabwid-1.1.3/tabwid.js"></script>
 <link rel="stylesheet" href="styles.css" />
 
 <!-- Global site tag (gtag.js) - Google Analytics -->
@@ -79,6 +78,28 @@ if (window.hljs) {
 
 
 
+<style type="text/css">
+/* for pandoc --citeproc since 2.11 */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}
+</style>
 
 
 
@@ -163,11 +184,15 @@ $(document).ready(function () {
     href = "index.html";
   var menuAnchor = $('a[href="' + href + '"]');
 
-  // mark it active
-  menuAnchor.tab('show');
-
-  // if it's got a parent navbar menu mark it active as well
-  menuAnchor.closest('li.dropdown').addClass('active');
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
 
   // Navbar adjustments
   var navHeight = $(".navbar").first().height() + 15;
@@ -196,8 +221,8 @@ $(document).ready(function () {
   border-radius: 4px;
 }
 
-.tabset-dropdown > .nav-tabs > li.active:before {
-  content: "";
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
   font-family: 'Glyphicons Halflings';
   display: inline-block;
   padding: 10px;
@@ -205,16 +230,9 @@ $(document).ready(function () {
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-  content: "&#xe258;";
-  border: none;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-  content: "";
+  content: "\e258";
   font-family: 'Glyphicons Halflings';
-  display: inline-block;
-  padding: 10px;
-  border-right: 1px solid #ddd;
+  border: none;
 }
 
 .tabset-dropdown > .nav-tabs > li.active {
@@ -429,30 +447,88 @@ div.tocify {
 
 <h1 class="title toc-ignore">Handling tables in R</h1>
 <h4 class="author">Martin Schweinberger</h4>
-<h4 class="date">2023-04-05</h4>
 
 </div>
 
 
 <p><img src="https://slcladal.github.io/images/uq1.jpg" width="100%" /></p>
-<div id="introduction" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Introduction</h1>
-<p>This tutorial shows how to work with tables and how to tabulate data in R. A more advanced and detailed but also truly excellent and highly recommendable resource on processing data in R is <span class="citation">Wickham and Grolemund (<a href="#ref-wickham2016r" role="doc-biblioref">2016</a>; see also Wickham et al. <a href="#ref-wickham2019welcome" role="doc-biblioref">2019</a>)</span>. Alternative but also very useful resources are <span class="citation">Stander and Dalla Valle (<a href="#ref-stander2017enthusing" role="doc-biblioref">2017</a>)</span> and <span class="citation">Estrellado et al. (<a href="#ref-estrellado2020data" role="doc-biblioref">2020</a>)</span>.</p>
+<div id="introduction" class="section level1 unnumbered">
+<h1 class="unnumbered">Introduction</h1>
+<p>This tutorial shows how to work with tables and how to tabulate data
+in R. A more advanced and detailed but also truly excellent and highly
+recommendable resource on processing data in R is <span
+class="citation">Wickham and Grolemund (<a href="#ref-wickham2016r"
+role="doc-biblioref">2016</a>; see also <a
+href="#ref-wickham2019welcome" role="doc-biblioref">Wickham et al.
+2019</a>)</span>. Alternative but also very useful resources are <span
+class="citation">Stander and Dalla Valle (<a
+href="#ref-stander2017enthusing" role="doc-biblioref">2017</a>)</span>
+and <span class="citation">Estrellado et al. (<a
+href="#ref-estrellado2020data"
+role="doc-biblioref">2020</a>)</span>.</p>
 <p><img src="https://slcladal.github.io/images/gy_chili.jpg" width="15%" style="float:right; padding:10px" /></p>
-<p>This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to work with and process tabulated data (tables) using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful functions and methods associated with tabular data.</p>
-<div class="warning" style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
+<p>This tutorial is aimed at beginners and intermediate users of R with
+the aim of showcasing how to work with and process tabulated data
+(tables) using R. The aim is not to provide a fully-fledged analysis but
+rather to show and exemplify selected useful functions and methods
+associated with tabular data.</p>
+<div class="warning"
+style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
 <span>
 <p style="margin-top:1em; text-align:center">
-The entire R Notebook for the tutorial can be downloaded <a href="https://slcladal.github.io/content/table.Rmd"><strong>here</strong></a>. If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the <a href="https://slcladal.github.io/content/bibliography.bib"><strong>bibliography file</strong></a> and store it in the same folder where you store the Rmd file. <br><br> <a href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftable_cb.ipynb%26branch%3Dmain"><img src="https://mybinder.org/badge_logo.svg" alt="Binder" /></a><br> <a href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftable_cb.ipynb%26branch%3Dmain"><strong>Click this link to open an interactive version of this tutorial on MyBinder.org</strong></a>. <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+To be able to follow this tutorial, we suggest you check out and
+familiarize yourself with the content of the following <strong>R
+Basics</strong> tutorials:<br>
+</p>
+<p style="margin-top:1em; text-align:left">
+<ul>
+<li>
+<a href="https://ladal.edu.au/intror.html">Getting started with R</a>
+</li>
+<li>
+<a href="https://ladal.edu.au/load.html">Loading, saving, and generating
+data in R</a>
+</li>
+<li>
+<a href="https://ladal.edu.au/string.html">String Processing in R</a>
+</li>
+<li>
+<a href="https://ladal.edu.au/regex.html">Regular Expressions in R</a>
+</li>
+</ul>
+</p>
+<p style="margin-top:1em; text-align:center">
+Click <a
+href="https://ladal.edu.au/content/table.Rmd"><strong>here</strong></a><a
+href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a> to
+download the <strong>entire R Notebook</strong> for this
+tutorial.<br><br> <a
+href="https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftable_cb.ipynb%26branch%3Dmain"><img
+src="https://mybinder.org/badge_logo.svg" alt="Binder" /></a><br> Click
+<a
+href="https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftable_cb.ipynb%26branch%3Dmain"><strong>here</strong></a>
+to open an interactive Jupyter notebook that allows you to execute,
+change, and edit the code as well as to upload your own data. <br>
 </p>
 <p style="margin-left:1em;">
 </p>
 <p></span></p>
 </div>
 <p><br></p>
-<div id="preparation-and-session-set-up" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Preparation and session set up</h2>
-<p>This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R <a href="https://slcladal.github.io/intror.html">here</a>. For this tutorials, we need to install certain <em>packages</em> from an R <em>library</em> so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).</p>
+<div id="preparation-and-session-set-up"
+class="section level2 unnumbered">
+<h2 class="unnumbered">Preparation and session set up</h2>
+<p>This tutorial is based on R. If you have not installed R or are new
+to it, you will find an introduction to and more information how to use
+R <a href="https://slcladal.github.io/intror.html">here</a>. For this
+tutorials, we need to install certain <em>packages</em> from an R
+<em>library</em> so that the scripts shown below are executed without
+errors. Before turning to the code below, please install the packages by
+running the code below this paragraph. If you have already installed the
+packages mentioned below, then you can skip ahead ignore this section.
+To install the necessary packages, simply run the following code - it
+may take some time (between 1 and 5 minutes to install all of the
+packages so you do not need to worry if it takes some time).</p>
 <pre class="r"><code># install packages
 install.packages(&quot;xlsx&quot;)
 install.packages(&quot;tidyverse&quot;)
@@ -462,7 +538,8 @@ install.packages(&quot;here&quot;)
 # install klippy for copy-to-clipboard button in code chunks
 install.packages(&quot;remotes&quot;)
 remotes::install_github(&quot;rlesur/klippy&quot;)</code></pre>
-<p>Now that we have installed the packages, we can activate them as shown below.</p>
+<p>Now that we have installed the packages, we can activate them as
+shown below.</p>
 <pre class="r"><code># load packages
 library(dplyr)
 library(tidyr)
@@ -476,158 +553,69 @@ klippy::klippy()</code></pre>
   addClassKlippyTo("pre.r, pre.markdown");
   addKlippy('left', 'top', 'auto', '1', 'Copy code', 'Copied!');
 </script>
-<p>Once you have installed RStudio and initiated the session by executing the code shown above, you are good to go.</p>
+<p>Once you have installed RStudio and initiated the session by
+executing the code shown above, you are good to go.</p>
 </div>
 </div>
-<div id="getting-started" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Getting started</h1>
-<p>Tables are one of the most common and important ways to process, handle, and describe data. This tutorial introduces different types of tables, how to load and save different types of tables, as well as how to modify and process tables and tabulated data.</p>
-<p>When working with R, there are different kinds or types of tables that have different characteristics. The most common types of tables in R are:</p>
+<div id="getting-started" class="section level1 unnumbered">
+<h1 class="unnumbered">Getting started</h1>
+<p>Tables are one of the most common and important ways to process,
+handle, and describe data. This tutorial introduces different types of
+tables, how to load and save different types of tables, as well as how
+to modify and process tables and tabulated data.</p>
+<p>When working with R, there are different kinds or types of tables
+that have different characteristics. The most common types of tables in
+R are:</p>
 <ul>
 <li>matrices</li>
 <li>data frames</li>
 <li>tibbles</li>
 </ul>
-<p>Matrices can only contain one type of data and all data points will be converted to the type of scale with the lowest information value. For instance, if at least one variables in a table represents characters (or strings), then all other variables are also converted into characters (although they may be numbers).</p>
-<p>Data frames can contain different types of scales and variables are not converted automatically. In this sense, data frames are more flexible and are preferable over matrices.</p>
-<p>Tibbles are the tidyverse equivalent of data frames which offer new functions and possibilities of handling and inspecting the data. .</p>
+<p>Matrices can only contain one type of data and all data points will
+be converted to the type of scale with the lowest information value. For
+instance, if at least one variables in a table represents characters (or
+strings), then all other variables are also converted into characters
+(although they may be numbers).</p>
+<p>Data frames can contain different types of scales and variables are
+not converted automatically. In this sense, data frames are more
+flexible and are preferable over matrices.</p>
+<p>Tibbles are the tidyverse equivalent of data frames which offer new
+functions and possibilities of handling and inspecting the data. .</p>
 </div>
-<div id="loading-tables-into-r" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Loading tables into R</h1>
-<p>There are several different functions that allow us to read tabulated data into R. In our case, we use the <code>readRDS</code> function which loads Rdata sets.</p>
+<div id="loading-tables-into-r" class="section level1 unnumbered">
+<h1 class="unnumbered">Loading tables into R</h1>
+<p>There are several different functions that allow us to read tabulated
+data into R. In our case, we use the <code>readRDS</code> function which
+loads Rdata sets.</p>
 <pre class="r"><code># load data with read.delim
 mytable &lt;- base::readRDS(url(&quot;https://slcladal.github.io/data/mld.rda&quot;, &quot;rb&quot;))</code></pre>
-<template id="7a39fe39-4d89-4c28-8f38-cb695bdc7532"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-.katex-display {
-    margin: 0 0 !important;
-}
-</style><div class="tabwid"><style>.cl-cf7b853c{table-layout:auto;width:50%;}.cl-cf780bc8{font-family:'DejaVu Sans';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-cf780bd2{font-family:'DejaVu Sans';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-cf781780{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-cf78178a{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-cf78353a{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783544{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783545{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf78354e{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf78354f{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783550{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783558{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783559{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf78355a{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf78355b{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783562{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cf783563{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-cf7b853c'>
-<caption class="Table Caption">
-<p>First 10 rows of mytable.</p>
-</caption>
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-cf783562"><p class="cl-cf781780"><span class="cl-cf780bc8">status</span></p></td><td class="cl-cf78355b"><p class="cl-cf781780"><span class="cl-cf780bc8">attraction</span></p></td><td class="cl-cf783563"><p class="cl-cf78178a"><span class="cl-cf780bc8">money</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-cf783545"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf78353a"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783544"><p class="cl-cf78178a"><span class="cl-cf780bd2">86.33</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf78355a"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf783559"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783558"><p class="cl-cf78178a"><span class="cl-cf780bd2">45.58</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf783545"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf78353a"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783544"><p class="cl-cf78178a"><span class="cl-cf780bd2">68.43</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf78355a"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf783559"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783558"><p class="cl-cf78178a"><span class="cl-cf780bd2">52.93</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf783545"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf78353a"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783544"><p class="cl-cf78178a"><span class="cl-cf780bd2">61.86</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf78355a"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf783559"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783558"><p class="cl-cf78178a"><span class="cl-cf780bd2">48.47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf783545"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf78353a"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783544"><p class="cl-cf78178a"><span class="cl-cf780bd2">32.79</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf78355a"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf783559"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783558"><p class="cl-cf78178a"><span class="cl-cf780bd2">35.91</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf783545"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf78353a"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf783544"><p class="cl-cf78178a"><span class="cl-cf780bd2">30.98</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cf783550"><p class="cl-cf781780"><span class="cl-cf780bd2">Relationship</span></p></td><td class="cl-cf78354f"><p class="cl-cf781780"><span class="cl-cf780bd2">NotInterested</span></p></td><td class="cl-cf78354e"><p class="cl-cf78178a"><span class="cl-cf780bd2">44.82</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="59c35119-01a0-4e41-9435-7692a48a50d4"></div>
-<script>
-var dest = document.getElementById("59c35119-01a0-4e41-9435-7692a48a50d4");
-var template = document.getElementById("7a39fe39-4d89-4c28-8f38-cb695bdc7532");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
-<p>If the data is stored as a txt-file, there are various functions to read in the data. The most common functions are <code>read.delim</code> and <code>read.table</code>.</p>
+<div class="tabwid"><style>.cl-c0f82902{table-layout:auto;width:50%;}.cl-c0ededca{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c0ededd4{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c0f1ec4a{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-c0f1ec4b{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-c0f2091e{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20928{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20929{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20932{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20933{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20934{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20935{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f2093c{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f2093d{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20946{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20947{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c0f20948{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing='true' class='cl-c0f82902'><caption style="display:table-caption;margin:0pt;text-align:center;border-bottom: 0.00pt solid transparent;border-top: 0.00pt solid transparent;border-left: 0.00pt solid transparent;border-right: 0.00pt solid transparent;padding-top:3pt;padding-bottom:3pt;padding-left:3pt;padding-right:3pt;line-height: 1;background-color:transparent;"><span>First 10 rows of mytable.</span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-c0f2091e"><p class="cl-c0f1ec4a"><span class="cl-c0ededca">status</span></p></th><th class="cl-c0f20928"><p class="cl-c0f1ec4a"><span class="cl-c0ededca">attraction</span></p></th><th class="cl-c0f20929"><p class="cl-c0f1ec4b"><span class="cl-c0ededca">money</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-c0f20932"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f20933"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f20934"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">86.33</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20935"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f2093c"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f2093d"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">45.58</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20932"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f20933"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f20934"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">68.43</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20935"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f2093c"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f2093d"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">52.93</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20932"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f20933"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f20934"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">61.86</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20935"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f2093c"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f2093d"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">48.47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20932"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f20933"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f20934"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">32.79</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20935"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f2093c"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f2093d"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">35.91</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20932"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f20933"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f20934"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">30.98</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c0f20946"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">Relationship</span></p></td><td class="cl-c0f20947"><p class="cl-c0f1ec4a"><span class="cl-c0ededd4">NotInterested</span></p></td><td class="cl-c0f20948"><p class="cl-c0f1ec4b"><span class="cl-c0ededd4">44.82</span></p></td></tr></tbody></table></div>
+<p>If the data is stored as a txt-file, there are various functions to
+read in the data. The most common functions are <code>read.delim</code>
+and <code>read.table</code>.</p>
 <pre class="r"><code># load data with read.delim
 tab1 &lt;- read.delim(&quot;https://slcladal.github.io/data/mlrdata.txt&quot;, 
                    sep = &quot;\t&quot;, header = TRUE)
 tab2 &lt;- read.table(&quot;https://slcladal.github.io/data/mlrdata.txt&quot;, header = TRUE)</code></pre>
-<p>To load excel data from the web, you can use the <code>read.xlsx</code> function from the <code>openxlsx</code> package.</p>
+<p>To load excel data from the web, you can use the
+<code>read.xlsx</code> function from the <code>openxlsx</code>
+package.</p>
 <pre class="r"><code># load data
 exceldata &lt;- openxlsx::read.xlsx(&quot;https://slcladal.github.io/data/testdata1.xlsx&quot;, 
                                  sheet = 1)</code></pre>
-<template id="ca67d2bc-50cb-423c-8bf0-883d2809aa99"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-.katex-display {
-    margin: 0 0 !important;
-}
-</style><div class="tabwid"><style>.cl-cfff8102{table-layout:auto;width:50%;}.cl-cff89676{font-family:'DejaVu Sans';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-cff89694{font-family:'DejaVu Sans';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-cff8ab2a{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-cff8e446{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e450{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e451{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e45a{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e464{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e465{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e46e{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-cff8e46f{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-cfff8102'>
-<caption class="Table Caption">
-<p>First 10 rows of the exceldata.</p>
-</caption>
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-cff8e46e"><p class="cl-cff8ab2a"><span class="cl-cff89676">Variable1</span></p></td><td class="cl-cff8e46f"><p class="cl-cff8ab2a"><span class="cl-cff89676">Variable2</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-cff8e446"><p class="cl-cff8ab2a"><span class="cl-cff89694">6</span></p></td><td class="cl-cff8e450"><p class="cl-cff8ab2a"><span class="cl-cff89694">67</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e464"><p class="cl-cff8ab2a"><span class="cl-cff89694">65</span></p></td><td class="cl-cff8e465"><p class="cl-cff8ab2a"><span class="cl-cff89694">16</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e446"><p class="cl-cff8ab2a"><span class="cl-cff89694">12</span></p></td><td class="cl-cff8e450"><p class="cl-cff8ab2a"><span class="cl-cff89694">56</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e464"><p class="cl-cff8ab2a"><span class="cl-cff89694">56</span></p></td><td class="cl-cff8e465"><p class="cl-cff8ab2a"><span class="cl-cff89694">34</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e446"><p class="cl-cff8ab2a"><span class="cl-cff89694">45</span></p></td><td class="cl-cff8e450"><p class="cl-cff8ab2a"><span class="cl-cff89694">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e464"><p class="cl-cff8ab2a"><span class="cl-cff89694">84</span></p></td><td class="cl-cff8e465"><p class="cl-cff8ab2a"><span class="cl-cff89694">42</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e446"><p class="cl-cff8ab2a"><span class="cl-cff89694">38</span></p></td><td class="cl-cff8e450"><p class="cl-cff8ab2a"><span class="cl-cff89694">36</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e464"><p class="cl-cff8ab2a"><span class="cl-cff89694">46</span></p></td><td class="cl-cff8e465"><p class="cl-cff8ab2a"><span class="cl-cff89694">47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e446"><p class="cl-cff8ab2a"><span class="cl-cff89694">64</span></p></td><td class="cl-cff8e450"><p class="cl-cff8ab2a"><span class="cl-cff89694">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-cff8e451"><p class="cl-cff8ab2a"><span class="cl-cff89694">24</span></p></td><td class="cl-cff8e45a"><p class="cl-cff8ab2a"><span class="cl-cff89694">29</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="a04034e6-f7ca-4db0-8b9a-ac4af819512b"></div>
-<script>
-var dest = document.getElementById("a04034e6-f7ca-4db0-8b9a-ac4af819512b");
-var template = document.getElementById("ca67d2bc-50cb-423c-8bf0-883d2809aa99");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
-<p>To load excel data from your own computer, you can use the <code>read_excel</code> function from the <code>readxl</code> package (which is part of the tidyverse and thus does not need to be installed separately.</p>
+<div class="tabwid"><style>.cl-c1e3e0b8{table-layout:auto;width:50%;}.cl-c1dbbdc0{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c1dbbdd4{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c1dee7de{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-c1defcba{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defcbb{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defcc4{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defcc5{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defcc6{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defcc7{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defcce{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c1defccf{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing='true' class='cl-c1e3e0b8'><caption style="display:table-caption;margin:0pt;text-align:center;border-bottom: 0.00pt solid transparent;border-top: 0.00pt solid transparent;border-left: 0.00pt solid transparent;border-right: 0.00pt solid transparent;padding-top:3pt;padding-bottom:3pt;padding-left:3pt;padding-right:3pt;line-height: 1;background-color:transparent;"><span>First 10 rows of the exceldata.</span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-c1defcba"><p class="cl-c1dee7de"><span class="cl-c1dbbdc0">Variable1</span></p></th><th class="cl-c1defcbb"><p class="cl-c1dee7de"><span class="cl-c1dbbdc0">Variable2</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc4"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">6</span></p></td><td class="cl-c1defcc5"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">67</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc6"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">65</span></p></td><td class="cl-c1defcc7"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">16</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc4"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">12</span></p></td><td class="cl-c1defcc5"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">56</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc6"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">56</span></p></td><td class="cl-c1defcc7"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">34</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc4"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">45</span></p></td><td class="cl-c1defcc5"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc6"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">84</span></p></td><td class="cl-c1defcc7"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">42</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc4"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">38</span></p></td><td class="cl-c1defcc5"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">36</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc6"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">46</span></p></td><td class="cl-c1defcc7"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcc4"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">64</span></p></td><td class="cl-c1defcc5"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c1defcce"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">24</span></p></td><td class="cl-c1defccf"><p class="cl-c1dee7de"><span class="cl-c1dbbdd4">29</span></p></td></tr></tbody></table></div>
+<p>To load excel data from your own computer, you can use the
+<code>read_excel</code> function from the <code>readxl</code> package
+(which is part of the tidyverse and thus does not need to be installed
+separately.</p>
 <hr />
-<div class="warning" style="padding:0.1em; background-color:#51247a; color:#f2f2f2">
+<div class="warning"
+style="padding:0.1em; background-color:#51247a; color:#f2f2f2">
 <span>
 <p style="margin-top:1em; text-align:center">
-<b>NOTE</b><br><br>You would need to adapt the path to the data (which currently points to the data folder on my computer!). Thus, the path below is specified to my computer.
+<b>NOTE</b><br><br>You would need to adapt the path to the data (which
+currently points to the data folder on my computer!). Thus, the path
+below is specified to my computer.
 </p>
 <p style="margin-left:1em;">
 </p>
@@ -640,68 +628,15 @@ fantome.appendChild(templateContent);
 <hr />
 <pre class="r"><code># load data
 excelcomp &lt;- readxl::read_excel(here::here(&quot;data&quot;, &quot;testdata1.xlsx&quot;), sheet = 1)</code></pre>
-<template id="98cb1705-1d56-4ee3-b93f-e7d3376c4932"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-.katex-display {
-    margin: 0 0 !important;
-}
-</style><div class="tabwid"><style>.cl-d00e23a6{table-layout:auto;width:50%;}.cl-d00b9a5a{font-family:'DejaVu Sans';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-d00b9a64{font-family:'DejaVu Sans';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-d00ba2ac{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-d00bb8b4{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8be{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8bf{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8c0{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8c8{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8c9{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8ca{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d00bb8d2{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-d00e23a6'>
-<caption class="Table Caption">
-<p>First 10 rows of the excelcomp data.</p>
-</caption>
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8ca"><p class="cl-d00ba2ac"><span class="cl-d00b9a5a">Variable1</span></p></td><td class="cl-d00bb8d2"><p class="cl-d00ba2ac"><span class="cl-d00b9a5a">Variable2</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8b4"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">6</span></p></td><td class="cl-d00bb8be"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">67</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8c8"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">65</span></p></td><td class="cl-d00bb8c9"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">16</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8b4"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">12</span></p></td><td class="cl-d00bb8be"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">56</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8c8"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">56</span></p></td><td class="cl-d00bb8c9"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">34</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8b4"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">45</span></p></td><td class="cl-d00bb8be"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8c8"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">84</span></p></td><td class="cl-d00bb8c9"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">42</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8b4"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">38</span></p></td><td class="cl-d00bb8be"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">36</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8c8"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">46</span></p></td><td class="cl-d00bb8c9"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8b4"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">64</span></p></td><td class="cl-d00bb8be"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d00bb8bf"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">24</span></p></td><td class="cl-d00bb8c0"><p class="cl-d00ba2ac"><span class="cl-d00b9a64">29</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="a9ffa931-a52f-4797-9e20-6ded015c6dda"></div>
-<script>
-var dest = document.getElementById("a9ffa931-a52f-4797-9e20-6ded015c6dda");
-var template = document.getElementById("98cb1705-1d56-4ee3-b93f-e7d3376c4932");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
+<div class="tabwid"><style>.cl-c2136f5e{table-layout:auto;width:50%;}.cl-c20aa7e8{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c20aa7fc{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c20e7210{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-c20e878c{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e878d{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e8796{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e8797{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e8798{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e87a0{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e87a1{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c20e87a2{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing='true' class='cl-c2136f5e'><caption style="display:table-caption;margin:0pt;text-align:center;border-bottom: 0.00pt solid transparent;border-top: 0.00pt solid transparent;border-left: 0.00pt solid transparent;border-right: 0.00pt solid transparent;padding-top:3pt;padding-bottom:3pt;padding-left:3pt;padding-right:3pt;line-height: 1;background-color:transparent;"><span>First 10 rows of the excelcomp data.</span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-c20e878c"><p class="cl-c20e7210"><span class="cl-c20aa7e8">Variable1</span></p></th><th class="cl-c20e878d"><p class="cl-c20e7210"><span class="cl-c20aa7e8">Variable2</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-c20e8796"><p class="cl-c20e7210"><span class="cl-c20aa7fc">6</span></p></td><td class="cl-c20e8797"><p class="cl-c20e7210"><span class="cl-c20aa7fc">67</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8798"><p class="cl-c20e7210"><span class="cl-c20aa7fc">65</span></p></td><td class="cl-c20e87a0"><p class="cl-c20e7210"><span class="cl-c20aa7fc">16</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8796"><p class="cl-c20e7210"><span class="cl-c20aa7fc">12</span></p></td><td class="cl-c20e8797"><p class="cl-c20e7210"><span class="cl-c20aa7fc">56</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8798"><p class="cl-c20e7210"><span class="cl-c20aa7fc">56</span></p></td><td class="cl-c20e87a0"><p class="cl-c20e7210"><span class="cl-c20aa7fc">34</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8796"><p class="cl-c20e7210"><span class="cl-c20aa7fc">45</span></p></td><td class="cl-c20e8797"><p class="cl-c20e7210"><span class="cl-c20aa7fc">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8798"><p class="cl-c20e7210"><span class="cl-c20aa7fc">84</span></p></td><td class="cl-c20e87a0"><p class="cl-c20e7210"><span class="cl-c20aa7fc">42</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8796"><p class="cl-c20e7210"><span class="cl-c20aa7fc">38</span></p></td><td class="cl-c20e8797"><p class="cl-c20e7210"><span class="cl-c20aa7fc">36</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8798"><p class="cl-c20e7210"><span class="cl-c20aa7fc">46</span></p></td><td class="cl-c20e87a0"><p class="cl-c20e7210"><span class="cl-c20aa7fc">47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e8796"><p class="cl-c20e7210"><span class="cl-c20aa7fc">64</span></p></td><td class="cl-c20e8797"><p class="cl-c20e7210"><span class="cl-c20aa7fc">54</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c20e87a1"><p class="cl-c20e7210"><span class="cl-c20aa7fc">24</span></p></td><td class="cl-c20e87a2"><p class="cl-c20e7210"><span class="cl-c20aa7fc">29</span></p></td></tr></tbody></table></div>
 </div>
-<div id="inspecting-tables" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Inspecting tables</h1>
-<p>The most common functions that are used to inspect tabular data are the <code>head()</code> and the <code>str()</code> functions. The <code>head()</code> function shows the first 6 lines (by default) but we can also specify the number of rows. The <code>str()</code> function provides a summary of the structure of the data.</p>
+<div id="inspecting-tables" class="section level1 unnumbered">
+<h1 class="unnumbered">Inspecting tables</h1>
+<p>The most common functions that are used to inspect tabular data are
+the <code>head()</code> and the <code>str()</code> functions. The
+<code>head()</code> function shows the first 6 lines (by default) but we
+can also specify the number of rows. The <code>str()</code> function
+provides a summary of the structure of the data.</p>
 <p>Inspecting the first 6 rows of a table.</p>
 <pre class="r"><code>head(mytable)</code></pre>
 <pre><code>##         status    attraction money
@@ -732,75 +667,48 @@ fantome.appendChild(templateContent);
 ##  $ money     : num  86.3 45.6 68.4 52.9 61.9 ...</code></pre>
 <p>The following section shows how to access and manipulate tables.</p>
 </div>
-<div id="processing-tabular-data" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Processing tabular data</h1>
-<p>The tidyverse is a specific way of writing R code that builds on a family of libraries designed for efficient data science work flows which were developed initially by Hadley Wickham. This new way of writing R code builds on a shared and underlying design philosophy and grammar. Due to its popularity and ease of use, the tidyverse way to write R code is becoming increasingly popular and we will use it in the following to handle and manipulate tabulated data.</p>
-<p>If you have already loaded data into R and now want to process the data, you typically have to modify the data in some form or another to get the information or format you need. The tidyverse offers very user-friendly, intuitive, and handy functions for processing the data to match the needs of your analysis. To have access to the tidyverse functions for data processing, we load the <code>tidyverse</code> package and load and inspect another set of data using the <code>read.delim</code> function. The new data is stored as a txt file and has 100 observations (rows) and 3 variables (<em>status</em>, <em>attraction</em>, and <em>money</em>). The data set represents how much money people have spend in someone they were interested in or not (attraction: <em>Interested</em> versus <em>NotInterested</em>) and their own relationship status (status: <em>Single</em> versus <em>Relationship</em>).</p>
+<div id="processing-tabular-data" class="section level1 unnumbered">
+<h1 class="unnumbered">Processing tabular data</h1>
+<p>The tidyverse is a specific way of writing R code that builds on a
+family of libraries designed for efficient data science work flows which
+were developed initially by Hadley Wickham. This new way of writing R
+code builds on a shared and underlying design philosophy and grammar.
+Due to its popularity and ease of use, the tidyverse way to write R code
+is becoming increasingly popular and we will use it in the following to
+handle and manipulate tabulated data.</p>
+<p>If you have already loaded data into R and now want to process the
+data, you typically have to modify the data in some form or another to
+get the information or format you need. The tidyverse offers very
+user-friendly, intuitive, and handy functions for processing the data to
+match the needs of your analysis. To have access to the tidyverse
+functions for data processing, we load the <code>tidyverse</code>
+package and load and inspect another set of data using the
+<code>read.delim</code> function. The new data is stored as a txt file
+and has 100 observations (rows) and 3 variables (<em>status</em>,
+<em>attraction</em>, and <em>money</em>). The data set represents how
+much money people have spend in someone they were interested in or not
+(attraction: <em>Interested</em> versus <em>NotInterested</em>) and
+their own relationship status (status: <em>Single</em> versus
+<em>Relationship</em>).</p>
 <pre class="r"><code># load new data
 newdata &lt;- base::readRDS(url(&quot;https://slcladal.github.io/data/mld.rda&quot;, &quot;rb&quot;))</code></pre>
-<template id="54033c03-7852-4373-a073-8895164acf30"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-.katex-display {
-    margin: 0 0 !important;
-}
-</style><div class="tabwid"><style>.cl-d0460046{table-layout:auto;width:50%;}.cl-d042f48c{font-family:'DejaVu Sans';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-d042f4a0{font-family:'DejaVu Sans';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-d043009e{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-d04300a8{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-d04324ac{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324b6{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324b7{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324c0{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324ca{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324cb{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324cc{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324d4{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324d5{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324d6{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324d7{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-d04324de{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-d0460046'>
-<caption class="Table Caption">
-<p>First 10 rows of the excelcomp data.</p>
-</caption>
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-d04324d7"><p class="cl-d043009e"><span class="cl-d042f48c">status</span></p></td><td class="cl-d04324d6"><p class="cl-d043009e"><span class="cl-d042f48c">attraction</span></p></td><td class="cl-d04324de"><p class="cl-d04300a8"><span class="cl-d042f48c">money</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-d04324b7"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324ac"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324b6"><p class="cl-d04300a8"><span class="cl-d042f4a0">86.33</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324d5"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324d4"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324cc"><p class="cl-d04300a8"><span class="cl-d042f4a0">45.58</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324b7"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324ac"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324b6"><p class="cl-d04300a8"><span class="cl-d042f4a0">68.43</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324d5"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324d4"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324cc"><p class="cl-d04300a8"><span class="cl-d042f4a0">52.93</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324b7"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324ac"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324b6"><p class="cl-d04300a8"><span class="cl-d042f4a0">61.86</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324d5"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324d4"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324cc"><p class="cl-d04300a8"><span class="cl-d042f4a0">48.47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324b7"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324ac"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324b6"><p class="cl-d04300a8"><span class="cl-d042f4a0">32.79</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324d5"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324d4"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324cc"><p class="cl-d04300a8"><span class="cl-d042f4a0">35.91</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324b7"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324ac"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324b6"><p class="cl-d04300a8"><span class="cl-d042f4a0">30.98</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-d04324cb"><p class="cl-d043009e"><span class="cl-d042f4a0">Relationship</span></p></td><td class="cl-d04324ca"><p class="cl-d043009e"><span class="cl-d042f4a0">NotInterested</span></p></td><td class="cl-d04324c0"><p class="cl-d04300a8"><span class="cl-d042f4a0">44.82</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="88497307-df21-4734-8425-de95bef9f1fc"></div>
-<script>
-var dest = document.getElementById("88497307-df21-4734-8425-de95bef9f1fc");
-var template = document.getElementById("54033c03-7852-4373-a073-8895164acf30");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
-<p>The table represents 3 variables (status, attraction, and money) and each row contains information on the relationship status of 100 people and how much money these people would spend on a gift to someone of the opposite sex who they are or are not interested in. We will now check out different ways and functions to process this data.</p>
-<div id="piping" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Piping</h2>
-<p>Piping, done with the sequence <code>%&gt;%</code>, is a very easy, intuitive, quick, and handy way to process data. Essentially piping means that we take an element that is to the left of the piping symbol and then do something to it; that way, the piping symbol can be translated as <em>and then</em>.</p>
-<p>We could, for example, load data and then capitalize the column names and then group the data by status and attraction and then get the mean of money spend on deleting all observations except for the first one. A more formal way to write this would be:</p>
+<div class="tabwid"><style>.cl-c2981376{table-layout:auto;width:50%;}.cl-c28f0330{font-family:'Arial';font-size:12pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c28f0344{font-family:'Arial';font-size:12pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-c2926bd8{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-c2926be2{margin:0;text-align:right;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-c2928320{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c292832a{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c292832b{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c292832c{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c2928334{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c2928335{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c2928336{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c2928337{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c292833e{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c292833f{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c2928340{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-c2928341{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing='true' class='cl-c2981376'><caption style="display:table-caption;margin:0pt;text-align:center;border-bottom: 0.00pt solid transparent;border-top: 0.00pt solid transparent;border-left: 0.00pt solid transparent;border-right: 0.00pt solid transparent;padding-top:3pt;padding-bottom:3pt;padding-left:3pt;padding-right:3pt;line-height: 1;background-color:transparent;"><span>First 10 rows of the excelcomp data.</span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-c2928320"><p class="cl-c2926bd8"><span class="cl-c28f0330">status</span></p></th><th class="cl-c292832a"><p class="cl-c2926bd8"><span class="cl-c28f0330">attraction</span></p></th><th class="cl-c292832b"><p class="cl-c2926be2"><span class="cl-c28f0330">money</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-c292832c"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928334"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c2928335"><p class="cl-c2926be2"><span class="cl-c28f0344">86.33</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c2928336"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928337"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c292833e"><p class="cl-c2926be2"><span class="cl-c28f0344">45.58</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c292832c"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928334"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c2928335"><p class="cl-c2926be2"><span class="cl-c28f0344">68.43</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c2928336"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928337"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c292833e"><p class="cl-c2926be2"><span class="cl-c28f0344">52.93</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c292832c"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928334"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c2928335"><p class="cl-c2926be2"><span class="cl-c28f0344">61.86</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c2928336"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928337"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c292833e"><p class="cl-c2926be2"><span class="cl-c28f0344">48.47</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c292832c"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928334"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c2928335"><p class="cl-c2926be2"><span class="cl-c28f0344">32.79</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c2928336"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928337"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c292833e"><p class="cl-c2926be2"><span class="cl-c28f0344">35.91</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c292832c"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928334"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c2928335"><p class="cl-c2926be2"><span class="cl-c28f0344">30.98</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-c292833f"><p class="cl-c2926bd8"><span class="cl-c28f0344">Relationship</span></p></td><td class="cl-c2928340"><p class="cl-c2926bd8"><span class="cl-c28f0344">NotInterested</span></p></td><td class="cl-c2928341"><p class="cl-c2926be2"><span class="cl-c28f0344">44.82</span></p></td></tr></tbody></table></div>
+<p>The table represents 3 variables (status, attraction, and money) and
+each row contains information on the relationship status of 100 people
+and how much money these people would spend on a gift to someone of the
+opposite sex who they are or are not interested in. We will now check
+out different ways and functions to process this data.</p>
+<div id="piping" class="section level2 unnumbered">
+<h2 class="unnumbered">Piping</h2>
+<p>Piping, done with the sequence <code>%&gt;%</code>, is a very easy,
+intuitive, quick, and handy way to process data. Essentially piping
+means that we take an element that is to the left of the piping symbol
+and then do something to it; that way, the piping symbol can be
+translated as <em>and then</em>.</p>
+<p>We could, for example, load data and then capitalize the column names
+and then group the data by status and attraction and then get the mean
+of money spend on deleting all observations except for the first one. A
+more formal way to write this would be:</p>
 <blockquote>
 <p>load %&gt;% capitalize %&gt;% group %&gt;% summarize.</p>
 </blockquote>
@@ -820,11 +728,18 @@ pipeddata</code></pre>
 ## 2 Relationship NotInterested  51.5
 ## 3 Single       Interested    157. 
 ## 4 Single       NotInterested  46.0</code></pre>
-<p>The pipe has worked and we get the resulting summary which shows the mean of the money spend based on Attraction and Status.</p>
+<p>The pipe has worked and we get the resulting summary which shows the
+mean of the money spend based on Attraction and Status.</p>
 </div>
-<div id="selecting-and-filtering" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Selecting and filtering</h2>
-<p>Among the most frequent procedures in data processing is selecting certain columns or extracting rows based on variable levels. In the tidyverse, this is done by using the <code>select</code> and <code>filter</code> functions. While <code>select</code> allows to extract columns, <code>filter</code> is used to extract rows, e.g. to get only observations that have a certain feature. Have a look at the example below.</p>
+<div id="selecting-and-filtering" class="section level2 unnumbered">
+<h2 class="unnumbered">Selecting and filtering</h2>
+<p>Among the most frequent procedures in data processing is selecting
+certain columns or extracting rows based on variable levels. In the
+tidyverse, this is done by using the <code>select</code> and
+<code>filter</code> functions. While <code>select</code> allows to
+extract columns, <code>filter</code> is used to extract rows, e.g. to
+get only observations that have a certain feature. Have a look at the
+example below.</p>
 <pre class="r"><code># select and filter
 reduceddata &lt;- newdata %&gt;%
   # select the columns attraction and money
@@ -837,7 +752,13 @@ nrow(reduceddata); table(reduceddata$attraction)</code></pre>
 <pre><code>## 
 ## Interested 
 ##         50</code></pre>
-<p>We have now reduced the data by excluding status (we have only selected attraction and money) and we have removed those 50 data rows of people who were not interested. The <code>select</code> function (like most other tidyverse functions) can also be used together with a minus sign which causes a column to be removed, thus <code>dplyr::select(-money)</code> would remove the money column (see below).</p>
+<p>We have now reduced the data by excluding status (we have only
+selected attraction and money) and we have removed those 50 data rows of
+people who were not interested. The <code>select</code> function (like
+most other tidyverse functions) can also be used together with a minus
+sign which causes a column to be removed, thus
+<code>dplyr::select(-money)</code> would remove the money column (see
+below).</p>
 <pre class="r"><code># select and filter
 datawithoutmoney &lt;- newdata %&gt;%
   # remove money
@@ -851,12 +772,21 @@ head(datawithoutmoney)</code></pre>
 ## 4 Relationship NotInterested
 ## 5 Relationship NotInterested
 ## 6 Relationship NotInterested</code></pre>
-<p>Selecting and filtering are extremely powerful functions that can also be combined with other functions. But before we discuss more complex issues, we will have a look at how we can change columns.</p>
+<p>Selecting and filtering are extremely powerful functions that can
+also be combined with other functions. But before we discuss more
+complex issues, we will have a look at how we can change columns.</p>
 </div>
-<div id="changing-data-and-adding-columns" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Changing data and adding columns</h2>
-<p>Changing and adding data is done with the <code>mutate</code> function. The <code>mutate</code> functions requires that we specify a column name - if we use the same name as the column we are changing, then we change the column but if we specify another column name, then a new column is created.</p>
-<p>We will now create a new column (Spendalot) in which we encode if the person has spend a lot of money (100 AUD or more) on the present or not (less than 100 AUD).</p>
+<div id="changing-data-and-adding-columns"
+class="section level2 unnumbered">
+<h2 class="unnumbered">Changing data and adding columns</h2>
+<p>Changing and adding data is done with the <code>mutate</code>
+function. The <code>mutate</code> functions requires that we specify a
+column name - if we use the same name as the column we are changing,
+then we change the column but if we specify another column name, then a
+new column is created.</p>
+<p>We will now create a new column (Spendalot) in which we encode if the
+person has spend a lot of money (100 AUD or more) on the present or not
+(less than 100 AUD).</p>
 <pre class="r"><code># creating a new column
 newdata &lt;- newdata %&gt;%
   dplyr::mutate(Spendalot = ifelse(money &gt;= 100, &quot;Alot&quot;, &quot;Alittle&quot;)) 
@@ -869,11 +799,20 @@ head(newdata)</code></pre>
 ## 4 Relationship NotInterested 52.93   Alittle
 ## 5 Relationship NotInterested 61.86   Alittle
 ## 6 Relationship NotInterested 48.47   Alittle</code></pre>
-<p>The table now has a new column (Spendalot) because we have specified a column name that did not exist yet - had we written <code>dplyr::mutate(money = ifelse(money &gt;= 100, "Alot", "Alittle"))</code> then we would have changed the money column and replaced the money values with the labels <em>Alot</em> and <em>Alittle</em>.</p>
+<p>The table now has a new column (Spendalot) because we have specified
+a column name that did not exist yet - had we written
+<code>dplyr::mutate(money = ifelse(money &gt;= 100, "Alot", "Alittle"))</code>
+then we would have changed the money column and replaced the money
+values with the labels <em>Alot</em> and <em>Alittle</em>.</p>
 </div>
-<div id="renaming-columns" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Renaming columns</h2>
-<p>Oftentimes, column names are not really meaningful or incoherent which makes it easier to wrap your head around what the values in a column refer to. The easiest way around this is rename columns which is, fortunately very simple in the tidyverse. While the column names of our example table are meaningful, I want to capitalize the first letter of each column name. This can be done as follows.</p>
+<div id="renaming-columns" class="section level2 unnumbered">
+<h2 class="unnumbered">Renaming columns</h2>
+<p>Oftentimes, column names are not really meaningful or incoherent
+which makes it easier to wrap your head around what the values in a
+column refer to. The easiest way around this is rename columns which is,
+fortunately very simple in the tidyverse. While the column names of our
+example table are meaningful, I want to capitalize the first letter of
+each column name. This can be done as follows.</p>
 <pre class="r"><code># renaming columns
 newdata &lt;- newdata  %&gt;%
   dplyr::rename(Status = status, Attraction = attraction, Money = money)
@@ -886,12 +825,19 @@ head(newdata)</code></pre>
 ## 4 Relationship NotInterested 52.93   Alittle
 ## 5 Relationship NotInterested 61.86   Alittle
 ## 6 Relationship NotInterested 48.47   Alittle</code></pre>
-<p>The renaming was successful as all column names now begin with a capital letter.</p>
+<p>The renaming was successful as all column names now begin with a
+capital letter.</p>
 </div>
-<div id="grouping-and-summarising" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Grouping and summarising</h2>
-<p>In contrast to mutate, which retains the number of rows, summarizing creates new columns but collapses rows and only provides the summary value (or values if more than one summary is specified). Also, columns that are not grouping variables are removed.</p>
-<p>Summarizing is particularly useful when we want to get summaries of groups. We will modify the example from above and extract the mean and the standard deviation of the money spend on presents by relationship status and whether the giver was attracted to the giv-ee.</p>
+<div id="grouping-and-summarising" class="section level2 unnumbered">
+<h2 class="unnumbered">Grouping and summarising</h2>
+<p>In contrast to mutate, which retains the number of rows, summarizing
+creates new columns but collapses rows and only provides the summary
+value (or values if more than one summary is specified). Also, columns
+that are not grouping variables are removed.</p>
+<p>Summarizing is particularly useful when we want to get summaries of
+groups. We will modify the example from above and extract the mean and
+the standard deviation of the money spend on presents by relationship
+status and whether the giver was attracted to the giv-ee.</p>
 <pre class="r"><code>#grouping and summarizing data 
 datasummary &lt;- newdata %&gt;%
   dplyr::group_by(Status, Attraction) %&gt;%
@@ -907,9 +853,14 @@ datasummary</code></pre>
 ## 3 Single       Interested    157.   23.2
 ## 4 Single       NotInterested  46.0  19.9</code></pre>
 </div>
-<div id="gathering-and-spreading" class="section level2 unnumbered" number="">
-<h2 class="unnumbered" number="">Gathering and Spreading</h2>
-<p>One very common problem is that data - or at least parts of it - have to be transformed from long to wide format or vice versa. In the tidyverse, this is done using the <code>gather</code> and <code>spread</code> function. We will convert the summary table shown above into a wide format (we also remove the SD column as it is no longer needed)</p>
+<div id="gathering-and-spreading" class="section level2 unnumbered">
+<h2 class="unnumbered">Gathering and Spreading</h2>
+<p>One very common problem is that data - or at least parts of it - have
+to be transformed from long to wide format or vice versa. In the
+tidyverse, this is done using the <code>gather</code> and
+<code>spread</code> function. We will convert the summary table shown
+above into a wide format (we also remove the SD column as it is no
+longer needed)</p>
 <pre class="r"><code># converting data to wide format 
 widedata &lt;- datasummary %&gt;%
   # remove SD column
@@ -924,7 +875,8 @@ widedata</code></pre>
 ##   &lt;chr&gt;             &lt;dbl&gt;         &lt;dbl&gt;
 ## 1 Relationship       99.2          51.5
 ## 2 Single            157.           46.0</code></pre>
-<p>We can re-convert the wide into a long format using the <code>gather</code> function.</p>
+<p>We can re-convert the wide into a long format using the
+<code>gather</code> function.</p>
 <pre class="r"><code># converting data to long format 
 longdata &lt;- widedata %&gt;%
   # convert into long format
@@ -939,12 +891,17 @@ longdata</code></pre>
 ## 2 Single       Interested    157. 
 ## 3 Relationship NotInterested  51.5
 ## 4 Single       NotInterested  46.0</code></pre>
-<p>There are many more useful functions for processing, handling, and summarizing tables but this should suffice to get you started.</p>
+<p>There are many more useful functions for processing, handling, and
+summarizing tables but this should suffice to get you started.</p>
 </div>
 </div>
-<div id="citation-session-info" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Citation &amp; Session Info</h1>
-<p>Schweinberger, Martin. 2022. <em>Handling tables in R</em>. Brisbane: The University of Queensland. url: <a href="https://ladal.edu.au/table.html" class="uri">https://ladal.edu.au/table.html</a> (Version 2022.11.17).</p>
+<div id="citation-session-info" class="section level1 unnumbered">
+<h1 class="unnumbered">Citation &amp; Session Info</h1>
+<p>Schweinberger, Martin. 2022. <em>Handling tables in R</em>. Brisbane:
+The University of Queensland. url: <a
+href="https://ladal.edu.au/table.html"
+class="uri">https://ladal.edu.au/table.html</a> (Version
+2022.11.17).</p>
 <pre><code>@manual{schweinberger2022tabr,
   author = {Schweinberger, Martin},
   title = {Handling tables in R},
@@ -955,64 +912,90 @@ longdata</code></pre>
   edition = {2022.11.17}
 }</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
-<pre><code>## R version 4.1.2 (2021-11-01)
-## Platform: x86_64-pc-linux-gnu (64-bit)
-## Running under: Ubuntu 22.04.2 LTS
+<pre><code>## R version 4.2.2 (2022-10-31 ucrt)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 10 x64 (build 22621)
 ## 
 ## Matrix products: default
-## BLAS:   /usr/lib/x86_64-linux-gnu/atlas/libblas.so.3.10.3
-## LAPACK: /usr/lib/x86_64-linux-gnu/atlas/liblapack.so.3.10.3
 ## 
 ## locale:
-##  [1] LC_CTYPE=en_AU.UTF-8          LC_NUMERIC=C                 
-##  [3] LC_TIME=en_AU.UTF-8           LC_COLLATE=en_AU.UTF-8       
-##  [5] LC_MONETARY=en_AU.UTF-8       LC_MESSAGES=en_AU.UTF-8      
-##  [7] LC_PAPER=en_AU.UTF-8          LC_NAME=en_AU.UTF-8          
-##  [9] LC_ADDRESS=en_AU.UTF-8        LC_TELEPHONE=en_AU.UTF-8     
-## [11] LC_MEASUREMENT=en_AU.UTF-8    LC_IDENTIFICATION=en_AU.UTF-8
+## [1] LC_COLLATE=English_Australia.utf8  LC_CTYPE=English_Australia.utf8   
+## [3] LC_MONETARY=English_Australia.utf8 LC_NUMERIC=C                      
+## [5] LC_TIME=English_Australia.utf8    
 ## 
 ## attached base packages:
-## [1] stats     graphics  grDevices datasets  utils     methods   base     
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-## [1] here_1.0.1      openxlsx_4.2.5  xlsx_0.6.5      flextable_0.7.3
-## [5] tidyr_1.2.0     dplyr_1.0.9    
+## [1] here_1.0.1       openxlsx_4.2.5.2 xlsx_0.6.5       flextable_0.9.1 
+## [5] tidyr_1.3.0      dplyr_1.1.2     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] zip_2.2.0         Rcpp_1.0.8.3      cellranger_1.1.0  pillar_1.7.0     
-##  [5] bslib_0.3.1       compiler_4.1.2    jquerylib_0.1.4   highr_0.9        
-##  [9] base64enc_0.1-3   tools_4.1.2       uuid_1.1-0        digest_0.6.29    
-## [13] jsonlite_1.8.0    evaluate_0.15     lifecycle_1.0.1   tibble_3.1.7     
-## [17] pkgconfig_2.0.3   rlang_1.0.4       cli_3.3.0         DBI_1.1.3        
-## [21] yaml_2.3.5        xfun_0.31         fastmap_1.1.0     rJava_1.0-6      
-## [25] xml2_1.3.3        officer_0.4.3     stringr_1.4.0     knitr_1.39       
-## [29] xlsxjars_0.6.1    systemfonts_1.0.4 gdtools_0.2.4     generics_0.1.3   
-## [33] vctrs_0.4.1       sass_0.4.1        rprojroot_2.0.3   tidyselect_1.1.2 
-## [37] glue_1.6.2        data.table_1.14.2 R6_2.5.1          fansi_1.0.3      
-## [41] readxl_1.4.0      rmarkdown_2.14    purrr_0.3.4       magrittr_2.0.3   
-## [45] ellipsis_0.3.2    htmltools_0.5.2   assertthat_0.2.1  renv_0.15.4      
-## [49] utf8_1.2.2        klippy_0.0.0.9500 stringi_1.7.8     crayon_1.5.1</code></pre>
+##  [1] Rcpp_1.0.10             xlsxjars_0.6.1          assertthat_0.2.1       
+##  [4] rprojroot_2.0.3         digest_0.6.31           utf8_1.2.3             
+##  [7] mime_0.12               cellranger_1.1.0        R6_2.5.1               
+## [10] evaluate_0.21           highr_0.10              pillar_1.9.0           
+## [13] gdtools_0.3.3           rlang_1.1.1             readxl_1.4.2           
+## [16] curl_5.0.0              uuid_1.1-0              rstudioapi_0.14        
+## [19] data.table_1.14.8       jquerylib_0.1.4         klippy_0.0.0.9500      
+## [22] rmarkdown_2.21          textshaping_0.3.6       shiny_1.7.4            
+## [25] compiler_4.2.2          httpuv_1.6.11           xfun_0.39              
+## [28] pkgconfig_2.0.3         askpass_1.1             systemfonts_1.0.4      
+## [31] gfonts_0.2.0            htmltools_0.5.5         openssl_2.0.6          
+## [34] tidyselect_1.2.0        tibble_3.2.1            fontBitstreamVera_0.1.1
+## [37] httpcode_0.3.0          fansi_1.0.4             withr_2.5.0            
+## [40] crayon_1.5.2            later_1.3.1             crul_1.4.0             
+## [43] grid_4.2.2              jsonlite_1.8.4          xtable_1.8-4           
+## [46] lifecycle_1.0.3         magrittr_2.0.3          zip_2.3.0              
+## [49] cli_3.6.1               stringi_1.7.12          cachem_1.0.8           
+## [52] promises_1.2.0.1        xml2_1.3.4              bslib_0.4.2            
+## [55] ellipsis_0.3.2          ragg_1.2.5              generics_0.1.3         
+## [58] vctrs_0.6.2             tools_4.2.2             glue_1.6.2             
+## [61] officer_0.6.2           fontquiver_0.2.1        purrr_1.0.1            
+## [64] fastmap_1.1.1           yaml_2.3.7              fontLiberation_0.1.0   
+## [67] rJava_1.0-6             knitr_1.43              sass_0.4.6</code></pre>
 </div>
-<div id="references" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">References</h1>
+<div id="references" class="section level1 unnumbered">
+<h1 class="unnumbered">References</h1>
 <hr />
 <p><a href="#introduction">Back to top</a></p>
-<p><a href="https://ladal.edu.au">Back to HOME</a></p>
+<p><a href="https://ladal.edu.au">Back to LADAL</a></p>
 <hr />
-<div id="refs" class="references hanging-indent">
-<div id="ref-estrellado2020data">
-<p>Estrellado, Ryan A, Emily A Freer, Jesse Mostipak, Joshua M Rosenberg, and Isabella C Velásquez. 2020. <em>Data Science in Education Using R</em>. Routledge.</p>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-estrellado2020data" class="csl-entry">
+Estrellado, Ryan A, Emily A Freer, Jesse Mostipak, Joshua M Rosenberg,
+and Isabella C Velásquez. 2020. <em>Data Science in Education Using
+r</em>. Routledge.
 </div>
-<div id="ref-stander2017enthusing">
-<p>Stander, Julian, and Luciana Dalla Valle. 2017. “On Enthusing Students About Big Data and Social Media Visualization and Analysis Using R, Rstudio, and Rmarkdown.” <em>Journal of Statistics Education</em> 25 (2): 60–67.</p>
+<div id="ref-stander2017enthusing" class="csl-entry">
+Stander, Julian, and Luciana Dalla Valle. 2017. <span>“On Enthusing
+Students about Big Data and Social Media Visualization and Analysis
+Using r, RStudio, and RMarkdown.”</span> <em>Journal of Statistics
+Education</em> 25 (2): 60–67.
 </div>
-<div id="ref-wickham2019welcome">
-<p>Wickham, Hadley, Mara Averick, Jennifer Bryan, Winston Chang, Lucy D’Agostino McGowan, Romain François, Garrett Grolemund, et al. 2019. “Welcome to the Tidyverse.” <em>Journal of Open Source Software</em> 4 (43): 1686.</p>
+<div id="ref-wickham2019welcome" class="csl-entry">
+Wickham, Hadley, Mara Averick, Jennifer Bryan, Winston Chang, Lucy
+D’Agostino McGowan, Romain François, Garrett Grolemund, et al. 2019.
+<span>“Welcome to the Tidyverse.”</span> <em>Journal of Open Source
+Software</em> 4 (43): 1686.
 </div>
-<div id="ref-wickham2016r">
-<p>Wickham, Hadley, and Garrett Grolemund. 2016. <em>R for Data Science: Import, Tidy, Transform, Visualize, and Model Data</em>. " O’Reilly Media, Inc.".</p>
+<div id="ref-wickham2016r" class="csl-entry">
+Wickham, Hadley, and Garrett Grolemund. 2016. <em>R for Data Science:
+Import, Tidy, Transform, Visualize, and Model Data</em>. " O’Reilly
+Media, Inc.".
 </div>
 </div>
+</div>
+<div class="footnotes footnotes-end-of-document">
+<hr />
+<ol>
+<li id="fn1"><p>If you want to render the R Notebook on your machine,
+i.e. knitting the document to html or a pdf, you need to make sure that
+you have R and RStudio installed and you also need to download the <a
+href="https://slcladal.github.io/content/bibliography.bib"><strong>bibliography
+file</strong></a> and store it in the same folder where you store the
+Rmd file.<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+</ol>
 </div>
 
 
