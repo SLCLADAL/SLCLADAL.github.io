@@ -1,0 +1,206 @@
+---
+title: "Semantic Similarity with Word2Vec and UMAP in R"
+author: "Martin Schweinberger"
+date: "31 May, 2023"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces basic inferential procedures for null-hypothesis hypothesis testing. Inferential statistics allow us to draw conclusions and make predictions about a population based on a smaller sample. They help us analyze relationships, test hypotheses, and understand the broader implications of data. Inferential statistics provide a framework for making informed inferences in humanities and linguistics research.
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to implement basic inferential statistical tests in R, but it also covers the conceptual underpinnings of the most commonly used tests (such as t-tests and $\chi^2$-tests). The aim is not to provide a fully-fledged analysis but rather to show and exemplify basic test commonly used to test hypotheses. 
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+To be able to follow this tutorial, we suggest you check out and familiarize yourself with the content of the following **R Basics** and **Data Science Basics** tutorials:<br>
+</p>
+<p style='margin-top:1em; text-align:left'>
+<ul>
+  <li>[Data Visualization with R](https://ladal.edu.au/dviz.html) </li>
+  <li>[Getting started with R](https://ladal.edu.au/intror.html) </li>
+  <li>[Loading, saving, and generating data in R](https://ladal.edu.au/load.html) </li>
+  <li>[Handling Tables in R](https://ladal.edu.au/regex.html) </li>
+</ul>
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click [**here**](https://ladal.edu.au/content/semsim.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fsemsim_cb.ipynb%26branch%3Dmain)<br>
+Click [**here**](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fsemsim_cb.ipynb%26branch%3Dmain) to open an interactive Jupyter notebook that allows you to execute, change, and edit the code as well as to upload your own data. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+After preparing our R session (see below), we start the tutorial by getting to know how to test if the assumptions fro parametric tests are met - this allows us to ascertain if we should use a parametric or a non-parametric test. The next part of this tutorial then focuses on basic parametric tests such as independent and dependent t-tests while the last part of the tutorial introduces on non-parametric tests such as the $\chi$^2^ family of tests. 
+
+## Preparation and session set up{-}
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("udpipe") 
+install.packages("word2vec") 
+install.packages("here") 
+install.packages("ggplot2") 
+install.packages("uwot")
+install.packages("ggrepel")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Now, we load the packages that we will need in this tutorial.
+
+```{r qq01, message=F, warning=F}
+# load packages
+library(udpipe)       # for data processing
+library(ggplot2)      # for data vis
+library(word2vec)     # for embeddings
+library(uwot)         # for dimension reduction
+library(ggrepel)      # to avoid overlap
+library(dplyr)       # for data processing
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Also we load some sample data sets that we will use in this tutorial.
+
+```{r data, message=F, warning=F}
+# data
+dat  <- base::readRDS(url("https://slcladal.github.io/data/darwin.rda", "rb"))
+```
+
+
+
+```{r}
+data(brussels_reviews, package ="udpipe")
+x <- subset(brussels_reviews, language=="fr")
+x <-tolower(dat)
+cat(x[1])
+```
+
+
+```{r}
+set.seed(123456789)
+model <- word2vec(x = x, type = "cbow", dim = 15, iter = 20)
+```
+
+```{r}
+embedding <- as.matrix(model)
+embedding <- predict(model, c("organism", "variation"), type = "embedding")
+embedding
+```
+
+
+```{r}
+lookslike <- predict(model, c("organism", "selection"), type = "nearest", top_n = 5)
+lookslike
+```
+
+```{r}
+#write.word2vec(model, "mymodel.bin")
+```
+
+```{r}
+#model <- read.word2vec("mymodel.bin")
+lookslike <- predict(model, c("chang", "selec"), type = "nearest", top_n = 5)
+lookslike
+```
+
+
+```{r}
+## Do Parts of Speech tagging + combine parts of speech tag with the lemma
+m_eng <- udpipe_load_model(file = here::here("udpipemodels", "english-ewt-ud-2.5-191206.udpipe"))
+anno <- udpipe::udpipe_annotate(m_eng, dat)%>%
+  as.data.frame() %>%
+  dplyr::select(-sentence)
+anno <- subset(anno, !is.na(lemma) & nchar(lemma) > 1 & !upos %in% "PUNCT")
+anno$text <- sprintf("%s//%s", anno$lemma, anno$upos)
+```
+
+```{r}
+head(anno[,c("doc_id", "token", "upos", "lemma", "text")], n = 3)
+```
+
+```{r}
+## Paste the text together again with space as a separator
+x <- paste.data.frame(anno, term = "text", group = "doc_id", collapse = " ")
+str(x)
+```
+
+```{r}
+model <- word2vec(x = x$text, dim = 15, iter = 20, split = c(" ", ".\n?!"))
+embedding <- as.matrix(model)
+```
+
+```{r}
+viz <- umap(embedding, n_neighbors = 15, n_threads = 2)
+rownames(viz) <- rownames(embedding)
+head(viz, n = 10)
+
+```
+
+```{r}
+df  <- data.frame(word = gsub("//.+", "", rownames(viz)), 
+                  upos = gsub(".+//", "", rownames(viz)), 
+                  x = viz[,1], y = viz[, 2], 
+                  stringsAsFactors = FALSE)
+df  <- subset(df, upos %in% c("ADJ"))
+ggplot(df, aes(x = x, y = y, label = word)) +
+geom_text_repel() +
+theme_void() +
+labs(title = "word2vec - adjectives in 2D using UMAP")
+```
+
+
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. `r format(Sys.time(), '%Y')`. *Semantic Similarity with Word2Vec and UMAP in R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/basicstatz.html (Version `r format(Sys.time(), '%Y.%m.%d')`).
+
+```
+@manual{schweinberger`r format(Sys.time(), '%Y')`semsim,
+  author = {Schweinberger, Martin},
+  title = {Semantic Similarity with Word2Vec and UMAP in R},
+  note = {www.ladal.edu.au/semsim.html},
+  year = {`r format(Sys.time(), '%Y')`},
+  organization = "The University of Queensland, School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {`r format(Sys.time(), '%Y.%m.%d')`}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](www.ladal.edu.au)
+
+***
+
+
+# References{-}
+
+
