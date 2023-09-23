@@ -1,0 +1,45 @@
+---
+title: "Leftorver code chunks"
+output: html_notebook
+---
+
+This code chunk aims to speed up the annotation of large text datsets with udpipe (the basic implementation worked fatser though)
+
+
+```{r eval = F}
+# start time
+start_time <- Sys.time()
+ud_model <- udpipe::udpipe_download_model(language = "english-ewt")
+ud_eng <- udpipe_load_model(ud_model)
+
+# define function
+annotate_splits <- function(x, file) {
+  ud_model <- udpipe_load_model(file)
+  x <- as.data.table(udpipe_annotate(ud_model, 
+                                     x = sentences))
+  return(x)
+}
+
+# Define cores to be used
+ncores <- 50
+plan(multisession, workers = ncores)
+
+# slit data into sentences
+sentences <- dickens_corpus$text %>%
+  quanteda::tokenize_sentence() %>% 
+  unlist()
+
+# split comments based on available cores
+corpus_splitted <- split(sentences, seq(1, length(sentences), by = 100))
+
+annotation <- future_lapply(corpus_splitted, annotate_splits, file = ud_model$file_model, future.seed=TRUE)
+annotation <- rbindlist(annotation)
+
+# end time
+end_time <- Sys.time()
+end_time - start_time
+
+# inspect results
+```
+
+

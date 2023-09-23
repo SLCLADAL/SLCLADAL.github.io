@@ -62,6 +62,7 @@ install.packages("here")
 install.packages("ggplot2") 
 install.packages("uwot")
 install.packages("ggrepel")
+install.packages("quanteda")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -76,7 +77,10 @@ library(ggplot2)      # for data vis
 library(word2vec)     # for embeddings
 library(uwot)         # for dimension reduction
 library(ggrepel)      # to avoid overlap
-library(dplyr)       # for data processing
+library(dplyr)        # for data processing
+library(stringr)      # for data processing
+library(quanteda)     # for tokenisation
+library(tibble)     # for tokenisation
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -85,35 +89,194 @@ Also we load some sample data sets that we will use in this tutorial.
 
 ```{r data, message=F, warning=F}
 # data
-dat  <- base::readRDS(url("https://slcladal.github.io/data/darwin.rda", "rb"))
+dat  <- base::readRDS(url("https://slcladal.github.io/data/cooee.rda", "rb")) %>%
+  # clean data
+  stringr::str_remove_all("<.*?>") %>% stringr::str_squish()
+datmeta <- base::readRDS(url("https://slcladal.github.io/data/cooeemeta.rda", "rb"))
+# inspect
+substr(dat[1:5], start=1, stop=500)
 ```
 
 
 
+split into sentences
+
 ```{r}
-data(brussels_reviews, package ="udpipe")
-x <- subset(brussels_reviews, language=="fr")
-x <-tolower(dat)
-cat(x[1])
+sen <- quanteda::tokenize_sentence(dat) %>%
+  unlist() %>%
+  tolower()
+# inspect 
+head(sen)
+```
+
+find collocations
+
+we start with 3-grams
+
+```{r}
+sen_tokzd <- quanteda::tokens(sen)
+colls3 <- sen_tokzd %>%
+  quanteda.textstats::textstat_collocations(min_count = 3, tolower = FALSE, size = 3) %>%
+  dplyr::mutate(collocation = tm::removeWords(collocation, stopwords("english")),
+                collocation = stringr::str_squish(collocation)) %>%
+  dplyr::filter(stringr::str_detect(collocation, "\\w{1,} \\w{1,} \\w{1,}")) %>%
+  dplyr::filter(count > 20) %>%
+  dplyr::arrange(-lambda)
+# inspect
+head(colls3, 20)
+```
+
+```{r}
+sen <- sen %>%
+  stringr::str_replace_all("new south wales", "new-south-wales") %>%
+  stringr::str_replace_all("van diemens land", "van-diemens-land") %>%
+  stringr::str_replace_all("van diemen's land", "van-diemens-land") %>%
+  stringr::str_replace_all("van diemans land", "van-diemens-land") %>%
+  stringr::str_replace_all("van dieman's land", "van-diemens-land") %>%
+  stringr::str_replace_all("new zealand", "new-zealand") %>%
+  stringr::str_replace_all("rufus dawes", "rufus-dawes") %>%
+  stringr::str_replace_all("joanna spring", "joanna-spring") %>%
+  stringr::str_replace_all("per cent", "percent") %>%
+  stringr::str_replace_all("botany bay", "botany-bay") %>%
+  stringr::str_replace_all(" don t ", " dont ") %>%
+  stringr::str_replace_all("privy council", "privy-council") %>%
+  stringr::str_replace_all("port jackson", "port-jackson") %>%
+  stringr::str_replace_all("hobart town", "hobart-town") %>%
+  stringr::str_replace_all("united kingdom", "united-kingdom") %>%
+  stringr::str_replace_all("moreton bay", "moreton-bay") %>%
+  stringr::str_replace_all("supreme court", "supreme-court") %>%
+  stringr::str_replace_all("letters patent", "letters-patent") %>%
+  stringr::str_replace_all("desert gums", "desert-gums") %>%
+  stringr::str_replace_all("port dalrymple", "port-dalrymple") %>%
+  stringr::str_replace_all("grass dale", "grass-dale") %>%
+  stringr::str_replace_all("william deane", "william-deane") %>%
+  stringr::str_replace_all("port phillip", "port-phillip") %>%
+  stringr::str_replace_all("surgeon superintendent", "surgeon-superintendent") %>%
+  stringr::str_replace_all("corporal punishment", "corporal-punishment") %>%
+  stringr::str_replace_all("wellington valley", "wellington-valley") %>%
+  stringr::str_replace_all("norfolk island", "norfolk-island") %>%
+  stringr::str_replace_all("new holland", "new-holland") %>%
+  stringr::str_replace_all("legislative assembly", "legislative-assembly") %>%
+  stringr::str_replace_all("attorney general", "attorney-general") %>%
+  stringr::str_replace_all("gold fields", "gold-fields") %>%
+  stringr::str_replace_all("judge advocate", "judge-advocate") %>%
+  stringr::str_replace_all("appropriation bill", "appropriation-bill") %>%
+  stringr::str_replace_all("gum trees", "gum-trees") %>%
+  stringr::str_replace_all("governor hunter", "governor-hunter") %>%
+  stringr::str_replace_all("sir george", "sir-george") %>%
+  stringr::str_replace_all("resident judge", "resident-judge") %>%
+  stringr::str_replace_all("macquarie harbour", "macquarie-harbour") %>%
+  stringr::str_replace_all("captain mitchell", "captain-mitchell") %>%
+  stringr::str_replace_all("solicitor general", "solicitor-general") %>%
+  stringr::str_replace_all("great britain", "great-britain") %>%
+  stringr::str_replace_all("colonial secretary", "colonial-secretary") %>%
+  stringr::str_replace_all("sir henry", "sir-henry") %>%
+  stringr::str_replace_all("hunter's river", "hunters-river") %>%
+  stringr::str_replace_all("post office", "post office")%>%
+  stringr::str_replace_all("chief constable", "chief-constable")%>%
+  stringr::str_replace_all("western australia", "western-australia")%>%
+  stringr::str_replace_all("mr gordon", "mr-gordon")%>%
+  stringr::str_replace_all("crown lands", "crown-lands")%>%
+  stringr::str_replace_all("northern queensland", "northern-queensland") %>%
+  stringr::str_replace_all("police magistrate", "police-magistrate") %>%
+  stringr::str_replace_all("imperial parliament", "imperial-parliament") %>%
+  stringr::str_replace_all("police magistrate", "police-magistrate") %>%
+  stringr::str_replace_all("executive council", "executive-council") %>%
+  stringr::str_replace_all("chief justice", "chief-justice") %>%
+  stringr::str_replace_all("penal settlement", "penal-settlement") %>%
+  stringr::str_replace_all("appropriation bill", "appropriation-bill") %>%
+  stringr::str_replace_all("legislative council", "legislative-council") %>%
+  stringr::str_replace_all("united states", "united-states") %>%
+  stringr::str_replace_all("mounted police", "mounted-police") %>%
+  stringr::str_replace_all("south australia", "south-australia")
+```
+
+
+```{r}
+sen_tokzd <- quanteda::tokens(sen)
+colls2 <- sen_tokzd %>%
+  quanteda.textstats::textstat_collocations(min_count = 3, tolower = FALSE) %>%
+  dplyr::mutate(collocation = tm::removeWords(collocation, stopwords("english")),
+                collocation = stringr::str_squish(collocation)) %>%
+  dplyr::filter(stringr::str_detect(collocation, " ")) %>%
+  dplyr::filter(count > 20) %>%
+  dplyr::arrange(-count, -z)
+# inspect
+head(colls2, 50)
+```
+
+
+remove stopwords (makes results worse!)
+
+```{r eval = F}
+csen <- tm::removeWords(sen, stopwords("english")) %>%
+  stringr::str_squish() %>%
+  stringr::str_replace_all("&", "and")
+head(csen)
 ```
 
 
 ```{r}
 set.seed(123456789)
-model <- word2vec(x = x, type = "cbow", dim = 15, iter = 20)
+model <- word2vec(x = sen, type = "skip-gram", dim = 15, iter = 20, hs = T)
 ```
+
+extract embeddings
 
 ```{r}
 embedding <- as.matrix(model)
-embedding <- predict(model, c("organism", "variation"), type = "embedding")
+embedding <- predict(model, c("aboriginal", "australia"), type = "embedding")
 embedding
+```
+
+extract similar words
+
+```{r}
+lookslike <- predict(model, c("aboriginal", "australia"), type = "nearest", top_n = 10)
+lookslike
 ```
 
 
 ```{r}
-lookslike <- predict(model, c("organism", "selection"), type = "nearest", top_n = 5)
-lookslike
+embedding <- as.matrix(model)
+collocates <- predict(model, c("aboriginal"), type = "nearest", top_n = 100)
+collocs <- collocates$aboriginal$term2
+sml <- collocates$aboriginal$similarity
+head(collocates, 10)
 ```
+
+```{r}
+viz <- umap(embedding, n_neighbors = 5, n_threads = 2)
+rownames(viz) <- rownames(embedding)
+head(viz, n = 10)
+
+```
+
+```{r}
+vizred <- viz[rownames(viz) %in% collocs,]
+colnames(vizred) <- c("x", "y")
+vizred2 <- as.data.frame(vizred) %>%
+  dplyr::mutate(words = rownames(vizred),
+                sml = sml) %>%
+  add_row(x = mean(.$x), y = mean(.$y), words = "aboriginal", sml = 1)# %>%  dplyr::filter(sml > .85)
+head(vizred2)
+```
+
+```{r}
+vizred2 %>%
+  dplyr::mutate(clr = ifelse(y > mean(y), -1, 1)) %>%
+  ggplot(aes(x = x, y = y, label = words, color = clr, size = sml, alpha = sml)) +
+  #geom_text() +
+  geom_text_repel(max.overlaps = getOption("ggrepel.max.overlaps", default = 75)) +
+  theme_void() +
+  scale_color_gradient(low = "black", high = "red") +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = "white")) 
+# save
+ggsave(here::here("images", "cooee_aboriginal.png"))
+```
+
+
 
 ```{r}
 #write.word2vec(model, "mymodel.bin")
@@ -121,7 +284,7 @@ lookslike
 
 ```{r}
 #model <- read.word2vec("mymodel.bin")
-lookslike <- predict(model, c("chang", "selec"), type = "nearest", top_n = 5)
+lookslike <- predict(model, c("aboriginal", "australia"), type = "nearest", top_n = 10)
 lookslike
 ```
 
@@ -129,7 +292,7 @@ lookslike
 ```{r}
 ## Do Parts of Speech tagging + combine parts of speech tag with the lemma
 m_eng <- udpipe_load_model(file = here::here("udpipemodels", "english-ewt-ud-2.5-191206.udpipe"))
-anno <- udpipe::udpipe_annotate(m_eng, dat)%>%
+anno <- udpipe::udpipe_annotate(m_eng, sen)%>%
   as.data.frame() %>%
   dplyr::select(-sentence)
 anno <- subset(anno, !is.na(lemma) & nchar(lemma) > 1 & !upos %in% "PUNCT")
@@ -137,7 +300,7 @@ anno$text <- sprintf("%s//%s", anno$lemma, anno$upos)
 ```
 
 ```{r}
-head(anno[,c("doc_id", "token", "upos", "lemma", "text")], n = 3)
+head(anno[,c("doc_id", "token", "upos", "lemma", "text")], n = 10)
 ```
 
 ```{r}
@@ -147,13 +310,13 @@ str(x)
 ```
 
 ```{r}
-model <- word2vec(x = x$text, dim = 15, iter = 20, split = c(" ", ".\n?!"))
-embedding <- as.matrix(model)
+posmodel <- word2vec(x = x$text, dim = 15, iter = 20, split = c(" ", ".\n?!"))
+posembedding <- as.matrix(posmodel)
 ```
 
 ```{r}
-viz <- umap(embedding, n_neighbors = 15, n_threads = 2)
-rownames(viz) <- rownames(embedding)
+viz <- umap(posembedding, n_neighbors = 15, n_threads = 2)
+rownames(viz) <- rownames(posembedding)
 head(viz, n = 10)
 
 ```
@@ -165,7 +328,7 @@ df  <- data.frame(word = gsub("//.+", "", rownames(viz)),
                   stringsAsFactors = FALSE)
 df  <- subset(df, upos %in% c("ADJ"))
 ggplot(df, aes(x = x, y = y, label = word)) +
-geom_text_repel() +
+geom_text_repel(max.overlaps = getOption("ggrepel.max.overlaps", default = 100), size = 3) +
 theme_void() +
 labs(title = "word2vec - adjectives in 2D using UMAP")
 ```
