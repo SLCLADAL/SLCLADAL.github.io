@@ -13,6 +13,33 @@ link-citations: yes
 This tutorial shows how to perform topic modelling using R. The entire R markdown document for the tutorial can be downloaded [here]("https://slcladal.github.io/content/ATAP_TopMod_Markdown.Rmd").
 The tutorial requires you to install and load a couple of packages (also called libraries) to analyze linguistic data. To help you, we directly include the commands to do so in the script and walk you through it step by step.
 
+<div class="warning" style='padding:0.1em; background-color:rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+To be able to follow this tutorial, we suggest you check out and familiarize yourself with the content of the following tutorials:<br>
+</p>
+<p style='margin-top:1em; text-align:left'>
+<ul>
+  <li>[Getting started with R](https://ladal.edu.au/intror.html) </li>
+  <li>[Loading, saving, and generating data in R](https://ladal.edu.au/load.html) </li>
+  <li>[String Processing in R](https://ladal.edu.au/string.html) </li>
+  <li>[Regular Expressions in R](https://ladal.edu.au/regex.html) </li>
+  <li>[Topic modeling with R](https://ladal.edu.au/topicmodels.html) </li>
+</ul>
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click [**here**](https://ladal.edu.au/content/topmod_dickens.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252F_dickens_cb.ipynb%26branch%3Dmain)<br>
+Click [**here**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252F_dickens_cb.ipynb%26branch%3Dmain) to open an interactive Jupyter notebook that allows you to execute, change, and edit the code as well as to upload your own data. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+
 ## Motivation
 
 There is an incredible amount of text that has been archived all over the world. Probably, there is more text being produced on any given day than a single person can ever hope to read. What are linguists and other language-oriented scholars - be that from perspectives historical, literary, sociological or beyond - going to do with this embarrassment of riches? Change field, focus on a particular niche of language or begin using automated language methods, most likely. If you belong to the latter category, and have yet to acquaint yourself with topic modelling, welcome.
@@ -169,25 +196,27 @@ Now that we have loaded the data, we need to prepare it for the analysis (the to
 
 ## Pre-Processing, Part 1
 
-The first step of the pre-processing requires us to transform the texts we stored under `dickens_corpus` and clean it by removing empty text elements using the `filter()` function from the `dplyr` package. Then, we group the data by title using `group_by()` (also a function from the `dplyr` package) and we then summarise the individual text elements (using the `summarise()` function from `dplyr`) by pasting them together using `paste0()` which results in one long string for each novel. :
+The first step of the pre-processing requires us to transform the texts we stored under `dickens_corpus` and clean it by removing empty text elements using the `filter()` function from the `dplyr` package. Then, we replace sentence punctuation marks (.?!) with the sequence "qwerty". Next, we group the data by title using `group_by()` (also a function from the `dplyr` package) and we then we reframe the data so that each row represents one sentence. During the reframing, we split the text into sentences by splitting the text by the "qwerty" sequence we just added, we remove upper case sequences, and we remove upper case letters except for capital *i* (I). This should result in a table where each sentence represents one row. 
 
 ```{r}
-#dickens_corpus <- corpus(dickens_corpus)
-dickens_corpus <- dickens_corpus %>%
+dickens_corpus %>%
   dplyr::filter(text != "") %>%
+  dplyr::mutate(text = stringr::str_replace_all(text, "([[:digit:][:lower:]])((\\.|\\?\\!))", "\\1\\2qwerty")) %>%
   dplyr::group_by(title) %>%
-  dplyr::summarise(text = paste0(text, collapse = " "))
-# inspect
-head(dickens_corpus)
+  dplyr::reframe(text = paste0(text, collapse = " "),
+                 text = unlist(strsplit(text, "qwerty")),
+                 text = stringr::str_remove_all(text, "[:upper:]{2,}"),
+                 text = stringr::str_replace_all(text, " [A:H,J:Z] ", " "),
+                 text = stringr::str_squish(text)) -> dickens_corpus
 ```
 
-Take a look at the transformed `dickens_corpus`:
+To check if the splitting into sentences has worked, let's have a look at the transformed `dickens_corpus`:
 
 ```{r}
-dickens_corpus
+head(dickens_corpus$text, 10)
 ```
 
-This should seem mighty familiar. Indeed, it looks identical to how it did before. Why do this, then? By transforming the data frame from the Gutenberg download into a corpus object, we give the object the default settings that are necessary for the subsequent processing of the corpus.
+As we can see, we are left with a data frame consisting of many rows and 2 columns with each row representing one sentence. Unfortunately, the sentence tokenisation has not worked perfectly as we see that in the first row, the title and author (*A Ghost Story of Christmas by Charles Dickens*) it still attached to the first sentence.
 
 To get a sense of the current structure of the corpus, we can take a look at the titles, in the form of a table:
 
@@ -199,19 +228,27 @@ This command builds a contingency table, basically counting how many documents i
 
 ## Parsing the Corpus
 
-The next step is an essential, but also a computationally intense one: we are going to parse the corpus. This is what we went through the Anaconda shenanigans earlier. This is where we get the corpus ready for topic modelling.
+The next step is an essential, but also a computationally intense one: we are going to parse the corpus. This is where we get the corpus ready for topic modelling.
 
 Before we go into the what and why of parsing, we suggest you initiate the process - it can take a while (depending on how good your device's computing power is - it takes 1 hour and 6 seconds on my laptop):
 
-> **Because it takes so long, we suggest you do not execute the following chunk but load the already processed data (as shown in the *loading* chunk following the *parsing* chunk).**
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+**Because it takes so long, we suggest you do not execute the following chunk but load the already processed data (as shown in the *loading* chunk following the *parsing* chunk).** <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
 
 ```{r eval=F}
 # parsing
 dickens_corpus$text %>%
-  # split into sentneces
-  quanteda::tokenize_sentence() %>% 
-  # unlist results
-  unlist() %>% 
   # pos-tagging
   udpipe::udpipe_annotate(m_eng, x = .) %>%
   # convert into data frame
@@ -219,6 +256,8 @@ dickens_corpus$text %>%
   # remove sentence variable and save
   dplyr::select(-sentence) -> dickens_parsed
 ```
+
+> **Execute the following chunk to load the already parsed data!**
 
 ```{r}
 # loading
@@ -238,7 +277,7 @@ str(dickens_parsed)
 
 We are now dealing with a data frame that contains 1,996,275 observations (rows) of 7 variables (columns). Roughly two million words for eight novels sounds about right. Of course, if we want to be sure that we didn't lose anything on the way thus far, we could go back to the Gutenberg information to see whether we have the correct amount of words. But we'll carry on with the assumption that everything worked fine so far.
 
-The structure of the parsed corpus is very different from the structure of the corpus as it was before. Among the columns, we find the doc-, sentence- and token-IDs, the tokens and their lemma, the part of speech tag and the entity. Most of this, we will ignore for the current purpose. What we need to get the corpus into processable form are the part of speech tags.
+The structure of the parsed corpus is very different from the structure of the corpus as it was before. Among the columns, we find the doc-, sentence- and token-ids, the tokens and their lemma, the part of speech tag and the entity. Most of this, we will ignore for the current purpose. What we need to get the corpus into processable form are the part of speech tags.
 
 So let's look at the first few entries:
 
@@ -246,7 +285,7 @@ So let's look at the first few entries:
 head(dickens_parsed, n=15)
 ```
 
-In these 15 rows we already see both the uses and the drawbacks of what we are about to do. In rows 13 and 14 we find the words *Charles* and *Dickens*, respectively. These get identified correctly as proper nouns. Looking at rows 3 and 5, however, we see that also *Carol* and *Prose* get identified as proper nouns. While Carol is a name, here it clearly does not refer to a person, but to a type of music that was typically sung around Christmas in the olden days. More baffling however, is the thought of someone naming their child *Prose*. The reason for the mislabelling of these words is rather, ahem, prosaic: as part of the title, they are both spelt with capital letters, which to the parser indicates that they are proper nouns. And the reason this presents a problem is because we are going to remove all proper nouns.
+In these 15 rows we already see both the uses and the drawbacks of what we are about to do. In rows 13 and 14 we find the words *Charles* and *Dickens*, respectively. These get identified correctly as proper nouns. Looking at rows 3 and 5, however, we see that also *Christmas* and *Carol* get identified as proper nouns (PROPN in the upos column). While Carol is a name, here it clearly does not refer to a person, but to a type of music that was typically sung around Christmas in the olden days. The reason for the mislabelling of these words is rather, ahem, prosaic: as part of the title, they are both spelt with capital letters, which to the parser indicates that they are proper nouns. And the reason this presents a problem is because we are going to remove all proper nouns.
 
 If you respect the integrity of books (as we of course do too, under most circumstances), you might be cringing at this point. Why would we ruthlessly mangle texts like that?
 
@@ -260,7 +299,7 @@ The algorithm we will use in a minute is called STM, which stands for Structural
 
 The output of a topic modelling process most frequently comes as a set of words that co-occur in multiple contexts across the corpus. This understanding of the process reveals why, in this case, we choose to remove the proper nouns: in the context of novels, proper nouns are mostly names of characters and locations - and these names and locations tend to co-occur mostly within novels. The upshot of which is that the model latches onto these distinct proper nouns, which display a pattern that is much more consistent than any other co-occurrence patterns in the corpus, thus crowding out other patterns that are actually helpful when it comes to answering our research questions on social criticism and literary realism in Dickens.
 
-Picking up where we left off with the pre-processing, there is perhaps a question to be answered regarding the misidentification of *Prose* and *Carol* as proper nouns. If we see something like that, shouldn't we make sure that we at least keep these terms in, since this is obviously not the type of word we want to get rid of when we remove the proper nouns from the corpus?
+Picking up where we left off with the pre-processing, there is perhaps a question to be answered regarding the misidentification of  *Carol* as a proper noun. If we see something like that, shouldn't we make sure that we at least keep these terms in, since this is obviously not the type of word we want to get rid of when we remove the proper nouns from the corpus?
 
 Well, no. For two reasons: firstly, when pre-processing large quantities of text, there are always going to be some inaccuracies. The relative merits of keeping in individual tokens that we see are misidentified are, for all intents and purposes, irrelevant when we are dealing with corpora that contain millions of words. Secondly, and probably more importantly, going in and manually adjusting for individual tokens make the process a lot less reproducible. Obviously, it depends on the purpose of a project, but generally we don't only want to produce research, but produce it in such a way that anyone can reproduce it (if they set their mind to it). Instead of going in and fixing individual mislabellings, it's a lot more useful to make sure that each step of the research project is comprehensible to someone not involved in the process.
 
@@ -287,7 +326,7 @@ Which, if we look at the number of rows the new variable contains, turns out be 
 nrow(no_prop_dickens)
 ```
 
-We get 1,916,286 rows, which means that only roughly 88,000 tokens had been classified as proper nouns. While this sounds like a lot in absolute terms, it only amounts to about 4.4% of the corpus. Considering how much of an improvement this is for the final model, it's an absolutely acceptable price to pay.
+We get 1,916,359 rows, which means that only roughly 88,000 tokens had been classified as proper nouns. While this sounds like a lot in absolute terms, it only amounts to about 4.4% of the corpus. Considering how much of an improvement this is for the final model, it's an absolutely acceptable price to pay.
 
 It's also worth checking briefly whether it was actually successful at removing what we wanted to remove:
 
@@ -302,7 +341,6 @@ The first fifteen rows certainly indicate a success: gone is *Christmas* and *Ca
 The first step is tokenizing the `no_prop_dickens` and removing punctuation and non-alphanumeric characters:
 
 ```{r}
-#toks <- as.tokens(no_prop_dickens)
 no_prop_dickens %>%
   dplyr::group_by(sentence_id) %>%
   dplyr::summarise(sen = paste0(lemma, collapse = " ")) %>%
@@ -311,30 +349,22 @@ no_prop_dickens %>%
   quanteda::tokenize_sentence() %>%
   unlist() %>% 
   # remove non-word alpha-numeric characters
-  stringr::str_remove_all("[^[:alnum:] ]") -> toks
+  stringr::str_remove_all("[^[:alnum:] ]") %>%
+  # remiove possessive s
+  stringr::str_replace_all(" s ", " ") %>%
+  # convert to lower case 
+  tolower() -> toks
 ```
 
 We assign the contents of the `no_prop_dickens` object a new variable `toks`, coercing the contents into a token object. With this, we get rid of a lot of excess information that is not relevant for the next steps. Let's take a look:
 
 ```{r}
-head(toks, n=15)
+head(toks, n=10)
 ```
 
 The corpus now looks a lot like it did before we started with the pre-processing: we see that again each sentence occupies one document. The obvious difference is that all the proper nouns are gone - as we intended.
 
-## Lowercasing
 
-Of these first fifteen features, many are spelt in all caps, despite the removal of the proper nouns. For the modelling algorithm to correctly identify features that are semantically identical, such as the *Ghostly* we see here and other, lower-case occurrences of *ghostly* which are in the corpus, we are required to turn all capital letters into their lowercase versions. We do this using the `tokens_tolower()` command:
-
-```{r}
-toks <- tolower(toks)
-```
-
-A quick check shows that this works as intended:
-
-```{r}
-head(toks, n=15)
-```
 
 ## Punctuation
 
@@ -424,7 +454,7 @@ Have a look at the variable r, for instance with the table function:
 table(r)
 ```
 
-The table shows you the number of repeated items. The number corresponds to what we describe above. `1` is repeated 1,000 times, as is `2`, as is `3` and so on, until we get to `717`, which is only repeated 412 times. The purpose to this madness comes with the next command, where we split the corpus in its current `list_toks` form into chunks of 1,000 words each:
+The table shows you the number of repeated items. The number corresponds to what we describe above. `1` is repeated 1,000 times, as is `2`, as is `3` and so on, until we get to `702`, which is only repeated 412 times. The purpose to this madness comes with the next command, where we split the corpus in its current `list_toks` form into chunks of 1,000 words each:
 
 ```{r}
 chunky_dickens <- split(list_toks, r)
@@ -444,13 +474,11 @@ Before looking at the contents of the `chunky_dickens` object, we can get an ind
 length(chunky_dickens)
 ```
 
-The length of 717, indicating 717 pseudo-documents in the corpus, is already a good sign. We term these chunks pseudo-documents since they are artificially constructed and not exactly representative of a structure of the novels (the way chapters would be, for instance). Now, let's take a look at only the first three entries of our new object `chunky_dickens`:
+The length of 695, indicating 695 pseudo-documents in the corpus, is already a good sign. We term these chunks pseudo-documents since they are artificially constructed and not exactly representative of a structure of the novels (the way chapters would be, for instance). Now, let's take a look at only the structure of our new object `chunky_dickens`:
 
 ```{r}
-head(chunky_dickens, n=3)
+str(chunky_dickens)
 ```
-
-For only three entries, this is a lot of output! What's going on here is that the three first rows of  `chunky_dickens` are the first three pseudo-documents, or chunks, which as per our intention each contain 1,000 words. Scrolling up through the output, we see that for each entry, or pseudo-document, contains 1,000 tokens, which is precisely what we were going for.
 
 ## Document-Term Matrix
 
@@ -460,7 +488,7 @@ Now, the corpus is almost in the shape it needs to be in for the topic modelling
 chunky_toks <- tokens(chunky_dickens)
 ```
 
-The contents of the `chunky_dickens` object are transformed into a tokens object and assigned to a new object, `chunky_toks`. Looking at the new object, it displays a different behaviour:
+The contents of the `chunky_dickens` object are transformed into a tokens object and assigned to a new object, `chunky_toks`. Looking at the new object, it displays a different behavior:
 
 ```{r}
 head(chunky_toks)
@@ -562,7 +590,7 @@ stmOut_1 <- stm(documents=dtm_trimmed, K=10, max.em.its=200, verbose = F)
 
 Before checking out the results, let's look at what this command does. We create a new object, `stmOut_1` and assign a structural topic model to it with the `stm()` command. We set `dtm_trimmed` as the document term matrix we want modelled, and tell the algorithm to create a model with 10 topics, which is represented by `K=10`. The final specification, `max.em.its=200` basically tells R to stop improving the model after 200 iterations, even if it does not reach convergence. What does this mean?
 
-Basically, the model starts with the 10,000 most frequent words. From these, it identifies some anchor words to build co-occurrence patterns on, and then it begins iterating over the model. With each iteration, the co-occurrences patterns are refined, with the new model being compared to the preceding one. In the output, you can see the relative change from model to model. Once the marginal improvements from further iterations flattens out, the model is considered converged, i.e. as good as it gets. So, with the parameter above, the improvement of the model is terminated after 200 iterations even if there are still marginal improvements to be had. For a more technical description of how this works, we refer you to Blei (2012).
+Basically, the model starts with the 10,000 most frequent words. From these, it identifies some anchor words to build co-occurrence patterns on, and then it begins iterating over the model. With each iteration, the co-occurrences patterns are refined, with the new model being compared to the preceding one. In the output, you can see the relative change from model to model. Once the marginal improvements from further iterations flattens out, the model is considered converged, i.e. as good as it gets. So, with the parameter above, the improvement of the model is terminated after 200 iterations even if there are still marginal improvements to be had. For a more technical description of how this works, we refer you to @blei2003lda. 
 
 Let's see what our latest object, `stmOut_1` holds:
 
@@ -573,7 +601,7 @@ stmOut_1
 Not very informative yet, is it? For interpretable results, we want to see the keywords of the ten topics in the model, which we can do by plotting the contents of the model. For this, we use the `plot()` command, feed it our model and tell it to display the top ten keywords for each model:
 
 ```{r}
-plot(stmOut_1,n=10)
+plot(stmOut_1, n=10, cex = .5, xlim = c(0, .8))
 ```
 
 If your model is anything like ours, this is not yet what you'd call revelatory. There are some word pairs throughout the topics which go well together. For instance, we get *prisoner* and *prison* in one topic; *sea*, *river*, and *ship* in another; *houses* and *windows*; *dog* and *guardian*; *magistrate* and *collector*.
@@ -593,15 +621,15 @@ So we have some indication that the topic modelling is a) working, by making vis
 ## Wild Goose Chase
 
 There is a whole bunch of parameters that determine what the model looks like. These are:
-*As part of the `stm()` function:
-  +Number of topics
-  +Maximum number of iterations (fairly irrelevant in this case)
-*As part of the `dfm_trim()` function:
-  +Minimum term frequency
-  +Minimum document frequency
-  +Maximum document frequency
-*As part of the pre-processing:
-  +The chunk size
+* As part of the `stm()` function:  
+  + Number of topics  
+  + Maximum number of iterations (fairly irrelevant in this case)  
+* As part of the `dfm_trim()` function:  
+  + Minimum term frequency  
+  + Minimum document frequency  
+  + Maximum document frequency  
+* As part of the pre-processing:  
+  + The chunk size  
 
 Getting from a first model to a good model is typically something of a wild goose chase, involving a lot of trial and error. In the following, we walk backwards through our options, starting with the number of topics, tweaking as we go along.
 
@@ -610,8 +638,8 @@ Getting from a first model to a good model is typically something of a wild goos
 Sometimes, the number of topics is a constraint that prevents the model from displaying its found co-occurrences in the level of granularity that is required. To remedy this, we give it space for 20 topics instead of 10, and see where this takes us:
 
 ```{r}
-stmOut_2 <- stm(documents=dtm_trimmed, K=20, max.em.its=200, verbose = F)
-plot(stmOut_2,n=10)
+stmOut_2 <- stm(documents=dtm_trimmed, K=20, seed = 123, max.em.its=200, verbose = F)
+plot(stmOut_2, n=10, cex = .5, xlim = c(0, .4))
 ```
 
 This already presents quite an improvement over the first model. There is a degree of clarity to the topics that gives us more cause for hope. One of the topics pertains to water, with words like *boat*, *river*, *wind*, *tide*, *sea* and *marshes*. Another topic reflects a young man's education, with the words like *boys*, *brothers*, *school*, *schoolmaster*, *son* and *desk*. Giving further indication of Dickens' interests in justice, there is a topic containing words like *prisoner*, *prison*, *jury*, *court*, *citizen* and *witness*. Closely related, there is a topic that reflects the institutional aspect more strongly, featuring words like *magistrate*, *office*, *clerk*, *attorney*, *officer* and *judge*. Pointing towards an interest in death and the otherworldly, there is a topic showing *beneath*, *grave*, *goblin*, *churchyard*, *earth*, *church* and *wind*. This also picks up on the ambiance Dickens is capable of conjuring, as he for instance does at the beginning of Great Expectations. Additionally, there are now several topics that capture contractions and alternate spellings, as discussed above. Although you won't see the exact same topics, you should be able to see some improvements in the model.
@@ -629,7 +657,7 @@ dtm_trimmed <- dfm_trim(dtm, min_termfreq=2, min_docfreq=0.005, max_docfreq=0.15
 And then we create a new model:
 
 ```{r}
-stmOut_3 <- stm(documents=dtm_trimmed, K=20, max.em.its=200, verbose = F)
+stmOut_3 <- stm(documents=dtm_trimmed, K=20, seed = 123, max.em.its=200, verbose = F)
 stmOut_3
 stmOut_1
 ```
@@ -637,7 +665,7 @@ stmOut_1
 Comparing this new model `stmOut_3` to the first one, `stmOut_1`, we see that the dictionary is smaller, as we would expect, limiting the range of included words as we did. With the latest trimming step, we lost some 397 words. Let's see where that gets us in terms of the model:
 
 ```{r}
-plot(stmOut_3,n=10)
+plot(stmOut_3, n=10, cex = .5, xlim = c(0, .4))
 ```
 
 If your model is anything like ours, you will find some rather intriguing new words in some of the topics, for instance *monks* and a *lion* show up for us, but in general this does not seem to have been an improvement. Indeed, we also get words like *murdstone* and *peggotty*, which in addition to *copperfield* and *squeers* that we already had before, indicate that the removal of proper nouns in the pre-processing did not capture all of the characters. Depending on how rigorous a research project is intended to be, this might be the point at which to revisit the pre-processing, and finding alternate means of identifying character names. For the current purposes we continue working with this rather imperfect data (although, for expectation management: your data is likely to always have some flaws or quirks).
@@ -648,7 +676,7 @@ We can also explore what happens when increasing the minimum document frequency 
 
 ```{r}
 dtm_trimmed <- dfm_trim(dtm, min_termfreq=2, min_docfreq=0.01, max_docfreq=0.25, docfreq_type="prop")
-stmOut_4 <- stm(documents=dtm_trimmed, K=30, max.em.its=200, verbose = F)
+stmOut_4 <- stm(documents=dtm_trimmed, K=30, seed = 123, max.em.its=200, verbose = F)
 ```
 
 You'll notice that we jumped directly to `K=30`, sparing you at least one step between the previous model and this one. The reason is that the model in between did not yield anything exciting. We would very much encourage you to experiment with different parameters here to get a sense for what changes when you shift a single parameter. Or, to at the very least do so when you are working on a project of your own. For better or worse, at this stage in its life cycle (and improvements in the method are sure to come), topic modelling takes a lot of tinkering. 
@@ -656,7 +684,7 @@ You'll notice that we jumped directly to `K=30`, sparing you at least one step b
 Let's see how the most recent adjustment, tightening the range of document frequencies, changed our model:
 
 ```{r}
-plot(stmOut_4, n=10)
+plot(stmOut_4, n=10, cex = .5, xlim = c(0, .3))
 ```
 
 Again, if your model is anything like ours, there will be a remnant of some of the clearest topics from the second model (we smell a vaguely salty breeze from a somewhat diluted water-related topic and hear the rustling of papers in court from another, less coherent legal topic), but no overall improvement - which may be down to the fact that we need to backtrack a bit further.
@@ -683,7 +711,7 @@ For this first model derived from smaller chunks, we use the specifications that
 
 ```{r}
 dtm_trimmed <- dfm_trim(dtm, min_termfreq=2, min_docfreq=0.005, max_docfreq=0.25, docfreq_type="prop")
-stmOut_5 <- stm(documents=dtm_trimmed, K=25, max.em.its=200, verbose = F)
+stmOut_5 <- stm(documents=dtm_trimmed, K=25, seed = 123, max.em.its=200, verbose = F)
 ```
 
 Again, we opt to go for another number of topics, this time twenty five, for identical reasons as above. 
@@ -691,7 +719,7 @@ Again, we opt to go for another number of topics, this time twenty five, for ide
 While the model is being constructed, we can quickly think through how working with smaller chunks affects the other parameters. We still simply select a number of topics, and since we do not process the content of the corpus any further, the minimum term frequency will remain the same. However, the minimum and maximum document frequency will change. Since we are using relative document frequencies, and increasing the number of documents, rare words that made the trimming-cut before might now not be included anymore. Conversely, more frequent words that made the cut before (because they appeared in, let's say, 23% of all documents) might not be included anymore, since they might now be present in 26% of documents, or even more. Let's see how that changes our model:
 
 ```{r}
-plot(stmOut_5, n=10)
+plot(stmOut_5, n=10, cex = .5, xlim = c(0, .3))
 ```
 
 This looks rather different than before, and the glimpses of Dickens' literary realism and perspective on poverty that we saw in earlier models are beginning to consolidate. The most salient topics in our model are still the ones that capture informal language usage: Considering that *said*' was the term with the highest document frequency, we have a good indication that there is a lot of dialogue - and we could tell so even if we had never read a single un-processed word of these novels. Now we see that seven out of twenty five topics contain informal or dialectal language. This sheer presence of informal language topics shows how much space Dickens is willing to give to people who do not speak received pronunciation, which can be a marker for rural and working class folks, as well as children - all of whom have a high chance of living in poverty. So Dickens' willingness to represent people in poverty becomes even more salient than it was before.
@@ -716,8 +744,8 @@ chunky_dickens <- split(list_toks, r)
 chunky_toks <- tokens(chunky_dickens)
 dtm_3 <- dfm(chunky_toks)
 dtm_trimmed_3 <- dfm_trim(dtm_3, min_termfreq=2, min_docfreq=0.005, max_docfreq=0.25, docfreq_type="prop")
-stmOut_6 <- stm(documents=dtm_trimmed_3, K=25, max.em.its=200, verbose = F)
-plot(stmOut_6, n=10)
+stmOut_6 <- stm(documents=dtm_trimmed_3, K=25, seed = 123, max.em.its=200, verbose = F)
+plot(stmOut_6, n=10, cex = .5, xlim = c(0, .3))
 ```
 
 Decreasing the chunk size gets us much closer to where we want to get. Across the twenty five topics, themes begin to emerge. Reliably emerging - and since the very first model, too - are alternate spellings and contractions, indicative of non-RP spoken language. In our version, we get four different topics relating to this theme, with some distinct flavors. One of them is reflective of dialects or sociolects - containing *wery, *wot*, *ere*, *ai* - while another one contains contractions like *‘ll* and *n't* alongside words that detail interactions, like *asked*, *hear* and *tell*. We have four topics of this kind, with some variation and distinction but a lot of consistency.
@@ -738,8 +766,8 @@ Since the trajectory of smaller chunks has thus far led to improvements with our
 
 ```{r}
 dtm_trimmed_4 <- dfm_trim(dtm_3, min_termfreq=2, min_docfreq=0.005, max_docfreq=0.15, docfreq_type="prop")
-stmOut_7 <- stm(documents=dtm_trimmed_4, K=25, max.em.its=200, verbose = F)
-plot(stmOut_7, n=10)
+stmOut_7 <- stm(documents=dtm_trimmed_4, K=25, seed = 123, max.em.its=200, verbose = F)
+plot(stmOut_7, n=10, cex = .5, xlim = c(0, .3))
 ```
 
 In comparison to the improvements between earlier models, these might only be a few degrees, but some of them are worth getting into in a bit of detail.
@@ -758,7 +786,7 @@ An interesting sidenote is that the word *poor* no longer appears, with this spe
 
 As mentioned numerous times, there is of course going to be some deviation between what we describe and what you see, since the models are constructed with a random component. But you will certainly have seen how tweaking the parameters can change the results, and also have gotten a taste of how topic models can be interpreted. Which almost brings this introduction to topic modelling to a close.
 
-## Final Comments
+# Final Comments
 
 The biggest disclaimer is: many roads lead to Rome. This goes for each step of the way, beginning with the choice of programming language (there are dedicated tools for topic modelling, like MALLET, but also ways of doing it in Python, for instance) and the packages, through the pre-processing, to the precise specification and interpretation of the models. There is no one-size fits all approach. The question is rather, whether you find an approach that allows you to reach meaningful results. Probably the best frame for thinking about topic modelling is provided by @tangherlini2013trawling who discuss topic modelling in terms of a division of labour: "the computer algorithm is given the task of doing what it does best: counting words and calculating probabilities of term co-occurrence" and the *researcher is given the task of doing what he or she does best: applying domain expertise and experience for labelling and curating the topics" [@tangherlini2013trawling 728]. There is a vast literature on topic modelling out there that will give more technical analyses, further information on how to go from the results of your models back to the text, different perspectives on the pros and cons of the method, and more. However, after working through this humble course of ours, you should be well equipped to get to decent topic models using R and be able to begin investigating your own research questions. Let's get on it!
 
