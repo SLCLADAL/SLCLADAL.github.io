@@ -135,201 +135,45 @@ The text is now split into individual words.
 
 Now we can extract concordances using the `kwic` function from the `quanteda` package. This function requires 
 
-+ a text (`x`) 
-+ a keyword defined by a search pattern (`pattern`) 
++ `x`: a text or collection of texts  
++ `pattern`: a keyword defined by a search pattern  
++ `window`: the size of the context window (how many word before and after)  
++ `valuetype`: the type of pattern matching  
+  + "glob" for "glob"-style wildcard expressions;  
+  + "regex" for regular expressions; or  
+  + "fixed" for exact matching  
++ `separator`: a character to separate words in the output  
++ `case_insensitive`: logical; if TRUE, ignore case when matching a pattern or dictionary values
 
 ```{r basekwic2, message=F, warning=F}
 mykwic <- kwic(
   # define text
   text, 
   # define target word (this is called the "search pattern")
-  pattern = "alice")
+  pattern = phrase("alice"),
+  # 5 worde before and after
+  window = 5,
+  # no regex
+  valuetype = "fixed",
+  # words separated by whitespace
+  separator = " ",
+  # search should be case insensitive
+  case_insensitive = TRUE)
 # inspect
 mykwic %>%
   as.data.frame() %>%
   head()
 ```
-
-
-
-To extract the frequency of the search term (*alice*) we can use `nrow` or `length`.
-
-```{r basekwic4}
-nrow(mykwic); length(mykwic$keyword)
-```
-
-The results show that there are 386 instances of the search term (*alice*). 
-
-We now  increase the context window size to 10 words/elements (the default is 5 word/elements).
-
-
-```{r basekwic8, message=F, warning=F}
-mykwic_longer <- kwic(text, pattern = "alice", 
-  # define context window size
-  window = 10)
-# inspect
-mykwic_longer %>%
-  as.data.frame() %>%
-  head()
-```
-
 
 ## Exporting concordances
 
 To export a concordance table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
 
 ```{r eval = F, warning=F, message=F}
-write_xlsx(mykwic, here::here("mykwic.xlsx"))
-# check where the working directory is
 getwd()
+here::here("MyOutput/mykwic.xlsx")
+write_xlsx(mykwic, here::here("MyOutput/mykwic.xlsx"))
 ```
-
-
-## Extracting more than single words
-
-To extract more than just one word, we specify that we are searching for a `phrase` (you can also include full sentences).
-
-```{r multikwic2, message=FALSE, warning=FALSE}
-kwic_pooralice <- kwic(text, pattern = phrase("poor alice"))
-# inspect
-kwic_pooralice %>%
-  as.data.frame() %>%
-  head()
-```
-
-## Searches using regular expressions
-
-Regular expressions add flexibility by allowing us to search for abstract patterns rather than concrete words or phrases. A regular expression is a special sequence of characters that describe a pattern. For more information about regular expression in R [see this tutorial](https://ladal.edu.au/regex.html).
-
-
-To specifiy that we are using regular expressions, we set `valuetype` to `"regex"`. The search pattern `"\\balic.*|\\bhatt.*"` retrieves elements that contain `alic` and `hatt` followed by any characters and where the `a` in `alic` and the `h` in `hatt` are at a word boundary. The `|` is an operator (like `+`, `-`, or `*`) that stands for *or*.
-
-```{r rkwic6, message=FALSE, warning=FALSE}
-# define search patterns
-patterns <- c("\\balic.*|\\bhatt.*")
-kwic_regex <- kwic(text, patterns, 
-  # define valuetype
-  valuetype = "regex")
-# inspect
-kwic_regex %>%
-  as.data.frame() %>%
-  head()
-```
-
-
-## Piping concordances
-
-Quite often, we only want to retrieve patterns if they occur in a certain context. For instance, we might be interested in instances of *alice* but only if the preceding word is *poor*. Such conditional concordances can be retrieved by piping using  `%>%`  which can be translated as *and then*. We then extract concordances that contain *poor* using `filter`. Note the the `$` stands for the end of a string so that *poor$* means that *poor* is the last element preceding the keyword.
-
-```{r pipekwic7, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_pipe <- kwic(x = text, pattern = "alice") %>%
-  dplyr::filter(stringr::str_detect(pre, "poor$|little$"))
-# inspect
-kwic_pipe %>%
-  as.data.frame() %>%
-  head()
-```
-
-
-
-## Arranging concordances and adding frequency information
-
-When inspecting concordances, it is useful to re-order the concordances so that they appeared with frequent collocates first (at the top). To reorder concordances, we use  `arrange` which takes the column by which we want to re-arrange as its argument. 
-
-In the example below, we extract all instances of *alice* and then arrange the instances according to the alphabetical order of the first word in the `post` column.
-
-```{r orderkwic2, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_ordered <- kwic(x = text, pattern = "alice") %>%
-  dplyr::arrange(post)
-# inspect
-kwic_ordered %>%
-  as.data.frame() %>%
-  head() 
-```
-
-
-A more useful option may be to arrange concordances according to the frequency of co-occurring terms. In order to do this, we need to extract the co-occurring words and their frequency. We do this by using `mutate`, `group_by`, `n()` and`str_remove_all`. 
-
-```{r orderkwic4, echo=T, eval = T, message=FALSE, warning=FALSE}
-kwic_ordered_coll <- kwic(
-  # define text
-  x = text, 
-  # define search pattern
-  pattern = "alice") %>%
-  # extract word following the keyword
-  dplyr::mutate(post_word = str_remove_all(post, " .*")) %>%
-  # group following words
-  dplyr::group_by(post_word) %>%
-  # extract frequencies of the following words
-  dplyr::mutate(post_word_freq = n()) %>%
-  # arrange/order by the frequency of the following word
-  dplyr::arrange(-post_word_freq)
-# inspect
-kwic_ordered_coll %>%
-  as.data.frame() %>%
-  head()
-```
-
-## Ordering by subsequent elements
-
-We now extract the three words following the keyword (*alice*) and organize the concordances by the frequencies of the following words. 
-
-We begin by creating a clean *post* column (that is all in)we convert post to lower case and remove punctuation).
-
-
-```{r, message=FALSE, warning=FALSE}
-mykwic %>%
-  # convert to data frame
-  as.data.frame() %>%
-  # create new CleanPost
-  dplyr::mutate(CleanPost = stringr::str_remove_all(post, "[:punct:]"),
-                CleanPost = stringr::str_squish(CleanPost),
-                CleanPost = tolower(CleanPost))-> mykwic_following
-# inspect
-head(mykwic_following)
-```
-
-Next, we extract the 1^st^, 2^nd^, and 3^rd^ words following the keyword.
-
-
-```{r, message=FALSE, warning=FALSE}
-mykwic_following %>%
-  # extract first element after keyword
-  dplyr::mutate(FirstWord = stringr::str_remove_all(CleanPost, " .*")) %>%
-  # extract second element after keyword
-  dplyr::mutate(SecWord = stringr::str_remove(CleanPost, ".*? "),
-                SecWord = stringr::str_remove_all(SecWord, " .*")) %>%
-  # extract third element after keyword
-  dplyr::mutate(ThirdWord = stringr::str_remove(CleanPost, ".*? "),
-                ThirdWord = stringr::str_remove(ThirdWord, ".*? "),
-                ThirdWord = stringr::str_remove_all(ThirdWord, " .*")) -> mykwic_following
-# inspect
-head(mykwic_following)
-```
-
-Now, we calculate the frequencies of the subsequent words and order in descending order from the  1^st^ to the 3^rd^ word following the keyword.
-
-```{r, message=FALSE, warning=FALSE}
-mykwic_following %>%
-  # calculate frequency of following words
-  # 1st word
-  dplyr::group_by(FirstWord) %>%
-  dplyr::mutate(FreqW1 = n()) %>%
-  # 2nd word
-  dplyr::group_by(SecWord) %>%
-  dplyr::mutate(FreqW2 = n()) %>%
-  # 3rd word
-  dplyr::group_by(ThirdWord) %>%
-  dplyr::mutate(FreqW3 = n()) %>%
-  # ungroup
-  dplyr::ungroup() %>%
-  # arrange by following words
-  dplyr::arrange(-FreqW1, -FreqW2, -FreqW3) -> mykwic_following
-# inspect results
-head(mykwic_following, 10)
-```
-
-The results now show the concordance arranged by the frequency of the words following the keyword.
 
 
 [Back to LADAL](https://ladal.edu.au/kwics.html)
