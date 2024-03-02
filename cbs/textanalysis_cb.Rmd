@@ -17,18 +17,19 @@ We set up our session by activating the packages we need for this tutorial.
 
 ```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
 # activate packages
-library(quanteda)
-library(dplyr)
-library(stringr)
-library(tidytext)
-library(ggplot2)
-library(quanteda.textplots)
-library(quanteda.textstats)
-library(udpipe)
-library(ggplot2)
-library(textplot)
-library(openxlsx)
-library(viridis)
+library(quanteda)           # Text analysis and processing
+library(dplyr)              # Data manipulation and transformation
+library(stringr)            # String manipulation and pattern matching
+library(tidytext)           # Tidy text data for analysis
+library(ggplot2)            # Data visualization
+library(quanteda.textplots) # Text visualization using ggplot2
+library(quanteda.textstats) # Text statistics and analysis
+library(udpipe)             # Tokenization and part-of-speech tagging
+library(ggplot2)            # Additional data visualization with ggplot2
+library(textplot)           # Text-based plots
+library(openxlsx)           # Reading and writing Excel files
+library(viridis)            # Color mapping for data visualization
+library(writexl)            # For saving data
 ```
 
 Once you have initiated the session by executing the code shown above, you are good to go.
@@ -42,43 +43,47 @@ For this tutorial, the default data represents the text of Lewis Caroll's  *Alic
 
 ## Using your own data
 
-While the tutorial uses data from the LADAL website, you can also use your own data. You can see below what you need to do to upload and use your own data.
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
 
-The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+While the tutorial uses data from the LADAL website, you can also **use your own data**. To use your own data, click on the folder called `MyTexts` (it is in the menu to the left of the screen) and then simply drag and drop your txt-files into the folder. When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>
+<br>
+You can upload <b>only txt-files</b> (simple unformatted files created in or saved by a text editor)! The notebook assumes that you upload some form of text data - not tabular data! <br>
+<br>
+<b>IMPORTANT: Be sure to to then replace `mytext` with `text` in the above code chunk and not execute the following code chunk which loads an example text from the LADAL repository so that you work with your and not the sample data!</b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
 
-![Binder Folder Symbol](https://slcladal.github.io/images/binderfolder.JPG)
+<br>
 
-
-Then, when the menu has unfolded, click on the smaller folder symbol (encircled in red in the picture below).
-
-![Small Binder Folder Symbol](https://slcladal.github.io/images/upload2.png)
-
-Now, you are in the main menu and can click on the 'MyData' folder.
-
-![MyData Folder Symbol](https://slcladal.github.io/images/upload3.png)
-
-Now, that you are in the MyData folder, you can click on the upload symbol.
-
-![Binder Upload Symbol](https://slcladal.github.io/images/binderupload.JPG)
-
-Select and upload the files you want to analyze (**IMPORTANT: here, we assume that you upload some form of text data - not tabular data! You can upload only txt and docx files!**). When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.
 
 ```{r}
-myfiles <- list.files(here::here("MyData"), # path to the corpus data
+myfiles <- list.files(here::here("notebooks/MyTexts"), # path to the corpus data
                           # full paths - not just the names of the files
                           full.names = T) 
-# load files
+# loop over the vector 'myfiles' that contains paths to the data
 mytext <- sapply(myfiles, function(x){
+
+  # read the content of each file using 'scan'
   x <- scan(x, 
-            what = "char", 
-            sep = "", 
-            quote = "", 
-            quiet = T, 
-            skipNul = T)
+            what = "char",    # specify that the input is characters
+            sep = "",         # set separator to an empty string (read entire content)
+            quote = "",       # set quote to an empty string (no quoting)
+            quiet = T,        # suppress scan messages
+            skipNul = T)      # skip NUL bytes if encountered
+
+  # combine the character vector into a single string with spaces
   x <- paste0(x, sep = " ", collapse = " ")
+
+  # remove extra whitespaces using 'str_squish' from the 'stringr' package
   x <- stringr::str_squish(x)
+
 })
-# inspect
+
+# inspect the structure of the text object
 str(mytext)
 ```
 
@@ -87,7 +92,7 @@ str(mytext)
 
 ***
 
-
+## Loading the example data
 
 We begin by loading the data which represents the text of Lewis Caroll's  *Alice's Adventures in Wonderland*. 
 
@@ -98,10 +103,20 @@ text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb"))
 head(text)
 ```
 
+## Splitting the data into chapter
 
+The example data still consists of short text snippets which is why we collapse these snippets and then split the collapsed data into chapters. 
 
-The data still consists of short text snippets which is why we collapse these snippets and then split the collapsed data into chapters. 
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>IMPORTANT: If your data does not consist of chapters that have *CHAPTER* in the chapter text, then do not use this code chunk when working with your own data!</b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
 
+<br>
 
 ```{r conc2, message=FALSE, warning=FALSE}
 # combine and split into chapters
@@ -125,39 +140,72 @@ text_chapters %>%
 
 ## Concordancing
 
-Once we have split the data into chapters, we perform the concordancing and extract the KWICs. To create these kwics, we use the `kwic` function from the `quanteda` package. This function takes the data (x), the search pattern (pattern), and the window size as its main arguments. 
+Once we have split the data into chapters, we perform the concordancing and extract the KWICs using the `kwic` function from the `quanteda` package. This function has the following arguments: 
 
-To start with, we generate kwics for the term *alice* as shown below. 
++ `x`: a text or collection of texts. The text needs to be tokenised, i.e. split it into individual words, which is why we use the *text* in the `tokens()` function. 
++ `pattern`: a keyword defined by a search pattern  
++ `window`: the size of the context window (how many word before and after)  
++ `valuetype`: the type of pattern matching  
+  + "glob" for "glob"-style wildcard expressions;  
+  + "regex" for regular expressions; or  
+  + "fixed" for exact matching  
++ `separator`: a character to separate words in the output  
++ `case_insensitive`: logical; if TRUE, ignore case when matching a pattern or dictionary values
 
-```{r conc3, message=FALSE, warning=FALSE}
-# create kwic
-kwic_alice <- quanteda::kwic(x = tokens(text_chapters), # define and tokenise text(s) 
-                         # define pattern
-                          pattern = "alice",
-                         # define window size
-                          window = 5) %>%
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You can easily change and adapt the concordance. For instance, you can search for a different word, like *speak*, by substituting *alice* with *speak* as the pattern. Additionally, if you wish to widen the context window, just replace the '5' with '10'. This adjustment will extend the context around the keyword by 5 additional words in both the preceding and following context. </b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+```{r basekwic2, message=F, warning=F}
+kwic1 <- kwic(
+  # tokenise and define text
+  tokens(text), 
+  # define target word (this is called the "search pattern")
+  pattern = phrase("alice"),
+  # 5 words before and after
+  window = 5,
+  # no regex
+  valuetype = "fixed",
+  # words separated by whitespace
+  separator = " ",
+  # search should be case insensitive
+  case_insensitive = TRUE)
+
+# inspect resulting kwic
+kwic1 %>%
   # convert into a data frame
   as.data.frame() %>%
-  # remove superfluous columns
-  dplyr::select(-to, -from, -pattern)
-# inspect data
-kwic_alice %>%
-  head()
+  # show only first 10 results
+  head(10)
 ```
 
-## Exporting data
+# Exporting tables
 
-Commonly, researchers would now save the kwics on their own computer to annotate or code instances of the keyword or phrase manually. To export a data frame as a Microsoft Excel spreadsheet, we can use the `write.xlsx` from the `openxlsx` package as shown below. This function has the basic form `write.xlsx(x, file, asTable = FALSE, overwrite = TRUE, ...)` and thus takes two main arguments:
+To export a concordance table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
 
-+ x = the data frame you want to save 
-+ file = the location/path where you want to store the file.
-
-
-In our case, we save the data frame in the working directory (the base directory called `interactive-notebooks`) - from there you can simply download it to your own computer.
-
-```{r}
-write.xlsx(kwic_alice, here::here("kwic_alice.xlsx"))
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(kwic1, here::here("notebooks/MyOutput/kwic1.xlsx"))
 ```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the generated MS Excel spreadsheet named *mykwic.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *mykwic.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
 
 ## More on concordancing
 
@@ -165,7 +213,7 @@ We can also use regular expressions in our search to extract not only *alice* bu
 
 ```{r conc5, message=FALSE, warning=FALSE}
 # create kwic
-kwic_walk <- quanteda::kwic(x = tokens(text_chapters), 
+kwic2 <- quanteda::kwic(x = tokens(text_chapters), 
                           pattern = "walk.*",
                           window = 5,
                           valuetype = "regex") %>%
@@ -174,16 +222,22 @@ kwic_walk <- quanteda::kwic(x = tokens(text_chapters),
   # remove superfluous columns
   dplyr::select(-to, -from, -pattern)
 # inspect data
-kwic_walk %>%
+kwic2 %>%
   head()
 ```
 
+Again, to export a concordance table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(kwic2, here::here("notebooks/MyOutput/kwic2.xlsx"))
+```
 
 When search for expressions that represent phrase and that consists out of several elements such as *poor alice*, we also need to specify that we are looking for a phrase in the pattern argument. 
 
 ```{r conc7, message=FALSE, warning=FALSE}
 # create kwic
-kwic_pooralice <- quanteda::kwic(x = tokens(text_chapters), 
+kwic3 <- quanteda::kwic(x = tokens(text_chapters), 
                           pattern = quanteda::phrase("poor alice"),
                           window = 5) %>%
   # convert into a data frame
@@ -191,14 +245,21 @@ kwic_pooralice <- quanteda::kwic(x = tokens(text_chapters),
   # remove superfluous columns
   dplyr::select(-to, -from, -pattern)
 # inspect data
-kwic_pooralice %>%
+kwic3 %>%
   head()
 ```
 
 
+
+
+Again, to export a concordance table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(kwic3, here::here("notebooks/MyOutput/kwic3.xlsx"))
+```
+
 We could now continue and analyze how the phrase *poor alice* is used or perform similar analyses.
-
-
 
 ## Word Frequency
 
@@ -266,7 +327,42 @@ wfreq_wostop %>%
 ```
 
 
-To save the visualization, you can simply right-click and select `Copy Output to Clipboard` (the top most option) and then paste the graph, e.g.,  into a Word document.
+To save the visualization, you can simply right-click and select `Copy Output to Clipboard` (the top most option) and then paste the graph, e.g., into a Word document. Alternatively, you can export the image as described below.
+
+
+
+## Exporting images
+
+To export image as an png-file, we use `ggsave`. Be aware that we use the `here` function to save the file in the `MyOutput` folder.
+
+The `ggsave` function has the following main arguments:
+
++ `filename`: File name to create on disk.    
++ `device`: Device to use. Can either be a device function (e.g. png), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only). If NULL (default), the device is guessed based on the filename extension  
++ `path`: Path of the directory to save plot to: path and filename are combined to create the fully qualified file name. Defaults to the working directory.  
++ `width, height`: Plot size in units expressed by the units argument. If not supplied, uses the size of the current graphics device.  
++ `units`: One of the following units in which the width and height arguments are expressed: "in", "cm", "mm" or "px".  
++ `dpi`: Plot resolution. Also accepts a string input: "retina" (320), "print" (300), or "screen" (72). Applies only to raster output types.  
++ `bg`: Background colour. If NULL, uses the plot.background fill value from the plot theme.  
+
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_01.png"), bg = "white")
+```
+
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_01.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_01.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
 
 ## Wordclouds
 
@@ -285,6 +381,23 @@ text %>%
 ```
 
 
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_02.png"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_02.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_02.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
 
 Another variant of word clouds, so-called *comparison clouds*, Word lists can be used to determine differences between texts. For instance, we can load different texts and check whether they differ with respect to word frequencies. To show this, we load Herman Melville's *Moby Dick*, George Orwell's *1984*, and we also use  in the example text . 
 
@@ -325,6 +438,24 @@ corp_dom  %>%
                                            max_words = 150)
 ```
 
+
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_03.png"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_03.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_03.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
 
 ## Frequency changes
 
@@ -383,6 +514,25 @@ ggplot(tb, aes(x = Chapters, y = Frequency, group = 1)) +
   scale_y_continuous(name ="Relative Frequency (per 1,000 words)")
 ```
 
+
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_04.png"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_04.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_04.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
 ## Dispersion plots
 
 To show when in a text or in a collection of texts certain terms occur, we can use *dispersion plots*. The `quanteda` package offers a very easy-to-use function `textplot_xray` to generate dispersion plots.
@@ -404,6 +554,24 @@ quanteda.textplots::textplot_xray(kwic(tokens(text_corpus), pattern = "alice"),
   theme(legend.position = "none")
 ```
 
+
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_05.png"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_05.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_05.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
 
 ## Collocations
 
@@ -505,6 +673,25 @@ textplot_network(tag_fcm,
                  vertex_labelsize = log(rowSums(tag_fcm))*2)
 ```
 
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_06.png"), bg = "white")
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_06.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_06.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
 ## Keyness
 
 Another common method that can be used for automated text summarization is keyword extraction. Keyword extraction builds on identifying words that are particularly associated  with a certain text. In other words, keyness analysis aims to identify words that are particularly indicative of the content of a certain text.
@@ -560,6 +747,24 @@ ggplot(freq_weight, aes(nrow(freq_weight):1, frequency)) +
 ```
 
 
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_07.png"), bg = "white")
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_07.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_07.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
 ## Part-of-Speech tagging
 
 A very common procedure to add information to texts is to part-of-speech tag the data, which means to determine to what type of word a specific word belongs. Below, we will add pos-tags to a short English text.
@@ -579,14 +784,14 @@ Now that we have a text that we can work with, we will download a pre-trained la
 
 ```{r udi1b, eval = F, message=FALSE, warning=FALSE}
 # download language model
-m_eng	<- udpipe::udpipe_download_model(language = "english-ewt")
+m_eng <- udpipe::udpipe_download_model(language = "english-ewt")
 ```
 
 If you have downloaded a model it will by default be stored in the main directory.
 
 ```{r udi1c, message=FALSE, warning=FALSE}
 # load language model from your computer after you have downloaded it once
-m_eng <- udpipe_load_model("english-ewt-ud-2.5-191206.udpipe")
+m_eng <-udpipe_load_model("english-ewt-ud-2.5-191206.udpipe")
 ```
 
 We can now use the model to annotate out text.
@@ -650,9 +855,26 @@ dplot <- textplot::textplot_dependencyparser(sent, size = 3)
 dplot
 ```
 
+
+As we did above, we use the `ggsave` function to save the image in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_08.png"), bg = "white")
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_08.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_08.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
 Dependency parsing cane be used, e.g. to study who is the agent versus who is the patient of certain actions such as crimes or other activities.
-
-
 
 [Back to LADAL](https://ladal.edu.au)
 
