@@ -4,76 +4,55 @@
 
 colldf <- function(x){
   
-  # step 1: clean and split corpus into sentences
-  x %>% 
-    # concatenate the elements in the 'text' object
-    paste0(collapse = " ") %>%
-    # separate possessives and contractions
-    stringr::str_replace_all(fixed("'"), fixed(" '")) %>%
-    stringr::str_replace_all(fixed("’"), fixed(" '")) %>%
-    # split text into sentences
-    tokenizers::tokenize_sentences() %>%
-    # unlist sentences and save sentences in 'sentences' object
-    unlist() -> sentences
-  
-  # convert sentences into a corpus object
-  textcorpus <- Corpus(VectorSource(sentences))
-  # convert to lower case
-  extcorpusclean <- textcorpus %>%
-  tm::tm_map(tolower) %>%
-    tm::removePunctuation() %>%
-    tm::tm_map(tdocs, toSpace, "\\W")
-  
-  # step 2: convert corpus into a tidy data frame
+# convert sentences into a corpus object
+  textcorpus <- Corpus(VectorSource(x))
+
+  # step 1: convert corpus into a tidy data frame
   # create document term matrix
-  textdtm <- DocumentTermMatrix(textcorpusclean, control=list(removePunctuation = TRUE,
-                                                              removeNumbers = TRUE))
+  textcorpusdtm <- tm::DocumentTermMatrix(textcorpus)
   # convert dtm into sparse matrix
-  textsdtm <- Matrix::sparseMatrix(i = textdtm$i, j = textdtm$j, 
-                                   x = textdtm$v, 
-                                   dims = c(textdtm$nrow, textdtm$ncol),
-                                   dimnames = dimnames(textdtm))
+  textdtm <- Matrix::sparseMatrix(i = textcorpusdtm$i, j = textcorpusdtm$j, 
+                                   x = textcorpusdtm$v, 
+                                   dims = c(textcorpusdtm$nrow, textcorpusdtm$ncol),
+                                   dimnames = dimnames(textcorpusdtm))
   # calculate co-occurrence counts
-  coocurrences <- t(textsdtm) %*% textsdtm
+  coocs <- t(textdtm) %*% textdtm
   # convert into matrix
-  collocates <- as.matrix(coocurrences)
+  coocs_mx <- as.matrix(coocs)
   
   # prepare data for transformation into a tidy data frame with word 1, word 2, 
   # and their co-occurrence frequency
-  words <- attr(collocates, "dimnames")[1] %>% 
+  words <- attr(coocs_mx, "dimnames")[1] %>% 
     unlist()
   # extract and repeat word 1
-  word1 <- rep(words, length(words))
+  Term <- rep(words, length(words))
   # extract and repeat word 2
-  word2 <- rep(words, each = length(words))
+  CoocTerm <- rep(words, each = length(words))
   # extract co-occurrence frequency
-  cooc_n <- as.numeric(c(collocates[!is.na(as.numeric(collocates))]))
+  TermCoocFreq <- as.numeric(c(coocs_mx[!is.na(as.numeric(coocs_mx))]))
   
   # create tidy data frame
-  colls <- data.frame(word1, word2, cooc_n) %>%
-  dplyr::rename(Term = 1,
-                CoocTerm = 2,
-                TermCoocFreq = 3)
+  colls <- data.frame(Term, CoocTerm, TermCoocFreq)
   
-  # step 3: reformat table nd extract frequency information for statistical analysis
+  # step 2: reformat table nd extract frequency information for statistical analysis
   # extract stats
   collocation_df <- colls %>%
-    dplyr::mutate(Term = factor(Term),
-                  CoocTerm = factor(CoocTerm)) %>%
+    #dplyr::mutate(Term = factor(Term),
+    #              CoocTerm = factor(CoocTerm)) %>%
     dplyr::mutate(AllFreq = sum(TermCoocFreq)) %>%
     dplyr::group_by(Term) %>%
     dplyr::mutate(TermFreq = sum(TermCoocFreq)) %>%
     dplyr::ungroup(Term) %>%
     dplyr::group_by(CoocTerm) %>%
     dplyr::mutate(CoocFreq = sum(TermCoocFreq)) %>%
-    dplyr::arrange(Term) %>%
+    #dplyr::arrange(Term) %>%
     dplyr::mutate(a = TermCoocFreq,
                   b = TermFreq - a,
                   c = CoocFreq - a,
                   d = AllFreq - (a + b + c)) %>%
     dplyr::mutate(NRows = nrow(.))
   
-  # step 4: return final data frame
+  # step 3: return final data frame
   return(collocation_df)
 }
 
