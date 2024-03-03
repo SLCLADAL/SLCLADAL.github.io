@@ -21,12 +21,13 @@ colldf <- function(x){
   # convert to lower case
   extcorpusclean <- textcorpus %>%
   tm::tm_map(tolower) %>%
-    tm::removePunctuation()
+    tm::removePunctuation() %>%
+    tm::tm_map(tdocs, toSpace, "\\W")
   
   # step 2: convert corpus into a tidy data frame
   # create document term matrix
   textdtm <- DocumentTermMatrix(textcorpusclean, control=list(removePunctuation = TRUE,
-                                                            removeNumbers = TRUE))
+                                                              removeNumbers = TRUE))
   # convert dtm into sparse matrix
   textsdtm <- Matrix::sparseMatrix(i = textdtm$i, j = textdtm$j, 
                                    x = textdtm$v, 
