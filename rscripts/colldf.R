@@ -20,7 +20,8 @@ colldf <- function(x){
   textcorpus <- Corpus(VectorSource(sentences))
   # convert to lower case
   extcorpusclean <- textcorpus %>%
-  tm::tm_map(tolower)
+  tm::tm_map(tolower) %>%
+    tm::removePunctuation()
   
   # step 2: convert corpus into a tidy data frame
   # create document term matrix
