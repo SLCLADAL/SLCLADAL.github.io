@@ -27,7 +27,7 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
                 pTermAndCoocTerm = a / (a + b + c + d),
                 MI = log2(pTermAndCoocTerm / (pTerm * pCoocTerm))) %>%
   # calculate odds ration
-  dplyr::mutate(OddsRatio = ((a/b) / (c/d))) %>%
+    dplyr::mutate(OddsRatio = ifelse(min(c(a,b,c,d) > 0),  ((a/b) / (c/d)), 0)) %>%
   # calculate loglikratio
   dplyr::mutate(LogLik = calculate_log_likelihood(a, b, c, d)) %>%
   # simplify significance
@@ -44,8 +44,8 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
   # arrange by phi (association measure)
   dplyr::arrange(-phi) %>%
   # remove superfluous columns
-  dplyr::select(-pTerm, -pCoocTerm, -pTermAndCoocTerm, -TermCoocFreq,
-              -AllFreq, -a, -b, -c, -d, -NRows) -> result
+  dplyr::select(-pTerm, -pCoocTerm, -pTermAndCoocTerm, -a, -b, -c, -d) %>%
+    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows"))) -> result
 # inspect
 return(result)
 }
