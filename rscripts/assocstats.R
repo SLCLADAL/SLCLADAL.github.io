@@ -5,9 +5,9 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
     # determine Term
   dplyr::filter(Term == term,
                 # set minimum number of occurrences of CoocTerm
-                CoocFreq > coocfreq,
+                b > coocfreq,
                 # set minimum number of co-occurrences of Term and CoocTerm
-                TermCoocFreq > termcoocfreq) %>%
+                a > termcoocfreq) %>%
   # work row-wise
   dplyr::rowwise() %>%
   # calculate fishers' exact test
