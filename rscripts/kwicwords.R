@@ -2,7 +2,7 @@ require(dplyr)
 require(tidyr)
 require(quanteda)
 
-kwic_words <- function(x){
+kwicwords <- function(x){
   x %>%
   # Convert kwic_keyword to a data frame
   as.data.frame() %>%
