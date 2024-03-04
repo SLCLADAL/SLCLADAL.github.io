@@ -23,7 +23,7 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
   dplyr::mutate(phi = sqrt((x2/(a + b + c + d)))) %>%
   # calculate mutual information (MI)
   dplyr::mutate(pTerm = (a + c) /  (a + b + c + d),
-                pCoocTerm = (b + d) / AllFreq,
+                pCoocTerm = (b + d) / (a + b + c + d),
                 pTermAndCoocTerm = a / (a + b + c + d),
                 MI = log2(pTermAndCoocTerm / (pTerm * pCoocTerm))) %>%
   # calculate odds ration
