@@ -1,4 +1,4 @@
-library(dplyr)
+require(dplyr)
 source("https://slcladal.github.io/rscripts/loglik.R")
 assocstats <- function(x, term, coocfreq, termcoocfreq){
   x %>%
@@ -22,9 +22,9 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
   # extract association measure phi
   dplyr::mutate(phi = sqrt((x2/(a + b + c + d)))) %>%
   # calculate mutual information (MI)
-  dplyr::mutate(pTerm = TermFreq / AllFreq,
-                pCoocTerm = CoocFreq / AllFreq,
-                pTermAndCoocTerm = TermCoocFreq / AllFreq,
+  dplyr::mutate(pTerm = (a + c) /  (a + b + c + d),
+                pCoocTerm = (b + d) / AllFreq,
+                pTermAndCoocTerm = a / (a + b + c + d),
                 MI = log2(pTermAndCoocTerm / (pTerm * pCoocTerm))) %>%
   # calculate odds ration
   dplyr::mutate(OddsRatio = ((a/b) / (c/d))) %>%
