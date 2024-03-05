@@ -4,55 +4,34 @@
 
 colldf <- function(x){
   
-# convert sentences into a corpus object
-  textcorpus <- Corpus(VectorSource(x))
-
-  # step 1: convert corpus into a tidy data frame
-  # create document term matrix
-  textcorpusdtm <- tm::DocumentTermMatrix(textcorpus)
-  # convert dtm into sparse matrix
-  textdtm <- Matrix::sparseMatrix(i = textcorpusdtm$i, j = textcorpusdtm$j, 
-                                   x = textcorpusdtm$v, 
-                                   dims = c(textcorpusdtm$nrow, textcorpusdtm$ncol),
-                                   dimnames = dimnames(textcorpusdtm))
-  # calculate co-occurrence counts
-  coocs <- t(textdtm) %*% textdtm
-  # convert into matrix
-  coocs_mx <- as.matrix(coocs)
+  colldf <- x %>%
+    quanteda::tokens() %>%
+    quanteda::dfm() %>%
+    quanteda::fcm(tri = FALSE) %>%
+    tidytext::tidy() %>%
+    dplyr::relocate(term, document, count) %>%
+    dplyr::rename(w1 = 1,
+                  w2 = 2,
+                  O11 = 3) %>%
+    # calculate N
+    dplyr::mutate(N = sum(O11)) %>%
+    # calculate R1
+    dplyr::group_by(w1) %>%
+    dplyr::mutate(R1 = sum(O11),
+                  O12 = R1-O11,
+                  R2 = N-R1) %>%
+    dplyr::ungroup(w1) %>%
+    # calculate C1
+    dplyr::group_by(w2) %>%
+    # calculate C1, O21, C2, O22
+    dplyr::mutate(C1 = sum(O11),
+                  O21 = C1-O11,
+                  C2 = N-C1,
+                  O22 = R2-O21) %>%
+    # remove superfluous columns
+    dplyr::select(-N, -R1, -R2, -C1, -C2)
+  # return
+  return(colldf)
   
-  # prepare data for transformation into a tidy data frame with word 1, word 2, 
-  # and their co-occurrence frequency
-  words <- attr(coocs_mx, "dimnames")[1] %>% 
-    unlist()
-  # extract and repeat word 1
-  Term <- rep(words, length(words))
-  # extract and repeat word 2
-  CoocTerm <- rep(words, each = length(words))
-  # extract co-occurrence frequency
-  TermCoocFreq <- as.numeric(c(coocs_mx[!is.na(as.numeric(coocs_mx))]))
-  
-  # create tidy data frame
-  colls <- data.frame(Term, CoocTerm, TermCoocFreq)
-  
-  # step 2: reformat table nd extract frequency information for statistical analysis
-  # extract stats
-  collocation_df <- colls %>%
-    #dplyr::mutate(Term = factor(Term),
-    #              CoocTerm = factor(CoocTerm)) %>%
-    dplyr::mutate(AllFreq = sum(TermCoocFreq)) %>%
-    dplyr::group_by(Term) %>%
-    dplyr::mutate(TermFreq = sum(TermCoocFreq)) %>%
-    dplyr::ungroup(Term) %>%
-    dplyr::group_by(CoocTerm) %>%
-    dplyr::mutate(CoocFreq = sum(TermCoocFreq)) %>%
-    #dplyr::arrange(Term) %>%
-    dplyr::mutate(a = TermCoocFreq,
-                  b = TermFreq - a,
-                  c = CoocFreq - a,
-                  d = AllFreq - (a + b + c)) %>%
-    dplyr::mutate(NRows = nrow(.))
-  
-  # step 3: return final data frame
-  return(collocation_df)
-}
+  }
 
