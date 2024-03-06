@@ -3,6 +3,42 @@ title: "Leftover code chunks"
 output: html_notebook
 ---
 
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>If you are using this notebook on your own computer and you have not already installed the R packages listed above, you need to install them.<br> <a href=
+"https://www.dataquest.io/blog/install-package-r/">
+        <div class="text">
+        <p style='margin-top:1em; text-align:center'>
+            Here is a Dataquest post on how to install packages in R.
+            </p>
+        </div>
+    </a>
+    </b>
+</p>
+</span>
+</div>
+
+<br>
+
+# Extracting N-Grams and Collocations
+
+We will use Lewis Caroll's  *Alice's Adventures in Wonderland* as an example text and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
+
+```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# read in text
+text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb")) %>%
+  paste0(collapse = " ") %>%
+  stringr::str_squish() %>%
+  stringr::str_remove_all("- ")
+# split text into words
+text_split <- text %>% 
+  as_tibble() %>%
+  tidytext::unnest_tokens(words, value)
+# inspect
+head(text_split)  
+```
+
 This code chunk aims to speed up the annotation of large text datsets with udpipe (the basic implementation worked faster though)
 
 
@@ -42,4 +78,184 @@ end_time - start_time
 # inspect results
 ```
 
+```{r coll4, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# extract and count unique tokens in the concordance
+# convert kwic_keyword to a data frame showing each token and its frequency
+kwic_words <- kwic_keyword %>%
+  # Convert kwic_keyword to a data frame
+  as.data.frame() %>%
+  # select columns 'pre', 'keyword', and 'post'
+  dplyr::select(pre, post) %>%
+  # reshape the data frame from wide to long format using gather
+  tidyr::gather(type, words, pre:post) %>%
+  # extract the 'words' column and collapse into a single character string
+  dplyr::pull(words) %>%
+  paste0(collapse = " ") %>%
+  # tokenize the text
+  quanteda::tokens() %>%
+  # unlist the tokens to create a data frame
+  unlist() %>%
+  as.data.frame() %>%
+  # rename the column to 'token'
+  dplyr::rename(token = 1) %>%
+  # group by 'token' and count the occurrences
+  dplyr::group_by(token) %>%
+  dplyr::summarise(n = n()) %>%
+  # add column stating where the frequency list is 'from'
+  dplyr::mutate(type = "kwic")
+# inspect the results by displaying the first 10 rows
+head(kwic_words, 10)
+```
 
+
+
+
+
+
+
+
+
+```{r coll5, message=FALSE, warning=FALSE, paged.print=FALSE}
+# convert into corpus
+textcorpus <- Corpus(VectorSource(sentences))
+# clean corpus
+textcorpusclean <- textcorpus %>%
+  tm::tm_map(tolower)
+# create document term matrix
+textdtm <- DocumentTermMatrix(textcorpusclean, control=list(removePunctuation = TRUE,
+                                                            removeNumbers = TRUE))
+# convert dtm into sparse matrix
+textsdtm <- Matrix::sparseMatrix(i = textdtm$i, j = textdtm$j, 
+                           x = textdtm$v, 
+                           dims = c(textdtm$nrow, textdtm$ncol),
+                           dimnames = dimnames(textdtm))
+# calculate co-occurrence counts
+coocurrences <- t(textsdtm) %*% textsdtm
+# convert into matrix
+collocates <- as.matrix(coocurrences)
+# inspect
+collocates[1:10, 1:10] %>%
+  as.data.frame() %>%
+   tibble::rownames_to_column("Word")
+```
+
+We now reformat the matrix into a tidy data frame.
+
+
+```{r}
+words <- attr(collocates, "dimnames")[1] %>% unlist()
+word1 <- rep(words, length(words))
+word2 <- rep(words, each = length(words))
+cooc_n <- as.numeric(c(collocates[!is.na(as.numeric(collocates))]))
+colls <- data.frame(word1, word2, cooc_n) %>%
+  dplyr::rename(Term = 1,
+                CoocTerm = 2,
+                TermCoocFreq = 3)
+head(colls, 10)
+```
+
+To determine which terms collocate significantly with the key term (*alice*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
+
+* a = Number of times `coocTerm` occurs with term j
+
+* b = Number of times `coocTerm` occurs without  term j
+
+* c = Number of times other terms occur with term j
+
+* d = Number of terms that are not `coocTerm` or term j
+
+In a first step, we create a table which holds these quantities.
+
+```{r coll_01_15, message=FALSE, warning=FALSE}
+# extract stats
+cooctb <- colls %>%
+  dplyr::mutate(Term = factor(Term),
+                CoocTerm = factor(CoocTerm)) %>%
+  dplyr::mutate(AllFreq = sum(TermCoocFreq)) %>%
+  dplyr::group_by(Term) %>%
+  dplyr::mutate(TermFreq = sum(TermCoocFreq)) %>%
+  dplyr::ungroup(Term) %>%
+  dplyr::group_by(CoocTerm) %>%
+  dplyr::mutate(CoocFreq = sum(TermCoocFreq)) %>%
+  dplyr::arrange(Term) %>%
+  dplyr::mutate(a = TermCoocFreq,
+                b = TermFreq - a,
+                c = CoocFreq - a, 
+                d = AllFreq - (a + b + c)) %>%
+  dplyr::mutate(NRows = nrow(.))
+# inspect
+head(cooctb)
+```
+
+We now select the key term (*alice*). If we wanted to find all collocations that are present in the data, we would use the entire data rather than only the subset that contains  *alice*. 
+
+```{r coll_01_23, message=FALSE, warning=FALSE}
+cooctb_redux <- cooctb %>%
+  dplyr::filter(Term == "alice")
+cooctb_redux
+```
+
+
+
+
+
+We now determine our keyword and calculate the association strength of our key word with other words. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) written by Gregor Wiedemann and Andreas Niekler (see also Wiedemann and Niekler 2017).
+
+```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load function for co-occurrence calculation
+source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
+# define term
+coocTerm <- "alice"
+# calculate co-occurrence statistics
+coocs <- calculateCoocStatistics(coocTerm, textsdtm, measure="LOGLIK")
+# convert into data.frame
+cooc_term <- data.frame(rep("alice", length(coocs)), names(coocs), coocs) %>%
+  dplyr::rename("keyword" = 1, 
+                "collocate" = 2, 
+                "LOGLIK" =3)
+
+# inspect results
+head(cooc_term, 10)
+```
+
+The output shows that the word most strongly associated with *alice* in the text is  *thought*.
+
+```{r coll_01_25, message=FALSE, warning=FALSE}
+coocStatz <- cooctb_redux %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(a, b, c, d), 
+                                                        ncol = 2, byrow = T))[1]))) %>%
+    dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(a, b, c, d),                                                           ncol = 2, byrow = T),  simulate.p.value = TRUE)[1]))) %>%
+  dplyr::mutate(phi = sqrt((x2/(a + b + c + d)))) %>%
+      dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(a, b, c, d), 
+                                                                  ncol = 2, byrow = T),  simulate.p.value = TRUE)$expected[1]))) %>%
+  dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
+                                                p <= .01 ~ "p<.01",
+                                                p <= .05 ~ "p<.05", 
+                                                TRUE ~ "n.s.")) %>%
+  dplyr::mutate(p = round(p, 5)) %>%
+  dplyr::filter(Significance != "n.s.")
+# inspect
+head(coocStatz)
+```
+
+
+There are various visualizations options for collocations. Which visualization method is appropriate depends on what the visualizations should display. 
+
+### Association Strength
+
+We start with the most basic and visualize the collocation strength using a simple dot chart. We use the vector of association strengths generated above and transform it into a table. Also, we exclude elements with an association strength lower than 30.
+
+```{r assocs01, message=F, warning=F}
+coocdf <- coocs %>%
+  as.data.frame() %>%
+  dplyr::mutate(CollStrength = coocs,
+                Term = names(coocs)) %>%
+  dplyr::filter(CollStrength > 10)
+# inspect
+coocdf %>%
+  as.data.frame() %>%
+  dplyr::select(-.) %>%
+  dplyr::relocate(Term, CollStrength) %>%
+  head()
+```

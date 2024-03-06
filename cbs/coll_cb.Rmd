@@ -6,409 +6,626 @@
 This tutorial is the interactive Jupyter notebook accompanying the [*Language Technology and Data Analysis Laboratory* (LADAL) tutorial *Analyzing Co-Occurrences and Collocations in R*](https://ladal.edu.au/coll.html). 
 
 
-
-
 **Preparation and session set up**
 
 We set up our session by activating the packages we need for this tutorial. 
 
 ```{r prep2, message=FALSE, warning=FALSE}
+# set options
+options(warn=-1)  # do not show warnings or messages
 # load packages
-library(GGally)
-library(ggdendro)
-library(Matrix)
-library(quanteda)
-library(quanteda.textplots)
-library(dplyr)
-library(stringr)
-library(tm)
-library(tidytext)
+library(GGally)        # extended functionality in ggplot2
+library(ggdendro)      # visualize dendrograms with ggplot2
+library(Matrix)        # sparse matrix operations
+library(quanteda)      # quantitative analysis of textual data
+library(quanteda.textplots)  # additional text visualization tools in quanteda
+library(dplyr)         # data manipulation and transformation
+library(stringr)       # string manipulation functions
+library(tm)            # text mining and analysis
+library(tidytext)      # tidy data principles applied to text data
+library(readxl)        # reading Excel files
+library(writexl)       # saving data in Excel format
+library(openxlsx)      # reading and saving Excel files
+library(here)          # for generating relative paths
 ```
 
-
-Once you have initiated the session by executing the code shown above, you are good to go.
-
-If you are using this notebook on your own computer and you have not already installed the R packages listed above, you need to install them. You can install them by replacing the `library` command with `install.packages` and putting the name of the package into quotation marks like this: `install.packages("dplyr")`. Then, you simply run this command and R will install the package you specified.
-
-
-
-# Extracting N-Grams and Collocations
-
-Collocations are terms that co-occur (significantly) more often together than would be expected by chance. A typical example of a collocation is *Merry Christmas* because the words *merry* and *Christmas* occur together more frequently together than would be expected, if words were just randomly stringed together.  
-
-N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use Lewis Caroll's  *Alice's Adventures in Wonderland* as an example text and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
-
-```{r coll1, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# read in text
-text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb")) %>%
-  paste0(collapse = " ") %>%
-  stringr::str_squish() %>%
-  stringr::str_remove_all("- ")
-# split text into words
-text_split <- text %>% 
-  as_tibble() %>%
-  tidytext::unnest_tokens(words, value)
-# inspect
-head(text_split)  
-```
 
 
 ## Using your own data
 
-While the tutorial uses data from the LADAL website, you can also use your own data. You can see below what you need to do to upload and use your own data.
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
 
-The code chunk below allows you to upload two files from your own computer. To be able to load your own data, you need to click on the folder symbol to the left of the screen:
+While the tutorial uses example data, you can also **use your own data**. To use your own data, click on the folder called `MyTexts` (it is in the menu to the left of the screen) and then simply drag and drop your txt-files into the folder. When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>
+<br>
+You can upload <b>only txt-files</b> (simple unformatted files created in or saved by a text editor)! The notebook assumes that you upload some form of text data - not tabular data! <br>
+<br>
+<b>IMPORTANT</b>: Be sure to <b>replace `mytext` with `text` in the code chunk below and  do not execute the code chunk which loads an example text</b> so that you work with your and not the sample data!</b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
 
-![Binder Folder Symbol](https://slcladal.github.io/images/binderfolder.JPG)
+<br>
 
-
-Then, when the menu has unfolded, click on the smaller folder symbol (encircled in red in the picture below).
-
-![Small Binder Folder Symbol](https://slcladal.github.io/images/upload2.png)
-
-Now, you are in the main menu and can click on the 'MyData' folder.
-
-![MyData Folder Symbol](https://slcladal.github.io/images/upload3.png)
-
-Now, that you are in the MyData folder, you can click on the upload symbol.
-
-![Binder Upload Symbol](https://slcladal.github.io/images/binderupload.JPG)
-
-Select and upload the files you want to analyze (**IMPORTANT: here, we assume that you upload some form of text data - not tabular data! You can upload only txt and docx files!**). When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.
 
 ```{r}
-myfiles <- list.files(here::here("MyData"), # path to the corpus data
+myfiles <- list.files(here::here("notebooks/MyTexts"), # path to the corpus data
                           # full paths - not just the names of the files
                           full.names = T) 
-# load colt files
+# loop over the vector 'myfiles' that contains paths to the data
 mytext <- sapply(myfiles, function(x){
+
+  # read the content of each file using 'scan'
   x <- scan(x, 
-            what = "char", 
-            sep = "", 
-            quote = "", 
-            quiet = T, 
-            skipNul = T)
+            what = "char",    # specify that the input is characters
+            sep = "",         # set separator to an empty string (read entire content)
+            quote = "",       # set quote to an empty string (no quoting)
+            quiet = T,        # suppress scan messages
+            skipNul = T)      # skip NUL bytes if encountered
+
+  # combine the character vector into a single string with spaces
   x <- paste0(x, sep = " ", collapse = " ")
+
+  # remove extra whitespaces using 'str_squish' from the 'stringr' package
   x <- stringr::str_squish(x)
+
 })
-# inspect
+
+# inspect the structure of the text object
+str(mytext)
+```
+
+## Loading the example data
+
+We begin by loading the data which represents the text of Lewis Caroll's  *Alice's Adventures in Wonderland*. 
+
+```{r conc1, message=FALSE, warning=FALSE}
+# load text
+text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb"))
+# inspect data
+head(text)
+```
+
+## Extracting N-Grams
+
+The `quanteda.textstats` package offers the `textstat_collocations` function for extracting N-grams. This function uses the following main arguments
+
++ `x`: a character, corpus, or tokens object.  
++ `method`: association measure for detecting collocations. Currently this is limited to "lambda".  
++ `size`: integer; the length of the ngram. The default is 2 - if you want to extract tri-grams set `size = 3` and if you want to extract four-grams set `size = 4` and so on.  
++ `min_count`: numeric; minimum frequency of collocations that will be scored.  
++ `smoothing`: numeric; a smoothing parameter added to the observed counts (default is 0.5).  
++ `tolower`: logical; if TRUE, tokens are transformed to lower-case.  
+
+```{r coll3m, message=FALSE, warning=FALSE, paged.print=FALSE}
+# concatenate the elements in the 'text' object
+text %>% 
+  paste0(collapse = " ") %>%
+  # convert the concatenated text into tokens
+  quanteda::tokens() %>%
+  # identify and extract bigrams 
+  quanteda.textstats::textstat_collocations(size = 2, min_count = 1) %>%
+  # convert into a data frame and save results in an object called 'ngrams'
+  as.data.frame() %>%
+  # order by frequency
+  dplyr::arrange(-count) -> ngrams
+# inspect the first 10 rows
+head(ngrams, 10)
+```
+
+### Exporting tables
+
+To export a table as an MS Excel spreadsheet, we use `write_xlsx`. 
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(ngrams, here::here("notebooks/MyOutput/ngrams.xlsx"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the generated MS Excel spreadsheet named *ngrams.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *ngrams.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+## Identifying Collocations
+
+There are various ways of finding collocations depending on the data provided, the context, and the association measure (which represents information of how strong the association between the words is). Below, you will see how to detect collocations in two different data structures:  
++ a list of sentences  
++ concordances  
+
+### Identifying collocations in sentences
+
+In the following, we will find collocations based on their co-occurrence in linguistic units (in this case sentences but this could also be speech units, tweets, or other paragraphs, etc.).
+
+**Data preparation**
+
+In a first step, we split our example text into sentences and clean the data (removing punctuation, converting to lower case, etc.).
+
+```{r}
+text %>% 
+  # concatenate the elements in the 'text' object
+  paste0(collapse = " ") %>%
+  # separate possessives and contractions
+  stringr::str_replace_all(fixed("'"), fixed(" '")) %>%
+  stringr::str_replace_all(fixed("’"), fixed(" '")) %>%
+  # split text into sentences
+  tokenizers::tokenize_sentences() %>%
+  # unlist sentences
+  unlist() %>%
+  # remove non-word characters
+  stringr::str_replace_all("\\W", " ") %>%
+  stringr::str_replace_all("[^[:alnum:] ]", " ") %>%
+  # remove superfluous white spaces
+  stringr::str_squish() %>%
+  # convert to lower case and save in 'sentences' object
+  tolower() -> sentences
+# inspect first 10 sentences
+head(sentences, 10)
+```
+
+*** 
+
+**Loading your own data**
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+
+While the tutorial uses example data, you can also **use your own data**. To use your own data, click on the folder called `MyTexts` (it is in the menu to the left of the screen) and then simply drag and drop your txt-files into the folder. When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>
+<br>
+You can upload <b>only txt-files</b> (simple unformatted files created in or saved by a text editor)! The notebook assumes that you upload some form of text data - not tabular data! <br>
+<br>
+<b>IMPORTANT</b>: Be sure to <b>replace `mytext` with `text` in the code chunk below and  do not execute the code chunk which loads an example text</b> so that you work with your and not the sample data!</b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+```{r}
+myfiles <- list.files(here::here("notebooks/MyTexts"), # path to the corpus data
+                          # full paths - not just the names of the files
+                          full.names = T) 
+# loop over the vector 'myfiles' that contains paths to the data
+mytext <- sapply(myfiles, function(x){
+
+  # read the content of each file using 'scan'
+  x <- scan(x, 
+            what = "char",    # specify that the input is characters
+            sep = "",         # set separator to an empty string (read entire content)
+            quote = "",       # set quote to an empty string (no quoting)
+            quiet = T,        # suppress scan messages
+            skipNul = T)      # skip NUL bytes if encountered
+
+  # combine the character vector into a single string with spaces
+  x <- paste0(x, sep = " ", collapse = " ")
+
+  # remove extra whitespaces using 'str_squish' from the 'stringr' package
+  x <- stringr::str_squish(x)
+
+})
+
+# inspect the structure of the text object
+str(mytext)
+```
+
+***
+
+Next, we feed the sentences to a function that tabulates all words and their co-occurrences.
+
+```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+# load function that generates a co-occurrence table
+#source("https://slcladal.github.io/rscripts/colldf.R")
+source(here::here("rscripts/colldf.R"))
+cooctb <- colldf(x = sentences)
+# inspect results
+head(cooctb, 10)
+```
+
+To determine which terms collocate significantly and with what association strength, we use the following information (that is provided by the table above):
+
+* O~11~ = Number of times *word~1~* occurs *with* *word~2~* (\[ w_1 \cap w_2 \])
+
+* O~12~ = Number of times *word~1~* occurs *without* *word~2~* (\[ w_1 \cup w_2 \])
+
+* O~21~ = Number of times `CoocTerm` occurs without `Term`
+
+* O~22~ = Number of terms that are not `coocTerm` or `Term`
+
+Example:
+
+
+|              | w~2~ present       |     w~2~ absent |      |
+ :---          | :-----:    |   --------:  | ---
+| **w~1~ present**     | O~11~      | O~12~        |  = R~1~
+| **w~1~ absent** | O~21~      | O~22~        |  = R~2~
+|              |  = C~1~    |   = C~2~     |  = N |
+
+
+
+We could calculate all collocations in the corpus (based on co-occurrence within the same sentence) or we can find collocations of a specific term - here, we will find collocations fo the term *alice*.
+
+
+```{r coll_01_25, message=FALSE, warning=FALSE}
+# load function that extracts association statistics
+#source("https://slcladal.github.io/rscripts/assocstats.R")
+source(here::here("rscripts/assocstats.R"))
+# extract association statistics
+coocStatz <- assocstats(cooctb, "alice", 10, 5)
+# inspect results
+head(coocStatz, 10)
+```
+
+The output shows that the words most strongly associated with *alice* (aside from *alice*) are *said*, *thought*, and *afraid*.
+
+
+To export a table as an MS Excel spreadsheet, we use `write_xlsx`. 
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(coocStatz, here::here("notebooks/MyOutput/coocStatz.xlsx"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the generated MS Excel spreadsheet named *coocStatz.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *coocStatz.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+### Identifying collocations using kwics
+
+In this section, we will extract collocations and calculate association measures based on  concordances and the corpus the concordances were extracted from.
+
+We start by cleaning our corpus and splitting it into chapters. 
+
+```{r}
+# clean corpus
+text %>%
+  # concatenate the elements in the 'text' object
+  paste0(collapse = " ") %>%
+  # separate possessives and contractions
+  stringr::str_replace_all(fixed("'"), fixed(" '")) %>%
+  stringr::str_replace_all(fixed("’"), fixed(" '")) %>%
+  # split text into different chapters
+  stringr::str_split("CHAPTER [IVX]{1,4}") %>%
+  # unlist sentences
+  unlist() %>%
+  # remove non-word characters
+  stringr::str_replace_all("\\W", " ") %>%
+  stringr::str_replace_all("[^[:alnum:] ]", " ") %>%
+  # remove superfluous white spaces
+  stringr::str_squish() %>%
+  # convert to lower case and save in 'sentences' object
+  tolower() -> texts
+# inspect first 100 words the first 10 chapters
+head(substr(texts, 1, 100), 10)
+
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+We split the corpus into chapter to mirror the fact that most text data will come in the form of corpora which consist of different files containing texts.
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+***
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+
+If you have data consisting of cleaned, lower-case, texts with each text being in a different txt-file, you can use your own data! Simply click on the folder called `MyTexts`  (it is in the menu to the left of the screen) and then simply drag and drop your txt-files into the folder. When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>
+<br>
+You can upload <b>only txt-files</b> (simple unformatted files created in or saved by a text editor)! The notebook assumes that you upload some form of text data - not tabular data! <br>
+<br>
+<b>IMPORTANT</b>: Be sure to <b>replace `mytext` with `text` in the code chunk below and  do not execute the code chunk which loads an example text</b> so that you work with your and not the sample data!</b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+```{r}
+myfiles <- list.files(here::here("notebooks/MyTexts"), # path to the corpus data
+                          # full paths - not just the names of the files
+                          full.names = T) 
+# loop over the vector 'myfiles' that contains paths to the data
+mytext <- sapply(myfiles, function(x){
+
+  # read the content of each file using 'scan'
+  x <- scan(x, 
+            what = "char",    # specify that the input is characters
+            sep = "",         # set separator to an empty string (read entire content)
+            quote = "",       # set quote to an empty string (no quoting)
+            quiet = T,        # suppress scan messages
+            skipNul = T)      # skip NUL bytes if encountered
+
+  # combine the character vector into a single string with spaces
+  x <- paste0(x, sep = " ", collapse = " ")
+
+  # remove extra whitespaces using 'str_squish' from the 'stringr' package
+  x <- stringr::str_squish(x)
+
+})
+
+# inspect the structure of the text object
 str(mytext)
 ```
 
 
-**Keep in mind though that you need to adapt the names of the texts in the code chunks below so that the code below work on your own texts!**
-
 ***
 
+Next, we generate a frequency list of words that occur around a keyword (we use the keyword *alice* in this example but you can also choose a different word).
+
+for this we use the `tokens_select` function (from the `quanteda` package) which has the following arguments: 
+
++ `x`: a text or collection of texts. The text needs to be tokenised, i.e. split it into individual words, which is why we use the *text* in the `tokens()` function. 
++ `pattern`: a keyword defined by a search pattern  
++ `window`: the size of the context window (how many word before and after)  
++ `valuetype`: the type of pattern matching  
+  + "glob" for "glob"-style wildcard expressions;  
+  + "regex" for regular expressions; or  
+  + "fixed" for exact matching  
++ `selection`: a character to define if the key word should be retained in the resulting frequency list or if it should be removed. The argument offers two options  
+  + "keep"  
+  + "remove"  
++ `case_insensitive`: logical; if TRUE, ignore case when matching a pattern or dictionary values
 
 
-## Extracting N-Grams with quanteda
-
-The `quanteda` package offers excellent and very fast functions for extracting bigrams.
-
-```{r coll3m, message=FALSE, warning=FALSE, paged.print=FALSE}
-#clean corpus
-text_clean <- text %>%
-  stringr::str_to_title()
-# tokenize corpus
-text_tokzd <- quanteda::tokens(text_clean)
-# extract bigrams
-BiGrams <- text_tokzd %>% 
-       quanteda::tokens_remove(stopwords("en")) %>% 
-       quanteda::tokens_select(pattern = "^[A-Z]", 
-                               valuetype = "regex",
-                               case_insensitive = FALSE, 
-                               padding = TRUE) %>% 
-       quanteda.textstats::textstat_collocations(min_count = 5, tolower = FALSE)
-# inspect
-head(BiGrams)
-```
-
-
-We can also extract bigrams very easily using the `tokens_compound` function which understands that we are looking for two-word expressions.
-
-```{r coll3o, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-ngram_extract <- quanteda::tokens_compound(text_tokzd, pattern = BiGrams)
-```
-
-We can now generate concordances (and clean the resulting kwic table - the keyword-in-context table).
-
-```{r coll3px, echo = F, message=FALSE, warning=FALSE}
-ngram_kwic <- kwic(ngram_extract, pattern = c("Red_Queen", "White_Rabbit")) %>%
-  as.data.frame() %>%
-  dplyr::select(-to, -from, -pattern)
-# inspect
-head(ngram_kwic)
-```
-
-The disadvantage here is that we are strictly speaking only extracting N-Grams but not collocates as collocates do not necessarily have to occur in direct adjacency. The following section shows how to expand the extraction of n-grams to the extraction of collocates.
-
-# Finding Collocations
-
-Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
-
-In the following, we will extract collocations from Lewis Caroll's  *Alice's Adventures in Wonderland*. In a first step, we will split the text into individual sentences.
-
-```{r coll4, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# read in and process text
-textsentences <- text %>%
-  stringr::str_squish() %>%
-  tokenizers::tokenize_sentences(.) %>%
+```{r}
+kwic_words <- quanteda::tokens_select(tokens(texts), 
+                                      pattern = "alice", 
+                                      window = 5, 
+                                      selection = "keep") %>%
   unlist() %>%
-  stringr::str_remove_all("- ") %>%
-  stringr::str_replace_all("\\W", " ") %>%
-  stringr::str_squish()
-# inspect data
-head(textsentences)
-```
-
-The first element does not represent a full sentence because we selected a sample of the text which began in the middle of a sentence rather than at its beginning. In a next step, we will create a matrix that shows how often each word co-occurred with each other word in the data.
-
-```{r coll5, message=FALSE, warning=FALSE, paged.print=FALSE}
-# convert into corpus
-textcorpus <- Corpus(VectorSource(textsentences))
-# create vector with words to remove
-extrawords <- c("the", "can", "get", "got", "can", "one", 
-                "dont", "even", "may", "but", "will", 
-                "much", "first", "but", "see", "new", 
-                "many", "less", "now", "well", "like", 
-                "often", "every", "said", "two")
-# clean corpus
-textcorpusclean <- textcorpus %>%
-  tm::tm_map(removePunctuation) %>%
-  tm::tm_map(removeNumbers) %>%
-  tm::tm_map(tolower) %>%
-  tm::tm_map(removeWords, stopwords()) %>%
-  tm::tm_map(removeWords, extrawords)
-# create document term matrix
-textdtm <- DocumentTermMatrix(textcorpusclean, control=list(bounds = list(global=c(1, Inf)), weighting = weightBin))
-
-# convert dtm into sparse matrix
-textsdtm <- Matrix::sparseMatrix(i = textdtm$i, j = textdtm$j, 
-                           x = textdtm$v, 
-                           dims = c(textdtm$nrow, textdtm$ncol),
-                           dimnames = dimnames(textdtm))
-# calculate co-occurrence counts
-coocurrences <- t(textsdtm) %*% textsdtm
-# convert into matrix
-collocates <- as.matrix(coocurrences)
-# inspect
-collocates[1:10, 1:10] %>%
+  # tabulate results
+  table() %>%
+  # convert into data frame
   as.data.frame() %>%
-   tibble::rownames_to_column("Word")
-```
-
-We can inspect this co-occurrence matrix and check how many terms (words or elements) it represents using the `ncol` function from base R. We can also check how often terms occur in the data using the `summary` function from base R. The output of the `summary` function tells us that the minimum frequency of a word in the data is 1 with a maximum of 25,435. The difference between the median (36.00) and the mean (74.47) indicates that the frequencies are distributed very non-normally - which is common for language data. 
-
-```{r coll6, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# inspect size of matrix
-ncol(collocates)
-summary(rowSums(collocates))
-```
-The `ncol` function reports that the data represents 8,638 words and that the most frequent word occurs 25,435 times in the text.
-
-# Visualizing Collocations
-
-We will now use an example of one individual word (*alice*) to show, how collocation strength for individual terms is calculated and how it can be visualized. The function `calculateCoocStatistics` is taken from [this tutorial](https://tm4ss.github.io/docs/Tutorial_5_Co-occurrence.html) written by Gregor Wiedemann and Andreas Niekler (see also Wiedemann and Niekler 2017).
-
-```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
-# load function for co-occurrence calculation
-source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
-# define term
-coocTerm <- "alice"
-# calculate co-occurrence statistics
-coocs <- calculateCoocStatistics(coocTerm, textsdtm, measure="LOGLIK")
+  # rename columns
+  dplyr::rename(token = 1,
+                n = 2) %>%
+  # add a coulm with type
+  dplyr::mutate(type = "kwic")
 # inspect results
-coocs[1:20]
+head(kwic_words, 10)
 ```
 
-The output shows that the word most strongly associated with *alice* in the text is  *thought*.
+Next, we create a frequency table of the entire clean corpus.
 
-There are various visualizations options for collocations. Which visualization method is appropriate depends on what the visualizations should display. 
-
-## Association Strength
-
-We start with the most basic and visualize the collocation strength using a simple dot chart. We use the vector of association strengths generated above and transform it into a table. Also, we exclude elements with an association strength lower than 30.
-
-```{r assocs01, message=F, warning=F}
-coocdf <- coocs %>%
-  as.data.frame() %>%
-  dplyr::mutate(CollStrength = coocs,
-                Term = names(coocs)) %>%
-  dplyr::filter(CollStrength > 10)
-# inspect
-coocdf %>%
-  as.data.frame() %>%
-  dplyr::select(-.) %>%
-  dplyr::relocate(Term, CollStrength) %>%
-  head()
+```{r}
+# load and execute function that creates frequency lists from text data
+source("https://slcladal.github.io/rscripts/corpuswords.R")
+corpus_words <- corpuswords(texts)
+# inspect the results by displaying the first 10 rows
+head(corpus_words, 10)
 ```
 
-We can now visualize the association strengths as shown in the code chunk below.
+Next, we combine the two frequency lists.
+
+```{r}
+# load and execute function that joins 'corpus_words' and 'kwic_words' data frames on the 'token' column
+source("https://slcladal.github.io/rscripts/combinefreq.R")
+freq_df <- combinefreq(corpus_words, kwic_words) 
+# inspect resulting frequency list
+head(freq_df, 10)
+```
+
+
+```{r}
+stats_tb <- freq_df %>%
+  dplyr::mutate(`kwic n words` = sum(kwic),
+                corpuswokwic = corpus-kwic,
+                `corpus n words` = sum(corpuswokwic)) %>%
+  dplyr::mutate(O11 = kwic,
+                O12 = `kwic n words` - kwic,
+                O21 = corpuswokwic,
+                O22 = `corpus n words` - corpuswokwic) %>%
+  dplyr::select(-corpus, -kwic, -`kwic n words`, -`corpus n words`,-corpuswokwic)
+# inspect resulting frequency list
+head(stats_tb, 10)
+```
+
+
+To determine which terms collocate significantly and with what association strength, we use the following information (that is provided by the table above):
+
+* O11 = Number of times word~x~ occurs in `kwic`
+
+* O12 = Number of times word~x~ occurs in `corpus` (without `kwic`)
+
+* O21 = Number of times other words occur in `kwic`
+
+* O22 = Number of times  other words occur in `corpus`
+
+Example:
+
+|co-occurrence with keyword   | Collocate (e.g., said) | other tokens |
+ ---------------------------- | ---------------------- | ------------ |
+| kwic                        | a                      | b            |
+| corpus (wo kwic)            | c                      | d            |
+
+
+
+|              | w~1~       |     other words |      |
+ :---          | :-----:    |   --------:  | ---
+| **kwic**     | O~11~      | O~12~        |  = R~1~
+| **corpus** | O~21~      | O~22~        |  = R~2~
+|              |  = C~1~    |   = C~2~     |  = N |
+
+```{r}
+# load and execute function that extracts association statistics
+#source("https://slcladal.github.io/rscripts/assockwic.R")
+source(here::here("rscripts/assockwic.R"))
+coocStatz <- assockwic(stats_tb)
+# inspect results
+head(coocStatz, 10)
+```
+
+
+
+## Visualising collocations
+
+### Dotplots
+
+We can now visualize the association strengths in a dotplot as shown in the code chunk below.
 
 ```{r assocs03, message=F, warning=F}
-ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
+coocStatz %>%
+  dplyr::arrange(-phi) %>%
+  head(20) %>%
+  ggplot(aes(x = reorder(token, phi, mean), y = phi)) +
   geom_point() +
   coord_flip() +
   theme_bw() +
-  labs(y = "")
+  labs(x = "Token", y = "Association strength (phi)")
 ```
 
-The dot chart shows that *alice* is collocating more strongly with *thought* compared to any other term. 
 
-## Dendrograms
+### Exporting images
 
-Another method for visualizing collocations are dendrograms. Dendrograms (also called tree-diagrams) show how similar elements are based on one or many features. As such, dendrograms are used to indicate groupings as they show elements (words) that are notably similar or different with respect to their association strength. To use this method, we first need to generate a distance matrix from our co-occurrence matrix.
+To export image as an png-file, we use `ggsave`. Be aware that we use the `here` function to save the file in the `MyOutput` folder.
 
-```{r coll7,message=FALSE, warning=FALSE, paged.print=FALSE}
-coolocs <- c(coocdf$Term, "alice")
-# remove non-collocating terms
-collocates_redux <- collocates[rownames(collocates) %in% coolocs, ]
-collocates_redux <- collocates_redux[, colnames(collocates_redux) %in% coolocs]
-# create distance matrix
-distmtx <- dist(collocates_redux)
+The `ggsave` function has the following main arguments:
 
-clustertexts <- hclust(    # hierarchical cluster object
-  distmtx,                 # use distance matrix as data
-  method="ward.D2")        # ward.D as linkage method
++ `filename`: File name to create on disk.    
++ `device`: Device to use. Can either be a device function (e.g. png), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only). If NULL (default), the device is guessed based on the filename extension  
++ `path`: Path of the directory to save plot to: path and filename are combined to create the fully qualified file name. Defaults to the working directory.  
++ `width, height`: Plot size in units expressed by the units argument. If not supplied, uses the size of the current graphics device.  
++ `units`: One of the following units in which the width and height arguments are expressed: "in", "cm", "mm" or "px".  
++ `dpi`: Plot resolution. Also accepts a string input: "retina" (320), "print" (300), or "screen" (72). Applies only to raster output types.  
++ `bg`: Background color. If NULL, uses the plot.background fill value from the plot theme.  
 
-ggdendrogram(clustertexts) +
-  ggtitle("Terms strongly collocating with *alice*")
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_01.png"), bg = "white")
 ```
 
-## Network Graphs
 
-Network graphs are a very useful tool to show relationships (or the absence of relationships) between elements. Network graphs are highly useful when it comes to displaying the relationships that words have among each other and which properties these networks of words have.
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_01.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_01.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
 
-### Basic Network Graphs
+<br>
 
-In order to display a network, we use the `quanteda` package and convert the co-occurrence matrix into a document-feature matrix (dfm) and then into a feature-co-occurence matrix.
+### Barplots
+
+We can now visualize the association strengths in a barplot as shown in the code chunk below.
+
+```{r assocs03, message=F, warning=F}
+coocStatz %>%
+  dplyr::arrange(-phi) %>%
+  head(20) %>%
+  ggplot(aes(x = reorder(token, phi, mean), y = phi, label = phi)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(y = phi-0.005, label = round(phi, 3)), color = "white", size=3) + 
+  coord_flip() +
+  theme_bw() +
+  labs(x = "Token", y = "Association strength (phi)")
+```
+
+To export the image to the `MyOutput` folder, run the code chunk below (the image will appear as `image_02.png` in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_02.png"), bg = "white")
+```
+
+### Dendrograms
+
+Another method for visualizing collocations are dendrograms (tree-diagrams) which show how similarity  to indicate groupings based on numeric values (e.g., association strength). 
+
+We start by extracting the tokens that we want to show (the top 20 collocates of *alice*).
+
+```{r}
+top20colls <- coocStatz %>%
+  dplyr::arrange(-phi) %>%
+  head(20) %>%
+  dplyr::pull(token)
+top20colls
+```
+
+We then need to generate a feature co-occurrence matrix from a document-feature matrix based on the cleaned, lower case sentences of our text.
+
+```{r}
+keyword_fcm <- sentences %>%
+  quanteda::tokens() %>%
+  quanteda::dfm() %>%
+  quanteda::dfm_select(pattern = c(top20colls, "alice")) %>%
+  quanteda::fcm(tri = FALSE)
+# inspect
+keyword_fcm[1:6, 1:6]
+```
+
+Then we generate the dendrogram based on a  distance matrix generated from the feature co-occurrence matrix.
+
+```{r}
+hclust(dist(keyword_fcm),       # use distance matrix as data
+       method="ward.D2") %>%    # ward.D as linkage method
+  ggdendrogram() +              # generate dendrogram
+  ggtitle("20 most strongly collocating terms of 'alice'")  # add title
+```
+
+
+To export the image to the `MyOutput` folder, run the code chunk below (the image will appear as `image_03.png` in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_03.png"), bg = "white")
+```
+
+### Network Graphs
+
+Network graphs are a very useful tool to show relationships (or the absence of relationships) between elements. 
+
+To generate a network graph of the collocates of a keyword, we 
+
 
 
 ```{r}
-# create a document feature matrix
-cooc_dfm <- quanteda::as.dfm(collocates_redux)
-# create feature co-occurrence matrix
-cooc_fcm <- quanteda::fcm(cooc_dfm)
-# inspect data
-head(cooc_fcm)
-```
-
-Next, we use the `textplot_network` function from the `quanteda.textplots` to generate a network graph.
-
-
-```{r}
-quanteda.textplots::textplot_network(cooc_fcm,  
+quanteda.textplots::textplot_network(keyword_fcm,  
                                      edge_alpha = 0.8, 
                                      edge_color = "gray",
-                                     vertex_labelsize = log(rowSums(cooc_fcm)),
+                                     vertex_labelsize = log(rowSums(keyword_fcm)),
                                      edge_size = 2)
 ```
 
 
+To export the image to the `MyOutput` folder, run the code chunk below (the image will appear as `image_03.png` in the `MyOutput` folder.
 
-# Determining Significance
-
-In order to identify which words occur together significantly more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *alice*.
-
-To determine which terms collocate significantly with the key term (*alice*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
-
-* a = Number of times `coocTerm` occurs with term j
-
-* b = Number of times `coocTerm` occurs without  term j
-
-* c = Number of times other terms occur with term j
-
-* d = Number of terms that are not `coocTerm` or term j
-
-In a first step, we create a table which holds these quantities.
-
-```{r coll_01_15, message=FALSE, warning=FALSE}
-# convert to data frame
-coocdf <- as.data.frame(as.matrix(collocates))
-# reduce data
-diag(coocdf) <- 0
-coocdf <- coocdf[which(rowSums(coocdf) > 10),]
-coocdf <- coocdf[, which(colSums(coocdf) > 10)]
-# extract stats
-cooctb <- coocdf %>%
-  dplyr::mutate(Term = rownames(coocdf)) %>%
-  tidyr::gather(CoocTerm, TermCoocFreq,
-                colnames(coocdf)[1]:colnames(coocdf)[ncol(coocdf)]) %>%
-  dplyr::mutate(Term = factor(Term),
-                CoocTerm = factor(CoocTerm)) %>%
-  dplyr::mutate(AllFreq = sum(TermCoocFreq)) %>%
-  dplyr::group_by(Term) %>%
-  dplyr::mutate(TermFreq = sum(TermCoocFreq)) %>%
-  dplyr::ungroup(Term) %>%
-  dplyr::group_by(CoocTerm) %>%
-  dplyr::mutate(CoocFreq = sum(TermCoocFreq)) %>%
-  dplyr::arrange(Term) %>%
-  dplyr::mutate(a = TermCoocFreq,
-                b = TermFreq - a,
-                c = CoocFreq - a, 
-                d = AllFreq - (a + b + c)) %>%
-  dplyr::mutate(NRows = nrow(coocdf))
-# inspect
-head(cooctb)
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_03.png"), bg = "white")
 ```
-
-We now select the key term (*alice*). If we wanted to find all collocations that are present in the data, we would use the entire data rather than only the subset that contains  *alice*. 
-
-```{r coll_01_23, message=FALSE, warning=FALSE}
-cooctb_redux <- cooctb %>%
-  dplyr::filter(Term == coocTerm)
-```
-
-Next, we calculate which terms are (significantly) over- and under-proportionately used with *alice*. It is important to note that this procedure informs about both: over- and under-use! This is especially crucial when analyzing if specific words are attracted o repelled by certain constructions. Of course, this approach is not restricted to analyses of constructions and it can easily be generalized across domains and has also been used in machine learning applications.
-
-```{r coll_01_25, message=FALSE, warning=FALSE}
-coocStatz <- cooctb_redux %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(a, b, c, d), 
-                                                        ncol = 2, byrow = T))[1]))) %>%
-    dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(a, b, c, d),                                                           ncol = 2, byrow = T),  simulate.p.value = TRUE)[1]))) %>%
-  dplyr::mutate(phi = sqrt((x2/(a + b + c + d)))) %>%
-      dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(a, b, c, d), 
-                                                                  ncol = 2, byrow = T),  simulate.p.value = TRUE)$expected[1]))) %>%
-  dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
-                                                p <= .01 ~ "p<.01",
-                                                p <= .05 ~ "p<.05", 
-                                                TRUE ~ "n.s."))
-# inspect
-head(coocStatz)
-```
-
-
-We now add information to the table and remove superfluous columns s that the table can be more easily parsed. 
-
-
-```{r coll_01_27, message=FALSE, warning=FALSE}
-coocStatz <- coocStatz %>%
-  dplyr::ungroup() %>%
-  dplyr::arrange(p) %>%
-  dplyr::mutate(j = 1:n()) %>%
-  # perform benjamini-hochberg correction
-  dplyr::mutate(corr05 = ((j/NRows)*0.05)) %>%
-  dplyr::mutate(corr01 = ((j/NRows)*0.01)) %>%
-  dplyr::mutate(corr001 = ((j/NRows)*0.001)) %>%
-  # calculate corrected significance status
-  dplyr::mutate(CorrSignificance = dplyr::case_when(p <= corr001 ~ "p<.001",
-                                                    p <= corr01 ~ "p<.01",
-                                                    p <= corr05 ~ "p<.05", 
-                                                    TRUE ~ "n.s.")) %>%
-  dplyr::mutate(p = round(p, 6)) %>%
-  dplyr::mutate(x2 = round(x2, 1)) %>%
-  dplyr::mutate(phi = round(phi, 2)) %>%
-  dplyr::arrange(p) %>%
-  dplyr::select(-a, -b, -c, -d, -j, -NRows, -corr05, -corr01, -corr001) %>%
-  dplyr::mutate(Type = ifelse(expected > TermCoocFreq, "Antitype", "Type"))
-# inspect
-head(coocStatz)
-```
-
-The results show that *alice* collocates significantly with *alice* (of course) but also, as expected, with *thought*. The corrected p-values shows that after Benjamini-Hochberg correction for multiple/repeated testing (see Field, Miles, and Field 2012) these are the only significant collocates of *alice*. Corrections are necessary when performing multiple tests because otherwise, the reliability of the test result would be strongly impaired as repeated testing causes substantive $\alpha$-error inflation. The Benjamini-Hochberg correction that has been used here is preferable over the more popular Bonferroni correction because it is less conservative and therefore less likely to result in $\beta$-errors (see again Field, Miles, and Field 2012).
-
 
 ***
 
@@ -416,8 +633,3 @@ The results show that *alice* collocates significantly with *alice* (of course) 
 
 ***
 
-# References
-
-Field, Andy, Jeremy Miles, and Zoe Field. 2012. *Discovering Statistics Using R*. Sage.
-
-Wiedemann, Gregor, and Andreas Niekler. 2017. Hands-on: A Five Day Text Mining Course for Humanists and Social Scientists in R. In *Proceedings of the Workshop on Teaching NLP for Digital Humanities (Teach4DH)*, Berlin, Germany, September 12, 2017., 57–65. http://ceur-ws.org/Vol-1918/wiedemann.pdf.

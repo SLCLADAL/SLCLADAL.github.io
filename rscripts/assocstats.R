@@ -3,48 +3,58 @@ source("https://slcladal.github.io/rscripts/loglik.R")
 assocstats <- function(x, term, coocfreq, termcoocfreq){
   x %>%
     # determine Term
-  dplyr::filter(Term == term,
+  dplyr::filter(w1 == term,
                 # set minimum number of occurrences of CoocTerm
-                b > coocfreq,
+                (O12+O22) > coocfreq,
                 # set minimum number of co-occurrences of Term and CoocTerm
-                a > termcoocfreq) %>%
-  # work row-wise
-  dplyr::rowwise() %>%
-  # calculate fishers' exact test
-  dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(a, b, c, d), 
+                O11 > termcoocfreq) %>%
+    # work row-wise
+    dplyr::rowwise() %>%
+    # add N
+    dplyr::mutate(N = sum(O11, O12, O21, O22)) %>%
+    # calculate fishers' exact test
+    dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
                                                         ncol = 2, byrow = T))[1]))) %>%
-  # extract x2 statistics
-  dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(a, b, c, d),   
+
+    # extract x2 statistics
+    dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(O11, O12, O21, O22),   
                                                         ncol = 2, byrow = T),  simulate.p.value = TRUE)[1]))) %>%
-  # extract expected frequency
-  dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(a, b, c, d), 
+    # extract expected frequency
+
+    dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(O11, O12, O21, O22), 
                                                               ncol = 2, byrow = T),  simulate.p.value = TRUE)$expected[1]))) %>%
-  # extract association measure phi
-  dplyr::mutate(phi = sqrt((x2/(a + b + c + d)))) %>%
-  # calculate mutual information (MI)
-  dplyr::mutate(pTerm = (a + c) /  (a + b + c + d),
-                pCoocTerm = (b + d) / (a + b + c + d),
-                pTermAndCoocTerm = a / (a + b + c + d),
-                MI = log2(pTermAndCoocTerm / (pTerm * pCoocTerm))) %>%
-  # calculate odds ration
-    dplyr::mutate(OddsRatio = ifelse(min(c(a,b,c,d) > 0),  ((a/b) / (c/d)), 0)) %>%
-  # calculate loglikratio
-  dplyr::mutate(LogLik = calculate_log_likelihood(a, b, c, d)) %>%
-  # simplify significance
-  dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
+
+    # extract association measures
+    dplyr::mutate(phi = sqrt((x2 / N)),
+                dice = (2 * O11) / (2 * (O11 + O12 + O21)),
+                MI = (O11 / N) * 
+                  log2((O11 / N) / ((O11+O12) / N) * 
+                         ((O11+O21) / N) ),
+                PMI = log2( (O11 / N) / ((O11+O12) / N) * 
+                              ((O11+O21) / N) ),
+                t = (O11 - expected) / sqrt(expected)) %>%
+
+    # calculate odds ration
+    dplyr::mutate(OddsRatio = ifelse(min(c(O11, O12, O21, O22) > 0),  ((O11/O12) / (O21/O22)), 0)) %>%
+
+    # calculate loglikratio
+    dplyr::mutate(LogLik = calculate_log_likelihood(O11, O12, O21, O22)) %>%
+
+    # simplify significance
+    dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
                                                 p <= .01 ~ "p<.01",
                                                 p <= .05 ~ "p<.05", 
                                                 TRUE ~ "n.s.")) %>%
-  # round p-value
-  dplyr::mutate(p = round(p, 5)) %>%
-  # filter out non significant results
-  dplyr::filter(Significance != "n.s.",
-                # filter out instances where the Term and CoocTerm repel each other
-                expected < a) %>%
-  # arrange by phi (association measure)
-  dplyr::arrange(-phi) %>%
-  # remove superfluous columns
-  dplyr::select(-pTerm, -pCoocTerm, -pTermAndCoocTerm, -a, -b, -c, -d) %>%
+    # round p-value
+
+    dplyr::mutate(p = round(p, 5)) %>%
+    # filter out non significant results
+    dplyr::filter(Significance != "n.s.",
+                # filter out instances where the w1 and w2 repel each other
+                expected < O11) %>%
+    # arrange by phi (association measure)
+    dplyr::arrange(-phi) %>%
+    # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows"))) -> result
 # inspect
 return(result)

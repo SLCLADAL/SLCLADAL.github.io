@@ -1,7 +1,7 @@
 ---
 title: "Analyzing Co-Occurrences and Collocations in R"
 author: "Martin Schweinberger"
-date: "2022, Nov. 18"
+date: "2024-03-03"
 output:
   bookdown::html_document2
 bibliography: bibliography.bib
@@ -135,22 +135,82 @@ klippy::klippy()
 Once you have installed R, RStudio, and once you have initiated the session by executing the code shown above, you are good to go.
 
 
-# Extracting N-Grams and Collocations
 
-Collocations are terms that co-occur (significantly) more often together than would be expected by chance. A typical example of a collocation is *Merry Christmas* because the words *merry* and *Christmas* occur together more frequently together than would be expected, if words were just randomly stringed together.  
+# What are Collocations?
 
-N-grams are related to collocates in that they represent words that occur together (bi-grams are two words that occur together, tri-grams three words and so on). Fortunately, creating N-gram lists is very easy. We will use the Charles Darwin's *On the Origin of Species by Means of Natural Selection* as a data source and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
+Collocations are combinations of words that frequently co-occur in a language, appearing together more often than would be expected by chance.  Collocations can involve two or more words and may be based on grammatical or semantic associations. These word pairings or groupings exhibit a certain degree of naturalness and tend to form recurring patterns. They play a crucial role in language acquisition,  learning, fluency, and usage and they contribute to the natural and idiomatic expression of ideas. A typical example of a collocation is *Merry Christmas* because the words *merry* and *Christmas* occur together more frequently together than would be expected, if words were just randomly stringed together. Other examples of collocations include *strong coffee*, *make a decision*, or *take a risk*. Recognizing and understanding collocations is essential for language learners, as it enhances their ability to produce authentic and contextually appropriate language.
+
+Identifying words pairs (w1 and w2) that collocate (i.e. collocations) and determining their association strength (a measure of how strongly attracted words are to each other) is based on the co-occurrence frequencies of word pairs in a contingency table (see below, *O* is short for *observed frequency*).
+
+|                   | w~2~ present  |     w~2~ absent |      |
+| :---              | :-----:       |   --------:     | ---  |
+| **w~1~ present**  | O~11~         | O~12~           |  = R~1~
+| **w~1~ absent**   | O~21~         | O~22~           |  = R~2~
+|                   |  = C~1~       |   = C~2~        |  = N |
+
+
+From this contingency table, we can calculate the  frequencies that would be expected if the words did not show any attraction or repulsion  (see below, *E* is short for *expected frequency*).
+
+
+|                    | w~2~ present                      |     w~2~ absent |      |
+| :----------        | :--------:                        |  :--------:     | ---  |
+| **w~1~ present**   | E~11~ = (R~1~ * C~1~) / (N) | E~12~ =  (R~1~ * C~2~) / (N)      |  = R~1~
+| **w~1~ absent**    | E~21~ = (R~2~ * C~1~) / (N) | E~22~ =   (R~2~ * C~2~) / (N)     |  = R~2~
+|                    |  = C~1~                           |   = C~2~        |  = N |
+
+
+**Association measures** use the frequency information in the above contingency tables to evaluate the strength of attraction or repulsion between words. As such, association measures are statistical metrics used to quantify the strength and significance of the relationship between words within a collocation. These measures help assess how likely it is for two words to appear together more frequently than expected by chance. Several association measures are commonly used in collocation analysis, including:
+
++    **Pointwise Mutual Information (PMI)**: PMI measures the likelihood of two words occurring together compared to their individual likelihoods of occurring separately. A higher PMI score suggests a stronger association.
+
+\[ \text{PMI}(w_1, w_2) = \log_2 \left( \frac{P(w_1 \cap w_2)}{P(w_1) \cdot P(w_2)} \right) \]
+
++    **Log-Likelihood Ratio (LLR)**: LLR compares the likelihood of the observed word combination occurring with the expected likelihood based on the individual frequencies of the words. Higher LLR values indicate a more significant association.
+
+   \[ \text{LLR}(w_1, w_2) = 2 \sum_{i=1}^4 \frac{(O_i - E_i)^2}{E_i} \]
+
+   where \(O_i\) is the observed frequency and \(E_i\) is the expected frequency for each combination.
+   
++    **Dice Coefficient**: This measure considers the co-occurrence of words and calculates the ratio of the overlap between the two words to the sum of their individual frequencies. The Dice coefficient ranges from 0 to 1, with higher values indicating stronger association.
+
+   \[ \text{Dice}(w_1, w_2) = \frac{2 \times \text{freq}(w_1 \cap w_2)}{\text{freq}(w_1) + \text{freq}(w_2)} \]
+
++    **Chi-Square**: Chi-square measures the difference between the observed and expected frequencies of word co-occurrence. A higher chi-square value signifies a more significant association.
+
+   \[ \chi^2(w_1, w_2) = \sum \frac{(O_i - E_i)^2}{E_i} \]
+
+   where \(O_i\) is the observed frequency and \(E_i\) is the expected frequency for each combination.
+
++    **t-Score**: The t-score is based on the difference between the observed and expected frequencies, normalized by the standard deviation. Higher T-scores indicate a stronger association.
+
+   \[ \text{T-Score}(w_1, w_2) = \frac{\text{freq}(w_1 \cap w_2) - \text{expected\_freq}(w_1 \cap w_2)}{\sqrt{\text{freq}(w_1 \cap w_2)}} \]
+
++    **Mutual Information (MI)**: MI measures the reduction in uncertainty about one word's occurrence based on the knowledge of another word's occurrence. Higher MI values indicate a stronger association.
+
+   \[ \text{MI}(w_1, w_2) = \log_2 \left( \frac{P(w_1 \cap w_2)}{P(w_1) \cdot P(w_2)} \right) \]
+
+   where \(P(w_1 \cap w_2)\) is the joint probability, and \(P(w_1)\) and \(P(w_2)\) are the individual probabilities.
+
+These association measures help researchers and language analysts identify meaningful and statistically significant collocations, assisting in the extraction of relevant information from corpora and improving the accuracy of collocation analysis in linguistic studies.
+
+# What are N-grams?
+
+N-grams  are contiguous sequences of N items (words, characters, or symbols) in a given text. The term *N* in N-grams refers to the number of items in the sequence. For example, a bigram (2-gram) consists of two consecutive items, a trigram (3-gram) consists of three, and so on. N-grams are widely used in natural language processing and text analysis to capture patterns and dependencies within a linguistic context. N-grams help analyze the frequency of word sequences in a corpus. This information can reveal common phrases, expressions, or patterns that occur frequently and that often represent  multiword expressions such as *New York*, *Prime Minister*, or *New South Wales*. N-grams are fundamental in language modeling, where they are used to estimate the likelihood of a word given its context. This is especially important in predictive text applications and machine translation.
+
+# Preparation
+ 
+We will use the Charles Darwin's *On the Origin of Species by Means of Natural Selection* as a data source and begin by generating a bi-gram list. As a first step, we load the data and split it into individual words.
 
 ```{r coll1, message=FALSE, warning=FALSE, paged.print=FALSE}
 # read in text
-darwin <- base::readRDS(url("https://slcladal.github.io/data/cdo.rda", "rb")) %>%
+text <- base::readRDS(url("https://slcladal.github.io/data/cdo.rda", "rb")) %>%
   paste0(collapse = " ") %>%
   stringr::str_squish() %>%
   stringr::str_remove_all("- ")
 ```
 
 ```{r coll1b, echo = F, message=FALSE, warning=FALSE}
-darwin %>%
+text %>%
   substr(start=1, stop=200) %>%
   as.data.frame()%>%
   as.data.frame() %>%
@@ -165,27 +225,37 @@ darwin %>%
   flextable::border_outer()
 ```
 
+# Extracting N-Grams
 
-We could create bi-grams (N-grams consisting of two elements) by manually pasting every word together with the word that immediately follows but we use the `quanteda` package [see @quanteda] which offers excellent and very fast functions for extracting bigrams.
+We could create bi-grams (N-grams consisting of two elements) by manually pasting every word together with the word that immediately follows but using the `quanteda` package [see @quanteda] offers excellent and very fast functions for extracting bigrams.
+
+Below, we use the `textstat_collocations` function for extracting N-grams. This function uses the following main arguments
+
++ `x`: a character, corpus, or tokens object.  
++ `method`: association measure for detecting collocations. Currently this is limited to "lambda".  
++ `size`: integer; the length of the ngram. The default is 2 - if you want to extract tri-grams set `size = 3` and if you want to extract four-grams set `size = 4` and so on.  
++ `min_count`: numeric; minimum frequency of collocations that will be scored.  
++ `smoothing`: numeric; a smoothing parameter added to the observed counts (default is 0.5).  
++ `tolower`: logical; if TRUE, tokens are transformed to lower-case.  
 
 ```{r coll3m, message=FALSE, warning=FALSE, paged.print=FALSE}
-#clean corpus
-darwin_clean <- darwin %>%
-  stringr::str_to_title()
-# tokenize corpus
-darwin_tokzd <- quanteda::tokens(darwin_clean)
-# extract bigrams
-BiGrams <- darwin_tokzd %>% 
-       quanteda::tokens_remove(stopwords("en")) %>% 
-       quanteda::tokens_select(pattern = "^[A-Z]", 
-                               valuetype = "regex",
-                               case_insensitive = FALSE, 
-                               padding = TRUE) %>% 
-       quanteda.textstats::textstat_collocations(min_count = 5, tolower = FALSE)
+# concatenate the elements in the 'text' object
+text %>% 
+  paste0(collapse = " ") %>%
+  # convert to lower case
+  tolower() %>%
+  # convert the concatenated text into tokens
+  quanteda::tokens() %>%
+  # identify and extract bigrams that occur at leats 10 times
+  quanteda.textstats::textstat_collocations(size = 2, min_count = 10) %>%
+  # convert into a data frame and save results in an object called 'ngrams'
+  as.data.frame() %>%
+  # order by lambda
+  dplyr::arrange(-lambda) -> ngrams
 ```
 
 ```{r coll3n, echo = F, message=FALSE, warning=FALSE}
-BiGrams %>%
+ngrams %>%
   as.data.frame() %>%
   head(15) %>%
   flextable() %>%
@@ -199,710 +269,512 @@ BiGrams %>%
 ```
 
 
-We can also extract bigrams very easily using the `tokens_compound` function which understands that we are looking for two-word expressions.
-
-```{r coll3o, message=FALSE, warning=FALSE, paged.print=FALSE}
-ngram_extract <- quanteda::tokens_compound(darwin_tokzd, pattern = BiGrams)
-```
-
-We can now generate concordances (and clean the resulting kwic table - the keyword-in-context table).
-
-```{r coll3px, message=FALSE, warning=FALSE}
-ngram_kwic <- kwic(ngram_extract, pattern = c("Natural_Selection", "South_America")) %>%
-  as.data.frame() %>%
-  dplyr::select(-to, -from, -pattern)
-```
-
-```{r coll3p, echo = F, message=FALSE, warning=FALSE}
-ngram_kwic %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .95, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
 
 The disadvantage here is that we are strictly speaking only extracting N-Grams but not collocates as collocates do not necessarily have to occur in direct adjacency. The following section shows how to expand the extraction of n-grams to the extraction of collocates.
 
-# Finding Collocations
+# Identifying Collocations
 
-Both N-grams and collocations are not only an important concept in language teaching but they are also fundamental in Text Analysis and many other research areas working with language data. Unfortunately, words that collocate do not have to be immediately adjacent but can also encompass several slots. This is unfortunate because it makes retrieval of collocates substantially more difficult compared with a situation in which we only need to extract words that occur right next to each other.
+As collocates do not have to be immediately adjacent but can be separated by several slots, their  retrieval is substantially more difficult compared with n-grams. Nonetheless, there are various ways of finding collocations depending on the data provided, the context, and the association measure (which represents information of how strong the association between the words is). Below, you will see how to detect collocations in two different data structures:  
++ a list of sentences  
++ concordances  
 
-In the following, we will extract collocations from Charles Darwin's *On the Origin of Species by Means of Natural Selection*. In a first step, we will split the Origin into individual sentences.
+In the following, we will extract collocations from the sentences in Charles Darwin's *On the Origin of Species by Means of Natural Selection*
 
-```{r coll4, message=FALSE, warning=FALSE, paged.print=FALSE}
-# read in and process text
-darwinsentences <- darwin %>%
-  stringr::str_squish() %>%
-  tokenizers::tokenize_sentences(.) %>%
+### Identifying collocations in sentences
+
+**Data preparation**
+
+In a first step, we split our example text into sentences and clean the data (removing punctuation, converting to lower case, etc.).
+
+```{r}
+text %>% 
+  # concatenate the elements in the 'text' object
+  paste0(collapse = " ") %>%
+  # separate possessives and contractions
+  stringr::str_replace_all(fixed("'"), fixed(" '")) %>%
+  stringr::str_replace_all(fixed("’"), fixed(" '")) %>%
+  # split text into sentences
+  tokenizers::tokenize_sentences() %>%
+  # unlist sentences
   unlist() %>%
-  stringr::str_remove_all("- ") %>%
+  # remove non-word characters
   stringr::str_replace_all("\\W", " ") %>%
-  stringr::str_squish()
-# inspect data
-head(darwinsentences)
+  stringr::str_replace_all("[^[:alnum:] ]", " ") %>%
+  # remove superfluous white spaces
+  stringr::str_squish() %>%
+  # convert to lower case and save in 'sentences' object
+  tolower() -> sentences
+# inspect first 10 sentences
+head(sentences, 10)
 ```
 
-The first element does not represent a full sentence because we selected a sample of the text which began in the middle of a sentence rather than at its beginning. In a next step, we can tokenize these sentences and apply the `textstat_collocations` function which identifies collocations.
+Next, we tabulate the data and reformat it so that we have the relevant information to calculate the association statistics (word 1 and word 2 as well as O11, O12, O21, and O22).
 
 ```{r}
-# create a token object
-text_tokens <- tokens(darwinsentences, remove_punct = TRUE) %>%
-  tokens_remove(stopwords("english"))
-# extract collocations
-text_coll <- textstat_collocations(text_tokens, size = 2, min_count = 20)
+# tokenize the 'sentences' data using quanteda package
+colldf <- sentences %>%
+  quanteda::tokens() %>%
+
+  # create a document-feature matrix (dfm) using quanteda
+  quanteda::dfm() %>%
+
+  # create a feature co-occurrence matrix (fcm) without considering trigrams
+  quanteda::fcm(tri = FALSE) %>%
+
+  # tidy the data using tidytext package
+  tidytext::tidy() %>%
+
+  # rearrange columns for better readability
+  dplyr::relocate(term, document, count) %>%
+
+  # rename columns for better interpretation
+  dplyr::rename(w1 = 1,
+                w2 = 2,
+                O11 = 3) %>%
+
+  # calculate the total number of observations (N)
+  dplyr::mutate(N = sum(O11)) %>%
+
+  # calculate R1, O12, and R2
+  dplyr::group_by(w1) %>%
+  dplyr::mutate(R1 = sum(O11),
+                O12 = R1 - O11,
+                R2 = N - R1) %>%
+  dplyr::ungroup(w1) %>%
+
+  # calculate C1, O21, C2, and O22
+  dplyr::group_by(w2) %>%
+  dplyr::mutate(C1 = sum(O11),
+                O21 = C1 - O11,
+                C2 = N - C1,
+                O22 = R2 - O21) %>%
+
+  # remove superfluous columns
+  dplyr::select(-N, -R1, -R2, -C1, -C2)
+
 # inspect
-text_coll[1:6, 1:6]
-```
-
-The resulting table shows collocations in the example text descending by collocation strength.
-
-
-## Visualizing Collocation Networks
-
-Network graphs are a very useful and flexible tool for visualizing relationships between elements such as words, personas, or authors. This section shows how to generate a network graph for collocations of the term alice using the quanteda package.
-
-In a first step, we generate a document-feature matrix based on the sentences in the example text. A document-feature matrix shows how often elements (here these elements are the words that occur in the the example text) occur in a selection of documents (here these documents are the sentences in the example text).
-
-```{r}
-text_dfm <- darwinsentences %>% 
-  quanteda::tokens(remove_punct = TRUE)  %>%
-  dfm() %>%
-  quanteda::dfm_remove(stopwords('english')) %>%
-  quanteda::dfm_remove(c("will", "h", "m")) %>%
-  quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE)
-# inspect
-text_dfm[1:6, 1:6]
+head(colldf)
 ```
 
 
-# Create document-feature matrix
+To determine which terms collocate significantly and with what association strength, we use the following information (that is provided by the table above):
 
-As we want to generate a network graph of words that collocate with the term organism, we use the `calculateCoocStatistics` function to determine which words most strongly collocate with our target term (organism).
+* O~11~ = Number of times *word~1~* occurs *with* *word~2~* (\[ w_1 \cap w_2 \])
 
-```{r}
-# load function for co-occurrence calculation
-source("https://slcladal.github.io/rscripts/calculateCoocStatistics.R")
-# define term
-coocTerm <- "selection"
-# calculate co-occurrence statistics
-coocs <- calculateCoocStatistics(coocTerm, text_dfm, measure="LOGLIK")
-# inspect results
-coocs[1:20]
-```
+* O~12~ = Number of times *word~1~* occurs *without* *word~2~* (\[ w_1 \cup w_2 \])
 
-The output shows that the word most strongly associated with *selection* in Charles Darwin's *Origin* is unsurprisingly *natural* - given the substantive strength of the association between *natural* and *selection* these term are definitely collocates and almost - if not already - a lexicalized construction (at least in this text).
+* O~21~ = Number of times `CoocTerm` occurs without `Term`
 
-There are various visualizations options for collocations. Which visualization method is appropriate depends on what the visualizations should display. 
+* O~22~ = Number of terms that are not `coocTerm` or `Term`
 
-## Association Strength{-}
-
-We start with the most basic and visualize the collocation strength using a simple dot chart. We use the vector of association strengths generated above and transform it into a table. Also, we exclude elements with an association strength lower than 30.
-
-```{r assocs01, message=F, warning=F}
-coocdf <- coocs %>%
-  as.data.frame() %>%
-  dplyr::mutate(CollStrength = coocs,
-                Term = names(coocs)) %>%
-  dplyr::filter(CollStrength > 30)
-```
-
-```{r assocs02, echo = F, message=F, warning=F}
-coocdf %>%
-  as.data.frame() %>%
-  dplyr::select(-.) %>%
-  dplyr::relocate(Term, CollStrength) %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-We can now visualize the association strengths as shown in the code chunk below.
-
-```{r assocs03, message=F, warning=F}
-ggplot(coocdf, aes(x = reorder(Term, CollStrength, mean), y = CollStrength)) +
-  geom_point() +
-  coord_flip() +
-  theme_bw() +
-  labs(y = "")
-```
-
-The dot chart shows that *natural* is collocating more strongly with *selection* compared to any other term. This confirms that *natural* and *selection* form a collocation in Darwin's *Origin*.
-
-## Dendrograms{-}
-
-Another method for visualizing collocations are dendrograms. Dendrograms (also called tree-diagrams) show how similar elements are based on one or many features. As such, dendrograms are used to indicate groupings as they show elements (words) that are notably similar or different with respect to their association strength. To use this method, we first need to generate a distance matrix from our co-occurrence matrix.
+Example:
 
 
-We now reduce the document-feature matrix that we generated above to contain only the top 20 collocates of organism.
-
-```{r}
-redux_dfm <- dfm_select(text_dfm, 
-                        pattern = c(names(coocs)[1:20], "selection"))
-```
-
-Now, we can transform the document-feature matrix into a feature-co-occurrence matrix as shown below. A feature-co-occurrence matrix shows how often each element in that matrix co-occurs with every other element in that matrix.
-
-```{r}
-tag_fcm <- fcm(redux_dfm)
-# inspect
-tag_fcm[1:6, 1:6]
-```
+|              | w~2~ present       |     w~2~ absent |      |
+ :---          | :-----:    |   --------:  | ---
+| **w~1~ present**     | O~11~      | O~12~        |  = R~1~
+| **w~1~ absent** | O~21~      | O~22~        |  = R~2~
+|              |  = C~1~    |   = C~2~     |  = N |
 
 
-```{r coll7,message=FALSE, warning=FALSE, paged.print=FALSE}
-# create distance matrix
-distmtx <- dist(tag_fcm)
 
-clustertexts <- hclust(    # hierarchical cluster object
-  distmtx,                 # use distance matrix as data
-  method="ward.D2")        # ward.D as linkage method
+We could calculate all collocations in the corpus (based on co-occurrence within the same sentence) or we can find collocations of a specific term - here, we will find collocations fo the term *selection*.
 
-ggdendrogram(clustertexts) +
-  ggtitle("Terms strongly collocating with *selection*")
-```
-
-## Network Graphs{-}
-
-Network graphs are a very useful tool to show relationships (or the absence of relationships) between elements. Network graphs are highly useful when it comes to displaying the relationships that words have among each other and which properties these networks of words have.
-
-Using the feature-co-occurrence matrix we generated above, we can generate the network graph which shows the terms that collocate with the target term *selection* with the edges representing the co-occurrence frequency. To generate this network graph, we use the `textplot_network` function from the `quanteda.textplots` package.
-
-```{r}
-# generate network graph
-textplot_network(tag_fcm, 
-                 min_freq = 5, 
-                 edge_alpha = 0.1, 
-                 edge_size = 5,
-                 edge_color = "purple",
-                 vertex_labelsize = log(colSums(tag_fcm)))
-```
+Now that we have all the relevant information, we can calculate the collocation statistics (the association strength).
 
 
-## Biplots{-}
-
-An alternative way to display co-occurrence patterns are bi-plots which are used to display the results of Correspondence Analyses. They are useful, in particular, when one is not interested in one particular key term and its collocations but in the overall similarity of many terms. Semantic similarity in this case refers to a shared semantic and this distributional profile. As such, words can be deemed semantically similar if they have a similar co-occurrence profile - i.e. they co-occur with the same elements. Biplots can be used to visualize collocations because collocates co-occur and thus share semantic properties which renders then more similar to each other compared with other terms. 
-
-```{r coll8, message=FALSE, warning=FALSE, paged.print=FALSE}
-# perform correspondence analysis
-res.ca <- CA(as.matrix(tag_fcm), graph = FALSE)
-# plot results
-fviz_ca_row(res.ca, repel = TRUE, col.row = "gray20")
-```
-
-
-The bi-plot shows that *natural* and *selection* collocate as they are plotted in close proximity. The advantage of the biplot becomes apparent when we focus on other terms because the biplot also shows other collocates such as *vary* and *independently* or *might injurious*. 
-
-# Determining Significance
-
-In order to identify which words occur together significantly more frequently than would be expected by chance, we have to determine if their co-occurrence frequency is statistical significant. This can be done wither for specific key terms or it can be done for the entire data. In this example, we will continue to focus on the key word *selection*.
-
-To determine which terms collocate significantly with the key term (*selection*), we use multiple (or repeated) Fisher's Exact tests which require the following information:
-
-* a = Number of times `coocTerm` occurs with term j
-
-* b = Number of times `coocTerm` occurs without  term j
-
-* c = Number of times other terms occur with term j
-
-* d = Number of terms that are not `coocTerm` or term j
-
-In a first step, we create a table which holds these quantities.
-
-```{r coll_01_15, message=FALSE, warning=FALSE}
-# convert to data frame
-coocdf <- as.data.frame(as.matrix(tag_fcm))
-# reduce data
-diag(coocdf) <- 0
-coocdf <- coocdf[which(rowSums(coocdf) > 10),]
-coocdf <- coocdf[, which(colSums(coocdf) > 10)]
-# extract stats
-cooctb <- coocdf %>%
-  dplyr::mutate(Term = rownames(coocdf)) %>%
-  tidyr::gather(CoocTerm, TermCoocFreq,
-                colnames(coocdf)[1]:colnames(coocdf)[ncol(coocdf)]) %>%
-  dplyr::mutate(Term = factor(Term),
-                CoocTerm = factor(CoocTerm)) %>%
-  dplyr::mutate(AllFreq = sum(TermCoocFreq)) %>%
-  dplyr::group_by(Term) %>%
-  dplyr::mutate(TermFreq = sum(TermCoocFreq)) %>%
-  dplyr::ungroup(Term) %>%
-  dplyr::group_by(CoocTerm) %>%
-  dplyr::mutate(CoocFreq = sum(TermCoocFreq)) %>%
-  dplyr::arrange(Term) %>%
-  dplyr::mutate(a = TermCoocFreq,
-                b = TermFreq - a,
-                c = CoocFreq - a, 
-                d = AllFreq - (a + b + c)) %>%
-  dplyr::mutate(NRows = nrow(coocdf))
-```
-
-```{r coll_01_15b, echo = F, message=FALSE, warning=FALSE}
-cooctb %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-We now select the key term (*selection*). If we wanted to find all collocations that are present in the data, we would use the entire data rather than only the subset that contains  *selection*. 
-
-```{r coll_01_23, message=FALSE, warning=FALSE}
-cooctb_redux <- cooctb %>%
-  dplyr::filter(Term == coocTerm)
-```
-
-Next, we calculate which terms are (significantly) over- and under-proportionately used with *selection*. It is important to note that this procedure informs about both: over- and under-use! This is especially crucial when analyzing if specific words are attracted o repelled by certain constructions. Of course, this approach is not restricted to analyses of constructions and it can easily be generalized across domains and has also been used in machine learning applications.
-
-```{r coll_01_25, message=FALSE, warning=FALSE}
-coocStatz <- cooctb_redux %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(a, b, c, d), 
+```{r coll10, eval=T, echo=T, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("https://slcladal.github.io/rscripts/loglik.R")
+colldf %>%
+# determine Term
+  dplyr::filter(w1 == "selection",
+                # set minimum number of occurrences of w2
+                (O11+O21) > 10,
+                # set minimum number of co-occurrences of w1 and w2
+                O11 > 5) %>%
+    # work row-wise
+    dplyr::rowwise() %>%
+    # add N
+    dplyr::mutate(N = sum(O11, O12, O21, O22)) %>%
+    # calculate fishers' exact test
+    dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
                                                         ncol = 2, byrow = T))[1]))) %>%
-    dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(a, b, c, d),                                                           ncol = 2, byrow = T))[1]))) %>%
-  dplyr::mutate(phi = sqrt((x2/(a + b + c + d)))) %>%
-      dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(a, b, c, d), ncol = 2, byrow = T))$expected[1]))) %>%
-  dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
+
+    # extract x2 statistics
+    dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(O11, O12, O21, O22),   
+                                                        ncol = 2, byrow = T),  simulate.p.value = TRUE)[1]))) %>%
+    # extract expected frequency
+
+    dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(O11, O12, O21, O22), 
+                                                              ncol = 2, byrow = T),  simulate.p.value = TRUE)$expected[1]))) %>%
+
+    # extract association measures
+    dplyr::mutate(phi = sqrt((x2 / N)),
+                dice = (2 * O11) / (2 * (O11 + O12 + O21)),
+                MI = (O11 / N) * 
+                  log2((O11 / N) / ((O11+O12) / N) * 
+                         ((O11+O21) / N) ),
+                PMI = log2( (O11 / N) / ((O11+O12) / N) * 
+                              ((O11+O21) / N) ),
+                t = (O11 - expected) / sqrt(expected)) %>%
+
+    # calculate odds ration
+    dplyr::mutate(OddsRatio = ifelse(min(c(O11, O12, O21, O22) > 0),  ((O11/O12) / (O21/O22)), 0)) %>%
+
+    # calculate loglikratio
+    dplyr::mutate(LogLik = calculate_log_likelihood(O11, O12, O21, O22)) %>%
+
+    # simplify significance
+    dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
                                                 p <= .01 ~ "p<.01",
                                                 p <= .05 ~ "p<.05", 
-                                                FALSE ~ "n.s."))
+                                                TRUE ~ "n.s.")) %>%
+    # round p-value
+
+    dplyr::mutate(p = round(p, 5)) %>%
+    # filter out non significant results
+    dplyr::filter(Significance != "n.s.",
+                # filter out instances where the w1 and w2 repel each other
+                expected < O11) %>%
+    # arrange by phi (association measure)
+    dplyr::arrange(-phi) %>%
+    # remove superfluous columns
+    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows"))) -> assoc_tb
+# inspect results
+head(assoc_tb, 10)
 ```
 
-```{r coll_01_25b, echo = F, message=FALSE, warning=FALSE}
-coocStatz %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
+### Identifying collocations using kwics
+
+In this section, we will extract collocations and calculate association measures based on  concordances and the corpus the concordances were extracted from.
+
+We start by cleaning our corpus and splitting it into chapters. 
+
+```{r}
+# clean corpus
+text %>%
+  # concatenate the elements in the 'text' object
+  paste0(collapse = " ") %>%
+  # separate possessives and contractions
+  stringr::str_replace_all(fixed("'"), fixed(" '")) %>%
+  stringr::str_replace_all(fixed("’"), fixed(" '")) %>%
+  # split text into different chapters
+  stringr::str_split("CHAPTER [IVX]{1,4}") %>%
+  # unlist sentences
+  unlist() %>%
+  # remove non-word characters
+  stringr::str_replace_all("\\W", " ") %>%
+  stringr::str_replace_all("[^[:alpha:] ]", " ") %>%
+  # remove superfluous white spaces
+  stringr::str_squish() %>%
+  # convert to lower case and save in 'sentences' object
+  tolower() -> texts
+# inspect first 100 words the first 10 chapters
+head(substr(texts, 1, 100), 10)
+
 ```
 
-
-We now add information to the table and remove superfluous columns s that the table can be more easily parsed. 
-
-
-```{r coll_01_27, message=FALSE, warning=FALSE}
-coocStatz <- coocStatz %>%
-  dplyr::ungroup() %>%
-  dplyr::arrange(p) %>%
-  dplyr::mutate(j = 1:n()) %>%
-  # perform benjamini-hochberg correction
-  dplyr::mutate(corr05 = ((j/NRows)*0.05)) %>%
-  dplyr::mutate(corr01 = ((j/NRows)*0.01)) %>%
-  dplyr::mutate(corr001 = ((j/NRows)*0.001)) %>%
-  # calculate corrected significance status
-  dplyr::mutate(CorrSignificance = dplyr::case_when(p <= corr001 ~ "p<.001",
-                                                    p <= corr01 ~ "p<.01",
-                                                    p <= corr05 ~ "p<.05", 
-                                                    FALSE ~ "n.s.")) %>%
-  dplyr::mutate(p = round(p, 6)) %>%
-  dplyr::mutate(x2 = round(x2, 1)) %>%
-  dplyr::mutate(phi = round(phi, 2)) %>%
-  dplyr::arrange(p) %>%
-  dplyr::select(-a, -b, -c, -d, -j, -NRows, -corr05, -corr01, -corr001) %>%
-  dplyr::mutate(Type = ifelse(expected > TermCoocFreq, "Antitype", "Type"))
-```
-
-```{r coll_01_25f, echo = F, message=FALSE, warning=FALSE}
-coocStatz %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-The results show that *selection* collocates significantly with *selection* (of course) but also, as expected, with *natural*. The corrected p-values shows that after Benjamini-Hochberg correction for multiple/repeated testing [see @field2012discovering] these are the only significant collocates of *selection*. Corrections are necessary when performing multiple tests because otherwise, the reliability of the test result would be strongly impaired as repeated testing causes substantive $\alpha$-error inflation. The Benjamini-Hochberg correction that has been used here is preferable over the more popular Bonferroni correction because it is less conservative and therefore less likely to result in $\beta$-errors [see again @field2012discovering].
-
-
-# Changes in Collocation Strength
-
-We now turn to analyses of changes in collocation strength over apparent time. The example focuses on adjective amplification in Australian English. The issue we will analyze here is whether we can unearth changes in the collocation pattern of adjective amplifiers such as *very*, *really*, or *so*. In other words, we will investigate if amplifiers associate with different adjectives among speakers from different age groups. 
-
-In a first step,  we activate packages and load the data.
-
-```{r coll_02_01, message=FALSE, warning=FALSE}
-# load functions
-source("https://SLCLADAL.github.io/rscripts/collexcovar.R")
-# load data
-ampaus <- base::readRDS(url("https://slcladal.github.io/data/ozd.rda", "rb"))
-```
-
-
-```{r coll_02_01b, echo = F, message=FALSE, warning=FALSE}
-ampaus %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-The data consists of three variables (`Adjective`, `Variant`, and `Age`). In a next step, we perform a co-varying collexeme analysis for *really* versus all other amplifiers. For this reason, we reduce the data set and retain only The function takes a data set consisting of three columns labeled `keys`, `colls`, and `time`.
-
-```{r coll_02_05, message=FALSE, warning=FALSE}
-# rename data
-ampaus <- ampaus %>%
-  dplyr::rename(keys = Variant, colls = Adjective, time = Age)
-# perform analysis
-collexcovar_really <- collexcovar(data = ampaus, keyterm = "really")
-```
-
-
-
-```{r coll_02_05b, echo = F, message=FALSE, warning=FALSE}
-collexcovar_really %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-Now, that the data has the correct labels, we can continue with the implementation of the co-varying collexeme analysis. 
-
-```{r coll_02_07, message=FALSE, warning=FALSE}
-# perform analysis
-collexcovar_pretty <- collexcovar(data = ampaus, keyterm = "pretty")
-collexcovar_so <- collexcovar(data = ampaus, keyterm = "so")
-collexcovar_very <- collexcovar(data = ampaus, keyterm = "very")
-```
-
-For other amplifiers, we have to change the label *other* to *bin* as the function already has a a label *other*. Once we have changed other to bin, we perform the analysis.
-
-```{r coll_02_09, message=FALSE, warning=FALSE}
-ampaus <- ampaus %>%
-  dplyr::mutate(keys = ifelse(keys == "other", "bin", keys))
-collexcovar_other <- collexcovar(data = ampaus, keyterm = "bin")
-```
-
-Next, we combine the results of the co-varying collexeme analysis into a single table.
-
-```{r coll_02_11, message=FALSE, warning=FALSE}
-# combine tables
-collexcovar_ampaus <- rbind(collexcovar_really, collexcovar_very, 
-                     collexcovar_so, collexcovar_pretty, collexcovar_other)
-collexcovar_ampaus <- collexcovar_ampaus %>%
-  dplyr::rename(Age = time,
-                Adjective = colls) %>%
-  dplyr::mutate(Variant = ifelse(Variant == "bin", "other", Variant)) %>%
-  dplyr::arrange(Age)
-```
-
-
-```{r coll_02_11b, echo = F, message=FALSE, warning=FALSE}
-collexcovar_ampaus %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-
-We now modify the data set so that we can plot the collocation strength across apparent time.
-
-```{r coll_02_13, message=FALSE, warning=FALSE}
-ampauscoll <- collexcovar_ampaus %>%
-  dplyr::select(Age, Adjective, Variant, Type, phi) %>%
-  dplyr::mutate(phi = ifelse(Type == "Antitype", -phi, phi)) %>%
-  dplyr::select(-Type) %>%
-  tidyr::spread(Adjective, phi) %>%
-  tidyr::replace_na(list(bad = 0,
-                         funny = 0,
-                         hard = 0,
-                         good = 0,
-                         nice = 0,
-                         other = 0)) %>%
-  tidyr::gather(Adjective, phi, bad:other) %>%
-  tidyr::spread(Variant, phi) %>%
-  tidyr::replace_na(list(pretty = 0,
-                    really = 0,
-                    so = 0,
-                    very = 0,
-                    other = 0)) %>%
-  tidyr::gather(Variant, phi, other:very)
-```
-
-
-```{r coll_02_13b, echo = F, message=FALSE, warning=FALSE}
-ampauscoll %>%
-  as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-In a final step, we visualize the results of our analysis.
-
-```{r coll_02_15, echo=F, eval = T, message=FALSE, warning=FALSE}
-p1 <- ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)),
-                       y = phi, group = Variant)) +
-  facet_wrap(vars(Adjective)) +
-  geom_line() +
-  theme_set(theme_bw(base_size = 12)) +
-  coord_cartesian(ylim = c(-.2, .4))
-```
-
-
-
-```{r coll_02_17, message=FALSE, warning=FALSE}
-ggplot(ampauscoll, aes(x = reorder(Age, desc(Age)),
-                       y = phi, group = Variant, 
-                      color = Variant, linetype = Variant)) +
-  facet_wrap(vars(Adjective)) +
-  geom_line() +
-  guides(color=guide_legend(override.aes=list(fill=NA))) +
-  scale_color_manual(values = 
-                       c("gray70", "gray70", "gray20", "gray70", "gray20"),
-                        name="Variant",
-                        breaks = c("other", "pretty", "really", "so", "very"), 
-                        labels = c("other", "pretty", "really", "so", "very")) +
-  scale_linetype_manual(values = 
-                          c("dotted", "dotdash", "longdash", "dashed", "solid"),
-                        name="Variant",
-                        breaks = c("other", "pretty", "really", "so", "very"), 
-                        labels = c("other",  "pretty", "really", "so", "very")) +
-  theme(legend.position="top", 
-        axis.text.x = element_text(size=12),
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank()) +
-  theme_set(theme_bw(base_size = 12)) +
-  coord_cartesian(ylim = c(-.2, .4)) +
-  labs(x = "Age", y = "Collocation Strength") +
-  guides(size = FALSE)+
-  guides(alpha = FALSE)
-```
-
-The results show that the collocation strength of different amplifier variants changes quite notably across age groups and we can also see that there is considerable variability in the way that the collocation strengths changes. For example, the collocation strengths between *bad* and *really* decreases from old to young speakers, while the reverse trend emerges for *good* which means that *really* is collocating more strongly with *good* among younger speakers than it is among older speakers.
-
-# Collostructional Analysis
-
-Collostructional  analysis [@stefanowitsch2003collostructions; @stefanowitsch2005covarying] investigates  the  lexicogrammatical associations between constructions and  lexical elements and there exist three basic subtypes of collostructional analysis: 
-
-* Simple Collexeme Analysis
-
-* Distinctive Collexeme Analysis
-
-* Co-Varying Collexeme Analysis
-
-The analyses performed here are based on the `collostructions` package [@flach2017collostructions].
-
-## Simple Collexeme Analysis{-}
-
-Simple Collexeme Analysis determines if a word is significantly attracted to a specific construction within a corpus. The idea is that the frequency of the word that is attracted to a construction is significantly higher within the construction than would be expected by chance.
-
-The example here analyzes the Go + Verb construction (e.g. *Go suck a nut!*). The question is which verbs are attracted to this constructions (in this case, if *suck* is attracted to this construction).
-
-To perform these analyses, we use the `collostructions` package. Information about how to download and install this package can be found [here](https://sfla.ch/collostructions/).
-
-***
-
-<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br>Downloading and installing the `collostructions` package is a bit tricky and nor really user friendly. To install this package, go the [website of Susanne Flach](https://sfla.ch/collostructions/), who has written the `collustructions` package. On that website, you find different versions of that package for different operating systems (OS) like Windows and Mac. Next, download the version that is the right one for your OS, unzip the package file and copy it into your R library. Once you have  copied the `collustructions` package in your R library, you can run the code chunks below to install and activate all the required packages and steps.</p>
+We split the corpus into chapter to mirror the fact that most text data will come in the form of corpora which consist of different files containing texts.
+</p>
 <p style='margin-left:1em;'>
 </p></span>
 </div>
 
-***
-
-Install and activate the `devtools` package and installing the `collostructions` package.
-
-```{r prep3, eval = F, message=FALSE, warning=FALSE}
-# install devtools package
-install.packages("devtools")
-# load devtools package
-library(devtools)
-# install collostructions package
-install_local(here::here("renv/library/R-4.2/x86_64-w64-mingw32/collostructions_0.2.0.zip"), repos=NULL, type="source")
-```
-
-We can now, finally, load the `collostructions` package.
-
-```{r prep4, message=FALSE, warning=FALSE}
-# load collostructions package
-library(collostructions)
-```
+<br>
 
 
-Next, we inspect the data. In this case, we will only use a sample of 100 rows from the data set as the output would become hard to read.
+Next, we generate a frequency list of words that occur around a keyword (we use the keyword *selection* in this example but you can also choose a different word).
 
-```{r coll_03_02, message=FALSE, warning=FALSE}
-# draw a sample of the data
-goVerb <- goVerb[sample(nrow(goVerb), 100),]
-```
+for this we use the `tokens_select` function (from the `quanteda` package) which has the following arguments: 
+
++ `x`: a text or collection of texts. The text needs to be tokenised, i.e. split it into individual words, which is why we use the *text* in the `tokens()` function. 
++ `pattern`: a keyword defined by a search pattern  
++ `window`: the size of the context window (how many word before and after)  
++ `valuetype`: the type of pattern matching  
+  + "glob" for "glob"-style wildcard expressions;  
+  + "regex" for regular expressions; or  
+  + "fixed" for exact matching  
++ `selection`: a character to define if the key word should be retained in the resulting frequency list or if it should be removed. The argument offers two options  
+  + "keep"  
+  + "remove"  
++ `case_insensitive`: logical; if TRUE, ignore case when matching a pattern or dictionary values
 
 
-```{r coll_03_02b, echo = F, message=FALSE, warning=FALSE}
-goVerb %>%
+```{r}
+kwic_words <- quanteda::tokens_select(tokens(texts), 
+                                      pattern = "selection", 
+                                      window = 5, 
+                                      selection = "keep") %>%
+  unlist() %>%
+  # tabulate results
+  table() %>%
+  # convert into data frame
   as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
+  # rename columns
+  dplyr::rename(token = 1,
+                n = 2) %>%
+  # add a coulm with type
+  dplyr::mutate(type = "kwic")
+# inspect results
+head(kwic_words, 10)
 ```
 
-The `collex` function which calculates the results of a simple collexeme analysis requires a data frame consisting out of three columns that contain in column 1 the word to be tested, in column 2 the frequency of the word in the construction (CXN.FREQ), and in column 3 the frequency of the word in the corpus (CORP.FREQ).
+Next, we create a frequency table of the entire clean corpus.
 
-To perform the simple collexeme analysis, we need the overall size of the corpus, the frequency with which a word occurs in the construction under investigation and the frequency of that construction.
-
-```{r coll_03_03, message=FALSE, warning=FALSE}
-# define corpus size
-crpsiz <- sum(goVerb$CORP.FREQ)
-# perform simple collexeme analysis
-scollex_results <- collex(goVerb, corpsize = crpsiz, am = "logl", 
-                          reverse = FALSE, decimals = 5,
-                          threshold = 1, cxn.freq = NULL, 
-                          str.dir = FALSE)
-```
-
-
-```{r coll_03_03b, echo = F, message=FALSE, warning=FALSE}
-scollex_results %>%
+```{r}
+corpus_words <- texts %>%
+  # tokenize the corpus files
+  quanteda::tokens() %>%
+  # unlist the tokens to create a data frame
+  unlist() %>%
   as.data.frame() %>%
-  head(15) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
+  # rename the column to 'token'
+  dplyr::rename(token = 1) %>%
+  # group by 'token' and count the occurrences
+  dplyr::group_by(token) %>%
+  dplyr::summarise(n = n()) %>%
+  # add column stating where the frequency list is 'from'
+  dplyr::mutate(type = "corpus")
+
+# inspect the results by displaying the first 10 rows
+head(corpus_words, 10)
 ```
 
-The results show which words are significantly attracted to the construction. If the ASSOC column did not show *attr*, then the word would be repelled by the construction.
+Next, we combine the two frequency lists.
 
-## Covarying Collexeme Analysis{-}
-
-Covarying collexeme analysis determines if the occurrence of a word in the first slot of a constructions correlates with the occurrence of a word in the second slot of the construction. As such, covarying collexeme analysis analyzes constructions with two slots and how the lexical elements within the two slots affect each other.
-
-The data we will use is called `vsmdata` and consist of 5,000 observations of adjectives and if the adjective is amplified. As such,  `vsmdata`  contains two columns: one column with the adjectives (Adjectives) and another column telling if the adjective has been amplified (0 means that the adjective occurred without an amplifier).  The first six rows of the data are shown below.
-
-```{r coll_03_07,  message=FALSE, warning=FALSE}
-# load data
-vsmdata <- base::readRDS(url("https://slcladal.github.io/data/vsd.rda", "rb")) %>%
-  dplyr::mutate(Amplifier = ifelse(Amplifier == 0, 0, 1))
-```
-
-
-```{r coll_03_07b, echo = F, message=FALSE, warning=FALSE}
-vsmdata %>%
-  as.data.frame() %>%
-  head() %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
-```
-
-We now perform the collexeme analysis and inspect the results.
-
-```{r coll_03_09, message=FALSE, warning=FALSE}
-covar_results <- collex.covar(vsmdata)
+```{r}
+freq_df <- dplyr::left_join(corpus_words, kwic_words, by = c("token")) %>%
+  # rename columns and select relevant columns
+  dplyr::rename(corpus = n.x,
+                kwic = n.y) %>%
+  dplyr::select(-type.x, -type.y) %>%
+  # replace NA values with 0 in 'corpus' and 'kwic' columns
+  tidyr::replace_na(list(corpus = 0, kwic = 0))
+# inspect resulting frequency list
+head(freq_df, 10)
 ```
 
 
-```{r coll_03_09b, echo = F, message=FALSE, warning=FALSE}
-covar_results %>%
-  as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
+```{r}
+stats_tb <- freq_df %>%
+  dplyr::mutate(`kwic n words` = sum(kwic),
+                corpuswokwic = corpus-kwic,
+                `corpus n words` = sum(corpuswokwic)) %>%
+  dplyr::mutate(O11 = kwic,
+                O12 = `kwic n words` - kwic,
+                O21 = corpuswokwic,
+                O22 = `corpus n words` - corpuswokwic) %>%
+  dplyr::select(-corpus, -kwic, -`kwic n words`, -`corpus n words`,-corpuswokwic)
+# inspect resulting frequency list
+head(stats_tb, 10)
 ```
 
 
-The results show if a words in the first and second slot attract or repel each other (ASSOC) and provide uncorrected significance levels.
+To determine which terms collocate significantly and with what association strength, we use the following information (that is provided by the table above):
 
-## Distinctive Collexeme Analysis{-}
+* O11 = Number of times word~x~ occurs in `kwic`
 
-Distinctive Collexeme Analysis determines if the frequencies of items in two alternating constructions or under two conditions differ significantly. This analysis can be extended to analyze if the use of a word differs between two corpora.
+* O12 = Number of times word~x~ occurs in `corpus` (without `kwic`)
 
-Again, we use the `vsmdata` data.
+* O21 = Number of times other words occur in `kwic`
 
-```{r coll_03_11, message=FALSE, warning=FALSE}
-collexdist_results <- collex.dist(vsmdata, raw = TRUE)
+* O22 = Number of times  other words occur in `corpus`
+
+Example:
+
+|              | w~1~       |     other words |      |
+ :---          | :-----:    |   --------:  | ---
+| **kwic**     | O~11~      | O~12~        |  = R~1~
+| **corpus** | O~21~      | O~22~        |  = R~2~
+|              |  = C~1~    |   = C~2~     |  = N |
+
+```{r}
+coocStatz <- stats_tb %>%
+    # work row-wise
+    dplyr::rowwise() %>%
+    # add N
+    dplyr::mutate(N = sum(O11, O12, O21, O22)) %>%
+    # calculate fishers' exact test
+    dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
+                                                          ncol = 2, byrow = T))[1]))) %>%
+    
+    # extract x2 statistics
+    dplyr::mutate(x2 = as.vector(unlist(chisq.test(matrix(c(O11, O12, O21, O22),   
+                                                          ncol = 2, byrow = T),  simulate.p.value = TRUE)[1]))) %>%
+    # extract expected frequency
+    
+    dplyr::mutate(expected = as.vector(unlist(chisq.test(matrix(c(O11, O12, O21, O22), 
+                                                                ncol = 2, byrow = T),  simulate.p.value = TRUE)$expected[1]))) %>%
+    
+    # extract association measures
+    dplyr::mutate(phi = sqrt((x2 / N)),
+                  dice = (2 * O11) / (2 * (O11 + O12 + O21)),
+                  MI = (O11 / N) * 
+                    log2((O11 / N) / ((O11+O12) / N) * 
+                           ((O11+O21) / N) ),
+                  PMI = log2( (O11 / N) / ((O11+O12) / N) * 
+                                ((O11+O21) / N) ),
+                  t = (O11 - expected) / sqrt(expected)) %>%
+    
+    # calculate odds ration
+    dplyr::mutate(OddsRatio = ifelse(min(c(O11, O12, O21, O22) > 0),  ((O11/O12) / (O21/O22)), 0)) %>%
+    
+    # calculate loglikratio
+    dplyr::mutate(LogLik = calculate_log_likelihood(O11, O12, O21, O22)) %>%
+    
+    # simplify significance
+    dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
+                                                  p <= .01 ~ "p<.01",
+                                                  p <= .05 ~ "p<.05", 
+                                                  TRUE ~ "n.s.")) %>%
+    # round p-value
+    
+    dplyr::mutate(p = round(p, 5)) %>%
+    # filter out non significant results
+    dplyr::filter(Significance != "n.s.",
+                  # filter out instances where the w1 and w2 repel each other
+                  expected < O11) %>%
+    # arrange by phi (association measure)
+    dplyr::arrange(-phi) %>%
+    # remove superfluous columns
+    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows")))
+# inspect results
+head(coocStatz, 10)
 ```
 
-```{r coll_03_11b, echo = F, message=FALSE, warning=FALSE}
-collexdist_results %>%
-  as.data.frame() %>%
-  head(10) %>%
-  flextable() %>%
-  flextable::set_table_properties(width = .5, layout = "autofit") %>%
-  flextable::theme_zebra() %>%
-  flextable::fontsize(size = 12) %>%
-  flextable::fontsize(size = 12, part = "header") %>%
-  flextable::align_text_col(align = "center") %>%
-  flextable::set_caption(caption = "")  %>%
-  flextable::border_outer()
+
+
+## Visualising collocations
+
+### Dotplots
+
+We can now visualize the association strengths in a dotplot as shown in the code chunk below.
+
+```{r assocs03, message=F, warning=F}
+# sort the coocStatz data frame in descending order based on the 'phi' column
+coocStatz %>%
+  dplyr::arrange(-phi) %>%
+  # select the top 20 rows after sorting
+  head(20) %>%
+  # create a ggplot with 'token' on the x-axis (reordered by 'phi') and 'phi' on the y-axis
+  ggplot(aes(x = reorder(token, phi, mean), y = phi)) +
+  # add a scatter plot with points representing the 'phi' values
+  geom_point() +
+  # flip the coordinates to have horizontal points
+  coord_flip() +
+  # set the theme to a basic white and black theme
+  theme_bw() +
+  # set the x-axis label to "Token" and y-axis label to "Association strength (phi)"
+  labs(x = "Token", y = "Association strength (phi)")
 ```
 
-The results show if words are significantly attracted or repelled by a modifier variant. 
+
+### Barplots
+
+Another option sis to visualize the association strengths in a barplot as shown in the code chunk below.
+
+```{r assocs03, message=F, warning=F}
+# sort the coocStatz data frame in descending order based on the 'phi' column
+coocStatz %>%
+  dplyr::arrange(-phi) %>%
+  # select the top 20 rows after sorting
+  head(20) %>%
+  # create a ggplot with 'token' on the x-axis (reordered by 'phi') and 'phi' on the y-axis
+  ggplot(aes(x = reorder(token, phi, mean), y = phi, label = phi)) +
+  # add a bar plot using the 'phi' values
+  geom_bar(stat = "identity") +
+  # add text labels above the bars with rounded 'phi' values
+  geom_text(aes(y = phi - 0.005, label = round(phi, 3)), color = "white", size = 3) + 
+  # flip the coordinates to have horizontal bars
+  coord_flip() +
+  # set the theme to a basic white and black theme
+  theme_bw() +
+  # set the x-axis label to "Token" and y-axis label to "Association strength (phi)"
+  labs(x = "Token", y = "Association strength (phi)")
+```
+
+
+### Dendrograms
+
+Another method for visualizing collocations are dendrograms (tree-diagrams) which show how similarity  to indicate groupings based on numeric values (e.g., association strength). 
+
+We start by extracting the tokens that we want to show (the top 20 collocates of *alice*).
+
+```{r}
+# sort the coocStatz data frame in descending order based on the 'phi' column
+top20colls <- coocStatz %>%
+  dplyr::arrange(-phi) %>%
+  # select the top 20 rows after sorting
+  head(20) %>%
+  # extract the 'token' column 
+  dplyr::pull(token)
+# inspect the top 20 tokens with the highest 'phi' values
+top20colls
+```
+
+We then need to generate a feature co-occurrence matrix from a document-feature matrix based on the cleaned, lower case sentences of our text.
+
+```{r}
+# tokenize the 'sentences' data using quanteda package
+keyword_fcm <- sentences %>%
+  quanteda::tokens() %>%
+  # create a document-feature matrix (dfm) from the tokens
+  quanteda::dfm() %>%
+  # select features based on 'top20colls' and the term "selection" pattern
+  quanteda::dfm_select(pattern = c(top20colls, "selection")) %>%
+  # Create a symmetric feature co-occurrence matrix (fcm) 
+  quanteda::fcm(tri = FALSE)
+# inspect the first 6 rows and 6 columns of the resulting fcm
+keyword_fcm[1:6, 1:6]
+```
+
+Then we generate the dendrogram based on a  distance matrix generated from the feature co-occurrence matrix.
+
+```{r}
+# create a hierarchical clustering object using the distance matrix of the fcm as data
+hclust(dist(keyword_fcm),     
+       # use ward.D as linkage method
+       method="ward.D2") %>% 
+  # generate visualization (dendrogram)
+  ggdendrogram() +              
+  # add title
+  ggtitle("20 most strongly collocating terms of 'selection'")  
+```
+
+### Network Graphs
+
+[Network graphs](https://ladal.edu.au/net.html), or networks for short, are a powerful and versatile visual representation used to depict relationships or connections among various elements. Network graphs typically consist of nodes, representing individual entities, and edges, indicating the connections or interactions between these entities. Nodes can represent diverse entities such as words (collocates), interlocutors, objects, or concepts, while edges convey the relationships or associations between them.  
+
+Here we generate a basic network graph of the collocates of our keyword based on the fcm.
+
+```{r}
+# create a network plot using the fcm
+quanteda.textplots::textplot_network(keyword_fcm,
+                                     # set the transparency of edges to 0.8 for visibility
+                                     edge_alpha = 0.8,
+                                     # set the color of edges to gray
+                                     edge_color = "gray",
+                                     # set the size of edges to 2 for better visibility
+                                     edge_size = 2,
+                                     # adjust the size of vertex labels 
+                                     # based on the logarithm of row sums of the fcm
+                                     vertex_labelsize = log(rowSums(keyword_fcm)))
+```
+
+
+## Biplots
+
+An alternative way to display co-occurrence patterns are bi-plots which are used to display the results of a [Correspondence Analysis](https://ladal.edu.au/clust.html#2_Correspondence_Analysis). Bi-plots are useful, in particular, when one is not interested in one particular keyterm and its collocations but in the overall similarity of many terms. Semantic similarity in this case refers to a shared semantic and this distributional profile. As such, words can be deemed semantically similar if they have a similar co-occurrence profile - i.e. they co-occur with the same elements. Biplots can be used to visualize collocations because collocates co-occur and thus share semantic properties which renders then more similar to each other compared with other terms. 
+
+```{r coll8, message=FALSE, warning=FALSE, paged.print=FALSE}
+# perform correspondence analysis
+res.ca <- CA(as.matrix(keyword_fcm), graph = FALSE)
+# plot results
+fviz_ca_row(res.ca, repel = TRUE, col.row = "gray20")
+```
 
 
 # Citation & Session Info {-}
@@ -928,7 +800,7 @@ sessionInfo()
 
 ***
 
-[Back to top](#introduction)
+[Back to top](#Introduction)
 
 [Back to LADAL home](https://ladal.edu.au)
 
