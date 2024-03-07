@@ -5,7 +5,6 @@ require(dplyr)
 # corpus2: frequency of token in corpus2
 assockwic <- function(x){
   x %>%
-    dplyr::filter(corpus2 > 0) %>%
     dplyr::mutate(corpus2 = as.numeric(corpus2),
                   corpus1 = as.numeric(corpus1)) %>%
     dplyr::mutate(C1 = sum(corpus1),
