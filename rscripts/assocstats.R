@@ -60,7 +60,7 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
     # filter out non significant results
     dplyr::filter(Significance != "n.s.",
                 # filter out instances where the w1 and w2 repel each other
-                expected < O11) %>%
+                E11 < O11) %>%
     # arrange by phi (association measure)
     dplyr::arrange(-phi) %>%
     # remove superfluous columns
