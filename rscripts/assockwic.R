@@ -5,8 +5,6 @@ require(dplyr)
 # kwic: frequency of token in kwic
 assockwic <- function(x){
   x %>%
-    # work row-wise
-    dplyr::rowwise() %>%
     dplyr::filter(corpus > 0) %>%
     dplyr::mutate(corpus = as.numeric(corpus),
                   kwic = as.numeric(kwic)) %>%
