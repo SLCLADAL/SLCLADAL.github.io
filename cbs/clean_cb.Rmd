@@ -94,17 +94,21 @@ str(texts); substring(texts, 1, 200)
 In a first step, we will reformat the data so that each speech unit is on a separate line. As speech units start with the sequence `<S1A`, we can use this as our starting point.
 
 ```{r}
+# replace instances of "<[S|s]1[A|a]" with "~~~<S1A", split the resulting text, and unlist
 texts_split <- stringr::str_replace_all(texts, "<[S|s]1[A|a]", "~~~<S1A") %>%
   stringr::str_split("~~~") %>%
   unlist() 
-# create data frame with id, file, speaker, text 
+
+# create a data frame with 'id', 'file', 'speaker', and 'text' columns
 texts_df <- tibble(id = 1:length(texts_split),
                   corpus = rep("ICE-IRE", length(texts_split)),
                   file = str_remove_all(texts_split, "#.*"),
                   speaker = str_remove_all(texts_split, ">.*"), 
                   texts_split)
-# inspect
+
+# inspect the first 10 rows of the created data frame
 head(texts_df, 10)
+
 ```
 
 ## Cleaning
@@ -112,40 +116,110 @@ head(texts_df, 10)
 Now that we have the data in tabular format, it is easy to clean it.
 
 ```{r}
-# create data frame with id, file, speaker, text 
+# create a data frame with 'id', 'file', 'speaker', and 'text' columns
 texts_df %>%
+  
+  # clean 'file' column by removing "<" and anything after "|$"
   dplyr::mutate(file = stringr::str_replace_all(file, "<", ""),
                 file = stringr::str_replace_all(file, "[ |\\$].*", ""),
-                # speaker
+                
+                # clean 'speaker' column by removing anything before "$"
                 speaker = stringr::str_replace_all(speaker, ".*\\$", ""),
-                # text
+                
+                # clean 'text' column by removing "<.*?>"
                 t_clean = stringr::str_remove_all(texts_split, "<.*?>")) %>%
-  # remove unneccessary rows
+  
+  # filter out unnecessary rows based on speaker length
   dplyr::filter(!nchar(speaker) < 1,
-                !nchar(speaker) > 2) -> clean_df 
-# inspect
+                !nchar(speaker) > 2) -> clean_df  # assign the result to 'clean_df'
+  
+# inspect the first 10 rows of the cleaned data frame
 head(clean_df, 10)
+
 ```
 
 
 ```{r}
+# group the 'clean_df' dataframe by 'corpus' and 'file'
 clean_df %>%
   dplyr::group_by(corpus, file) %>%
+  
+  # concatenate the cleaned text ('t_clean') into a single string for each group
   dplyr::summarise(text = paste0(t_clean, collapse = " ")) %>%
+  
+  # remove grouping
   dplyr::ungroup() %>%
+  
+  # extract the 'text' column
   dplyr::pull(text) %>%
+  
+  # convert the text to lowercase
   tolower() %>%
-  stringr::str_squish()-> ctexts
-# inspect
+  
+  # remove extra spaces in the resulting character vector
+  stringr::str_squish() -> ctexts  # Assign the cleaned and formatted text to 'ctexts'
+  
+# inspect the structure of the resulting character vector
 str(ctexts)
+
 ```
 
-We can now save the clean data.
+We create names for the files.
 
 ```{r}
-writeLines(ctexts, here::here("notebooks/MyOutput")
+# group the 'clean_df' dataframe by 'corpus' and 'file'
+clean_df %>%
+  dplyr::group_by(corpus, file) %>%
+  
+  # concatenate the cleaned text ('t_clean') into a single string for each group
+  dplyr::summarise(text = unique(paste0(t_clean, collapse = " "))) %>%
+  
+  # create a new column 'cfile' by combining 'corpus' and 'file', remove spaces and hyphens
+  dplyr::mutate(cfile = paste0(corpus, "_", file, ".txt"),
+                cfile = stringr::str_remove_all(cfile, " "),
+                cfile = stringr::str_remove_all(cfile, "-")) %>%
+  
+  # remove grouping
+  dplyr::ungroup() %>%
+  
+  # extract the 'cfile' column and squish the resulting character vector
+  dplyr::pull(cfile) %>%
+  # remove superfluous white spaces and save the results as names of the elements of 'ctexts'
+  stringr::str_squish() -> nms -> names(ctexts)
+  
+# 'nms' contains the cleaned and formatted file names
+nms
+
 ```
 
+```{r}
+# save result to disc
+# Use lapply to iterate over the indices of ctexts
+# and write each text to a separate file in the MyOutput folder
+
+lapply(seq_along(ctexts), function(i) {
+  # unlist the i-th element in ctexts to get the text content
+  text_content <- unlist(ctexts[i])
+
+  # construct the file path using the 'here' package
+  file_path <- paste0(here::here("notebooks/MyOutput/"), names(ctexts)[i])
+
+  # write the text content to the specified file
+  writeLines(text = text_content, con = file_path)
+})
+
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the txt-files in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then highlight the files, and choose *Download* from the dropdown menu to download the files. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
 
 
 
