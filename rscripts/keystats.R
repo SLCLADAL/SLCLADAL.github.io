@@ -1,21 +1,20 @@
 require(dplyr)
 # x must have columns with 
 # token: word 
-# corpus: frequency of token in corpus
-# kwic: frequency of token in kwic
+# corpus1: frequency of token in corpus1
+# corpus2: frequency of token in corpus2
 assockwic <- function(x){
   x %>%
-    dplyr::filter(corpus > 0) %>%
-    dplyr::mutate(corpus = as.numeric(corpus),
-                  kwic = as.numeric(kwic)) %>%
-    dplyr::mutate(corpus= corpus-kwic,
-                  C1 = sum(kwic),
-                  C2 = sum(corpus),
+    dplyr::filter(corpus2 > 0) %>%
+    dplyr::mutate(corpus2 = as.numeric(corpus2),
+                  corpus1 = as.numeric(corpus1)) %>%
+    dplyr::mutate(C1 = sum(corpus1),
+                  C2 = sum(corpus2),
                   N = C1 + C2) %>%
     dplyr::rowwise() %>%
-    dplyr::mutate(R1 = corpus+kwic,
+    dplyr::mutate(R1 = corpus+corpus1,
                   R2 = N - R1,
-                  O11 = kwic,
+                  O11 = corpus1,
                   O12 = R1-O11,
                   O21 = C1-O11,
                   O22 = C2-O12) %>%

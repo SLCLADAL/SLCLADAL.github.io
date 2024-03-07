@@ -64,7 +64,8 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
     # arrange by phi (association measure)
     dplyr::arrange(-phi) %>%
     # remove superfluous columns
-    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows"))) -> result
+    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
+                            "O22", "R1", "R2", "C1", "C2"))) -> result
 # inspect
 return(result)
 }
