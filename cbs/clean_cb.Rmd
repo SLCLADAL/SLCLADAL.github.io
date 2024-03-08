@@ -91,23 +91,52 @@ str(texts); substring(texts, 1, 200)
 
 ## Reformatting
 
-In a first step, we will reformat the data so that each speech unit is on a separate line. As speech units start with the sequence `<S1A`, we can use this as our starting point.
+In a first step, we generate file names from the paths. 
 
 ```{r}
-# replace instances of "<[S|s]1[A|a]" with "~~~<S1A", split the resulting text, and unlist
+# extract names of texts
+nms <- names(texts) %>%
+  stringr::str_remove_all(".*/") %>%
+  stringr::str_remove_all(".txt")
+# inspect names
+nms
+```
+
+Now, we split the text into speech units (this is optional).
+
+```{r}
+# replace instances of "<[S|s]1[A|a]" with "~~~<S1A", split the resulting text
 texts_split <- stringr::str_replace_all(texts, "<[S|s]1[A|a]", "~~~<S1A") %>%
-  stringr::str_split("~~~") %>%
-  unlist() 
+  stringr::str_split("~~~")
+# inspect
+str(texts_split)
+```
 
-# create a data frame with 'id', 'file', 'speaker', and 'text' columns
-texts_df <- tibble(id = 1:length(texts_split),
-                  corpus = rep("ICE-IRE", length(texts_split)),
-                  file = str_remove_all(texts_split, "#.*"),
-                  speaker = str_remove_all(texts_split, ">.*"), 
-                  texts_split)
+The text now is in a list format which each speech unit being an element in the list.
 
+We now repeat the names as often as there are elements in the list items because we want to create a data frame with the file, the original text, and the clean text.
+
+```{r}
+# extract how many items are in each text
+lngth <- sapply(texts_split, function(x) length(x) )
+# repeat name as many times as there are elements
+files <- rep(nms, lngth) 
+# inspect
+table(files)
+```
+
+We now clean the split test.
+
+```{r}
+# create a data frame of split texts
+stexts <- unlist(texts_split) %>% tibble()
+# add the file names
+stexts_df <- data.frame(files, stexts) %>%
+  # add column names
+  dplyr::rename(file = 1, 
+                text = 2)
 # inspect the first 10 rows of the created data frame
-head(texts_df, 10)
+head(stexts_df, 10)
 
 ```
 
@@ -121,39 +150,28 @@ Now that we've organized the data into a tabular format, the cleaning process be
 
 ```{r}
 # create a data frame with 'id', 'file', 'speaker', and 'text' columns
-texts_df %>%
+stexts_df %>%
   
-  # clean 'file' column by removing "<" and anything after "|$"
-  dplyr::mutate(file = stringr::str_replace_all(file, "<", ""),
-                file = stringr::str_replace_all(file, "[ |\\$].*", ""),
+  # # clean 'text' column by removing "<.*?>"
+  dplyr::mutate(text_clean = stringr::str_remove_all(text, "<.*?>"),
                 
-                # clean 'speaker' column by removing anything before "$"
-                speaker = stringr::str_replace_all(speaker, ".*\\$", ""),
-                
-                # clean 'text' column by removing "<.*?>"
-                t_clean = stringr::str_remove_all(texts_split, "<.*?>"),
-                
-                # convert 't_clean' to lower case) 
-                                t_clean = tolower(t_clean) %>%
-  
-  # filter out unnecessary rows based on speaker length
-  dplyr::filter(!nchar(speaker) < 1,
-                !nchar(speaker) > 2) -> clean_df  # assign the result to 'clean_df'
+                # convert 't_clean' to lower case)
+                text_clean = tolower(text_clean)) -> clean_df  # assign the result to 'clean_df'
   
 # inspect the first 10 rows of the cleaned data frame
 head(clean_df, 10)
 
 ```
 
-With the data now arranged in tabular form, the cleaning process becomes straightforward. In the subsequent step, we aggregate the cleaned texts from the 't-clean' column by file, ensuring we obtain a single consolidated clean text for each file. After this, we extract the cleaned text and store it in an object named 'ctexts.'
+With the data now arranged in tabular form, the cleaning process becomes straightforward. In the subsequent step, we aggregate the cleaned texts from the 'text_clean' column by file, ensuring we obtain a single consolidated clean text for each file. After this, we extract the cleaned text and store it in an object named 'ctexts.'
 
 ```{r}
 # group the 'clean_df' dataframe by 'corpus' and 'file'
 clean_df %>%
-  dplyr::group_by(corpus, file) %>%
+  dplyr::group_by(file) %>%
   
   # concatenate the cleaned text ('t_clean') into a single string for each group
-  dplyr::summarise(text = paste0(t_clean, collapse = " ")) %>%
+  dplyr::summarise(text = paste0(text_clean, collapse = " ")) %>%
   
   # remove grouping
   dplyr::ungroup() %>%
@@ -169,38 +187,16 @@ clean_df %>%
   
 # inspect the structure of the resulting character vector
 str(ctexts)
-
 ```
 
-Having successfully cleaned and extracted the text from the data frame, stored as 'ctexts,' our next step involves generating names for the texts we intend to save. For this illustration, we'll form file names by combining the corpus name with the file name. Thus, the initial file will be titled 'ICEIRE_S1A001.txt.'
-
-
+We now add names to the cleaned texts.
 
 ```{r}
-# group the 'clean_df' dataframe by 'corpus' and 'file'
-clean_df %>%
-  dplyr::group_by(corpus, file) %>%
-  
-  # concatenate the cleaned text ('t_clean') into a single string for each group
-  dplyr::summarise(text = unique(paste0(t_clean, collapse = " "))) %>%
-  
-  # create a new column 'cfile' by combining 'corpus' and 'file', remove spaces and hyphens
-  dplyr::mutate(cfile = paste0(corpus, "_", file, ".txt"),
-                cfile = stringr::str_remove_all(cfile, " "),
-                cfile = stringr::str_remove_all(cfile, "-")) %>%
-  
-  # remove grouping
-  dplyr::ungroup() %>%
-  
-  # extract the 'cfile' column and squish the resulting character vector
-  dplyr::pull(cfile) %>%
-  # remove superfluous white spaces and save the results as names of the elements of 'ctexts'
-  stringr::str_squish() -> nms -> names(ctexts)
-  
-# 'nms' contains the cleaned and formatted file names
-nms
-
+nms -> names(ctexts)
 ```
+
+
+## Saving to MyOutput
 
 As a concluding step, we save the outcomes – the three files housing our cleaned texts – in the 'MyOutput' folder, conveniently visible on the left side of the screen.
 
