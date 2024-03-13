@@ -4,7 +4,7 @@ require(stringr)
 
 # define function
 loadtxts <- function(x){
-  fls <- list.files(here::here("notebooks/MyTexts"), # path to the corpus data
+  fls <- list.files(here::here(x), # path to the corpus data
                     
                     # full paths - not just the names of the files
                     full.names = T) 
