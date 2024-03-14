@@ -10,7 +10,7 @@ loadnetdata <- function(x){
                     full.names = T) 
   
   # select own data (not test data)
-  fls <- fls[2]
+  fls <- fls[!stringr::str_detect(fls, "test.xlsx")]
   
   # loop over the vector 'myfiles' that contains paths to the data
   dat <- sapply(fls, function(y){
