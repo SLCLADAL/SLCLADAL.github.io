@@ -1,0 +1,462 @@
+
+![An interactive LADAL notebook](https://slcladal.github.io/images/uq1.jpg)
+
+
+This tutorial is the interactive Jupyter notebook accompanying the [Language Technology and Data Analysis Laboratory (LADAL) tutorial *Network Analysis using R*](https://ladal.edu.au/net.html). 
+
+
+
+**Preparation and session set up**
+
+We set up our session by activating the packages we need for this tutorial. 
+
+
+```{r prep2, message=FALSE, warning=FALSE, class.source='klippy'}
+# set options
+options(warn=-1)  # do not show warnings or messages
+# activate packages
+library(dplyr)    # for table processing
+library(openxlsx) # for reading and saving xlsx files
+library(quanteda) # for generating dfm and fcm
+library(quanteda.textplots)  # for generating network graphs 
+library(ggplot2)  # for visualisation
+library(stringr)  # for text processing
+library(tidyr)    # for table processing
+library(here)     # for path generation and processing
+library(igraph)   # for generating network graphs
+library(tidygraph)  # for generating network graphs
+library(ggraph)   # for generating network graphs
+library(readxl)   # for reading data
+library(writexl)  # for saving data
+```
+
+
+
+# Loading data
+
+For a network visualization, you need at least one table indicating the co-occurrence frequency of items (nodes). The default that that we provide below represents the frequency of co-occurrence (appearance in the same scene) of characters in William Shakespeare's *Romeo and Juliet*. 
+
+# Loading example data
+
+We load the example data and add row names. The data is a co-occurrence matrix that represents the frequency of co-occurrences of characters in the same scene. 
+
+```{r na1, echo=T, eval = T, message=FALSE, warning=FALSE}
+# load data
+dat <- openxlsx::read.xlsx("https://slcladal.github.io/data/romeo.xlsx")
+# add row names
+rownames(dat) <- colnames(dat)
+# inspect data (first 5 rows and first 5 columns)
+dat[1:5, 1:5] 
+```
+
+
+## Using your own data
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+
+While the tutorial uses data from the LADAL website, you can also **use your own data**. To use your own data, click on the folder called `MyData` (it is in the menu to the left of the screen) and then simply drag and drop your xlsx-files into the folder. When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>
+<br>
+You can upload <b>only xlsx-files</b> (MS Excel spreadsheets)! <br>
+<br>
+<b>IMPORTANT</b>: Be sure to to then <b>replace `mydat` with `dat` in the code chunk below and do not execute the following code chunk which loads an example table</b> so that you work with your and not the sample data!<br><br>
+Also, make sure that <b>your xlsx- file does not contain row names and only co-occurrence frequencies</b>. The columns must be the same as the rows (e.g. in the example data, the first row represents the co-occurrences of BALTHASAR, the second row the co-occurrences of BENVOLIO, the third row the co-occurrences of CAPULET etc.). </b><br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+```{r}
+myfiles <- list.files(here::here("notebooks/MyTables"), # path to the corpus data
+                          # full paths - not just the names of the files
+                          full.names = T) 
+# loop over the vector 'myfiles' that contains paths to the data
+mydat <- sapply(myfiles, function(x){
+
+  # read the content of each file using 'read_xlsx' from the 'readxl' package
+  x <- readxl::read_xlsx(x)      
+
+})
+
+# inspect the structure of the text object
+str(mydat)
+```
+
+
+# Quanteda Networks 
+
+We generate a first network using the `quanteda` package which contains the `textplot_network` function which provides a very handy way to display networks.    
+
+In a first step, we transform the data into a document-feature matrix using the `dfm ` function. 
+
+
+```{r qtda01, warning=F, message=F}
+# create a document feature matrix and save result as `dat_dfm`
+quanteda::as.dfm(dat) -> dat_dfm
+  # create feature co-occurrence matrix and save result as `dat_fcm`
+  quanteda::fcm(dat_dfm) -> dat_fcm
+# inspect data
+head(dat_fcm)
+```
+
+We feed the resulting feature-co-occurrence matrix into the `textplot_network` function that generates a nice network graph. 
+
+Now we generate a network graph using the `textplot_network` function from the `quanteda.textplots` package. This function has the following arguments: 
+
++ `x`: a fcm or dfm object  
++ `min_freq`: a frequency count threshold or proportion for co-occurrence frequencies of features to be included (default = 0.5),  
++ `omit_isolated`: if TRUE, features do not occur more frequent than min_freq will be omitted (default = TRUE),  
++ `edge_color`: color of edges that connect vertices (default = "#1F78B4"),
++ `edge_alpha`: opacity of edges ranging from 0 to 1.0 (default = 0.5),
++ `edge_size`: size of edges for most frequent co-occurrence (default = 2),
++ `vertex_color`: color of vertices (default = "#4D4D4D"),
++ `vertex_size`: size of vertices (default = 2),
++ `vertex_labelcolor`: color of texts. Defaults to the same as vertex_color,
++ `vertex_labelfont`: font-family of texts,
++ `vertex_labelsize`: size of vertex labels in mm. Defaults to size 5. Supports both integer values and vector values (default = 5),
++ `offset`: if NULL (default), the distance between vertices and texts are determined automatically,
+
+
+```{r qtda04}
+quanteda.textplots::textplot_network(
+  x = dat_fcm,                    # a fcm or dfm object
+  min_freq = 0.5,                   # frequency count threshold or proportion for co-occurrence frequencies (default = 0.5)
+  edge_alpha = 0.5,                 # opacity of edges ranging from 0 to 1.0 (default = 0.5)
+  edge_color = "gray",            # color of edges that connect vertices (default = "#1F78B4")
+  edge_size = 2,                    # size of edges for most frequent co-occurrence (default = 2)
+# calculate the size of vertex labels for the network plot
+vertex_labelsize = dat_dfm %>%
+  # convert the dfm object to a data frame
+  as.data.frame() %>% 
+  # exclude the 'doc_id' column
+  dplyr::select(-doc_id) %>%
+  # calculate the sum of row values for each row
+  rowSums() %>%
+  # apply the natural logarithm to the resulting sums
+  log(),
+  vertex_color = "#4D4D4D",         # color of vertices (default = "#4D4D4D")
+  vertex_size = 2                   # size of vertices (default = 2)
+)
+```
+
+
+## Exporting images
+
+To export network graph as an png-file, we use `ggsave`. Be aware that we use the `here` function to save the file in the `MyOutput` folder.
+
+The `ggsave` function has the following main arguments:
+
++ `filename`: File name to create on disk.    
++ `device`: Device to use. Can either be a device function (e.g. png), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only). If NULL (default), the device is guessed based on the filename extension  
++ `path`: Path of the directory to save plot to: path and filename are combined to create the fully qualified file name. Defaults to the working directory.  
++ `width, height`: Plot size in units expressed by the units argument. If not supplied, uses the size of the current graphics device.  
++ `units`: One of the following units in which the width and height arguments are expressed: "in", "cm", "mm" or "px".  
++ `dpi`: Plot resolution. Also accepts a string input: "retina" (320), "print" (300), or "screen" (72). Applies only to raster output types.  
++ `bg`: Background colour. If NULL, uses the plot.background fill value from the plot theme.  
+
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_01.png"), bg = "white")
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_01.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_01.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+# Tidy Networks
+
+We now turn to a different method for generating networks that is extremely flexible.
+
+First, we define the *nodes* and we can also add information about the nodes that we can use later on (such as frequency information).
+
+```{r tidy4, message=F, warning=F}
+# create a new data frame 'va' using the 'dat' data
+va <- dat %>%
+  # add a new column 'Persona' with row names and another column 'Occurrences' with row sums
+  dplyr::mutate(Persona = rownames(.),
+                Occurrences = rowSums(.)) %>%
+  # select only the 'Persona' and 'Occurrences' columns
+  dplyr::select(Persona, Occurrences) %>%
+  # filter out rows where 'Persona' contains the substring "SCENE"
+  dplyr::filter(!stringr::str_detect(Persona, "SCENE"))
+
+# show the resulting nodes table as a data frame
+va %>%
+  as.data.frame()
+```
+
+The next part is optional but it can help highlight important information. We add a column with additional information to our nodes table.
+
+```{r}
+# define family
+mon <- c("ABRAM", "BALTHASAR", "BENVOLIO", "LADY MONTAGUE", "MONTAGUE", "ROMEO")
+cap <- c("CAPULET", "CAPULET’S COUSIN", "FIRST SERVANT", "GREGORY", "JULIET", "LADY CAPULET", "NURSE", "PETER", "SAMPSON", "TYBALT")
+oth <- c("APOTHECARY", "CHORUS", "FIRST CITIZEN", "FIRST MUSICIAN", "FIRST WATCH", "FRIAR JOHN" , "FRIAR LAWRENCE", "MERCUTIO", "PAGE", "PARIS", "PRINCE", "SECOND MUSICIAN", "SECOND SERVANT", "SECOND WATCH", "SERVANT", "THIRD MUSICIAN")
+# create color vectors
+va <- va %>%
+  dplyr::mutate(Family = dplyr::case_when(Persona %in% mon ~ "MONTAGUE",
+                                          Persona %in% cap ~ "CAPULET",
+                                          TRUE ~ "Other"))
+# inspect updates nodes table
+va
+```
+
+
+Now, we define the *edges*, i.e., the connections between nodes and, again, we can add information in separate variables that we can use later on. 
+
+
+```{r tidy5, message=F, warning=F}
+# create a new data frame 'ed' using the 'dat' data
+ed <- dat %>%
+  # add a new column 'from' with row names
+  dplyr::mutate(from = rownames(.)) %>%
+  # reshape the data from wide to long format using 'gather'
+  tidyr::gather(to, Frequency, BALTHASAR:TYBALT) %>%
+  # remove zero frequencies 
+  dplyr::filter(Frequency != 0)
+
+# display the first 10 rows of the resulting edge table as a data frame
+ed %>%
+  as.data.frame() %>%
+  head(10)
+```
+
+Now that we have generated tables for the edges and the nodes, we can generate a graph object.
+
+```{r tidy6, message=F, warning=F}
+ig <- igraph::graph_from_data_frame(d=ed, vertices=va, directed = FALSE)
+```
+
+We will also add labels to the nodes as follows:
+
+```{r tidy7, message=F, warning=F}
+tg <- tidygraph::as_tbl_graph(ig) %>% 
+  tidygraph::activate(nodes) %>% 
+  dplyr::mutate(label=name)
+```
+
+When we now plot our network, it looks as shown below.
+
+
+```{r tidy11, message=F, warning=F}
+# set seed (so that the exact same network graph is created every time)
+set.seed(12345)
+
+# create a graph using the 'tg' data frame with the Fruchterman-Reingold layout
+tg %>%
+  ggraph(layout = "fr") +
+  
+  # add arcs for edges with various aesthetics
+  geom_edge_arc(colour = "gray50",
+                lineend = "round",
+                strength = .1,
+                aes(edge_width = ed$Frequency,
+                    alpha = ed$Frequency)) +
+  
+  # add points for nodes with size based on log-transformed 'v.size' and color based on 'va$Family'
+  geom_node_point(size = log(va$Occurrences) * 2, 
+                  aes(color = va$Family)) +
+  
+  # add text labels for nodes with various aesthetics
+  geom_node_text(aes(label = name), 
+                 repel = TRUE, 
+                 point.padding = unit(0.2, "lines"), 
+                 size = sqrt(va$Occurrences), 
+                 colour = "gray10") +
+  
+  # adjust edge width and alpha scales
+  scale_edge_width(range = c(0, 2.5)) +
+  scale_edge_alpha(range = c(0, .3)) +
+  
+  # set graph background color to white
+  theme_graph(background = "white") +
+  
+  # adjust legend position to the top
+  theme(legend.position = "top", 
+        # suppress legend title
+        legend.title = element_blank()) +
+  
+  # remove edge width and alpha guides from the legend
+  guides(edge_width = FALSE,
+         edge_alpha = FALSE)
+
+```
+
+As we did above, we use the `ggsave` function to save the network in the `MyOutput` folder.
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_02.png"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_02.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_02.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+# Network Statistics
+
+Network statistics tell us about structural properties of networks. 
+
+To extract the statistics, we use the edge object generated above (called `ed`) and then repeat each combination as often as it occurred based on the value in the `Frequency` column.
+
+```{r nstat1, message=F, warning=F}
+dg <- ed[rep(seq_along(ed$Frequency), ed$Frequency), 1:2]
+rownames(dg) <- NULL
+# inspect data
+dg %>%
+  as.data.frame() %>%
+  head(15)
+```
+
+### Degree centrality
+
+We now generate an edge list from the `dg` object and then extract the *degree centrality*. The *degree centrality* reflects how many edges each node has with the most central node having the highest value.
+
+```{r nstat2, message=F, warning=F}
+dgg <- graph.edgelist(as.matrix(dg), directed = T)
+# extract degree centrality
+igraph::degree(dgg) %>%
+  as.data.frame() %>%
+  dplyr::rename(`degree centrality` = 1) %>%
+  dplyr::arrange(-`degree centrality`) -> dc_tbl
+# inspect results
+dc_tbl
+```
+
+# Exporting tables
+
+To export a table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(dc_tbl, here::here("notebooks/MyOutput/dc_tbl.xlsx"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the generated MS Excel spreadsheet named *dc_tbl.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *dc_tbl.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+### Central node
+
+Next, we extract the most *central node*.
+
+```{r nstat2b, message=F, warning=F}
+names(igraph::degree(dgg))[which(igraph::degree(dgg) == max(igraph::degree(dgg)))]
+```
+
+### Betweenness centrality
+
+We now  extract the *betweenness centrality*. *Betweenness centrality* provides a measure of how important nodes are for information flow between nodes in a  network. The node with the highest betweenness centrality creates the shortest  paths in the network.  The higher a node’s *betweenness centrality*, the more important it is for the efficient flow of goods in a network.
+
+
+```{r nstat3, message=F, warning=F}
+igraph::betweenness(dgg) %>%
+  as.data.frame() %>%
+  dplyr::rename(`betweenness centrality` = 1) %>%
+  dplyr::arrange(-`betweenness centrality`) -> bc_tbl
+# inspect results
+bc_tbl
+```
+
+To export a table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(bc_tbl, here::here("notebooks/MyOutput/bc_tbl.xlsx"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the generated MS Excel spreadsheet named *dc_tbl.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br>
+<br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+We now extract the node with the highest *betweenness centrality*.
+
+```{r nstat3b, message=F, warning=F}
+names(igraph::betweenness(dgg))[which(igraph::betweenness(dgg) == max(igraph::betweenness(dgg)))]
+```
+
+### Closeness
+
+In addition, we extract the closeness statistic of all edges in the `dg` object by using the `closeness` function from the `igraph` package. Closeness centrality refers to the shortest paths between nodes. The distance between two nodes represents the length of the shortest path between them. The closeness of a node is the average distance from that node to all other nodes. 
+
+```{r nstat4, message=F, warning=F}
+igraph::closeness(dgg) %>%
+  as.data.frame() %>%
+  dplyr::rename(closeness = 1) %>%
+  dplyr::arrange(-closeness) -> c_tbl
+# inspect results
+c_tbl
+```
+
+
+To export a table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+
+```{r eval = F, warning=F, message=F}
+# save data for MyOutput folder
+write_xlsx(c_tbl, here::here("notebooks/MyOutput/c_tbl.xlsx"))
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the generated MS Excel spreadsheet named *c_tbl.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br>
+<br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+We now extract the node with the highest closeness.
+
+```{r nstat4b, message=F, warning=F}
+names(igraph::closeness(dgg))[which(igraph::closeness(dgg) == max(igraph::closeness(dgg)))]
+```
+
+
+***
+
+[Back to LADAL](https://ladal.edu.au/net.html)
+
+***
+
+
+
