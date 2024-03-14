@@ -43,6 +43,9 @@ extracttext <- function(x){
     # extract the 'text' column
     dplyr::pull(file) -> names(ctext)
   
+  # add file extension
+  names(ctext) <- paste0(names(ctext), ".txt")
+  
   # return result
   return(ctext)
 
