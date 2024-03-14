@@ -44,54 +44,17 @@ str(text)
 
 ## Reformatting
 
-In a first step, we generate file names from the paths. 
+Now, we convert the text(s) into a data frame. 
 
 ```{r}
-# extract names of texts
-nms <- names(texts) %>%
-  stringr::str_remove_all(".*/") %>%
-  stringr::str_remove_all(".txt")
-# inspect names
-nms
+# load function that helps loading texts
+source("https://slcladal.github.io/rscripts/formattext.R")
+# load texts
+text_df <- formattext(text)
+# inspect the structure of the text object
+str(text_df)
 ```
 
-Now, we split the text into speech units (this is optional).
-
-```{r}
-# replace instances of "<[S|s]1[A|a]" with "~~~<S1A", split the resulting text
-texts_split <- stringr::str_replace_all(texts, "<[S|s]1[A|a]", "~~~<S1A") %>%
-  stringr::str_split("~~~")
-# inspect
-str(texts_split)
-```
-
-The text now is in a list format which each speech unit being an element in the list.
-
-We now repeat the names as often as there are elements in the list items because we want to create a data frame with the file, the original text, and the clean text.
-
-```{r}
-# extract how many items are in each text
-lngth <- sapply(texts_split, function(x) length(x) )
-# repeat name as many times as there are elements
-files <- rep(nms, lngth) 
-# inspect
-table(files)
-```
-
-We now clean the split test.
-
-```{r}
-# create a data frame of split texts
-stexts <- unlist(texts_split) %>% tibble()
-# add the file names
-stexts_df <- data.frame(files, stexts) %>%
-  # add column names
-  dplyr::rename(file = 1, 
-                text = 2)
-# inspect the first 10 rows of the created data frame
-head(stexts_df, 10)
-
-```
 
 ## Cleaning
 
@@ -102,28 +65,29 @@ Now that we've organized the data into a tabular format, the cleaning process be
 + while `str_replace_all` additionally needs information on the replacement pattern for the specified pattern.  
 
 ```{r}
-# create a data frame with 'id', 'file', 'speaker', and 'text' columns
-stexts_df %>%
+# create a data frame with 'file' and 'text' columns
+text_df %>%
   
   # # clean 'text' column by removing "<.*?>"
   dplyr::mutate(text_clean = stringr::str_remove_all(text, "<.*?>"),
                 
-                # convert 't_clean' to lower case)
+                # convert clean text to lower case)
                 text_clean = tolower(text_clean)) -> clean_df  # assign the result to 'clean_df'
   
 # inspect the first 10 rows of the cleaned data frame
 head(clean_df, 10)
-
 ```
 
-With the data now arranged in tabular form, the cleaning process becomes straightforward. In the subsequent step, we aggregate the cleaned texts from the 'text_clean' column by file, ensuring we obtain a single consolidated clean text for each file. After this, we extract the cleaned text and store it in an object named 'ctexts.'
+## Extract text
+
+Now, we aggregate the cleaned texts from the 'text_clean' column by file, ensuring we obtain a single consolidated clean text for each file. After this, we extract the cleaned text and store it in an object named 'ctexts.'
 
 ```{r}
-# group the 'clean_df' dataframe by 'corpus' and 'file'
+# group the 'clean_df' data frame by 'file'
 clean_df %>%
   dplyr::group_by(file) %>%
   
-  # concatenate the cleaned text ('t_clean') into a single string for each group
+  # concatenate the cleaned text into a single string for each group
   dplyr::summarise(text = paste0(text_clean, collapse = " ")) %>%
   
   # remove grouping
@@ -131,9 +95,6 @@ clean_df %>%
   
   # extract the 'text' column
   dplyr::pull(text) %>%
-  
-  # convert the text to lowercase
-  tolower() %>%
   
   # remove extra spaces in the resulting character vector
   stringr::str_squish() -> ctexts  # Assign the cleaned and formatted text to 'ctexts'
