@@ -1,7 +1,8 @@
 # load and format xlsx for network analysis
 
 # required packages
-required(readxl)
+require(readxl)
+require(here)
 
 loadnetdata <- function(x){
   fls <- list.files(here::here(x), # path to the corpus data
