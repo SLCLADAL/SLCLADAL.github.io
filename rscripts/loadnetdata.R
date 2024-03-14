@@ -13,12 +13,7 @@ loadnetdata <- function(x){
   fls <- fls[!stringr::str_detect(fls, "test.xlsx")]
   
   # loop over the vector 'myfiles' that contains paths to the data
-  dat <- sapply(fls, function(y){
-    
-    # read the content of each file using 'read_xlsx' from the 'readxl' package
-    y <- readxl::read_xlsx(y) 
-    })
- 
+  dat <- readxl::read_xlsx(fls) 
 
   # add row names
   rownames(dat) <- colnames(dat)
