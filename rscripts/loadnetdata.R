@@ -9,12 +9,16 @@ loadnetdata <- function(x){
                     # full paths - not just the names of the files
                     full.names = T) 
   
+  # select own data (not test data)
+  fls <- fls[2]
+  
   # loop over the vector 'myfiles' that contains paths to the data
   dat <- sapply(fls, function(y){
     
     # read the content of each file using 'read_xlsx' from the 'readxl' package
     y <- readxl::read_xlsx(y) 
     })
+ 
 
   # add row names
   rownames(dat) <- colnames(dat)
