@@ -6,6 +6,7 @@ require(udpipe)
 postag <- function(x, language){
   m <- udpipe::udpipe_load_model(udpipe::udpipe_download_model(language = language))
 
+  # perform pos-tagging
   pos <- sapply(x, function(i){
     udpipe::udpipe_annotate(m, x = i) %>%
     as.data.frame() %>%
@@ -16,6 +17,7 @@ postag <- function(x, language){
   })
   
   # add names
+  names(pos) <- stringr::str_replace_all(names(pos), ".*/")
   names(pos) <- ifelse(is.null(names(pos)) == TRUE, 
                                 paste0("text", 
                                        stringr::str_pad(1:length(pos), 
