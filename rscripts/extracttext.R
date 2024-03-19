@@ -31,7 +31,7 @@ extracttext <- function(x){
   # extract names
   x %>%
     
-    # froup by file
+    # group by file
     dplyr::group_by(file) %>%
     
     # concatenate the cleaned text into a single string for each group
