@@ -6,13 +6,15 @@ require(udpipe)
 postag <- function(x, language){
   m <- udpipe::udpipe_load_model(udpipe::udpipe_download_model(language = language))
 
-  udpipe::udpipe_annotate(m, x = x) %>%
+  pos <- sapply(x, function(i){
+    udpipe::udpipe_annotate(m, x = i) %>%
     as.data.frame() %>%
     dplyr::group_by(doc_id) %>%
     dplyr::summarise(postagged = paste(token, "/", xpos, collapse = " ", sep = "")) %>%
-    dplyr::pull(postagged) -> pos
+    dplyr::pull(postagged)
   # inspect tagged text
   return(pos)
+  })
 }
 
 # test

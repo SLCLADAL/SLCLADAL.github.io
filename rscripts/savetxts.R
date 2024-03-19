@@ -1,4 +1,4 @@
-# save result to disc
+# save texts to disc
 # Use lapply to iterate over the indices of x
 # and write each text to a separate file in the MyOutput folder
 
@@ -11,7 +11,10 @@ savetxts <- function(x){
     
     # add names
     names(text_content) <- ifelse(is.null(names(text_content)) == TRUE, 
-                                  paste0("text", stringr::str_pad(1:length(text_content), nchar(max(length(text_content))), pad = "0")),
+                                  paste0("text", 
+                                         stringr::str_pad(1:length(text_content), 
+                                                          width = nchar(max(length(text_content))), 
+                                                          pad = "0")),
                                   names(text_content))
     
     # construct the file path using the 'here' package
