@@ -7,7 +7,7 @@ postag <- function(x, language){
   m <- udpipe::udpipe_load_model(udpipe::udpipe_download_model(language = language))
 
   # perform pos-tagging
-  pos <- lapply(x, function(i){
+  pos <- sapply(x, function(i){
     udpipe::udpipe_annotate(m, x = i) %>%
     as.data.frame() %>%
     dplyr::group_by(doc_id) %>%
