@@ -17,14 +17,14 @@ postag <- function(x, language){
   })
   
   # add names
-  names(pos) <- stringr::str_remove_all(names(pos), ".*/")
-  names(pos) <- paste0(names(pos), ".txt")
-  names(pos) <- ifelse(is.null(names(pos)) == TRUE, 
-                                paste0("text", 
-                                       stringr::str_pad(1:length(pos), 
-                                                        width = nchar(max(length(pos))), 
-                                                        pad = "0"), ".txt"),
-                                names(pos))
+  #names(pos) <- stringr::str_remove_all(names(pos), ".*/")
+  #names(pos) <- paste0(names(pos), ".txt")
+  #names(pos) <- ifelse(is.null(names(pos)) == TRUE, 
+  #                              paste0("text", 
+  #                                     stringr::str_pad(1:length(pos), 
+  #                                                      width = nchar(max(length(pos))), 
+  #                                                      pad = "0"), ".txt"),
+  #                              names(pos))
   
   # return tagged text
   return(pos)

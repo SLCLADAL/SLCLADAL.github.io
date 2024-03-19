@@ -29,6 +29,9 @@ loadtxts <- function(x){
     x <- stringr::str_squish(x)
     })
   
+  # clean names
+  names(txts) <- stringr::str_remove_all(names(txts), ".*/")
+  
   # inspect the structure of the text object
   return(txts)
 }
