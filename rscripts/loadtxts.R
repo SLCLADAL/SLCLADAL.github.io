@@ -8,6 +8,9 @@ loadtxts <- function(x){
                     
                     # full paths - not just the names of the files
                     full.names = T) 
+  #remove test.txt from file list
+  fls <- fls[!stringr::str_detect(".*test.txt")]
+  
   # loop over the vector 'myfiles' that contains paths to the data
   txts <- sapply(fls, function(x){
     
