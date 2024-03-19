@@ -12,9 +12,11 @@ postag <- function(x, language){
     dplyr::group_by(doc_id) %>%
     dplyr::summarise(postagged = paste(token, "/", xpos, collapse = " ", sep = "")) %>%
     dplyr::pull(postagged)
-  # inspect tagged text
-  return(pos)
+
   })
+  
+  # return tagged text
+  return(pos)
 }
 
 # test
