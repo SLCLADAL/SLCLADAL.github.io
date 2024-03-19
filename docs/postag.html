@@ -11,11 +11,11 @@
 
 <meta name="author" content="Martin Schweinberger" />
 
-<meta name="date" content="2023-04-06" />
+<meta name="date" content="2024-03-19" />
 
 <title>Part-of-Speech Tagging and Dependency Parsing with R</title>
 
-<script src="site_libs/header-attrs-2.14/header-attrs.js"></script>
+<script src="site_libs/header-attrs-2.25/header-attrs.js"></script>
 <script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
@@ -31,14 +31,14 @@
        h6 {font-size: 12px;}
        code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
        pre:not([class]) { background-color: white }</style>
-<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
 <link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
 <script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
 <script src="site_libs/navigation-1.1/tabsets.js"></script>
 <link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
 <script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
-<link href="site_libs/tabwid-1.0.0/tabwid.css" rel="stylesheet" />
-<link href="site_libs/tabwid-1.0.0/scrool.css" rel="stylesheet" />
+<link href="site_libs/tabwid-1.1.3/tabwid.css" rel="stylesheet" />
+<script src="site_libs/tabwid-1.1.3/tabwid.js"></script>
 <script src="site_libs/clipboard-1.7.1/clipboard.min.js"></script>
 <link href="site_libs/primer-tooltips-1.4.0/build.css" rel="stylesheet" />
 <link href="site_libs/klippy-0.0.0.9500/css/klippy.min.css" rel="stylesheet" />
@@ -79,6 +79,28 @@ if (window.hljs) {
 
 
 
+<style type="text/css">
+/* for pandoc --citeproc since 2.11 */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}
+</style>
 
 
 
@@ -163,11 +185,15 @@ $(document).ready(function () {
     href = "index.html";
   var menuAnchor = $('a[href="' + href + '"]');
 
-  // mark it active
-  menuAnchor.tab('show');
-
-  // if it's got a parent navbar menu mark it active as well
-  menuAnchor.closest('li.dropdown').addClass('active');
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
 
   // Navbar adjustments
   var navHeight = $(".navbar").first().height() + 15;
@@ -196,8 +222,8 @@ $(document).ready(function () {
   border-radius: 4px;
 }
 
-.tabset-dropdown > .nav-tabs > li.active:before {
-  content: "";
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
   font-family: 'Glyphicons Halflings';
   display: inline-block;
   padding: 10px;
@@ -205,16 +231,9 @@ $(document).ready(function () {
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
-  content: "&#xe258;";
-  border: none;
-}
-
-.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
-  content: "";
+  content: "\e258";
   font-family: 'Glyphicons Halflings';
-  display: inline-block;
-  padding: 10px;
-  border-right: 1px solid #ddd;
+  border: none;
 }
 
 .tabset-dropdown > .nav-tabs > li.active {
@@ -427,111 +446,198 @@ div.tocify {
 
 
 
-<h1 class="title toc-ignore">Part-of-Speech Tagging and Dependency Parsing with R</h1>
+<h1 class="title toc-ignore">Part-of-Speech Tagging and Dependency
+Parsing with R</h1>
 <h4 class="author">Martin Schweinberger</h4>
-<h4 class="date">2023-04-06</h4>
+<h4 class="date">2024-03-19</h4>
 
 </div>
 
 
 <p><img src="https://slcladal.github.io/images/uq1.jpg" width="100%" /></p>
-<div id="introduction" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Introduction</h1>
+<div id="introduction" class="section level1 unnumbered">
+<h1 class="unnumbered">Introduction</h1>
 <p><img src="https://slcladal.github.io/images/gy_chili.jpg" width="15%" style="float:right; padding:10px" /></p>
-<p>This tutorial introduces part-of-speech tagging and syntactic parsing using R. This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to annotate textual data with part-of-speech (pos) tags and how to syntactically parse textual data using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with pos-tagging and syntactic parsing. Another highly recommendable tutorial on part-of-speech tagging in R with UDPipe is available <a href="https://bnosac.github.io/udpipe/en/">here</a> and another tutorial on pos-tagging and syntactic parsing by Andreas Niekler and Gregor Wiedemann can be found <a href="https://tm4ss.github.io/docs/Tutorial_8_NER_POS.html">here</a> <span class="citation">(see Wiedemann and Niekler <a href="#ref-WN17" role="doc-biblioref">2017</a>)</span>.</p>
-<div class="warning" style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
+<p>This tutorial introduces part-of-speech tagging and syntactic parsing
+using R. This tutorial is aimed at beginners and intermediate users of R
+with the aim of showcasing how to annotate textual data with
+part-of-speech (pos) tags and how to syntactically parse textual data
+using R. The aim is not to provide a fully-fledged analysis but rather
+to show and exemplify selected useful methods associated with
+pos-tagging and syntactic parsing. Another highly recommendable tutorial
+on part-of-speech tagging in R with UDPipe is available <a
+href="https://bnosac.github.io/udpipe/en/">here</a> and another tutorial
+on pos-tagging and syntactic parsing by Andreas Niekler and Gregor
+Wiedemann can be found <a
+href="https://tm4ss.github.io/docs/Tutorial_8_NER_POS.html">here</a>
+<span class="citation">(see <a href="#ref-WN17">Wiedemann and Niekler
+2017</a>)</span>.</p>
+<div class="warning"
+style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
 <span>
 <p style="margin-top:1em; text-align:center">
-The entire R Notebook for the tutorial can be downloaded <a href="https://slcladal.github.io/content/postag.Rmd"><strong>here</strong></a>. If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the <a href="https://slcladal.github.io/content/bibliography.bib"><strong>bibliography file</strong></a> and store it in the same folder where you store the Rmd file. <br><br> <a href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fpostag_cb.ipynb%26branch%3Dmain"><img src="https://mybinder.org/badge_logo.svg" alt="Binder" /></a><br> <a href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fpostag_cb.ipynb%26branch%3Dmain"><strong>Click this link to open an interactive version of this tutorial on MyBinder.org</strong></a>. <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+The entire R Notebook for the tutorial can be downloaded <a
+href="https://slcladal.github.io/content/postag.Rmd"><strong>here</strong></a>.
+If you want to render the R Notebook on your machine, i.e. knitting the
+document to html or a pdf, you need to make sure that you have R and
+RStudio installed and you also need to download the <a
+href="https://slcladal.github.io/content/bibliography.bib"><strong>bibliography
+file</strong></a> and store it in the same folder where you store the
+Rmd file. <br><br> <a
+href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fpostag_cb.ipynb%26branch%3Dmain"><img
+src="https://mybinder.org/badge_logo.svg" alt="Binder" /></a><br> <a
+href="https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fpostag_cb.ipynb%26branch%3Dmain"><strong>Click
+this link to open an interactive version of this tutorial on
+MyBinder.org</strong></a>. <br> This interactive Jupyter notebook allows
+you to execute code yourself and you can also change and edit the
+notebook, e.g. you can change code and upload your own data. <br>
 </p>
 <p style="margin-left:1em;">
 </p>
 <p></span></p>
 </div>
 <p><br></p>
+<div class="warning"
+style="padding:0.1em; background-color:#51247a; color:#f2f2f2">
+<span>
+<p style="margin-top:1em; text-align:center">
+<strong>LADAL TOOL</strong>
+</p>
+<p style="margin-top:1em; text-align:center">
+Click on this <a
+href="https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fpostool.ipynb%26branch%3Dmain"><img
+src="https://mybinder.org/badge_logo.svg" alt="Binder" /></a> badge to
+open an notebook-based tool <br> that allows you upload your own
+text(s), pos-tag them and download the resulting pos-tagged texts.
+</p>
+<br>
+<p style="margin-left:1em;">
+</p>
+<p></span></p>
 </div>
-<div id="part-of-speech-tagging" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Part-Of-Speech Tagging</h1>
-<p>Many analyses of language data require that we distinguish different parts of speech. In order to determine the word class of a certain word, we use a procedure which is called part-of-speech tagging (commonly referred to as pos-, pos-, or PoS-tagging). pos-tagging is a common procedure when working with natural language data. Despite being used quite frequently, it is a rather complex issue that requires the application of statistical methods that are quite advanced. In the following, we will explore different options for pos-tagging and syntactic parsing.</p>
-<p>Parts-of-speech, or word categories, refer to the grammatical nature or category of a lexical item, e.g. in the sentence <em>Jane likes the girl</em> each lexical item can be classified according to whether it belongs to the group of determiners, verbs, nouns, etc. pos-tagging refers to a (computation) process in which information is added to existing text. This process is also called <em>annotation</em>. Annotation can be very different depending on the task at hand. The most common type of annotation when it comes to language data is part-of-speech tagging where the word class is determined for each word in a text and the word class is then added to the word as a tag. However, there are many different ways to tag or annotate texts.</p>
-<p>Pos–tagging assigns part-of-speech tags to character strings (these represent mostly words, of course, but also encompass punctuation marks and other elements). This means that pos–tagging is one specific type of annotation, i.e. adding information to data (either by directly adding information to the data itself or by storing information in e.g. a list which is linked to the data). It is important to note that annotation encompasses various types of information such as pauses, overlap, etc. pos–tagging is just one of these many ways in which corpus data can be <em>enriched</em>. Sentiment Analysis, for instance, also annotates texts or words with respect to its or their emotional value or polarity.</p>
-<p>Annotation is required in many machine-learning contexts because annotated texts are commonly used as training sets on which machine learning or deep learning models are trained that then predict, for unknown words or texts, what values they would most likely be assigned if the annotation were done manually. Also, it should be mentioned that by many online services offer pos-tagging (e.g. <a href="http://www.infogistics.com/posdemo.htm">here</a> or <a href="https://linguakit.com/en/part-of-speech-tagging">here</a>.</p>
-<p>When pos–tagged, the example sentence could look like the example below.</p>
+<p><br></p>
+</div>
+<div id="part-of-speech-tagging" class="section level1 unnumbered">
+<h1 class="unnumbered">Part-Of-Speech Tagging</h1>
+<p>Many analyses of language data require that we distinguish different
+parts of speech. In order to determine the word class of a certain word,
+we use a procedure which is called part-of-speech tagging (commonly
+referred to as pos-, pos-, or PoS-tagging). pos-tagging is a common
+procedure when working with natural language data. Despite being used
+quite frequently, it is a rather complex issue that requires the
+application of statistical methods that are quite advanced. In the
+following, we will explore different options for pos-tagging and
+syntactic parsing.</p>
+<p>Parts-of-speech, or word categories, refer to the grammatical nature
+or category of a lexical item, e.g. in the sentence <em>Jane likes the
+girl</em> each lexical item can be classified according to whether it
+belongs to the group of determiners, verbs, nouns, etc. pos-tagging
+refers to a (computation) process in which information is added to
+existing text. This process is also called <em>annotation</em>.
+Annotation can be very different depending on the task at hand. The most
+common type of annotation when it comes to language data is
+part-of-speech tagging where the word class is determined for each word
+in a text and the word class is then added to the word as a tag.
+However, there are many different ways to tag or annotate texts.</p>
+<p>Pos–tagging assigns part-of-speech tags to character strings (these
+represent mostly words, of course, but also encompass punctuation marks
+and other elements). This means that pos–tagging is one specific type of
+annotation, i.e. adding information to data (either by directly adding
+information to the data itself or by storing information in e.g. a list
+which is linked to the data). It is important to note that annotation
+encompasses various types of information such as pauses, overlap, etc.
+pos–tagging is just one of these many ways in which corpus data can be
+<em>enriched</em>. Sentiment Analysis, for instance, also annotates
+texts or words with respect to its or their emotional value or
+polarity.</p>
+<p>Annotation is required in many machine-learning contexts because
+annotated texts are commonly used as training sets on which machine
+learning or deep learning models are trained that then predict, for
+unknown words or texts, what values they would most likely be assigned
+if the annotation were done manually. Also, it should be mentioned that
+by many online services offer pos-tagging (e.g. <a
+href="http://www.infogistics.com/posdemo.htm">here</a> or <a
+href="https://linguakit.com/en/part-of-speech-tagging">here</a>.</p>
+<p>When pos–tagged, the example sentence could look like the example
+below.</p>
 <ol style="list-style-type: decimal">
 <li>Jane/NNP likes/VBZ the/DT girl/NN</li>
 </ol>
-<p>In the example above, <code>NNP</code> stands for proper noun (singular), <code>VBZ</code> stands for 3rd person singular present tense verb, <code>DT</code> for determiner, and <code>NN</code> for noun(singular or mass). The pos-tags used by the <code>openNLPpackage</code> are the <a href="https://dpdearing.com/posts/2011/12/opennlp-part-of-speech-pos-tags-penn-english-treebank/">Penn English Treebank pos-tags</a>. A more elaborate description of the tags can be found here which is summarised below:</p>
-<template id="d338445c-48e1-443f-9aba-1b6fddd410fb"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-.katex-display {
-    margin: 0 0 !important;
-}
-</style><div class="tabwid"><style>.cl-87618206{table-layout:auto;width:95%;}.cl-875df44c{font-family:'DejaVu Sans';font-size:10pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-875df456{font-family:'DejaVu Sans';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-875dfe4c{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-875e1e36{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e37{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e38{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e40{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e41{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e42{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e43{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e4a{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e4b{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e4c{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e4d{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-875e1e4e{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-87618206'>
-<caption class="Table Caption">
-<p>Overview of Penn English Treebank part-of-speech tags.</p>
-</caption>
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-875e1e4e"><p class="cl-875dfe4c"><span class="cl-875df44c">Tag</span></p></td><td class="cl-875e1e4d"><p class="cl-875dfe4c"><span class="cl-875df44c">Description</span></p></td><td class="cl-875e1e4c"><p class="cl-875dfe4c"><span class="cl-875df44c">Examples</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">CC</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Coordinating conjunction</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">and, or, but</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">CD</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Cardinal number</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">one, two, three</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">DT</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Determiner</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">a, the</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">EX</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Existential there</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">There/EX was a party in progress</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">FW</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Foreign word</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">persona/FW non/FW grata/FW</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">IN</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Preposition or subordinating con</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">uh, well, yes</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">JJ</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Adjective</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">good, bad, ugly</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">JJR</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Adjective, comparative</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">better, nicer</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">JJS</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Adjective, superlative</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">best, nicest</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">LS</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">List item marker</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">a., b., 1., 2.</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">MD</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Modal</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">can, would, will</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">NN</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Noun, singular or mass</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">tree, chair</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">NNS</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Noun, plural</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">trees, chairs</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">NNP</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Proper noun, singular</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">John, Paul, CIA</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">NNPS</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Proper noun, plural</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">Johns, Pauls, CIAs</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">PDT</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Predeterminer</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">all/PDT this marble, many/PDT a soul</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">POS</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Possessive ending</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">John/NNP 's/POS, the parentss/NNP '/POS distress</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">PRP</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Personal pronoun</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">I, you, he</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">PRP$</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Possessive pronoun</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">mine, yours</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">RB</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Adverb</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">evry, enough, not</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">RBR</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Adverb, comparative</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">later</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">RBS</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Adverb, superlative</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">latest</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">RP</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Particle</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">RP</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">SYM</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Symbol</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">CO2</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">TO</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">to</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">to</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">UH</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Interjection</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">uhm, uh</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">VB</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Verb, base form</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">go, walk</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">VBD</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Verb, past tense</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">walked, saw</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">VBG</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Verb, gerund or present particip</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">walking, seeing</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">VBN</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Verb, past participle</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">walked, thought</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">VBP</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Verb, non-3rd person singular pr</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">walk, think</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">VBZ</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Verb, 3rd person singular presen</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">walks, thinks</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">WDT</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Wh-determiner</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">which, that</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e42"><p class="cl-875dfe4c"><span class="cl-875df456">WP</span></p></td><td class="cl-875e1e40"><p class="cl-875dfe4c"><span class="cl-875df456">Wh-pronoun</span></p></td><td class="cl-875e1e41"><p class="cl-875dfe4c"><span class="cl-875df456">what, who, whom (wh-pronoun)</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e36"><p class="cl-875dfe4c"><span class="cl-875df456">WP$</span></p></td><td class="cl-875e1e38"><p class="cl-875dfe4c"><span class="cl-875df456">Possessive wh-pronoun</span></p></td><td class="cl-875e1e37"><p class="cl-875dfe4c"><span class="cl-875df456">whose, who (wh-words)</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-875e1e43"><p class="cl-875dfe4c"><span class="cl-875df456">WRB</span></p></td><td class="cl-875e1e4b"><p class="cl-875dfe4c"><span class="cl-875df456">Wh-adverb</span></p></td><td class="cl-875e1e4a"><p class="cl-875dfe4c"><span class="cl-875df456">how, where, why (wh-adverb)</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="714473ab-b8d8-4c50-89d6-aadf21e0ca5e"></div>
-<script>
-var dest = document.getElementById("714473ab-b8d8-4c50-89d6-aadf21e0ca5e");
-var template = document.getElementById("d338445c-48e1-443f-9aba-1b6fddd410fb");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
-<p>Assigning these pos-tags to words appears to be rather straight forward. However, pos-tagging is quite complex and there are various ways by which a computer can be trained to assign pos-tags. For example, one could use orthographic or morphological information to devise rules such as. . .</p>
+<p>In the example above, <code>NNP</code> stands for proper noun
+(singular), <code>VBZ</code> stands for 3rd person singular present
+tense verb, <code>DT</code> for determiner, and <code>NN</code> for
+noun(singular or mass). The pos-tags used by the
+<code>openNLPpackage</code> are the <a
+href="https://dpdearing.com/posts/2011/12/opennlp-part-of-speech-pos-tags-penn-english-treebank/">Penn
+English Treebank pos-tags</a>. A more elaborate description of the tags
+can be found here which is summarised below:</p>
+<div class="tabwid"><style>.cl-3a929e92{table-layout:auto;width:95%;}.cl-3a82b00e{font-family:'Arial';font-size:10pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-3a82b022{font-family:'Arial';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-3a8778dc{margin:0;text-align:center;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-3a879880{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a87988a{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a879894{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a879895{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a879896{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a87989e{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a87989f{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a8798a0{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a8798a8{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a8798a9{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a8798b2{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3a8798b3{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing='true' class='cl-3a929e92'><caption style="display:table-caption;margin:0pt;text-align:center;border-bottom: 0.00pt solid transparent;border-top: 0.00pt solid transparent;border-left: 0.00pt solid transparent;border-right: 0.00pt solid transparent;padding-top:3pt;padding-bottom:3pt;padding-left:3pt;padding-right:3pt;line-height: 1;background-color:transparent;"><span>Overview of Penn English Treebank part-of-speech tags.</span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-3a879880"><p class="cl-3a8778dc"><span class="cl-3a82b00e">Tag</span></p></th><th class="cl-3a87988a"><p class="cl-3a8778dc"><span class="cl-3a82b00e">Description</span></p></th><th class="cl-3a879894"><p class="cl-3a8778dc"><span class="cl-3a82b00e">Examples</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">CC</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Coordinating conjunction</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">and, or, but</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">CD</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Cardinal number</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">one, two, three</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">DT</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Determiner</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">a, the</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">EX</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Existential there</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">There/EX was a party in progress</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">FW</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Foreign word</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">persona/FW non/FW grata/FW</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">IN</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Preposition or subordinating con</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">uh, well, yes</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">JJ</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Adjective</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">good, bad, ugly</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">JJR</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Adjective, comparative</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">better, nicer</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">JJS</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Adjective, superlative</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">best, nicest</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">LS</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">List item marker</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">a., b., 1., 2.</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">MD</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Modal</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">can, would, will</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">NN</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Noun, singular or mass</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">tree, chair</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">NNS</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Noun, plural</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">trees, chairs</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">NNP</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Proper noun, singular</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">John, Paul, CIA</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">NNPS</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Proper noun, plural</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">Johns, Pauls, CIAs</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">PDT</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Predeterminer</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">all/PDT this marble, many/PDT a soul</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">POS</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Possessive ending</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">John/NNP 's/POS, the parentss/NNP '/POS distress</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">PRP</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Personal pronoun</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">I, you, he</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">PRP$</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Possessive pronoun</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">mine, yours</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">RB</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Adverb</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">evry, enough, not</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">RBR</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Adverb, comparative</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">later</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">RBS</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Adverb, superlative</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">latest</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">RP</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Particle</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">RP</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">SYM</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Symbol</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">CO2</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">TO</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">to</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">to</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">UH</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Interjection</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">uhm, uh</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">VB</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Verb, base form</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">go, walk</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">VBD</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Verb, past tense</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">walked, saw</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">VBG</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Verb, gerund or present particip</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">walking, seeing</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">VBN</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Verb, past participle</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">walked, thought</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">VBP</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Verb, non-3rd person singular pr</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">walk, think</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">VBZ</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Verb, 3rd person singular presen</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">walks, thinks</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">WDT</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Wh-determiner</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">which, that</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a87989f"><p class="cl-3a8778dc"><span class="cl-3a82b022">WP</span></p></td><td class="cl-3a8798a0"><p class="cl-3a8778dc"><span class="cl-3a82b022">Wh-pronoun</span></p></td><td class="cl-3a8798a8"><p class="cl-3a8778dc"><span class="cl-3a82b022">what, who, whom (wh-pronoun)</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a879895"><p class="cl-3a8778dc"><span class="cl-3a82b022">WP$</span></p></td><td class="cl-3a879896"><p class="cl-3a8778dc"><span class="cl-3a82b022">Possessive wh-pronoun</span></p></td><td class="cl-3a87989e"><p class="cl-3a8778dc"><span class="cl-3a82b022">whose, who (wh-words)</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3a8798a9"><p class="cl-3a8778dc"><span class="cl-3a82b022">WRB</span></p></td><td class="cl-3a8798b2"><p class="cl-3a8778dc"><span class="cl-3a82b022">Wh-adverb</span></p></td><td class="cl-3a8798b3"><p class="cl-3a8778dc"><span class="cl-3a82b022">how, where, why (wh-adverb)</span></p></td></tr></tbody></table></div>
+<p>Assigning these pos-tags to words appears to be rather straight
+forward. However, pos-tagging is quite complex and there are various
+ways by which a computer can be trained to assign pos-tags. For example,
+one could use orthographic or morphological information to devise rules
+such as. . .</p>
 <ul>
-<li><p>If a word ends in <em>ment</em>, assign the pos-tag <code>NN</code> (for common noun)</p></li>
-<li><p>If a word does not occur at the beginning of a sentence but is capitalized, assign the pos-tag <code>NNP</code> (for proper noun)</p></li>
+<li><p>If a word ends in <em>ment</em>, assign the pos-tag
+<code>NN</code> (for common noun)</p></li>
+<li><p>If a word does not occur at the beginning of a sentence but is
+capitalized, assign the pos-tag <code>NNP</code> (for proper
+noun)</p></li>
 </ul>
-<p>Using such rules has the disadvantage that pos-tags can only be assigned to a relatively small number of words as most words will be ambiguous – think of the similarity of the English plural (-<em>(e)s</em>) and the English 3<sup>rd</sup> person, present tense indicative morpheme (-<em>(e)s</em>), for instance, which are orthographically identical.Another option would be to use a dictionary in which each word is as-signed a certain pos-tag and a program could assign the pos-tag if the word occurs in a given text. This procedure has the disadvantage that most words belong to more than one word class and pos-tagging would thus have to rely on additional information.The problem of words that belong to more than one word class can partly be remedied by including contextual information such as. .</p>
+<p>Using such rules has the disadvantage that pos-tags can only be
+assigned to a relatively small number of words as most words will be
+ambiguous – think of the similarity of the English plural
+(-<em>(e)s</em>) and the English 3<sup>rd</sup> person, present tense
+indicative morpheme (-<em>(e)s</em>), for instance, which are
+orthographically identical.Another option would be to use a dictionary
+in which each word is as-signed a certain pos-tag and a program could
+assign the pos-tag if the word occurs in a given text. This procedure
+has the disadvantage that most words belong to more than one word class
+and pos-tagging would thus have to rely on additional information.The
+problem of words that belong to more than one word class can partly be
+remedied by including contextual information such as. .</p>
 <ul>
-<li>If the previous word is a determiner and the following word is a common noun, assign the pos-tag <code>JJ</code> (for a common adjective)</li>
+<li>If the previous word is a determiner and the following word is a
+common noun, assign the pos-tag <code>JJ</code> (for a common
+adjective)</li>
 </ul>
-<p>This procedure works quite well but there are still better options.The best way to pos-tag a text is to create a manually annotated training set which resembles the language variety at hand. Based on the frequency of the association between a given word and the pos-tags it is assigned in the training data, it is possible to tag a word with the pos-tag that is most often assigned to the given word in the training data.All of the above methods can and should be optimized by combining them and additionally including pos–n–grams, i.e. determining a pos-tag of an unknown word based on which sequence of pos-tags is most similar to the sequence at hand and also most common in the training data.This introduction is extremely superficial and only intends to scratch some of the basic procedures that pos-tagging relies on. The interested reader is referred to introductions on machine learning and pos-tagging such as e.g.https://class.coursera.org/nlp/lecture/149.</p>
-<p>There are several different R packages that assist with pos-tagging texts <span class="citation">(see Kumar and Paul <a href="#ref-kumar2016mastering" role="doc-biblioref">2016</a>)</span>. In this tutorial, we will use the <code>udpipe</code> <span class="citation">(Wijffels <a href="#ref-udpipe" role="doc-biblioref">2021</a>)</span> and the <code>openNLP</code> packages <span class="citation">(Hornik <a href="#ref-opennlp" role="doc-biblioref">2019</a>)</span>. Each of these has advantages and shortcomings and it is advantageous to try which result best matches one’s needs. That said, the <code>udpipe</code> package is really great as it is easy to use, covers a wide range of languages, is very flexible, and very accurate.</p>
+<p>This procedure works quite well but there are still better
+options.The best way to pos-tag a text is to create a manually annotated
+training set which resembles the language variety at hand. Based on the
+frequency of the association between a given word and the pos-tags it is
+assigned in the training data, it is possible to tag a word with the
+pos-tag that is most often assigned to the given word in the training
+data.All of the above methods can and should be optimized by combining
+them and additionally including pos–n–grams, i.e. determining a pos-tag
+of an unknown word based on which sequence of pos-tags is most similar
+to the sequence at hand and also most common in the training data.This
+introduction is extremely superficial and only intends to scratch some
+of the basic procedures that pos-tagging relies on. The interested
+reader is referred to introductions on machine learning and pos-tagging
+such as e.g.https://class.coursera.org/nlp/lecture/149.</p>
+<p>There are several different R packages that assist with pos-tagging
+texts <span class="citation">(see <a
+href="#ref-kumar2016mastering">Kumar and Paul 2016</a>)</span>. In this
+tutorial, we will use the <code>udpipe</code> <span class="citation">(<a
+href="#ref-udpipe">Wijffels 2021</a>)</span> and the
+<code>openNLP</code> packages <span class="citation">(<a
+href="#ref-opennlp">Hornik 2019</a>)</span>. Each of these has
+advantages and shortcomings and it is advantageous to try which result
+best matches one’s needs. That said, the <code>udpipe</code> package is
+really great as it is easy to use, covers a wide range of languages, is
+very flexible, and very accurate.</p>
 <p><strong>Preparation and session set up</strong></p>
-<p>This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R <a href="https://slcladal.github.io/intror.html">here</a>. For this tutorials, we need to install certain <em>packages</em> from an R <em>library</em> so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).</p>
+<p>This tutorial is based on R. If you have not installed R or are new
+to it, you will find an introduction to and more information how to use
+R <a href="https://slcladal.github.io/intror.html">here</a>. For this
+tutorials, we need to install certain <em>packages</em> from an R
+<em>library</em> so that the scripts shown below are executed without
+errors. Before turning to the code below, please install the packages by
+running the code below this paragraph. If you have already installed the
+packages mentioned below, then you can skip ahead ignore this section.
+To install the necessary packages, simply run the following code - it
+may take some time (between 1 and 5 minutes to install all of the
+libraries so you do not need to worry if it takes some time).</p>
 <pre class="r"><code># install packages
 install.packages(&quot;dplyr&quot;) 
 install.packages(&quot;stringr&quot;)
@@ -540,7 +646,8 @@ install.packages(&quot;flextable&quot;)
 # install klippy for copy-to-clipboard button in code chunks
 install.packages(&quot;remotes&quot;)
 remotes::install_github(&quot;rlesur/klippy&quot;)</code></pre>
-<p>Now that we have installed the packages, we activate them as shown below.</p>
+<p>Now that we have installed the packages, we activate them as shown
+below.</p>
 <pre class="r"><code># load packages
 library(dplyr)
 library(stringr) 
@@ -552,87 +659,51 @@ klippy::klippy()</code></pre>
   addClassKlippyTo("pre.r, pre.markdown");
   addKlippy('left', 'top', 'auto', '1', 'Copy code', 'Copied!');
 </script>
-<p>Once you have installed R and RStudio and initiated the session by executing the code shown above, you are good to go.</p>
+<p>Once you have installed R and RStudio and initiated the session by
+executing the code shown above, you are good to go.</p>
 </div>
-<div id="pos-tagging-with-udpipe" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">POS-Tagging with UDPipe</h1>
-<p>UDPipe was developed at the Charles University in Prague and the <code>udpipe</code> R package <span class="citation">(Wijffels <a href="#ref-udpipe" role="doc-biblioref">2021</a>)</span> is an extremely interesting and really fantastic package as it provides a very easy and handy way for language-agnostic tokenization, pos-tagging, lemmatization and dependency parsing of raw text in R. It is particularly handy because it addresses and remedies major shortcomings that previous methods for pos-tagging had, namely</p>
+<div id="pos-tagging-with-udpipe" class="section level1 unnumbered">
+<h1 class="unnumbered">POS-Tagging with UDPipe</h1>
+<p>UDPipe was developed at the Charles University in Prague and the
+<code>udpipe</code> R package <span class="citation">(<a
+href="#ref-udpipe">Wijffels 2021</a>)</span> is an extremely interesting
+and really fantastic package as it provides a very easy and handy way
+for language-agnostic tokenization, pos-tagging, lemmatization and
+dependency parsing of raw text in R. It is particularly handy because it
+addresses and remedies major shortcomings that previous methods for
+pos-tagging had, namely</p>
 <ul>
-<li>it offers a wide range of language models (64 languages at this point)</li>
-<li>it does not rely on external software (like, e.g., TreeTagger, that had to be installed separately and could be challenging when using different operating systems)</li>
-<li>it is really easy to implement as one only need to install and load the <code>udpipe</code> package and download and activate the language model one is interested in</li>
+<li>it offers a wide range of language models (64 languages at this
+point)</li>
+<li>it does not rely on external software (like, e.g., TreeTagger, that
+had to be installed separately and could be challenging when using
+different operating systems)</li>
+<li>it is really easy to implement as one only need to install and load
+the <code>udpipe</code> package and download and activate the language
+model one is interested in</li>
 <li>it allows to train and tune one’s own models rather easily</li>
 </ul>
 <p>The available pre-trained language models in UDPipe are:</p>
-<template id="4423d5b8-4baa-48ef-8463-01e11518f34b"><style>
-.tabwid table{
-  border-spacing:0px !important;
-  border-collapse:collapse;
-  line-height:1;
-  margin-left:auto;
-  margin-right:auto;
-  border-width: 0;
-  display: table;
-  margin-top: 1.275em;
-  margin-bottom: 1.275em;
-  border-color: transparent;
-}
-.tabwid_left table{
-  margin-left:0;
-}
-.tabwid_right table{
-  margin-right:0;
-}
-.tabwid td {
-    padding: 0;
-}
-.tabwid a {
-  text-decoration: none;
-}
-.tabwid thead {
-    background-color: transparent;
-}
-.tabwid tfoot {
-    background-color: transparent;
-}
-.tabwid table tr {
-background-color: transparent;
-}
-.katex-display {
-    margin: 0 0 !important;
-}
-</style><div class="tabwid"><style>.cl-87a90626{table-layout:auto;width:95%;}.cl-87a5ee00{font-family:'DejaVu Sans';font-size:10pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-87a5ee0a{font-family:'DejaVu Sans';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-87a5f670{margin:0;text-align:left;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-87a614a2{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614ac{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614ad{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614ae{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614af{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614b6{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614b7{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-87a614b8{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table class='cl-87a90626'>
-<caption class="Table Caption">
-<p>Languages and langauge modesl available via udpipe.</p>
-</caption>
-<thead><tr style="overflow-wrap:break-word;"><td class="cl-87a614b7"><p class="cl-87a5f670"><span class="cl-87a5ee00">Languages</span></p></td><td class="cl-87a614b8"><p class="cl-87a5f670"><span class="cl-87a5ee00">Models</span></p></td></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Afrikaans</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">afrikaans-afribooms</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Ancient Greek</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">ancient_greek-perseus, ancient_greek-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Arabic</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">arabic-padt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Armenian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">armenian-armtdp</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Basque</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">basque-bdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Belarusian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">belarusian-hse</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">bulgarian-btb</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">bulgarian-btb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Buryat</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">buryat-bdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Catalan</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">catalan-ancora</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Chinese</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">chinese-gsd, chinese-gsdsimp, classical_chinese-kyoto</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Coptic</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">coptic-scriptorium</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Croatian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">croatian-set</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Czech</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">czech-cac, czech-cltt, czech-fictree, czech-pdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Danish</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">danish-ddt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Dutch</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">dutch-alpino, dutch-lassysmall</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">English</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">english-ewt, english-gum, english-lines, english-partut</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Estonian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">estonian-edt, estonian-ewt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Finnish</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">finnish-ftb, finnish-tdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">French</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">french-gsd, french-partut, french-sequoia, french-spoken</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Galician</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">galician-ctg, galician-treegal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">German</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">german-gsd, german-hdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Gothic</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">gothic-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Greek</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">greek-gdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Hebrew</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">hebrew-htb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Hindi</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">hindi-hdtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Hungarian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">hungarian-szeged</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Indonesian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">indonesian-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Irish Gaelic</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">irish-idt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Italian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">italian-isdt, italian-partut, italian-postwita, italian-twittiro, italian-vit</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Japanese</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">japanese-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Kazakh</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">kazakh-ktb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Korean</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">korean-gsd, korean-kaist</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Kurmanji</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">kurmanji-mg</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Latin</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">latin-ittb, latin-perseus, latin-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Latvian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">latvian-lvtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Lithuanian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">lithuanian-alksnis, lithuanian-hse</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Maltese</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">maltese-mudt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Marathi</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">marathi-ufal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">North Sami</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">north_sami-giella</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Norwegian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">norwegian-bokmaal, norwegian-nynorsk, norwegian-nynorsklia</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Old Church Slavonic</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">old_church_slavonic-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Old French</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">old_french-srcmf</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Old Russian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">old_russian-torot</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Persian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">persian-seraji</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Polish</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">polish-lfg, polish-pdb, polish-sz</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Portugese</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">portuguese-bosque, portuguese-br, portuguese-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Romanian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">romanian-nonstandard, romanian-rrt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Russian</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">russian-gsd, russian-syntagrus, russian-taiga</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Sanskrit</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">sanskrit-ufal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Scottish Gaelic</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">scottish_gaelic-arcosg</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Serbian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">serbian-set</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Slovak</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">slovak-snk</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Slovenian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">slovenian-ssj, slovenian-sst</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Spanish</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">spanish-ancora, spanish-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Swedish</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">swedish-lines, swedish-talbanken</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Tamil</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">tamil-ttb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Telugu</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">telugu-mtg</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Turkish</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">turkish-imst</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Ukrainian</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">ukrainian-iu</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Upper Sorbia</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">upper_sorbian-ufal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Urdu</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">urdu-udtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ae"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Uyghur</span></p></td><td class="cl-87a614ad"><p class="cl-87a5f670"><span class="cl-87a5ee0a">uyghur-udt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614ac"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Vietnamese</span></p></td><td class="cl-87a614a2"><p class="cl-87a5f670"><span class="cl-87a5ee0a">vietnamese-vtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-87a614af"><p class="cl-87a5f670"><span class="cl-87a5ee0a">Wolof</span></p></td><td class="cl-87a614b6"><p class="cl-87a5f670"><span class="cl-87a5ee0a">wolof-wtb</span></p></td></tr></tbody></table></div></template>
-<div class="flextable-shadow-host" id="bff18d8e-8d0a-48e3-8d78-526db33c054d"></div>
-<script>
-var dest = document.getElementById("bff18d8e-8d0a-48e3-8d78-526db33c054d");
-var template = document.getElementById("4423d5b8-4baa-48ef-8463-01e11518f34b");
-var caption = template.content.querySelector("caption");
-if(caption) {
-  caption.style.cssText = "display:block;text-align:center;";
-  var newcapt = document.createElement("p");
-  newcapt.appendChild(caption)
-  dest.parentNode.insertBefore(newcapt, dest.previousSibling);
-}
-var fantome = dest.attachShadow({mode: 'open'});
-var templateContent = template.content;
-fantome.appendChild(templateContent);
-</script>
-
-<div class="warning" style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
+<div class="tabwid"><style>.cl-3b4a2882{table-layout:auto;width:95%;}.cl-3b3f5de4{font-family:'Arial';font-size:10pt;font-weight:bold;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-3b3f5dee{font-family:'Arial';font-size:10pt;font-weight:normal;font-style:normal;text-decoration:none;color:rgba(0, 0, 0, 1.00);background-color:transparent;}.cl-3b433c66{margin:0;text-align:left;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);padding-bottom:5pt;padding-top:5pt;padding-left:5pt;padding-right:5pt;line-height: 1;background-color:transparent;}.cl-3b435958{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b435962{background-color:rgba(207, 207, 207, 1.00);vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 1pt solid rgba(102, 102, 102, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b435963{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b43596c{background-color:rgba(239, 239, 239, 1.00);vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b43596d{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b43596e{background-color:transparent;vertical-align: middle;border-bottom: 0 solid rgba(0, 0, 0, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b435976{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 1pt solid rgba(102, 102, 102, 1.00);border-right: 0 solid rgba(0, 0, 0, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}.cl-3b435977{background-color:transparent;vertical-align: middle;border-bottom: 1pt solid rgba(102, 102, 102, 1.00);border-top: 0 solid rgba(0, 0, 0, 1.00);border-left: 0 solid rgba(0, 0, 0, 1.00);border-right: 1pt solid rgba(102, 102, 102, 1.00);margin-bottom:0;margin-top:0;margin-left:0;margin-right:0;}</style><table data-quarto-disable-processing='true' class='cl-3b4a2882'><caption style="display:table-caption;margin:0pt;text-align:center;border-bottom: 0.00pt solid transparent;border-top: 0.00pt solid transparent;border-left: 0.00pt solid transparent;border-right: 0.00pt solid transparent;padding-top:3pt;padding-bottom:3pt;padding-left:3pt;padding-right:3pt;line-height: 1;background-color:transparent;"><span>Languages and langauge modesl available via udpipe.</span></caption><thead><tr style="overflow-wrap:break-word;"><th class="cl-3b435958"><p class="cl-3b433c66"><span class="cl-3b3f5de4">Languages</span></p></th><th class="cl-3b435962"><p class="cl-3b433c66"><span class="cl-3b3f5de4">Models</span></p></th></tr></thead><tbody><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Afrikaans</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">afrikaans-afribooms</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Ancient Greek</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">ancient_greek-perseus, ancient_greek-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Arabic</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">arabic-padt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Armenian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">armenian-armtdp</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Basque</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">basque-bdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Belarusian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">belarusian-hse</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">bulgarian-btb</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">bulgarian-btb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Buryat</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">buryat-bdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Catalan</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">catalan-ancora</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Chinese</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">chinese-gsd, chinese-gsdsimp, classical_chinese-kyoto</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Coptic</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">coptic-scriptorium</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Croatian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">croatian-set</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Czech</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">czech-cac, czech-cltt, czech-fictree, czech-pdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Danish</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">danish-ddt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Dutch</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">dutch-alpino, dutch-lassysmall</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">English</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">english-ewt, english-gum, english-lines, english-partut</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Estonian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">estonian-edt, estonian-ewt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Finnish</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">finnish-ftb, finnish-tdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">French</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">french-gsd, french-partut, french-sequoia, french-spoken</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Galician</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">galician-ctg, galician-treegal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">German</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">german-gsd, german-hdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Gothic</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">gothic-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Greek</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">greek-gdt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Hebrew</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">hebrew-htb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Hindi</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">hindi-hdtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Hungarian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">hungarian-szeged</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Indonesian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">indonesian-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Irish Gaelic</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">irish-idt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Italian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">italian-isdt, italian-partut, italian-postwita, italian-twittiro, italian-vit</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Japanese</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">japanese-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Kazakh</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">kazakh-ktb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Korean</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">korean-gsd, korean-kaist</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Kurmanji</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">kurmanji-mg</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Latin</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">latin-ittb, latin-perseus, latin-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Latvian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">latvian-lvtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Lithuanian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">lithuanian-alksnis, lithuanian-hse</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Maltese</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">maltese-mudt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Marathi</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">marathi-ufal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">North Sami</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">north_sami-giella</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Norwegian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">norwegian-bokmaal, norwegian-nynorsk, norwegian-nynorsklia</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Old Church Slavonic</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">old_church_slavonic-proiel</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Old French</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">old_french-srcmf</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Old Russian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">old_russian-torot</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Persian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">persian-seraji</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Polish</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">polish-lfg, polish-pdb, polish-sz</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Portugese</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">portuguese-bosque, portuguese-br, portuguese-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Romanian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">romanian-nonstandard, romanian-rrt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Russian</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">russian-gsd, russian-syntagrus, russian-taiga</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Sanskrit</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">sanskrit-ufal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Scottish Gaelic</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">scottish_gaelic-arcosg</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Serbian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">serbian-set</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Slovak</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">slovak-snk</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Slovenian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">slovenian-ssj, slovenian-sst</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Spanish</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">spanish-ancora, spanish-gsd</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Swedish</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">swedish-lines, swedish-talbanken</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Tamil</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">tamil-ttb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Telugu</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">telugu-mtg</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Turkish</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">turkish-imst</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Ukrainian</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">ukrainian-iu</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Upper Sorbia</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">upper_sorbian-ufal</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Urdu</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">urdu-udtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b43596d"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Uyghur</span></p></td><td class="cl-3b43596e"><p class="cl-3b433c66"><span class="cl-3b3f5dee">uyghur-udt</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435963"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Vietnamese</span></p></td><td class="cl-3b43596c"><p class="cl-3b433c66"><span class="cl-3b3f5dee">vietnamese-vtb</span></p></td></tr><tr style="overflow-wrap:break-word;"><td class="cl-3b435976"><p class="cl-3b433c66"><span class="cl-3b3f5dee">Wolof</span></p></td><td class="cl-3b435977"><p class="cl-3b433c66"><span class="cl-3b3f5dee">wolof-wtb</span></p></td></tr></tbody></table></div>
+<div class="warning"
+style="padding:0.1em; background-color:#f2f2f2; color:#51247a">
 <span>
 <p style="margin-top:1em; text-align:center">
-The udpipe R package also allows you to easily train your own models, based on data in CONLL-U format, so that you can use these for your own commercial or non-commercial purposes. This is described in the other vignette of this package which you can view by the command <br><br> <code>vignette("udpipe-train", package = "udpipe")</code><br>
+The udpipe R package also allows you to easily train your own models,
+based on data in CONLL-U format, so that you can use these for your own
+commercial or non-commercial purposes. This is described in the other
+vignette of this package which you can view by the command <br><br>
+<code>vignette("udpipe-train", package = "udpipe")</code><br>
 </p>
 <p style="margin-left:1em;">
 </p>
 <p></span></p>
 </div>
 <p><br></p>
-<p>To download any of these models, we can use the <code>udpipe_download_model</code> function. For example, to download the <code>english-ewt</code> model, we would use the call: <code>m_eng   &lt;- udpipe::udpipe_download_model(language = "english-ewt")</code>.</p>
+<p>To download any of these models, we can use the
+<code>udpipe_download_model</code> function. For example, to download
+the <code>english-ewt</code> model, we would use the call:
+<code>m_eng   &lt;- udpipe::udpipe_download_model(language = "english-ewt")</code>.</p>
 <p>We start by loading a text</p>
 <pre class="r"><code># load text
 text &lt;- readLines(&quot;https://slcladal.github.io/data/testcorpus/linguistics06.txt&quot;, skipNul = T) %&gt;%
@@ -641,10 +712,14 @@ text &lt;- readLines(&quot;https://slcladal.github.io/data/testcorpus/linguistic
 # inspect
 text</code></pre>
 <pre><code>## [1] &quot;Linguistics also deals with the social, cultural, historical and political factors that influence language, through which linguistic and language-based context is often determined. Research on language through the sub-branches of historical and evolutionary linguistics also focus on how languages change and grow, particularly over an extended period of time.&quot;</code></pre>
-<p>Now that we have a text that we can work with, we will download a pre-trained language model.</p>
+<p>Now that we have a text that we can work with, we will download a
+pre-trained language model.</p>
 <pre class="r"><code># download language model
 m_eng   &lt;- udpipe::udpipe_download_model(language = &quot;english-ewt&quot;)</code></pre>
-<p>If you have downloaded a model once, you can also load the model directly from the place where you stored it on your computer. In my case, I have stored the model in a folder called <em>udpipemodels</em></p>
+<p>If you have downloaded a model once, you can also load the model
+directly from the place where you stored it on your computer. In my
+case, I have stored the model in a folder called
+<em>udpipemodels</em></p>
 <pre class="r"><code># load language model from your computer after you have downloaded it once
 m_eng &lt;- udpipe_load_model(file = here::here(&quot;udpipemodels&quot;, &quot;english-ewt-ud-2.5-191206.udpipe&quot;))</code></pre>
 <p>We can now use the model to annotate out text.</p>
@@ -676,16 +751,24 @@ head(text_anndf, 10)</code></pre>
 ## 8                 Degree=Pos             6     conj &lt;NA&gt; SpaceAfter=No
 ## 9                       &lt;NA&gt;            10    punct &lt;NA&gt;          &lt;NA&gt;
 ## 10                Degree=Pos             6     conj &lt;NA&gt;          &lt;NA&gt;</code></pre>
-<p>It can be useful to extract only the words and their pos-tags and convert them back into a text format (rather than a tabular format).</p>
+<p>It can be useful to extract only the words and their pos-tags and
+convert them back into a text format (rather than a tabular format).</p>
 <pre class="r"><code>tagged_text &lt;- paste(text_anndf$token, &quot;/&quot;, text_anndf$xpos, collapse = &quot; &quot;, sep = &quot;&quot;)
 # inspect tagged text
 tagged_text</code></pre>
 <pre><code>## [1] &quot;Linguistics/NNS also/RB deals/NNS with/IN the/DT social/JJ ,/, cultural/JJ ,/, historical/JJ and/CC political/JJ factors/NNS that/WDT influence/VBP language/NN ,/, through/IN which/WDT linguistic/NN and/CC language/NN -/HYPH based/VBN context/NN is/VBZ often/RB determined/JJ ./. Research/VB on/IN language/NN through/IN the/DT sub-branches/NNS of/IN historical/JJ and/CC evolutionary/JJ linguistics/NNS also/RB focus/RB on/IN how/WRB languages/NNS change/VBP and/CC grow/VBP ,/, particularly/RB over/IN an/DT extended/JJ period/NN of/IN time/NN ./.&quot;</code></pre>
 </div>
-<div id="pos-tagging-non-english-texts" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">POS-Tagging non-English texts</h1>
-<p>We can apply the same method for annotating, e.g. adding pos-tags, to other languages. For this, we could train our own model, or, we can use one of the many pre-trained language models that <code>udpipe</code> provides.</p>
-<p>Let us explore how to do this by using example texts from different languages, here from German and Spanish (but we could also annotate texts from any of the wide variety of languages for which UDPipe provides pre-trained models.</p>
+<div id="pos-tagging-non-english-texts"
+class="section level1 unnumbered">
+<h1 class="unnumbered">POS-Tagging non-English texts</h1>
+<p>We can apply the same method for annotating, e.g. adding pos-tags, to
+other languages. For this, we could train our own model, or, we can use
+one of the many pre-trained language models that <code>udpipe</code>
+provides.</p>
+<p>Let us explore how to do this by using example texts from different
+languages, here from German and Spanish (but we could also annotate
+texts from any of the wide variety of languages for which UDPipe
+provides pre-trained models.</p>
 <p>We begin by loading a German and a Dutch text.</p>
 <pre class="r"><code># load texts
 gertext &lt;- readLines(&quot;https://slcladal.github.io/data/german.txt&quot;) 
@@ -698,7 +781,8 @@ gertext; duttext</code></pre>
 <pre class="r"><code># download language model
 m_ger   &lt;- udpipe::udpipe_download_model(language = &quot;german-gsd&quot;)
 m_dut   &lt;- udpipe::udpipe_download_model(language = &quot;dutch-alpino&quot;)</code></pre>
-<p>Or we load them from our machine (if we have downloaded and saved them before).</p>
+<p>Or we load them from our machine (if we have downloaded and saved
+them before).</p>
 <pre class="r"><code># load language model from your computer after you have downloaded it once
 m_ger   &lt;- udpipe::udpipe_load_model(file = here::here(&quot;udpipemodels&quot;, &quot;german-gsd-ud-2.5-191206.udpipe&quot;))
 m_dut   &lt;- udpipe::udpipe_load_model(file = here::here(&quot;udpipemodels&quot;, &quot;dutch-alpino-ud-2.5-191206.udpipe&quot;))</code></pre>
@@ -721,9 +805,15 @@ nl_pos &lt;- udpipe::udpipe_annotate(m_dut, x = duttext) %&gt;%
 nl_pos</code></pre>
 <pre><code>## [1] &quot;Taalkunde/N|soort|ev|basis|zijd|stan ,/LET ook/BW wel/BW taalwetenschap/N|soort|ev|basis|zijd|stan of/VG|neven linguïstiek/N|soort|ev|basis|zijd|stan ,/LET is/WW|pv|tgw|ev de/LID|bep|stan|rest wetenschappelijke/ADJ|prenom|basis|met-e|stan studie/N|soort|ev|basis|zijd|stan van/VZ|init de/LID|bep|stan|rest natuurlijke/ADJ|prenom|basis|met-e|stan talen/N|soort|mv|basis ./LET&quot;</code></pre>
 </div>
-<div id="dependency-parsing-using-udpipe" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Dependency Parsing Using UDPipe</h1>
-<p>In addition to pos-tagging, we can also generate plots showing the syntactic dependencies of the different constituents of a sentence. For this, we generate an object that contains a sentence (in this case, the sentence <em>Linguistics is the scientific study of language</em>), and we then plot (or visualize) the dependencies using the <code>textplot_dependencyparser</code> function.</p>
+<div id="dependency-parsing-using-udpipe"
+class="section level1 unnumbered">
+<h1 class="unnumbered">Dependency Parsing Using UDPipe</h1>
+<p>In addition to pos-tagging, we can also generate plots showing the
+syntactic dependencies of the different constituents of a sentence. For
+this, we generate an object that contains a sentence (in this case, the
+sentence <em>Linguistics is the scientific study of language</em>), and
+we then plot (or visualize) the dependencies using the
+<code>textplot_dependencyparser</code> function.</p>
 <pre class="r"><code># parse text
 sent &lt;- udpipe::udpipe_annotate(m_eng, x = &quot;Linguistics is the scientific study of language&quot;) %&gt;%
   as.data.frame()
@@ -763,11 +853,18 @@ dplot &lt;- textplot::textplot_dependencyparser(sent, size = 3)
 # show plot
 dplot</code></pre>
 <p><img src="postag_files/figure-html/udi5-1.png" width="672" /></p>
-<p>That’s it for this tutorial. We hope that you have enjoyed this tutorial and learned how to annotate texts using language models and perform pos-tagging and dependency parsing of English texts as well as texts in other languages.</p>
+<p>That’s it for this tutorial. We hope that you have enjoyed this
+tutorial and learned how to annotate texts using language models and
+perform pos-tagging and dependency parsing of English texts as well as
+texts in other languages.</p>
 </div>
-<div id="citation-session-info" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">Citation &amp; Session Info</h1>
-<p>Schweinberger, Martin. 2023. <em>Part-of-Speech Tagging and Dependency Parsing with R</em>. Brisbane: The University of Queensland. url: <a href="https://slcladal.github.io/postag.html" class="uri">https://slcladal.github.io/postag.html</a> (Version 2023.01.11).</p>
+<div id="citation-session-info" class="section level1 unnumbered">
+<h1 class="unnumbered">Citation &amp; Session Info</h1>
+<p>Schweinberger, Martin. 2023. <em>Part-of-Speech Tagging and
+Dependency Parsing with R</em>. Brisbane: The University of Queensland.
+url: <a href="https://slcladal.github.io/postag.html"
+class="uri">https://slcladal.github.io/postag.html</a> (Version
+2023.01.11).</p>
 <pre><code>@manual{schweinberger2023postag,
   author = {Schweinberger, Martin},
   title = {Part-of-Speech Tagging and Dependency Parsing with R},
@@ -778,66 +875,88 @@ dplot</code></pre>
   edition = {2023.01.11}
 }</code></pre>
 <pre class="r"><code>sessionInfo()</code></pre>
-<pre><code>## R version 4.1.2 (2021-11-01)
-## Platform: x86_64-pc-linux-gnu (64-bit)
-## Running under: Ubuntu 22.04.2 LTS
+<pre><code>## R version 4.3.2 (2023-10-31 ucrt)
+## Platform: x86_64-w64-mingw32/x64 (64-bit)
+## Running under: Windows 11 x64 (build 22621)
 ## 
 ## Matrix products: default
-## BLAS:   /usr/lib/x86_64-linux-gnu/atlas/libblas.so.3.10.3
-## LAPACK: /usr/lib/x86_64-linux-gnu/atlas/liblapack.so.3.10.3
+## 
 ## 
 ## locale:
-##  [1] LC_CTYPE=en_AU.UTF-8       LC_NUMERIC=C              
-##  [3] LC_TIME=en_AU.UTF-8        LC_COLLATE=en_AU.UTF-8    
-##  [5] LC_MONETARY=en_AU.UTF-8    LC_MESSAGES=en_AU.UTF-8   
-##  [7] LC_PAPER=en_AU.UTF-8       LC_NAME=C                 
-##  [9] LC_ADDRESS=C               LC_TELEPHONE=C            
-## [11] LC_MEASUREMENT=en_AU.UTF-8 LC_IDENTIFICATION=C       
+## [1] LC_COLLATE=English_Australia.utf8  LC_CTYPE=English_Australia.utf8   
+## [3] LC_MONETARY=English_Australia.utf8 LC_NUMERIC=C                      
+## [5] LC_TIME=English_Australia.utf8    
+## 
+## time zone: Australia/Brisbane
+## tzcode source: internal
 ## 
 ## attached base packages:
-## [1] stats     graphics  grDevices datasets  utils     methods   base     
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-## [1] udpipe_0.8.9    stringr_1.4.0   dplyr_1.0.9     flextable_0.7.3
+## [1] udpipe_0.8.11   stringr_1.5.1   dplyr_1.1.4     flextable_0.9.4
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] ggrepel_0.9.1      Rcpp_1.0.8.3       here_1.0.1         lattice_0.20-45   
-##  [5] tidyr_1.2.0        assertthat_0.2.1   rprojroot_2.0.3    digest_0.6.29     
-##  [9] utf8_1.2.2         ggforce_0.3.3      R6_2.5.1           evaluate_0.15     
-## [13] ggplot2_3.3.6      highr_0.9          pillar_1.7.0       gdtools_0.2.4     
-## [17] rlang_1.0.4        uuid_1.1-0         data.table_1.14.2  jquerylib_0.1.4   
-## [21] Matrix_1.4-1       textplot_0.2.2     klippy_0.0.0.9500  rmarkdown_2.14    
-## [25] labeling_0.4.2     igraph_1.3.2       polyclip_1.10-0    munsell_0.5.0     
-## [29] compiler_4.1.2     xfun_0.31          pkgconfig_2.0.3    systemfonts_1.0.4 
-## [33] base64enc_0.1-3    htmltools_0.5.2    tidyselect_1.1.2   gridExtra_2.3     
-## [37] tibble_3.1.7       graphlayouts_0.8.0 viridisLite_0.4.0  fansi_1.0.3       
-## [41] crayon_1.5.1       MASS_7.3-58.1      grid_4.1.2         jsonlite_1.8.0    
-## [45] gtable_0.3.0       lifecycle_1.0.1    DBI_1.1.3          magrittr_2.0.3    
-## [49] scales_1.2.0       zip_2.2.0          cli_3.3.0          stringi_1.7.8     
-## [53] farver_2.1.1       renv_0.15.4        viridis_0.6.2      xml2_1.3.3        
-## [57] bslib_0.3.1        ellipsis_0.3.2     generics_0.1.3     vctrs_0.4.1       
-## [61] tools_4.1.2        glue_1.6.2         officer_0.4.3      tweenr_1.0.2      
-## [65] purrr_0.3.4        ggraph_2.0.5       fastmap_1.1.0      yaml_2.3.5        
-## [69] colorspace_2.0-3   tidygraph_1.2.1    knitr_1.39         sass_0.4.1</code></pre>
+##  [1] tidyselect_1.2.0        viridisLite_0.4.2       farver_2.1.1           
+##  [4] viridis_0.6.5           ggraph_2.2.0            fastmap_1.1.1          
+##  [7] tweenr_2.0.3            fontquiver_0.2.1        promises_1.2.1         
+## [10] digest_0.6.34           mime_0.12               lifecycle_1.0.4        
+## [13] ellipsis_0.3.2          gfonts_0.2.0            magrittr_2.0.3         
+## [16] compiler_4.3.2          rlang_1.1.3             sass_0.4.8             
+## [19] tools_4.3.2             igraph_2.0.2            utf8_1.2.4             
+## [22] yaml_2.3.8              data.table_1.15.2       knitr_1.45             
+## [25] askpass_1.2.0           labeling_0.4.3          graphlayouts_1.1.0     
+## [28] curl_5.2.0              here_1.0.1              xml2_1.3.6             
+## [31] httpcode_0.3.0          klippy_0.0.0.9500       withr_3.0.0            
+## [34] purrr_1.0.2             grid_4.3.2              polyclip_1.10-6        
+## [37] textplot_0.2.2          fansi_1.0.6             gdtools_0.3.6          
+## [40] xtable_1.8-4            colorspace_2.1-0        ggplot2_3.5.0          
+## [43] scales_1.3.0            MASS_7.3-60             crul_1.4.0             
+## [46] cli_3.6.2               rmarkdown_2.25          crayon_1.5.2           
+## [49] ragg_1.2.7              generics_0.1.3          rstudioapi_0.15.0      
+## [52] cachem_1.0.8            ggforce_0.4.2           assertthat_0.2.1       
+## [55] vctrs_0.6.5             Matrix_1.6-5            jsonlite_1.8.8         
+## [58] fontBitstreamVera_0.1.1 ggrepel_0.9.5           systemfonts_1.0.5      
+## [61] jquerylib_0.1.4         tidyr_1.3.1             glue_1.7.0             
+## [64] stringi_1.8.3           gtable_0.3.4            later_1.3.2            
+## [67] munsell_0.5.0           tibble_3.2.1            pillar_1.9.0           
+## [70] htmltools_0.5.7         openssl_2.1.1           R6_2.5.1               
+## [73] textshaping_0.3.7       tidygraph_1.3.1         rprojroot_2.0.4        
+## [76] evaluate_0.23           shiny_1.8.0             lattice_0.21-9         
+## [79] highr_0.10              memoise_2.0.1           fontLiberation_0.1.0   
+## [82] httpuv_1.6.14           bslib_0.6.1             Rcpp_1.0.12            
+## [85] zip_2.3.1               uuid_1.2-0              gridExtra_2.3          
+## [88] officer_0.6.5           xfun_0.42               pkgconfig_2.0.3</code></pre>
 <hr />
 <p><a href="#introduction">Back to top</a></p>
 <p><a href="https://ladal.edu.au">Back to HOME</a></p>
 <hr />
 </div>
-<div id="references" class="section level1 unnumbered" number="">
-<h1 class="unnumbered" number="">References</h1>
-<div id="refs" class="references hanging-indent">
-<div id="ref-opennlp">
-<p>Hornik, Kurt. 2019. “OpenNLP: Apache Opennlp Tools Interface.” <a href="https://cran.r-project.org/web/packages/openNLP/index.html">https://cran.r-project.org/web/packages/openNLP/index.html</a>.</p>
+<div id="references" class="section level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-opennlp" class="csl-entry">
+Hornik, Kurt. 2019. <em>openNLP: Apache OpenNLP Tools Interface</em>. <a
+href="https://CRAN.R-project.org/package=openNLP">https://CRAN.R-project.org/package=openNLP</a>.
 </div>
-<div id="ref-kumar2016mastering">
-<p>Kumar, Ashish, and Avinash Paul. 2016. <em>Mastering Text Mining with R</em>. Packt Publishing Ltd.</p>
+<div id="ref-kumar2016mastering" class="csl-entry">
+Kumar, Ashish, and Avinash Paul. 2016. <em>Mastering Text Mining with
+r</em>. Packt Publishing Ltd.
 </div>
-<div id="ref-WN17">
-<p>Wiedemann, Gregor, and Andreas Niekler. 2017. “Hands-on: A Five Day Text Mining Course for Humanists and Social Scientists in R.” In <em>Proceedings of the Workshop on Teaching NLP for Digital Humanities (Teach4DH), Berlin, Germany, September 12, 2017.</em>, 57–65. <a href="http://ceur-ws.org/Vol-1918/wiedemann.pdf">http://ceur-ws.org/Vol-1918/wiedemann.pdf</a>.</p>
+<div id="ref-WN17" class="csl-entry">
+Wiedemann, Gregor, and Andreas Niekler. 2017. <span>“Hands-on:
+<span>A</span> Five Day Text Mining Course for Humanists and Social
+Scientists in <span>R</span>.”</span> In <em>Proceedings of the Workshop
+on Teaching <span>NLP</span> for Digital Humanities
+(<span>Teach4DH</span>), Berlin, Germany, September 12, 2017.</em>,
+57–65. <a
+href="http://ceur-ws.org/Vol-1918/wiedemann.pdf">http://ceur-ws.org/Vol-1918/wiedemann.pdf</a>.
 </div>
-<div id="ref-udpipe">
-<p>Wijffels, Jan. 2021. <em>Udpipe: Tokenization, Parts of Speech Tagging, Lemmatization and Dependency Parsing with the ’Udpipe’ ’Nlp’ Toolkit</em>. <a href="https://CRAN.R-project.org/package=udpipe">https://CRAN.R-project.org/package=udpipe</a>.</p>
+<div id="ref-udpipe" class="csl-entry">
+Wijffels, Jan. 2021. <em>Udpipe: Tokenization, Parts of Speech Tagging,
+Lemmatization and Dependency Parsing with the ’UDPipe’ ’NLP’
+Toolkit</em>. <a
+href="https://CRAN.R-project.org/package=udpipe">https://CRAN.R-project.org/package=udpipe</a>.
 </div>
 </div>
 </div>
