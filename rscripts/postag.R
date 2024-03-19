@@ -15,6 +15,14 @@ postag <- function(x, language){
 
   })
   
+  # add names
+  names(pos) <- ifelse(is.null(names(pos)) == TRUE, 
+                                paste0("text", 
+                                       stringr::str_pad(1:length(pos), 
+                                                        width = nchar(max(length(pos))), 
+                                                        pad = "0")),
+                                names(pos))
+  
   # return tagged text
   return(pos)
 }

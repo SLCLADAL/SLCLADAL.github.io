@@ -10,12 +10,12 @@ savetxts <- function(x){
     text_content <- unlist(x[i])
     
     # add names
-    names(text_content) <- ifelse(is.null(names(text_content)) == TRUE, 
-                                  paste0("text", 
-                                         stringr::str_pad(1:length(text_content), 
-                                                          width = nchar(max(length(text_content))), 
-                                                          pad = "0")),
-                                  names(text_content))
+    #names(text_content) <- ifelse(is.null(names(text_content)) == TRUE, 
+    #                              paste0("text", 
+    #                                     stringr::str_pad(1:length(text_content), 
+    #                                                      width = nchar(max(length(text_content))), 
+    #                                                      pad = "0")),
+    #                              names(text_content))
     
     # construct the file path using the 'here' package
     file_path <- paste0(here::here("notebooks/MyOutput/"), names(x)[i])
