@@ -17,7 +17,7 @@ postag <- function(x, language){
   })
   
   # add names
-  names(pos) <- stringr::str_replace_all(names(pos), ".*/")
+  names(pos) <- stringr::str_remove_all(names(pos), ".*/")
   names(pos) <- ifelse(is.null(names(pos)) == TRUE, 
                                 paste0("text", 
                                        stringr::str_pad(1:length(pos), 
