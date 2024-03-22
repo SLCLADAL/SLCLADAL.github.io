@@ -14,6 +14,8 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
                 (O12+O22) > coocfreq,
                 # set minimum number of co-occurrences of Term and CoocTerm
                 O11 > termcoocfreq) %>%
+    # determine number of rows
+    dplyr::mutate(Rws = nrow(.)) %>% 
     # work row-wise
     dplyr::rowwise() %>%
     # add N
@@ -54,11 +56,16 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
                                                 p <= .01 ~ "p<.01",
                                                 p <= .05 ~ "p<.05", 
                                                 TRUE ~ "n.s.")) %>%
+    # determine Bonferroni corrected significance
+    dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
+                                                   p / Rws > .01 ~ "p < .05*",
+                                                   p / Rws > .001 ~ "p < .01**",
+                                                   p / Rws <= .001 ~ "p < .001***",
+                                                   T ~ "N.A.")) %>%
     # round p-value
-
     dplyr::mutate(p = round(p, 5)) %>%
     # filter out non significant results
-    dplyr::filter(Significance != "n.s.",
+    dplyr::filter(Sig_corrected != "n.s.",
                 # filter out instances where the w1 and w2 repel each other
                 E11 < O11) %>%
     # arrange by phi (association measure)

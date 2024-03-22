@@ -410,6 +410,8 @@ Now we can calculate the collocation statistics (the association strength).
 
 ```{r message=FALSE, warning=FALSE, paged.print=FALSE}
 colldf_redux %>%
+  # determine number of rows
+  dplyr::mutate(Rws = nrow(.)) %>%
     # work row-wise
     dplyr::rowwise() %>%
     # calculate fishers' exact test
@@ -440,11 +442,17 @@ colldf_redux %>%
                                                 p <= .01 ~ "p<.01",
                                                 p <= .05 ~ "p<.05", 
                                                 TRUE ~ "n.s.")) %>%
-    # round p-value
-
+  # determine Bonferroni corrected significance
+  dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
+                                                 p / Rws > .01 ~ "p < .05*",
+                                                 p / Rws > .001 ~ "p < .01**",
+                                                 p / Rws <= .001 ~ "p < .001***",
+                                                 T ~ "N.A.")) %>%
+  
+  # round p-value
     dplyr::mutate(p = round(p, 5)) %>%
     # filter out non significant results
-    dplyr::filter(Significance != "n.s.",
+    dplyr::filter(Sig_corrected != "n.s.",
                 # filter out instances where the w1 and w2 repel each other
                 E11 < O11) %>%
     # arrange by phi (association measure)
@@ -691,6 +699,8 @@ Example:
 
 ```{r}
 stats_tb %>%
+  # determine number of rows
+  dplyr::mutate(Rws = nrow(.)) %>%
     # work row-wise
     dplyr::rowwise() %>%
     # calculate fishers' exact test
@@ -723,11 +733,17 @@ stats_tb %>%
                                                 p <= .01 ~ "p<.01",
                                                 p <= .05 ~ "p<.05", 
                                                 TRUE ~ "n.s.")) %>%
-    # round p-value
-
+    # determine Bonferroni corrected significance
+  dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
+                                                 p / Rws > .01 ~ "p < .05*",
+                                                 p / Rws > .001 ~ "p < .01**",
+                                                 p / Rws <= .001 ~ "p < .001***",
+                                                 T ~ "N.A.")) %>%  
+  
+  # round p-value
     dplyr::mutate(p = round(p, 5)) %>%
     # filter out non significant results
-    dplyr::filter(Significance != "n.s.",
+    dplyr::filter(Sig_corrected != "n.s.",
                 # filter out instances where the w1 and w2 repel each other
                 E11 < O11) %>%
     # arrange by phi (association measure)
@@ -1170,7 +1186,9 @@ We can now calculate the association strength which, in this case serves as a ke
 
 ```{r}
 stats_tb2 %>%
-    # work row-wise
+  # determine number of rows
+  dplyr::mutate(Rws = nrow(.)) %>%   
+  # work row-wise
     dplyr::rowwise() %>%
     # calculate fishers' exact test
     dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
@@ -1202,12 +1220,18 @@ stats_tb2 %>%
                                                 p <= .01 ~ "p<.01",
                                                 p <= .05 ~ "p<.05", 
                                                 TRUE ~ "n.s.")) %>%
+    
+  # determine Bonferroni corrected significance
+  dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
+                                                 p / Rws > .01 ~ "p < .05*",
+                                                 p / Rws > .001 ~ "p < .01**",
+                                                 p / Rws <= .001 ~ "p < .001***",
+                                                 T ~ "N.A.")) %>% 
     # round p-value
-
     dplyr::mutate(p = round(p, 5),
                   type = ifelse(E11 > O11, "antitype", "type")) %>%
     # filter out non significant results
-    dplyr::filter(Significance != "n.s.") %>%
+    dplyr::filter(Sig_corrected != "n.s.") %>%
     # arrange by phi (association measure)
     dplyr::arrange(-DeltaP12) %>%
     # remove superfluous columns
