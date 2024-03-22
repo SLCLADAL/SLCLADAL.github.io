@@ -208,7 +208,7 @@ text <- base::readRDS(url("https://slcladal.github.io/data/cdo.rda", "rb")) %>%
   stringr::str_remove_all("- ")
 ```
 
-```{r coll2, echo = F, message=FALSE, warning=FALSE}
+```{r coll2b, echo = F, message=FALSE, warning=FALSE}
 text %>%
   substr(start=1, stop=200) %>%
   as.data.frame()%>%
@@ -805,7 +805,7 @@ assoc_tb2 %>%
 
 Another method for visualizing collocations are dendrograms (tree-diagrams) which show how similarity  to indicate groupings based on numeric values (e.g., association strength). 
 
-We start by extracting the tokens that we want to show (the top 20 collocates of *alice*).
+We start by extracting the tokens that we want to show (the top 20 collocates of *selection*).
 
 ```{r}
 # sort the coocStatz data frame in descending order based on the 'phi' column
@@ -883,13 +883,11 @@ fviz_ca_row(res.ca, repel = TRUE, col.row = "gray20")
 
 # N-grams {-}
 
-N-grams  are contiguous sequences of N items (words, characters, or symbols) in a given text. The term *N* in N-grams refers to the number of items in the sequence. For example, a bigram (2-gram) consists of two consecutive items, a trigram (3-gram) consists of three, and so on. N-grams are widely used in natural language processing and text analysis to capture patterns and dependencies within a linguistic context. N-grams help analyze the frequency of word sequences in a corpus. This information can reveal common phrases, expressions, or patterns that occur frequently and that often represent  multiword expressions such as *New York*, *Prime Minister*, or *New South Wales*. N-grams are fundamental in language modeling, where they are used to estimate the likelihood of a word given its context. This is especially important in predictive text applications and machine translation.
+N-grams  are contiguous sequences of N items (words, characters, or symbols) in a given text. The term *N* in N-grams refers to the number of items in the sequence. For example, a bigram (2-gram) consists of two consecutive items, a trigram (3-gram) consists of three, and so on. N-grams are widely used in natural language processing and text analysis to capture patterns and dependencies within a linguistic context. N-grams help analyze the frequency of word sequences in a corpus. This information can reveal common phrases, expressions, or patterns that occur frequently and that often represent  multiword expressions such as *New York*, *Prime Minister*, or *New South Wales*. Identifying such multiword expressions can be useful to fuse  compound words in subsequent steps of an analysis (e.g., combining *wheel chair* to *wheelchair* or *wheel-chair*). N-grams are fundamental in language modeling, where they are used to estimate the likelihood of a word given its context. This is especially important in predictive text applications and machine translation.
 
-## Identifying n-grams  {-}
+## Identifying n-grams using quanteda {-}
 
-We could create bi-grams (N-grams consisting of two elements) by manually pasting every word together with the word that immediately follows but using the `quanteda` package [see @quanteda] offers excellent and very fast functions for extracting bigrams.
-
-Below, we use the `textstat_collocations` function for extracting N-grams. This function uses the following main arguments
+The `quanteda` package [see @quanteda] offers excellent and very fast functions for extracting N-grams. It's a fun way to discover meaningful word pairs in your text! Below, we use the `textstat_collocations` function for extracting N-grams. This function uses the following main arguments
 
 + `x`: a character, corpus, or tokens object.  
 + `method`: association measure for detecting collocations. Currently this is limited to "lambda".  
@@ -928,9 +926,63 @@ ngrams %>%
   flextable::border_outer()
 ```
 
-Identifying n-grams that co-occur frequently is very important and can help identify multiword expressions that one may want to fuse for subsequent steps during an analysis (e.g., combining *wheel chair* to *wheelchair* or *wheel-chair*).
 
-However, when extracting n-grams, we are strictly speaking only extracting sequences but not collocates as collocates do not necessarily have to occur in direct adjacency. The following section shows how to expand the extraction of n-grams to the extraction of collocates.
+
+## Identifying n-grams using quanteda {-}
+
+Creating N-gram lists manually, especially bi-grams, is surprisingly easy. In our example text, we'll craft a bi-gram list by doing something quite straightforward: taking each word and introducing it to the next word in line. The difference to the previous method is that we retain the original order of the bi-grams here.
+
+In a first step, we split the text into words and remove any non-word characters.
+
+```{r}
+# process the text
+text  %>%
+  # convert all text to lowercase
+  tolower() %>%
+  # remove non-word characters, keeping spaces
+  str_replace_all("[^[:alpha:][:space:]]*", "")  %>%
+  # remove punctuation
+  tm::removePunctuation() %>%
+  # squish consecutive spaces into a single space
+  stringr::str_squish() %>%
+  # split the text into individual words, separated by spaces
+  stringr::str_split(" ") %>%
+  # unlist the result into a single vector of words  and save result in "text_words"
+  unlist() -> text_words
+```
+
+Now, we generate a table with the N-grams(in our case bi-grams).
+
+
+```{r coll2, message=FALSE, warning=FALSE, paged.print=FALSE}
+# create data frame
+text_bigrams <- data.frame(text_words[1:length(text_words)-1], 
+                       text_words[2:length(text_words)]) %>%
+  dplyr::rename(Word1 = 1,
+                Word2 = 2) %>%
+  dplyr::mutate(Bigram = paste0(Word1, " ", Word2)) %>%
+  dplyr::group_by(Bigram) %>%
+  dplyr::summarise(Frequency = n()) %>%
+  dplyr::arrange(-Frequency)
+```
+
+
+```{r coll3b, echo = F, message=FALSE, warning=FALSE}
+# inspect data
+text_bigrams %>%
+  as.data.frame() %>%
+  head(15) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .5, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Top 10 most frequent bigrams and their (relative) freqeuncy in the example text")  %>%
+  flextable::border_outer()
+```
+
+
 
 # Keywords {-}
 
@@ -1205,7 +1257,7 @@ assoc_tb3 %>%
 
 ### Barplots {-}
 
-Another option sis to visualize the association strengths in a barplot as shown in the code chunk below.
+Another option to visualize the association strengths is a barplot as shown  below.
 
 ```{r message=F, warning=F}
 # get top 10 keywords for text 1
