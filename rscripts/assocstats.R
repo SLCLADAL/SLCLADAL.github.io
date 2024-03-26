@@ -84,7 +84,7 @@ assocstats <- function(x, term){
     # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
                             "O22", "R1", "R2", "C1", "C2", "E11", "E12", "E21",
-                            "E22"))) -> result
+                            "E22", "upp", "low", "op"))) -> result
 # inspect
 return(result)
 }
