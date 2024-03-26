@@ -47,8 +47,8 @@ assockwic <- function(x){
     dplyr::mutate(AM = op / upp) %>%
     
     # remove superfluous columns
-    dplyr::select(-btr_O21, -btr_O12, -btr_O22, -btl_O12, -btl_O11, -btl_O21, -btl_O22, -btr_O11) %>% 
-    
+    dplyr::select(-any_of(c("btr_O21", "btr_O12", "btr_O22", "btl_O12", 
+                            "btl_O11", "btl_O21", "btl_O22", "btr_O11"))) %>%
     # extract x2 statistics
     dplyr::mutate(X2 = (O11-E11)^2/E11 + (O12-E12)^2/E12 + (O21-E21)^2/E21 + (O22-E22)^2/E22) %>%
     
@@ -68,13 +68,7 @@ assockwic <- function(x){
                   LogOddsRatio = log(((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )),
                   # calculate LL aka G2
                   G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22))) %>%
-    
-    
-    # simplify significance
-    dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
-                                                  p <= .01 ~ "p<.01",
-                                                  p <= .05 ~ "p<.05", 
-                                                  TRUE ~ "n.s.")) %>%
+
     # determine Bonferroni corrected significance
     dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
                                                    p / Rws > .01 ~ "p < .05*",
@@ -87,11 +81,12 @@ assockwic <- function(x){
     dplyr::filter(Sig_corrected != "n.s.",
                   # filter out instances where the w1 and w2 repel each other
                   E11 < O11) %>%
-    # arrange by phi (association measure)
-    dplyr::arrange(-AM) %>%
+    # arrange by DeltaP12 (association measure)
+    dplyr::arrange(-DeltaP12) %>%
     # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
-                            "O22", "R1", "R2", "C1", "C2"))) -> result
+                            "O22", "R1", "R2", "C1", "C2", "E11", "E12", "E21",
+                            "E22", "upp", "low", "op", "Rws"))) -> result
   # inspect
   return(result)
 }
