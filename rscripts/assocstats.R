@@ -45,7 +45,8 @@ assocstats <- function(x, term){
     dplyr::mutate(AM = op / upp) %>%
     
     # remove superfluous columns
-    dplyr::select(-btr_O21, -btr_O12, -btr_O22, -btl_O12, -btl_O11, -btl_O21, -btl_O22, -btr_O11) %>% 
+    dplyr::select(-any_of(c("btr_O21", "btr_O12", "btr_O22", "btl_O12", 
+                            "btl_O11", "btl_O21", "btl_O22", "btr_O11"))) %>% 
 
     # extract x2 statistics
     dplyr::mutate(X2 = (O11-E11)^2/E11 + (O12-E12)^2/E12 + (O21-E21)^2/E21 + (O22-E22)^2/E22) %>%
