@@ -6,14 +6,10 @@ require(dplyr)
 # O12: co-occurrence frequency of w1 without w2
 # O21: frequency of w2 without w1
 # O22: frequency of words in corpus without w1 and w2
-assocstats <- function(x, term, coocfreq, termcoocfreq){
+assocstats <- function(x, term){
   x %>%
     # determine Term
-  dplyr::filter(w1 == term,
-                # set minimum number of occurrences of CoocTerm
-                (O12+O22) > coocfreq,
-                # set minimum number of co-occurrences of Term and CoocTerm
-                O11 > termcoocfreq) %>%
+  dplyr::filter(w1 == term) %>%
     # determine number of rows
     dplyr::mutate(Rws = nrow(.)) %>% 
     # work row-wise
@@ -73,11 +69,6 @@ assocstats <- function(x, term, coocfreq, termcoocfreq){
                   # calculate LL aka G2
                   G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22))) %>%
     
-    # simplify significance
-    dplyr::mutate(Significance = dplyr::case_when(p <= .001 ~ "p<.001",
-                                                p <= .01 ~ "p<.01",
-                                                p <= .05 ~ "p<.05", 
-                                                TRUE ~ "n.s.")) %>%
     # determine Bonferroni corrected significance
     dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
                                                    p / Rws > .01 ~ "p < .05*",
