@@ -4,7 +4,7 @@
 # load required packages
 require(dplyr)
 
-prepam <- function(x){
+prepkey <- function(x){
   x %>%
   dplyr::mutate(text1 = as.numeric(text1),
                 text2 = as.numeric(text2)) %>%
