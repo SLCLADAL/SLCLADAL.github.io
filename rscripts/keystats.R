@@ -1,21 +1,21 @@
 require(dplyr)
 # x must have columns with 
 # token: word 
-# corpus1: frequency of token in corpus1
-# corpus2: frequency of token in corpus2
+# text1: frequency of token in text1
+# text2: frequency of token in text2
 keystats <- function(x){
   x %>%
-    dplyr::mutate(corpus2 = as.numeric(corpus2),
-                  corpus1 = as.numeric(corpus1)) %>%
-    dplyr::mutate(C1 = sum(corpus1),
-                  C2 = sum(corpus2),
+    dplyr::mutate(text1 = as.numeric(text1),
+                  text2 = as.numeric(text2)) %>%
+    dplyr::mutate(C1 = sum(text1),
+                  C2 = sum(text2),
                   N = C1 + C2) %>%
     # determine number of rows
     dplyr::mutate(Rws = nrow(.)) %>% 
     dplyr::rowwise() %>%
-    dplyr::mutate(R1 = corpus+corpus1,
+    dplyr::mutate(R1 = text1+text2,
                   R2 = N - R1,
-                  O11 = corpus1,
+                  O11 = text1,
                   O12 = R1-O11,
                   O21 = C1-O11,
                   O22 = C2-O12) %>%
