@@ -3,7 +3,7 @@ require(dplyr)
 # token: word 
 # corpus1: frequency of token in corpus1
 # corpus2: frequency of token in corpus2
-assockwic <- function(x){
+keystats <- function(x){
   x %>%
     dplyr::mutate(corpus2 = as.numeric(corpus2),
                   corpus1 = as.numeric(corpus1)) %>%
