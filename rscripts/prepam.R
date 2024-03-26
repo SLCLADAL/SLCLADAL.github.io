@@ -20,5 +20,5 @@ prepam <- function(x){
                   O21 = C1 - O11,
                   C2 = N - C1,
                   O22 = R2 - O21) -> x
-  retunr(x)
+  return(x)
 }
