@@ -8,8 +8,6 @@ require(dplyr)
 # O22: frequency of words in corpus without w1 and w2
 assocstats <- function(x, term){
   x %>%
-    # determine Term
-  dplyr::filter(w1 == term) %>%
     # determine number of rows
     dplyr::mutate(Rws = nrow(.)) %>% 
     # work row-wise
