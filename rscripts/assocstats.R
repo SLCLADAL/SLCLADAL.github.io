@@ -82,7 +82,8 @@ assocstats <- function(x, term){
     dplyr::arrange(-AM) %>%
     # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
-                            "O22", "R1", "R2", "C1", "C2"))) -> result
+                            "O22", "R1", "R2", "C1", "C2", "E11", "E12", "E21",
+                            "E22"))) -> result
 # inspect
 return(result)
 }
