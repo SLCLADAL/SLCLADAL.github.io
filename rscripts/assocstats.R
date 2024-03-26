@@ -78,10 +78,9 @@ assocstats <- function(x, term){
     # round p-value
     dplyr::mutate(p = round(p, 5)) %>%
     # filter out non significant results
-    dplyr::filter(Sig_corrected != "n.s.",
-                # filter out instances where the w1 and w2 repel each other
+    dplyr::filter(# filter out instances where the w1 and w2 repel each other
                 E11 < O11) %>%
-    # arrange by phi (association measure)
+    # arrange by AM (association measure)
     dplyr::arrange(-AM) %>%
     # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
