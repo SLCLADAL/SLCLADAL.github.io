@@ -23,7 +23,6 @@ keystats <- function(x){
                   E12 = (R1 * C2) / N,
                   E21 = (R2 * C1) / N,
                   E22 = (R2 * C2) / N) %>%
-    dplyr::select(-corpus, -kwic) %>%
     # calculate fishers' exact test
     dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
                                                           ncol = 2, byrow = T))[1]))) %>%
