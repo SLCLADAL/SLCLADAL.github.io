@@ -39,7 +39,7 @@ loadkeytxts <- function(x="notebooks/Target", y="notebooks/Reference"){
     # remove extra whitespaces using 'str_squish' from the 'stringr' package
     x <- stringr::str_squish(x)
   })
-  text1 <- paste0(unlist(text1), collapse = " ")
+  text1 <- paste0(unlist(text1), sep = " ", collapse = " ")
 
 
   # loop over the vector 'myfiles' that contains paths to the data
@@ -59,7 +59,7 @@ loadkeytxts <- function(x="notebooks/Target", y="notebooks/Reference"){
     # remove extra whitespaces using 'str_squish' from the 'stringr' package
     x <- stringr::str_squish(x)
   }) 
-  text2 <- paste0(unlist(text2), collapse = " ")
+  text2 <- paste0(unlist(text2), sep = " ", collapse = " ")
     
   # inspect the structure of the text object
   return(c(text1, text2))
