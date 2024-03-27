@@ -1,6 +1,7 @@
 # required packages
 require(here)
 require(stringr)
+require(dplyr)
 
 # define function
 loadtxts <- function(x){
