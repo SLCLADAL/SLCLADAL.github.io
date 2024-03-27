@@ -4,6 +4,7 @@ require(stringr)
 require(dplyr)
 require(ggplot2)
 require(writexl)
+require(quanteda)
 
 # define function
 loadtxts <- function(x="notebooks/MyTexts"){
