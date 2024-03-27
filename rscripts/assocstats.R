@@ -80,7 +80,7 @@ assocstats <- function(x, term){
     dplyr::filter(# filter out instances where the w1 and w2 repel each other
                 E11 < O11) %>%
     # arrange by AM (association measure)
-    dplyr::arrange(-AM) %>%
+    dplyr::arrange(-DeltaP12) %>%
     # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
                             "O22", "R1", "R2", "C1", "C2", "E11", "E12", "E21",
