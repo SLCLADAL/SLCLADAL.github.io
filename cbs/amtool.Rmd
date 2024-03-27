@@ -28,42 +28,13 @@ library(writexl)  # for saving xlsx files
 ```
 
 
-## Using your own data
-
-There are two options when uploading your data (you need to choose one!). 
-
-1) You can upload a table with the co-occurrence of a specific word pair. If you upload this format, your data should be a spreadsheet  with
-
-+ a column called `w1` with the first word of interest (*word1*) in rows 1 and 2 and the term *other* in rows 3 and 4
-
-+ a column called `w2` with the co-occurring word (*word2*) in rows 1 and 3 and the term *other* in rows 2 and 4
-
-+ a column called `O11` with co-occurrence frequency of word 1 with word 2 in row 1 and the frequency off all other words in row 2 (together, these frequencies should represent the total corpus size).
-
-The data should have the same structure as the example below:
-
-![Data format required for this notebook](https://slcladal.github.io/images/colltb_0.png)
-
-
-2) You can upload a table with **all** co-occurrences in a corpus. If you upload this format, your data should be a spreadsheet  with
-
-+ a column called `w1` with all word types in a corpus (*word1*)
-
-+ a column called `w2` with all co-occurring word types in a corpus  (*word2*)
-
-+ a column called `O11` with co-occurrence frequency of word 1 with word 2
-
-The data should have the same structure as the example below:
-
-![Data format required for this notebook](https://slcladal.github.io/images/colltb_1.png)
-
 
 ## Using your own data
 
 <div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-To <b>use your own data</b>, click on the folder called <b>`MyTables`</b> (it is in the menu to the left of the screen) and then simply drag and drop your xlsx-file into the folder. <br>When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>You can upload <b>only xlsx-files</b>! ! 
+To <b>use your own data</b>, click on the folder called <b>`MyTexts`</b> (it is in the menu to the left of the screen) and then simply drag and drop your txt-files into the folder. <br>When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>You can upload <b>only txt-files</b> (simple unformatted files created in or saved by a text editor)! <br>The notebook assumes that you upload some form of text data - not tabular data! 
 <br>
 </p>
 <p style='margin-left:1em;'>
@@ -74,12 +45,12 @@ To <b>use your own data</b>, click on the folder called <b>`MyTables`</b> (it is
 
 
 ```{r}
-# load function that helps loading the xlsx data
-source("https://slcladal.github.io/rscripts/loadtable.R")
+# load function that helps loading texts
+source("https://slcladal.github.io/rscripts/loadtxts.R")
 # load texts
-mytable <- loadtable("notebooks/MyTables")
-# inspect first 10 rows of the data
-head(mytable, 10)
+text <- loadtxts("notebooks/MyTexts")
+# inspect the structure of the text object
+str(text)
 ```
 
 
@@ -90,7 +61,7 @@ We now prepare the table so that we can extract the association measures.
 # load function that extract association measures
 source("https://slcladal.github.io/rscripts/prepam.R")
 # load texts
-colldf <- prepam(mytable)
+colldf <- prepam(text)
 # inspect first 10 rows of the data
 head(colldf, 10)
 ```
@@ -128,6 +99,61 @@ write_xlsx(assocs, here::here("notebooks/MyOutput/assocs.xlsx"))
 
 <br>
 
+## Visualising collocations
+
+Here we will use a simple bar plot to visualize the 20 top collocations. The bar plot uses the *phi* value but you are welcome to visualize another association measure (simply replace `phi` with the measure you want to use).
+
+```{r}
+# sort the assocs data frame in descending order based on the 'phi' column
+assocs %>%
+  dplyr::arrange(-phi) %>%
+  # select the top 20 rows after sorting
+  head(20) %>%
+  # create a ggplot with 'token' on the x-axis (reordered by 'phi') and 'phi' on the y-axis
+  ggplot(aes(x = reorder(token, phi, mean), y = phi, label = phi)) +
+  # add a bar plot using the 'phi' values
+  geom_bar(stat = "identity") +
+  # add text labels above the bars with rounded 'phi' values
+  geom_text(aes(y = phi - 0.005, label = round(phi, 3)), color = "white", size = 3) + 
+  # flip the coordinates to have horizontal bars
+  coord_flip() +
+  # set the theme to a basic white and black theme
+  theme_bw() +
+  # set the x-axis label to "Token" and y-axis label to "Association strength (phi)"
+  labs(x = "Token", y = "Association strength")
+```
+
+
+## Exporting images
+
+To export network graph as an png-file, we use `ggsave`. Be aware that we use the `here` function to save the file in the `MyOutput` folder.
+
+The `ggsave` function has the following main arguments:
+
++ `filename`: File name to create on disk.    
++ `device`: Device to use. Can either be a device function (e.g. png), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only). If NULL (default), the device is guessed based on the filename extension  
++ `path`: Path of the directory to save plot to: path and filename are combined to create the fully qualified file name. Defaults to the working directory.  
++ `width, height`: Plot size in units expressed by the units argument. If not supplied, uses the size of the current graphics device.  
++ `units`: One of the following units in which the width and height arguments are expressed: "in", "cm", "mm" or "px".  
++ `dpi`: Plot resolution. Also accepts a string input: "retina" (320), "print" (300), or "screen" (72). Applies only to raster output types.  
++ `bg`: Background colour. If NULL, uses the plot.background fill value from the plot theme.  
+
+
+```{r eval = F, warning=F, message=F}
+# save network graph for MyOutput folder
+ggsave(here::here("notebooks/MyOutput/image_01.png"), bg = "white")
+```
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>You will find the image-file named *image_01.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_01.png* file, and choose Download from the dropdown menu to download the file. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
 
 
 ***
