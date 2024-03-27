@@ -6,7 +6,7 @@ require(ggplot2)
 require(writexl)
 
 # define function
-loadtxts <- function(x){
+loadtxts <- function(x="notebooks/MyTexts"){
   fls <- list.files(here::here(x), # path to the corpus data
                     
                     # full paths - not just the names of the files
