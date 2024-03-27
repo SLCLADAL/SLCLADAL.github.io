@@ -23,7 +23,7 @@ loadkeytxts <- function(x="notebooks/Target", y="notebooks/Reference"){
   
     
   # loop over the vector 'myfiles' that contains paths to the data
-  t_texts <- sapply(t_fls, function(x){
+  text1 <- sapply(t_fls, function(x){
     
     # read the content of each file using 'scan'
     x <- scan(x, 
@@ -38,13 +38,12 @@ loadkeytxts <- function(x="notebooks/Target", y="notebooks/Reference"){
     
     # remove extra whitespaces using 'str_squish' from the 'stringr' package
     x <- stringr::str_squish(x)
-  })
-  
-  # clean names
-  text1 <- paste0(t_texts, collaspe = " ", sep = " ")
+  }) %>%
+    dplyr::bind_rows()
+
 
   # loop over the vector 'myfiles' that contains paths to the data
-  r_texts <- sapply(r_fls, function(x){
+  text2 <- sapply(r_fls, function(x){
     
     # read the content of each file using 'scan'
     x <- scan(x, 
@@ -59,10 +58,8 @@ loadkeytxts <- function(x="notebooks/Target", y="notebooks/Reference"){
     
     # remove extra whitespaces using 'str_squish' from the 'stringr' package
     x <- stringr::str_squish(x)
-  })
-  
-  # clean names
-  text2 <- paste0(r_texts, collaspe = " ", sep = " ")
+  }) %>%
+    dplyr::bind_rows()
     
   # inspect the structure of the text object
   return(c(text1, text2))
