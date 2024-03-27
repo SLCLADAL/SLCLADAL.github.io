@@ -3,6 +3,7 @@
 # required packages
 require(readxl)
 require(here)
+require(dplyr)
 
 loadtable <- function(x){
   fls <- list.files(here::here(x), # path to the corpus data

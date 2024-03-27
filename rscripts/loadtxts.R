@@ -2,6 +2,8 @@
 require(here)
 require(stringr)
 require(dplyr)
+require(ggplot2)
+require(writexl)
 
 # define function
 loadtxts <- function(x){
