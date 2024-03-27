@@ -65,5 +65,5 @@ loadkeytxts <- function(x="notebooks/Target", y="notebooks/Reference"){
   text2 <- paste0(r_texts, collaspe = " ", sep = " ")
     
   # inspect the structure of the text object
-  return(text1, text2)
+  return(c(text1, text2))
 }
