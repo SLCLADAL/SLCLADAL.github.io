@@ -69,9 +69,9 @@ assocstats <- function(x, term){
                   G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22))) %>%
     
     # determine Bonferroni corrected significance
-    dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
-                                                   p / Rws > .01 ~ "p < .05*",
-                                                   p / Rws > .001 ~ "p < .01**",
+    dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws >= .05 ~ "n.s.",
+                                                   p / Rws >= .01 ~ "p < .05*",
+                                                   p / Rws >= .001 ~ "p < .01**",
                                                    p / Rws <= .001 ~ "p < .001***",
                                                    T ~ "N.A.")) %>%
     # round p-value
