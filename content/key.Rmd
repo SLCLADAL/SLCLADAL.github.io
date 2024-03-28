@@ -1,0 +1,585 @@
+---
+title: "Keyness and Keyword Analysis in R"
+author: "Martin Schweinberger"
+date: "2024-03-07"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction {-}
+
+This tutorial introduces keyness and keyword analysis with R and shows how to extract and visualize keywords.
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to extract keywords from and analyze keywords in textual data  using R. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with keyness and keyword analysis.
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+To be able to follow this tutorial, we suggest you check out and familiarize yourself with the content of the following **R Basics** tutorials:<br>
+</p>
+<p style='margin-top:1em; text-align:left'>
+<ul>
+  <li>[Getting started with R](https://ladal.edu.au/intror.html) </li>
+  <li>[Loading, saving, and generating data in R](https://ladal.edu.au/load.html) </li>
+  <li>[String Processing in R](https://ladal.edu.au/string.html) </li>
+  <li>[Regular Expressions in R](https://ladal.edu.au/regex.html) </li>
+</ul>
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click [**here**](https://ladal.edu.au/content/coll.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fkey_cb.ipynb%26branch%3Dmain)<br>
+Click [**here**](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fkey_cb.ipynb%26branch%3Dmain) to open an interactive Jupyter notebook that allows you to execute, change, and edit the code as well as to upload your own data. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+**LADAL TOOL** 
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click on this [![Binder](https://mybinder.org/badge_logo.svg)](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fkeytool.ipynb%26branch%3Dmain) badge to open an notebook-based tool <br>that <b>calculates keyness statistics</b> and allows you to download the results.</p><br>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+
+<br>
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b> How can you detect keywords, i.e. words that are characteristic of a text (or a collection of texts)?</b><br></p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+This tutorial aims to show how you can answer this question. 
+
+
+**Preparation and session set up**
+
+This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the libraries so you do not need to worry if it takes some time).
+
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)
+options(scipen = 999)
+options(max.print=1000)
+# install packages
+install.packages("flextable")
+install.packages("Matrix")
+install.packages("quanteda")
+install.packages("quanteda.textstats")
+install.packages("quanteda.textplots")
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("tm")
+install.packages("sna")
+install.packages("tidytext")
+install.packages("ggplot2")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Next, we load the packages.
+
+```{r prep2, message=FALSE, warning=FALSE}
+# load packages
+library(flextable)
+library(Matrix)
+library(quanteda)
+library(quanteda.textstats)
+library(quanteda.textplots)
+library(dplyr)
+library(stringr)
+library(tm)
+library(sna)
+library(ggplot2)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+
+# Keywords {-}
+
+Keywords play a pivotal role in text analysis, serving as distinctive terms that hold particular significance within a given text, context, or collection. These words stand out due to their heightened frequency in a specific text or context, setting them apart from their occurrence in another. In essence, keywords are linguistic markers that encapsulate the essence or topical focus of a document or dataset. The process of identifying keywords involves a methodology akin to the one employed for detecting collocations using kwics. This entails comparing the use of a particular word in corpus A, against its use in corpus B. By discerning the frequency disparities, we gain valuable insights into the salient terms that contribute significantly to the unique character and thematic emphasis of a given text or context.
+
+
+<div class="warning" style='padding:0.1em; background-color:#51247a; color:#f2f2f2'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+**LADAL TOOL** 
+</p>
+<p style='margin-top:1em; text-align:center'>
+Click on this [![Binder](https://mybinder.org/badge_logo.svg)](https://binderhub.atap-binder.cloud.edu.au/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fkeytool.ipynb%26branch%3Dmain) badge to open an notebook-based tool <br>that calculates association measures and allows you to download the results.</p><br>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+## Dimensions of keyness {-}
+
+Before we start with the practical part of this tutorial, it is important to talk about the different dimensions of keyness [see @soenning2023key]. 
+
+Keyness analysis identifies typical items in a discourse domain, where typicalness traditionally relates to frequency of occurrence. The emphasis is on items used more frequently in the target corpus compared to a reference corpus. @egbert2019incorporating expanded this notion, highlighting two criteria for typicalness: *content-distinctiveness* and *content-generalizability*.  
+
+  + Content-distinctiveness refers to an item's association with the domain and its topical relevance.   
+  
+  + Content-generalizability pertains to an item's widespread usage across various texts within the domain.  
+  
+These criteria bridge traditional keyness approaches with broader linguistic perspectives, emphasizing both the distinctiveness and generalizability of key items within a corpus.
+
+Following @soenning2023key, we adopt @egbert2019incorporating keyness criteria, distinguishing between frequency-oriented and dispersion-oriented approaches to assess keyness. These perspectives capture distinct, linguistically meaningful attributes of typicalness. We also differentiate between keyness features inherent to the target variety and those that emerge from comparing it to a reference variety. This four-way classification, detailed in the table below, links methodological choices to the linguistic meaning conveyed by quantitative measures. Typical items exhibit a sufficiently high occurrence rate to be discernible in the target variety, with discernibility measured solely within the target corpus. Key items are also distinct, being used more frequently than in reference domains of language use. While discernibility and distinctiveness both rely on frequency, they measure different aspects of typicalness.
+
+```{r ds17, echo=F, message=FALSE, warning=FALSE}
+Analysis <- c("Target variety in isolation", "Comparison to reference variety")
+`Frequency-oriented` <- c("Discernibility of item in the target variety", "Distinctiveness relative to the reference variety")
+`Dispersion-oriented` <- c("Generality across texts in the target variety", "Comparative generality relative to the reference variety")
+df <- data.frame(Analysis, `Frequency-oriented`, `Dispersion-oriented`)
+df %>%
+  as.data.frame() %>%
+  flextable::flextable() %>%
+  flextable::set_table_properties(width = .75, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Dimensions of keyness (see Soenning, 2023: 3)")  %>%
+  flextable::border_outer()
+```
+
+
+
+The second aspect of keyness involves an item's dispersion across texts in the target domain, indicating its widespread use. A typical item should appear evenly across various texts within the target domain, reflecting its generality. This breadth of usage can be compared to its occurrence in the reference domain, termed as comparative generality. Therefore, a key item should exhibit greater prevalence across target texts compared to those in the reference domain.
+
+## Identifying keywords {-}
+
+Here, we focus on a frequency-based approach that assesses distinctiveness relative to the reference variety. To identify these keywords, we can follow the procedure we have used to identify collocations using kwics - the idea is essentially identical: we compare the use of a word in a *target* corpus A to its use in a *reference* corpus.
+
+To determine if a token is a keyword and if it occurs significantly more frequently in a target corpus compared to a reference corpus, we use the following information (that is provided by the table above):
+
+* O11 = Number of times word~x~ occurs in `target corpus`
+
+* O12 = Number of times word~x~ occurs in `reference corpus` (without `target corpus`)
+
+* O21 = Number of times other words occur in `target corpus`
+
+* O22 = Number of times  other words occur in `reference corpus`
+
+Example:
+
+|              | target corpus       |    reference corpus |      |
+ :---          | :-----:    |   --------:  | ---
+| **token**     | O~11~      | O~12~        |  = R~1~
+| **other tokens** | O~21~      | O~22~        |  = R~2~
+|              |  = C~1~    |   = C~2~     |  = N |
+
+
+We begin with loading two texts (text1 is our *target* and text2 is our *reference*).
+
+```{r}
+# load data
+text1 <- base::readRDS(url("https://slcladal.github.io/data/orwell.rda", "rb")) %>%
+  paste0(collapse = " ")
+text2 <- base::readRDS(url("https://slcladal.github.io/data/melville.rda", "rb"))  %>%
+  paste0(collapse = " ")
+```
+
+```{r echo = F, message=FALSE, warning=FALSE}
+text1 %>%
+  substr(start=1, stop=200) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 200 characters of text 1")  %>%
+  flextable::border_outer()
+```
+
+As you can see, text1 is George Orwell's *1984*. 
+
+```{r echo = F, message=FALSE, warning=FALSE}
+text2 %>%
+  substr(start=1, stop=200) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 200 characters of text 2")  %>%
+  flextable::border_outer()
+```
+
+The table shows that text2 is Herman Melville's *Moby Dick*.
+
+After loading the two texts, we create a frequency table of first text.
+
+```{r}
+text1_words <- text1 %>%
+  # remove non-word characters
+  stringr::str_remove_all("[^[:alpha:] ]") %>%
+  # convert to lower
+  tolower() %>%
+  # tokenize the corpus files
+  quanteda::tokens(remove_punct = T, 
+                   remove_symbols = T,
+                   remove_numbers = T) %>%
+  # unlist the tokens to create a data frame
+  unlist() %>%
+  as.data.frame() %>%
+  # rename the column to 'token'
+  dplyr::rename(token = 1) %>%
+  # group by 'token' and count the occurrences
+  dplyr::group_by(token) %>%
+  dplyr::summarise(n = n()) %>%
+  # add column stating where the frequency list is 'from'
+  dplyr::mutate(type = "text1")
+```
+
+Now, we create a frequency table of second text.
+
+```{r}
+text2_words <- text2 %>%
+  # remove non-word characters
+  stringr::str_remove_all("[^[:alpha:] ]") %>%
+  # convert to lower
+  tolower() %>%
+  # tokenize the corpus files
+  quanteda::tokens(remove_punct = T, 
+                   remove_symbols = T,
+                   remove_numbers = T) %>%
+  # unlist the tokens to create a data frame
+  unlist() %>%
+  as.data.frame() %>%
+  # rename the column to 'token'
+  dplyr::rename(token = 1) %>%
+  # group by 'token' and count the occurrences
+  dplyr::group_by(token) %>%
+  dplyr::summarise(n = n()) %>%
+  # add column stating where the frequency list is 'from'
+  dplyr::mutate(type = "text2")
+```
+
+In a next step, we combine the tables.
+
+```{r}
+texts_df <- dplyr::left_join(text1_words, text2_words, by = c("token")) %>%
+  # rename columns and select relevant columns
+  dplyr::rename(text1 = n.x,
+                text2 = n.y) %>%
+  dplyr::select(-type.x, -type.y) %>%
+  # replace NA values with 0 in 'corpus' and 'kwic' columns
+  tidyr::replace_na(list(text1 = 0, text2 = 0))
+```
+
+
+
+```{r echo = F, message=FALSE, warning=FALSE}
+texts_df %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "Frequency table of tokens in text1 and text2")  %>%
+  flextable::border_outer()
+```
+
+We now calculate the frequencies of the observed and expected frequencies as well as the row and column totals.
+
+
+```{r}
+texts_df %>%
+  dplyr::mutate(text1 = as.numeric(text1),
+                text2 = as.numeric(text2)) %>%
+  dplyr::mutate(C1 = sum(text1),
+                C2 = sum(text2),
+                N = C1 + C2) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(R1 = text1+text2,
+                R2 = N - R1,
+                O11 = text1,
+                O12 = R1-O11,
+                O21 = C1-O11,
+                O22 = C2-O12) %>%
+  dplyr::mutate(E11 = (R1 * C1) / N,
+                E12 = (R1 * C2) / N,
+                E21 = (R2 * C1) / N,
+                E22 = (R2 * C2) / N) %>%
+  dplyr::select(-text1, -text2) -> stats_tb2
+```
+
+```{r echo = F, message=FALSE, warning=FALSE}
+stats_tb2 %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the processed frequency table")  %>%
+  flextable::border_outer()
+```
+
+We can now calculate the association strength which, in this case serves as a keyness measure.
+
+```{r}
+stats_tb2 %>%
+  # determine number of rows
+  dplyr::mutate(Rws = nrow(.)) %>%   
+  # work row-wise
+    dplyr::rowwise() %>%
+    # calculate fishers' exact test
+    dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
+                                                        ncol = 2, byrow = T))[1]))) %>%
+
+    # extract AM
+    # 1. bias towards top left
+    dplyr::mutate(btl_O12 = ifelse(C1 > R1, 0, R1-C1),
+                  btl_O11 = ifelse(C1 > R1, R1, R1-btl_O12),
+                  btl_O21 = ifelse(C1 > R1, C1-R1, C1-btl_O11),
+                  btl_O22 = ifelse(C1 > R1, C2, C2-btl_O12),
+                  
+    # 2. bias towards top right
+                  btr_O11 = 0, 
+                  btr_O21 = R1,
+                  btr_O12 = C1,
+                  btr_O22 = C2-R1) %>%
+    
+    # 3. calculate AM
+    dplyr::mutate(upp = btl_O11/R1,
+                  low = btr_O11/R1,
+                  op = O11/R1) %>%
+    dplyr::mutate(AM = op / upp) %>%
+    
+    # remove superfluous columns
+    dplyr::select(-any_of(c("btr_O21", "btr_O12", "btr_O22", "btl_O12", 
+                            "btl_O11", "btl_O21", "btl_O22", "btr_O11"))) %>% 
+  
+  # extract descriptives
+  dplyr::mutate(ptw_target = O11/C1*1000,
+                ptw_ref = O12/C2*1000) %>%
+  
+  # extract x2 statistics
+    dplyr::mutate(X2 = (O11-E11)^2/E11 + (O12-E12)^2/E12 + (O21-E21)^2/E21 + (O22-E22)^2/E22) %>%
+
+    # extract association measures
+    dplyr::mutate(phi = sqrt((X2 / N)),
+                MI = log2(O11 / E11),
+                t.score = (O11 - E11) / sqrt(O11),
+                z.score = (O11 - E11) / sqrt(E11),
+                PMI = log2( (O11 / N) / ((O11+O12) / N) * 
+                              ((O11+O21) / N) ),
+                DeltaP = (O11 / R1) - (O21 / R2),
+                LogOddsRatio = log(((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )),
+                G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22)),
+                
+                # traditional keyness measures
+                RateRatio = (O11/(C1*1000)) / (O12/(C2*1000)),
+                RateDifference = (O11/(C1*1000)) - (O12/(C2*1000)),
+                DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
+                OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )) %>%
+    
+  # determine Bonferroni corrected significance
+  dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
+                                                 p / Rws > .01 ~ "p < .05*",
+                                                 p / Rws > .001 ~ "p < .01**",
+                                                 p / Rws <= .001 ~ "p < .001***",
+                                                 T ~ "N.A.")) %>% 
+    # round p-value
+    dplyr::mutate(p = round(p, 5),
+                  type = ifelse(E11 > O11, "antitype", "type")) %>%
+    # filter out non significant results
+    dplyr::filter(Sig_corrected != "n.s.") %>%
+    # arrange by DeltaP (association measure)
+    dplyr::arrange(-DeltaP) %>%
+    # remove superfluous columns
+    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", 
+                            "R1", "R2", "C1", "C2", "E12", "E21",
+                            "E22", "upp", "low", "op", "t.score", "z.score", "Rws"))) %>%
+  dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "E11",
+                           "ptw_target", "ptw_ref", "DeltaP", "LogOddsRatio", 
+                           "AM",  "MI", "PMI", "phi", 
+                           "X2", "G2", "RateRatio", "RateDifference",
+                           "DifferenceCoefficient", "OddsRatio", 
+                           "p", "O12", "O21", "O22"))) -> assoc_tb3
+```
+
+```{r echo = F, message=FALSE, warning=FALSE}
+assoc_tb3 %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 rows of the association statistic table")  %>%
+  flextable::border_outer()
+```
+
+The above table shows the keywords for text1, i.e. for George Orwell's *1984*. 
+
+## Visualising keywords {-}
+
+### Dotplots {-}
+
+We can now visualize the association strengths in a dotplot as shown in the code chunk below.
+
+```{r message=F, warning=F}
+# sort the assoc_tb3 data frame in descending order based on the 'DeltaP' column
+assoc_tb3 %>%
+  dplyr::arrange(-DeltaP) %>%
+  # select the top 20 rows after sorting
+  head(20) %>%
+  # create a ggplot with 'token' on the x-axis (reordered by 'DeltaP') and 'DeltaP' on the y-axis
+  ggplot(aes(x = reorder(token, DeltaP, mean), y = DeltaP)) +
+  # add a scatter plot with points representing the 'DeltaP' values
+  geom_point() +
+  # flip the coordinates to have horizontal points
+  coord_flip() +
+  # set the theme to a basic white and black theme
+  theme_bw() +
+  # set the x-axis label to "Token" and y-axis label to "Association strength (phi)"
+  labs(x = "Token", y = "Association strength (DeltaP12)")
+```
+
+### Barplots {-}
+
+Another option to visualize the association strengths is a barplot as shown  below.
+
+```{r message=F, warning=F}
+# get top 10 keywords for text 1
+top <- assoc_tb3 %>% dplyr::ungroup() %>% dplyr::slice_head(n = 12)
+# get top 10 keywords for text 2
+bot <- assoc_tb3 %>% dplyr::ungroup() %>% dplyr::slice_tail(n = 12)
+# combine into table
+rbind(top, bot) %>%
+  # create a ggplot
+  ggplot(aes(x = reorder(token, DeltaP, mean), y = DeltaP, label = DeltaP, fill = type)) +
+  # add a bar plot using the 'phi' values
+  geom_bar(stat = "identity") +
+  # add text labels above the bars with rounded 'phi' values
+  geom_text(aes(y = ifelse(DeltaP> 0, DeltaP - 0.05, DeltaP + 0.05), 
+                label = round(DeltaP, 5)), color = "white", size = 3) + 
+  # flip the coordinates to have horizontal bars
+  coord_flip() +
+  # set the theme to a basic white and black theme
+  theme_bw() +
+  # remove legend
+  theme(legend.position = "none") +
+    # define colors
+  scale_fill_manual(values = c("orange","darkgray")) +
+  # set the x-axis label to "Token" and y-axis label to "Association strength (phi)"
+  labs(title = "Top 10 keywords for text1 and text 2", x = "Keyword", y = "Association strength (DeltaP12)")
+```
+
+## Comparative wordclouds {-}
+
+
+Another form of word clouds, known as *comparison clouds*, is helpful in discerning disparities between texts. The problem compared to previous, more informative methods for identifying keywords is that comparison clouds use a very basic and not very sophisticated methods for identifying keywords. Nonetheless, comparison clouds are very useful visualization tools during initial steps on an analysis.
+
+In a first step, we generate a corpus object from the texts and create a variable with the author name.
+
+```{r wc3, message=FALSE, warning=FALSE}
+corp_dom <- quanteda::corpus(c(text1, text2)) 
+attr(corp_dom, "docvars")$Author = c("Orwell", "Melville")
+```
+
+Now, we can remove so-called *stopwords* (non-lexical function words) and punctuation and generate the comparison cloud.
+
+```{r wc4, message=FALSE, warning=FALSE}
+# create a comparison word cloud for a corpus
+corp_dom %>%
+  # tokenize the corpus, removing punctuation, symbols, and numbers
+  quanteda::tokens(remove_punct = TRUE,
+                   remove_symbols = TRUE,
+                   remove_numbers = TRUE) %>%
+  # remove English stopwords
+  quanteda::tokens_remove(stopwords("english")) %>%
+  # create a Document-Feature Matrix (DFM)
+  quanteda::dfm() %>%
+  # group the DFM by the 'Author' column from 'corp_dom'
+  quanteda::dfm_group(groups = corp_dom$Author) %>%
+  # trim the DFM, keeping terms that occur at least 10 times
+  quanteda::dfm_trim(min_termfreq = 10, verbose = FALSE) %>%
+  # generate a comparison word cloud
+  quanteda.textplots::textplot_wordcloud(
+    # create a comparison word cloud
+    comparison = TRUE,  
+    # set colors for different groups
+    color = c("darkgray", "orange"),  
+    # define the maximum number of words to display in the word cloud
+    max_words = 150)  
+```
+
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. 2024. *Keyness and Keyword Analysis in R*. Brisbane: The University of Queensland. url: https://ladal.edu.au/coll.html (Version 2024.03.28).
+
+```
+@manual{schweinberger`2024key,
+  author = {Schweinberger, Martin},
+  title = {Keyness and Keyword Analysis in R},
+  note = {https://ladal.edu.au/key.html},
+  year = {2024},
+  organization = {The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2024.03.28}
+}
+```
+
+```{r fin}
+sessionInfo()
+```
+
+
+***
+
+[Back to top](#Introduction)
+
+[Back to LADAL home](https://ladal.edu.au)
+
+***
+
+# References {-}
+
+

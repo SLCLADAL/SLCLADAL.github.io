@@ -237,6 +237,99 @@ adf
 ```
 
 
+# Keyness
+
+
+```{r}
+#install.packages("devtools")
+devtools::install_github("amacanovic/KeynessMeasures")
+```
+
+```{r}
+library(KeynessMeasures)
+```
+
+
+```{r}
+# load data
+text1 <- base::readRDS(url("https://slcladal.github.io/data/orwell.rda", "rb")) %>%
+  paste0(collapse = " ")
+text2 <- base::readRDS(url("https://slcladal.github.io/data/melville.rda", "rb"))  %>%
+  paste0(collapse = " ")
+```
+```{r}
+
+```
+
+After loading the two texts, we create a frequency table of first text.
+
+```{r}
+text1_words <- text1 %>%
+  # remove non-word characters
+  stringr::str_remove_all("[^[:alpha:] ]") %>%
+  # convert to lower
+  tolower() %>%
+  # tokenize the corpus files
+  quanteda::tokens(remove_punct = T, 
+                   remove_symbols = T,
+                   remove_numbers = T) %>%
+  # unlist the tokens to create a data frame
+  unlist() %>%
+  as.data.frame() %>%
+  # rename the column to 'token'
+  dplyr::rename(token = 1) %>%
+  # group by 'token' and count the occurrences
+  dplyr::group_by(token) %>%
+  dplyr::summarise(n = n()) %>%
+  # add column stating where the frequency list is 'from'
+  dplyr::mutate(type = "text1")
+```
+
+Now, we create a frequency table of second text.
+
+```{r}
+text2_words <- text2 %>%
+  # remove non-word characters
+  stringr::str_remove_all("[^[:alpha:] ]") %>%
+  # convert to lower
+  tolower() %>%
+  # tokenize the corpus files
+  quanteda::tokens(remove_punct = T, 
+                   remove_symbols = T,
+                   remove_numbers = T) %>%
+  # unlist the tokens to create a data frame
+  unlist() %>%
+  as.data.frame() %>%
+  # rename the column to 'token'
+  dplyr::rename(token = 1) %>%
+  # group by 'token' and count the occurrences
+  dplyr::group_by(token) %>%
+  dplyr::summarise(n = n()) %>%
+  # add column stating where the frequency list is 'from'
+  dplyr::mutate(type = "text2")
+```
+
+In a next step, we combine the tables.
+
+```{r}
+texts_df <- dplyr::left_join(text1_words, text2_words, by = c("token")) %>%
+  # rename columns and select relevant columns
+  dplyr::rename(text1 = n.x,
+                text2 = n.y) %>%
+  dplyr::select(-type.x, -type.y) %>%
+  # replace NA values with 0 in 'corpus' and 'kwic' columns
+  tidyr::replace_na(list(text1 = 0, text2 = 0))
+texts_df %>%
+  as.data.frame() %>%
+  head(10)
+```
+
+
+```{r}
+keyness_measure_calculator(texts_df)
+```
+
+
 
 ```{r}
 sessionInfo()
