@@ -31,12 +31,11 @@ assocstats <- function(x, term){
                   btl_O11 = ifelse(C1 > R1, R1, R1-btl_O12),
                   btl_O21 = ifelse(C1 > R1, C1-R1, C1-btl_O11),
                   btl_O22 = ifelse(C1 > R1, C2, C2-btl_O12),
-                  
-    # 2. bias towards top right
-                  btr_O11 = 0, 
-                  btr_O21 = R1,
-                  btr_O12 = C1,
-                  btr_O22 = C2-R1) %>%
+                  # 2. bias towards top right
+                  btr_O12 = ifelse(C2 > R1, 0, R1-C2),
+                  btr_O11 = ifelse(C2 > R1, R1, R1-btl_O12),
+                  btr_O21 = ifelse(C2 > R1, C2-R1, C2-btl_O11),
+                  btr_O22 = ifelse(C2 > R1, C2, C2-btl_O12)) %>%
     
     # 3. calculate AM
     dplyr::mutate(upp = btl_O11/R1,
