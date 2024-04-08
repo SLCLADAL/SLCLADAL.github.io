@@ -89,7 +89,7 @@ keystats <- function(x){
     # filter out non significant results
     dplyr::filter(Sig_corrected != "n.s.") %>%
     # arrange by DeltaP (association measure)
-    dplyr::arrange(-RateRatio) %>%
+    dplyr::arrange(-RateDifference) %>%
     # remove superfluous columns
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", 
                             "R1", "R2", "C1", "C2", "E12", "E21",
