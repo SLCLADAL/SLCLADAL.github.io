@@ -28,30 +28,7 @@ keystats <- function(x){
     # calculate fishers' exact test
     dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
                                                           ncol = 2, byrow = T))[1]))) %>%
-    
-    # extract AM
-    # 1. bias towards top left
-    dplyr::mutate(btl_O12 = ifelse(C1 > R1, 0, R1-C1),
-                  btl_O11 = ifelse(C1 > R1, R1, R1-btl_O12),
-                  btl_O21 = ifelse(C1 > R1, C1-R1, C1-btl_O11),
-                  btl_O22 = ifelse(C1 > R1, C2, C2-btl_O12),
-                  
-                  # 2. bias towards top right
-                  btr_O11 = 0, 
-                  btr_O21 = R1,
-                  btr_O12 = C1,
-                  btr_O22 = C2-R1) %>%
-    
-    # 3. calculate AM
-    dplyr::mutate(upp = btl_O11/R1,
-                  low = btr_O11/R1,
-                  op = O11/R1) %>%
-    dplyr::mutate(AM = op / upp) %>%
-    
-    # remove superfluous columns
-    dplyr::select(-any_of(c("btr_O21", "btr_O12", "btr_O22", "btl_O12", 
-                            "btl_O11", "btl_O21", "btl_O22", "btr_O11"))) %>% 
-    
+
     # extract descriptives
     dplyr::mutate(ptw_target = O11/C1*1000,
                   ptw_ref = O12/C2*1000) %>%
@@ -63,7 +40,6 @@ keystats <- function(x){
     dplyr::mutate(phi = sqrt((X2 / N)),
                   MI = log2(O11 / E11),
                   t.score = (O11 - E11) / sqrt(O11),
-                  z.score = (O11 - E11) / sqrt(E11),
                   PMI = log2( (O11 / N) / ((O11+O12) / N) * 
                                 ((O11+O21) / N) ),
                   DeltaP = (O11 / R1) - (O21 / R2),
@@ -75,6 +51,7 @@ keystats <- function(x){
                   RateDifference = (O11/(C1*1000)) - (O12/(C2*1000)),
                   DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
                   OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) ),
+                  LLR = 2 * (O11 * (log((O11 / E11))),
                   SignedDKL = sum(ifelse(O11 > 0, O11 * log(O11 / ((O11 + O12) / 2)), 0) - ifelse(O12 > 0, O12 * log(O12 / ((O11 + O12) / 2)), 0))) %>%
     
     # determine Bonferroni corrected significance
@@ -96,10 +73,9 @@ keystats <- function(x){
                             "E22", "upp", "low", "op", "t.score", "z.score", "Rws"))) %>%
     dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "O12",
                              "ptw_target", "ptw_ref", "SignedDKL", "RateRatio", 
-                             "RateDifference", "DifferenceCoefficient", 
+                             "RateDifference", "DifferenceCoefficient", "LLR", 
                              "LogOddsRatio", "MI", "PMI", "phi", "X2", "G2", 
-                             "AM", "OddsRatio", "DeltaP", 
-                             "p", "E11", "O21", "O22"))) -> result
+                             "OddsRatio", "DeltaP", "p", "E11", "O21", "O22"))) -> result
   # inspect
   return(result)
 }
