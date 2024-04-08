@@ -52,7 +52,7 @@ keystats <- function(x){
                   DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
                   OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) ),
                   LLR = 2 * (O11 * (log((O11 / E11)))),
-                  RDF <- abs((O11 / C1) - (O12 / C2)),
+                  RDF = abs((O11 / C1) - (O12 / C2)),
                   PDiff = abs(ptw_target - ptw_ref) / ((ptw_target + ptw_ref) / 2) * 100,
                   SignedDKL = sum(ifelse(O11 > 0, O11 * log(O11 / ((O11 + O12) / 2)), 0) - ifelse(O12 > 0, O12 * log(O12 / ((O11 + O12) / 2)), 0))) %>%
     
