@@ -94,12 +94,12 @@ keystats <- function(x){
     dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", 
                             "R1", "R2", "C1", "C2", "E12", "E21",
                             "E22", "upp", "low", "op", "t.score", "z.score", "Rws"))) %>%
-    dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "E11",
+    dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "O12",
                              "ptw_target", "ptw_ref", "SignedDKL", "RateRatio", 
                              "RateDifference", "DifferenceCoefficient", 
                              "LogOddsRatio", "MI", "PMI", "phi", "X2", "G2", 
                              "AM", "OddsRatio", "DeltaP", 
-                             "p", "O12", "O21", "O22"))) -> result
+                             "p", "E11", "O21", "O22"))) -> result
   # inspect
   return(result)
 }
