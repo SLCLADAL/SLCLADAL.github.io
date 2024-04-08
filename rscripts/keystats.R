@@ -44,14 +44,14 @@ keystats <- function(x){
                                 ((O11+O21) / N) ),
                   DeltaP = (O11 / R1) - (O21 / R2),
                   LogOddsRatio = log(((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )),
-                  G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22)),
+                  G2 = 2 * ((O11+ 0.001) * log((O11+ 0.001) / E11) + (O12+ 0.001) * log((O12+ 0.001) / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22)),
                   
                   # traditional keyness measures
                   RateRatio = (O11/(C1*1000)) / (O12/(C2*1000)),
                   RateDifference = (O11/(C1*1000)) - (O12/(C2*1000)),
                   DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
                   OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) ),
-                  LLR = 2 * (O11 * (log((O11 / E11))),
+                  LLR = 2 * (O11 * (log((O11 / E11)))),
                   SignedDKL = sum(ifelse(O11 > 0, O11 * log(O11 / ((O11 + O12) / 2)), 0) - ifelse(O12 > 0, O12 * log(O12 / ((O11 + O12) / 2)), 0))) %>%
     
     # determine Bonferroni corrected significance
