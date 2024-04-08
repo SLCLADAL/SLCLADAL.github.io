@@ -63,7 +63,8 @@ keystats <- function(x){
                   RateRatio = (O11/(C1*1000)) / (O12/(C2*1000)),
                   RateDifference = (O11/(C1*1000)) - (O12/(C2*1000)),
                   DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
-                  OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )) %>%
+                  OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) ),
+                  SignedDKL = sum(ifelse(w1 > 0, w1 * log(w1 / ((w1 + w2) / 2)), 0) - ifelse(w2 > 0, w2 * log(w2 / ((w1 + w2) / 2)), 0))) %>%
     
     # determine Bonferroni corrected significance
     dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
@@ -83,10 +84,10 @@ keystats <- function(x){
                             "R1", "R2", "C1", "C2", "E12", "E21",
                             "E22", "upp", "low", "op", "t.score", "z.score", "Rws"))) %>%
     dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "E11",
-                             "ptw_target", "ptw_ref", "DeltaP", "LogOddsRatio", 
-                             "AM",  "MI", "PMI", "phi", 
-                             "X2", "G2", "RateRatio", "RateDifference",
-                             "DifferenceCoefficient", "OddsRatio", 
+                             "ptw_target", "ptw_ref", "SignedDKL", "RateRatio", 
+                             "RateDifference", "DifferenceCoefficient", 
+                             "LogOddsRatio", "MI", "PMI", "phi", "X2", "G2", 
+                             "AM", "OddsRatio", "DeltaP", 
                              "p", "O12", "O21", "O22"))) -> result
   # inspect
   return(result)
