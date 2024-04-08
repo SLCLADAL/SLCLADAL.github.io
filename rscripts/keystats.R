@@ -75,7 +75,7 @@ keystats <- function(x){
                             "R1", "R2", "C1", "C2", "E12", "E21",
                             "E22", "upp", "low", "op", "t.score", "z.score", "Rws"))) %>%
     dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "O12",
-                             "ptw_target", "ptw_ref", , "G2",  "RDF", "RateRatio", 
+                             "ptw_target", "ptw_ref", "G2",  "RDF", "RateRatio", 
                              "RateDifference", "DifferenceCoefficient", "LLR", "SignedDKL",
                              "LogOddsRatio", "MI", "PMI", "phi", "X2", "G2", 
                              "OddsRatio", "DeltaP", "p", "E11", "O21", "O22"))) -> result
