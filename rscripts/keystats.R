@@ -11,21 +11,13 @@ keystats <- function(x){
                   C2 = sum(text2),
                   N = C1 + C2) %>%
     # determine number of rows
-    dplyr::mutate(Rws = nrow(.)) %>% 
+    dplyr::mutate(Rws = nrow(.)) %>%   
+    # work row-wise
     dplyr::rowwise() %>%
-    dplyr::mutate(R1 = text1+text2,
-                  R2 = N - R1,
-                  O11 = text1,
-                  O12 = R1-O11,
-                  O21 = C1-O11,
-                  O22 = C2-O12) %>%
-    dplyr::mutate(E11 = (R1 * C1) / N,
-                  E12 = (R1 * C2) / N,
-                  E21 = (R2 * C1) / N,
-                  E22 = (R2 * C2) / N) %>%
     # calculate fishers' exact test
     dplyr::mutate(p = as.vector(unlist(fisher.test(matrix(c(O11, O12, O21, O22), 
                                                           ncol = 2, byrow = T))[1]))) %>%
+    
     # extract AM
     # 1. bias towards top left
     dplyr::mutate(btl_O12 = ifelse(C1 > R1, 0, R1-C1),
@@ -47,45 +39,55 @@ keystats <- function(x){
     
     # remove superfluous columns
     dplyr::select(-any_of(c("btr_O21", "btr_O12", "btr_O22", "btl_O12", 
-                            "btl_O11", "btl_O21", "btl_O22", "btr_O11"))) %>%
+                            "btl_O11", "btl_O21", "btl_O22", "btr_O11"))) %>% 
+    
+    # extract descriptives
+    dplyr::mutate(ptw_target = O11/C1*1000,
+                  ptw_ref = O12/C2*1000) %>%
+    
     # extract x2 statistics
     dplyr::mutate(X2 = (O11-E11)^2/E11 + (O12-E12)^2/E12 + (O21-E21)^2/E21 + (O22-E22)^2/E22) %>%
     
     # extract association measures
     dplyr::mutate(phi = sqrt((X2 / N)),
-                  Dice = (2 * O11) / (R1 + C1),
-                  LogDice = log((2 * O11) / (R1 + C1)),
                   MI = log2(O11 / E11),
-                  MS = min((O11/C1), (O11/R1)),
                   t.score = (O11 - E11) / sqrt(O11),
                   z.score = (O11 - E11) / sqrt(E11),
                   PMI = log2( (O11 / N) / ((O11+O12) / N) * 
                                 ((O11+O21) / N) ),
-                  DeltaP12 = (O11 / (O11 + O12)) - (O21 / (O21 + O22)),
-                  DeltaP21 =  (O11 / (O11 + O21)) - (O21 / (O12 + O22)),
-                  DP = (O11 / R1) - (O21 / R2),
+                  DeltaP = (O11 / R1) - (O21 / R2),
                   LogOddsRatio = log(((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )),
-                  # calculate LL aka G2
-                  G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22))) %>%
-
+                  G2 = 2 * (O11 * log(O11 / E11) + O12 * log(O12 / E12) + O21 * log(O21 / E21) + O22 * log(O22 / E22)),
+                  
+                  # traditional keyness measures
+                  RateRatio = (O11/(C1*1000)) / (O12/(C2*1000)),
+                  RateDifference = (O11/(C1*1000)) - (O12/(C2*1000)),
+                  DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
+                  OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) )) %>%
+    
     # determine Bonferroni corrected significance
     dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
                                                    p / Rws > .01 ~ "p < .05*",
                                                    p / Rws > .001 ~ "p < .01**",
                                                    p / Rws <= .001 ~ "p < .001***",
-                                                   T ~ "N.A.")) %>%  
+                                                   T ~ "N.A.")) %>% 
     # round p-value
-    dplyr::mutate(p = round(p, 5)) %>%
+    dplyr::mutate(p = round(p, 5),
+                  type = ifelse(E11 > O11, "antitype", "type")) %>%
     # filter out non significant results
-    dplyr::filter(Sig_corrected != "n.s.",
-                  # filter out instances where the w1 and w2 repel each other
-                  E11 < O11) %>%
-    # arrange by DeltaP12 (association measure)
-    dplyr::arrange(-DeltaP12) %>%
+    dplyr::filter(Sig_corrected != "n.s.") %>%
+    # arrange by DeltaP (association measure)
+    dplyr::arrange(-DeltaP) %>%
     # remove superfluous columns
-    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", "O12", "O21", 
-                            "O22", "R1", "R2", "C1", "C2", "E11", "E12", "E21",
-                            "E22", "upp", "low", "op", "Rws"))) -> result
+    dplyr::select(-any_of(c("TermCoocFreq", "AllFreq", "NRows", 
+                            "R1", "R2", "C1", "C2", "E12", "E21",
+                            "E22", "upp", "low", "op", "t.score", "z.score", "Rws"))) %>%
+    dplyr::relocate(any_of(c("token", "type", "Sig_corrected", "O11", "E11",
+                             "ptw_target", "ptw_ref", "DeltaP", "LogOddsRatio", 
+                             "AM",  "MI", "PMI", "phi", 
+                             "X2", "G2", "RateRatio", "RateDifference",
+                             "DifferenceCoefficient", "OddsRatio", 
+                             "p", "O12", "O21", "O22"))) -> result
   # inspect
   return(result)
 }
