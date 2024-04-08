@@ -63,7 +63,7 @@ keystats <- function(x){
     # round p-value
     dplyr::mutate(p = round(p, 5),
                   type = ifelse(E11 > O11, "antitype", "type"),
-                  phi = ifelse(E11 > O11, phi, -phi)) %>%
+                  phi = ifelse(E11 > O11, -phi, phi)) %>%
     # filter out non significant results
     dplyr::filter(Sig_corrected != "n.s.") %>%
     # arrange by DeltaP (association measure)
