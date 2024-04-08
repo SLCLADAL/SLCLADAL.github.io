@@ -75,7 +75,7 @@ keystats <- function(x){
                   RateDifference = (O11/(C1*1000)) - (O12/(C2*1000)),
                   DifferenceCoefficient = RateDifference / sum((O11/(C1*1000)), (O12/(C2*1000))),
                   OddsRatio = ((O11 + 0.5) * (O22 + 0.5))  / ( (O12 + 0.5) * (O21 + 0.5) ),
-                  SignedDKL = sum(ifelse(w1 > 0, w1 * log(w1 / ((w1 + w2) / 2)), 0) - ifelse(w2 > 0, w2 * log(w2 / ((w1 + w2) / 2)), 0))) %>%
+                  SignedDKL = sum(ifelse(O11 > 0, O11 * log(O11 / ((O11 + O12) / 2)), 0) - ifelse(O12 > 0, O12 * log(O12 / ((O11 + O12) / 2)), 0))) %>%
     
     # determine Bonferroni corrected significance
     dplyr::mutate(Sig_corrected = dplyr::case_when(p / Rws > .05 ~ "n.s.",
