@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # load and format xlsx for network analysis
 
 # required packages
