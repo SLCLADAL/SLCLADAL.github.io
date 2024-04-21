@@ -1,16 +1,17 @@
 # load and format xlsx for network analysis
 
 # required packages
-require(readxl)
-require(here)
-require(dplyr)    # for table processing
-require(openxlsx) # for reading and saving xlsx files
-require(quanteda) # for generating dfm and fcm
-require(quanteda.textplots)  # for generating network graphs 
-require(ggplot2)  # for visualization
-require(stringr)  # for text processing
-require(tidyr)    # for table processing
-require(tidytext)
+library(dplyr)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(here)
+library(openxlsx)
+library(readxl)
+library(stringr)
+library(tidyr)
+library(tidytext)
+library(tidygraph)
 
 loadnetdata <- function(x){
   fls <- list.files(here::here(x), # path to the corpus data
