@@ -53,8 +53,8 @@ netplot <- function(x = ed, edge_col = "gray80", edge_curv= .2, node_tran = .5, 
           legend.title = element_blank()) +
     
     # remove edge width and alpha guides from the legend
-    guides(edge_width = FALSE,
-           edge_alpha = FALSE) -> np
+    guides(edge_width = "none",
+           edge_alpha = "none") -> np
   
   return(np)
   
