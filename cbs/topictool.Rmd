@@ -28,37 +28,15 @@ corpus <- loadtxts("notebooks/MyTexts")
 str(corpus)
 ```
 
-## Preparation and session set up
-
-Activate required packages.
-
-```{r prep2, message=FALSE, warning=FALSE}
-# load packages
-library(here)
-library(tidyr)
-library(quanteda.textstats)
-library(quanteda.textplots)
-library(seededlda)
-library(writexl)
-```
-
 ## Cleaning and tokenising
 
-We start by cleaning the corpus data by removing tags, artefacts and non-alpha-numeric characters.
+We start by cleaning the corpus data (by removing tags, artefacts and non-alpha-numeric characters) and then splitting the clean corpora into individual words.
 
 ```{r cleancorusp}
 corpus_clean <- 
   stringr::str_remove_all(corpus, "<.*?>") %>%
   # remove superfluous white spaces
   stringr::str_squish()
-# inspect
-substr(corpus_clean[1], start=1, stop=200)
-```
-
-We now split the clean corpora into individual words.
-
-
-```{r}
 toks_corpus <- tokens(corpus, remove_punct = TRUE, remove_numbers = TRUE, remove_symbol = TRUE)
 toks_corpus <- tokens_remove(toks_corpus, pattern = c(stopwords("en"), "*-time", "updated-*", "gmt", "bst"))
 dfmat_corpus <- dfm(toks_corpus) %>% 
@@ -93,7 +71,7 @@ Now, we perform a supervised LDA. Here we use the keywords extracted based on th
 <div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>IMPORTANT</b>: If you are using your own data, you need to change and adapt the topics and keywords defined below (simply replace the topics and seed terms with your own topics and seed terms (based on the results of the unsupervised LDA!). 
+<b>IMPORTANT</b>: you need to change and adapt the topics and keywords defined below (simply replace the topics and seed terms with your own topics and seed terms (based on the results of the unsupervised LDA!). 
 <br>
 </p>
 </span>
@@ -106,33 +84,19 @@ Now, we perform a supervised LDA. Here we use the keywords extracted based on th
 # semisupervised LDA
 dict <- dictionary(list(Computer = c("computers", "information", "machine", "computer"),
                         Education = c("students", "courses", "education", "university"),
-                        Movies = c("movie", "film", "commercial", "watch"),
-                        Family = c("parents", "home", "mother", "father"),
-                        War = c("war", "peace", "somalia", "consequences"),
-                        Foreigners = c("foreigners", "germans", "turkish", "turks"),
-                        Phone = c("phone", "telephone", "call"),
-                        Food = c("mcdonald's", "restaurant", "chips", "fastfood", "taste"),
-                        Pets = c("dog*", "walk", "cat", "pet", "happy"),
-                        Eco = c("green", "car*", "drive", "speed", "accident", "exhaust"),
-                        Dating = c("girl", "boy", "date", "merries")))
+                        Movies = c("movie", "film", "commercial", "watch")))
 tmod_slda <- textmodel_seededlda(dfmat_corpus, dict, residual = TRUE, min_termfreq = 10)
 terms(tmod_slda)
 ```
 
-We can now inspect topics by file. This shows what text contains which topic.
-
-```{r}
-topics(tmod_slda)[1:20]
-```
-
 Now, we can extract files and create a data frame of topics and documents. This shows what topic is dominant in which file in tabular form.  
-
 
 ```{r}
 files <- stringr::str_replace_all(names(topics(tmod_slda)), ".*/(.*?).txt", "\\1")
+cleancontent <- corpus_clean
 topics <- topics(tmod_slda)
-language <- ifelse(stringr::str_detect(files, "GE"), "German", "Spanish")
-df <- data.frame(language, topics) %>%
+# generate data frame
+df <- data.frame(files, cleancontent, topics) %>%
   dplyr::mutate_if(is.character, factor)
 # inspect
 head(df)
@@ -160,70 +124,9 @@ write_xlsx(dfp, here::here("notebooks/MyOutput/df.xlsx"))
 <br>
 
 
-To visualize the results, we summaries the table to show the percentage of  topics by language.
-
-```{r}
-dfp <- df %>%
-  dplyr::group_by(language, topics) %>%
-  dplyr::summarise(freq = n()) %>%
-  dplyr::group_by(language) %>%
-  dplyr::mutate(all = sum(freq),
-                percent = round(freq/all*100, 2))
-# inspect
-head(dfp)
-```
-
-In a final step, we visualize the results.
-
-
-
-```{r}
-dfp %>%
-  ggplot(aes(x = topics, y = percent, label = percent, fill = language)) +
-  geom_bar(stat = "identity", position = position_dodge()) + 
-  geom_text(vjust=-0.3, position = position_dodge(0.9)) + 
-  theme_bw() +
-  coord_cartesian(ylim = c(0, 30)) +
-  labs(x = "Topic", y = "Percent") +
-  theme(legend.position = "top",
-        axis.text.x = element_text(angle = 90))
-```
-
-
-## Exporting images
-
-To export network graph as an png-file, we use `ggsave`. Be aware that we use the `here` function to save the file in the `MyOutput` folder.
-
-The `ggsave` function has the following main arguments:
-
-+ `filename`: File name to create on disk.    
-+ `device`: Device to use. Can either be a device function (e.g. png), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only). If NULL (default), the device is guessed based on the filename extension  
-+ `path`: Path of the directory to save plot to: path and filename are combined to create the fully qualified file name. Defaults to the working directory.  
-+ `width, height`: Plot size in units expressed by the units argument. If not supplied, uses the size of the current graphics device.  
-+ `units`: One of the following units in which the width and height arguments are expressed: "in", "cm", "mm" or "px".  
-+ `dpi`: Plot resolution. Also accepts a string input: "retina" (320), "print" (300), or "screen" (72). Applies only to raster output types.  
-+ `bg`: Background colour. If NULL, uses the plot.background fill value from the plot theme.  
-
-
-```{r eval = F, warning=F, message=F}
-# save network graph for MyOutput folder
-ggsave(here::here("notebooks/MyOutput/image_01.png"), bg = "white")
-```
-
-<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>You will find the image-file named *image_01.png* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *image_01.png* file, and choose Download from the dropdown menu to download the file. <br>
-</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<br>
-
 ***
 
-[Back to LADAL](https://ladal.edu.au/net.html)
+[Back to LADAL](https://ladal.edu.au/topicmodels.html)
 
 ***
 
