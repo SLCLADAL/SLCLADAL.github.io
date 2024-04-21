@@ -2,17 +2,17 @@
 # load and format xlsx for network analysis
 
 # required packages
-library(dplyr)
-library(ggplot2)
-library(ggraph)
-library(igraph)
-library(here)
-library(openxlsx)
-library(readxl)
-library(stringr)
-library(tidyr)
-library(tidytext)
-library(tidygraph)
+require(dplyr)
+require(ggplot2)
+require(ggraph)
+require(igraph)
+require(here)
+require(openxlsx)
+require(readxl)
+require(stringr)
+require(tidyr)
+require(tidytext)
+require(tidygraph)
 
 loadnetdata <- function(x){
   fls <- list.files(here::here(x), # path to the corpus data
