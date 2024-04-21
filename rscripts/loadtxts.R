@@ -1,10 +1,14 @@
 # required packages
-require(here)
-require(stringr)
-require(dplyr)
-require(ggplot2)
-require(writexl)
-require(quanteda)
+library(dplyr)
+library(ggplot2)
+library(here)
+library(quanteda)
+library(quanteda.textplots)
+library(quanteda.textstats)
+library(seededlda)
+library(stringr)
+library(tidyr)
+library(writexl)
 
 # define function
 loadtxts <- function(x="notebooks/MyTexts"){
