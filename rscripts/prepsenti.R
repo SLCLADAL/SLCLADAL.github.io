@@ -1,5 +1,6 @@
 require(dplyr)
 require(tidytext)
+require(syuzhet)
 
 prepsenti <- function(x){
   senti <- data.frame(names(x), x) %>%
@@ -10,7 +11,7 @@ prepsenti <- function(x){
     dplyr::group_by(file) %>%
     tidytext::unnest_tokens(word, text) %>%
     dplyr::mutate(words = n()) %>%
-    dplyr::left_join(tidytext::get_sentiments("nrc")) %>%
+    dplyr::left_join(syuzhet::get_nrc_sentiment()) %>%
     dplyr::mutate(file = factor(file),
                   sentiment = factor(sentiment))
   return(senti)
