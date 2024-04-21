@@ -42,70 +42,45 @@ text <- loadtxts("notebooks/MyTexts")
 str(text)
 ```
 
-
-We now prepare the table so that we can extract the association measures.
-
-
-```{r}
-# load function that extract association measures
-source("https://slcladal.github.io/rscripts/prepam.R")
-# load texts
-colldf <- prepam(text)
-# inspect first 10 rows of the data
-head(colldf, 10)
-```
+Now, we combine the data with the *Word-Emotion Association Lexicon* [@mohammad2013crowdsourcing]. 
 
 
-Next, we select the term that we want to extract collocates of.
-
-<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>IMPORTANT</b>: only execute the following code chunk if if you are interested in the collocates of a specific term! <br>
-Do NOT execute the following code chunk if you are interested in ALL collocations in the text (this would be unusual though). 
-<br>
-</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<br>
-
-Replace `YOUR TERM` with the term you are intersted in.
-
-```{r}
-colldf %>%
-  dplyr::filter(w1 == "YOUR TERM") -> colldf
+```{r message=FALSE, warning=FALSE}
+# load function that helps prepare the texts for a sentiment analysis
+source("https://slcladal.github.io/rscripts/prepsenti.R")
+# prepare texts
+senti <- prepsenti(text)
 # inspect
-head(colldf)
+head(senti)
 ```
 
 
-Now, we extract the association measures (if the table has many rows, this may take a few minutes).
+Next, we genarte an overview table. You can chosse to download the table shown or the table produced below depending on what you need.
 
 ```{r}
-# load function that extract association measures
-source("https://slcladal.github.io/rscripts/assocstats.R")
-# calculate collocation statistics
-assocs <- assocstats(colldf) 
-# inspect first 10 rows of the data
-head(assocs, 10)
+# load function that helps summarise the sentiment analysis
+source("https://slcladal.github.io/rscripts/sumsenti.R")
+# summarise the results
+senti_sum <- sumsenti(senti)
+# inspect
+head(senti_sum)
 ```
 
 
-## Exporting the association table
 
-To export the table with the association measures as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+## Exporting the results
+
+To export the table with the results as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
 
 ```{r eval = F, warning=F, message=F}
 # save data for MyOutput folder
-write_xlsx(assocs, here::here("notebooks/MyOutput/assocs.xlsx"))
+write_xlsx(senti_sum, here::here("notebooks/MyOutput/senti_sum.xlsx"))
 ```
 
 <div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>You will find the generated MS Excel spreadsheet named *assocs.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *assocs.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
+<b>You will find the generated MS Excel spreadsheet named *senti_sum.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *senti_sum.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
 </p>
 <p style='margin-left:1em;'>
 </p></span>
@@ -113,28 +88,21 @@ write_xlsx(assocs, here::here("notebooks/MyOutput/assocs.xlsx"))
 
 <br>
 
-## Visualising collocations
+## Visualising sentiments
 
-Here we will use a simple bar plot to visualize the 20 top collocations. The bar plot uses the *DeltaP12* value but you are welcome to visualize another association measure (simply replace `DeltaP12` with the measure you want to use).
+Here you can use the code below to generate a simple bar plot to visualize the sentiments by file. 
 
 ```{r}
-# sort the assocs data frame in descending order based on the 'DeltaP12' column
-assocs %>%
-  dplyr::arrange(-DeltaP12) %>%
-  # select the top 20 rows after sorting
-  head(20) %>%
-  # create a ggplot with 'token' on the x-axis (reordered by 'DeltaP12') and 'DeltaP12' on the y-axis
-  ggplot(aes(x = reorder(w2, DeltaP12, mean), y = DeltaP12, label = DeltaP12)) +
-  # add a bar plot using the 'DeltaP12' values
-  geom_bar(stat = "identity") +
-  # add text labels above the bars with rounded 'DeltaP12' values
-  geom_text(aes(y = DeltaP12 - 0.005, label = round(DeltaP12, 3)), color = "white", size = 3) + 
-  # flip the coordinates to have horizontal bars
-  coord_flip() +
-  # set the theme to a basic white and black theme
+# plot the results of the sentiment analysis
+senti_sum %>%
+  dplyr::filter(sentiment != "positive",
+                sentiment != "negative") %>%
+  ggplot(aes(file, percentage, fill = sentiment)) +    
+  geom_bar(stat="identity",   
+           position=position_dodge()) + 
+  scale_fill_brewer(palette = "RdBu") +
   theme_bw() +
-  # add axes titles
-  labs(x = "Collocate", y = "Association strength")
+  theme(legend.position = "top")
 ```
 
 
