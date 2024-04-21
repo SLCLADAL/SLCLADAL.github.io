@@ -11,7 +11,7 @@ prepsenti <- function(x){
     dplyr::group_by(file) %>%
     tidytext::unnest_tokens(word, text) %>%
     dplyr::mutate(words = n()) %>%
-    dplyr::left_join(syuzhet::get_nrc_sentiment()) %>%
+    dplyr::left_join(syuzhet::get_nrc_sentiment(word)) %>%
     dplyr::mutate(file = factor(file),
                   sentiment = factor(sentiment))
   return(senti)
