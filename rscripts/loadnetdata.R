@@ -22,32 +22,9 @@ loadnetdata <- function(x){
   fls <- fls[!stringr::str_detect(fls, "test.xlsx")]
   
   # loop over the vector 'myfiles' that contains paths to the data
-  dat <- readxl::read_xlsx(fls) 
+  ed <- readxl::read_xlsx(fls) 
 
-  n1 <- dat
-  n2 <- dat %>%
-    dplyr::rename(from = to,
-                  to = from)
-  dat <- rbind(n1, n2) 
-  
-  # Create a co-occurrence matrix
-  com <- dat %>%
-    dplyr::group_by(to, from) %>%
-    dplyr::summarise(count = n()) %>%
-    spread(from, count, fill = 0) %>%
-    as.data.frame()
-  
-  # Replace missing values with 0
-  com[is.na(com)] <- 0
-  
-  # Print the co-occurrence matrix
-  rownames(com) <- com[,1]
-  com <- com[, 2:ncol(com)]
-  
-  # create a document feature matrix
-  fcm <- quanteda::as.fcm(as.matrix(com))
-  
   # return result
-  return(fcm)
+  return(ed)
   
   }
