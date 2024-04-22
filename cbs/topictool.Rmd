@@ -21,7 +21,7 @@ To <b>use your own data</b>, click on the folder called <b>`MyTexts`</b> (it is 
 <br>
 
 
-```{r}
+```{r eval = F}
 # load function that helps loading texts
 source("https://slcladal.github.io/rscripts/loadtxts.R")
 # load texts
@@ -30,22 +30,26 @@ corpus <- loadtxts("notebooks/MyTexts")
 str(corpus)
 ```
 
+
+```{r}
+cf <- list.files(here::here("data/tcorpus"), full.names = T)
+corpus <- sapply(cf, function(x){
+  x <- scan(x, what = "char")
+  x <- paste0(x, collapse = " ")
+})
+str(corpus)
+```
+
+
 ## Cleaning and tokenising
 
 We start by cleaning the corpus data (by removing tags, artefacts and non-alpha-numeric characters) and then splitting the clean corpora into individual words.
 
 ```{r cleancorusp}
-corpus_clean <- 
-  stringr::str_remove_all(corpus, "<.*?>") %>%
-  # remove superfluous white spaces
-  stringr::str_squish()
-toks_corpus <- tokens(corpus, 
-                      remove_punct = TRUE, 
-                      remove_numbers = TRUE, 
-                      remove_symbol = TRUE) %>%
-  tokens_remove(toks_corpus, 
-                pattern = c(stopwords("en"), "these", "are", "example", "words"))
-dfmat_corpus <- dfm(toks_corpus)
+# load function that helps loading texts
+source("https://slcladal.github.io/rscripts/preptop.R")
+# clean corpus
+clean_dfm <- preptop(corpus)
 ```
 
 
@@ -57,15 +61,34 @@ Now that we have cleaned the data, we can perform the topic modelling. This cons
 
 2. Then, we perform a supervised LDA (based on the results of the unsupervised LDA) to identify meaningful topics in our data. For the supervised LDA, we define so-called *seed terms* that help in generating coherent topics.
 
-Here we look for 10 topics but we would vary the number of topics (k) to check what topics are in our data.
+
+<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+<b>In the code below, the default is to look for 10 topics but you will need to vary and adapt the number of topics (k) for your data and check what topics are in your data.</b>
+<br>
+</p></span>
+</div>
+
+<br>
+
+
+
 
 ```{r}
-# set seed
-set.seed(1234)
 # generate model: change k to different numbers, e.g. 5 or 15 and look for consistencies in the keywords for the topics below.
-tmod_lda <- seededlda::textmodel_lda(dfmat_corpus, k = 10)
+tmlda <- topicmodels::LDA(clean_dfm, k = 4, control = list(seed = 1234))
+```
+
+Now that the topic model has been generated, you can inspect it. The code chunk below will show the top 10 terms for each topic.
+
+```{r}
 # inspect
-terms(tmod_lda, 10)
+tidytext::tidy(tmlda, matrix = "beta") %>%
+  dplyr::group_by(topic) %>%
+  dplyr::slice_max(beta, n = 10) %>% 
+  dplyr::ungroup() %>%
+  dplyr::arrange(topic, -beta)
 ```
 
 ## Supervised LDA
