@@ -1,4 +1,4 @@
-require(tidytxt)
+require(tidytext)
 require(topicmodels)
 
 preptop <- function(x) {
