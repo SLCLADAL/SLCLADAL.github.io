@@ -31,16 +31,6 @@ str(corpus)
 ```
 
 
-```{r}
-cf <- list.files(here::here("data/tcorpus"), full.names = T)
-corpus <- sapply(cf, function(x){
-  x <- scan(x, what = "char")
-  x <- paste0(x, collapse = " ")
-})
-str(corpus)
-```
-
-
 ## Cleaning and tokenising
 
 We start by cleaning the corpus data (by removing tags, artefacts and non-alpha-numeric characters) and then splitting the clean corpora into individual words.
@@ -77,7 +67,7 @@ Now that we have cleaned the data, we can perform the topic modelling. This cons
 
 ```{r}
 # generate model: change k to different numbers, e.g. 5 or 15 and look for consistencies in the keywords for the topics below.
-tmlda <- topicmodels::LDA(clean_dfm, k = 4, control = list(seed = 1234))
+tmlda <- topicmodels::LDA(clean_dfm, k = 10, control = list(seed = 1234))
 ```
 
 Now that the topic model has been generated, you can inspect it. The code chunk below will show the top 10 terms for each topic.
@@ -110,15 +100,18 @@ Now, we perform a supervised LDA. Here we use the keywords extracted based on th
 dict <- dictionary(list(Computer = c("computers", "information", "machine", "computer"),
                         Education = c("students", "courses", "education", "university"),
                         Movies = c("movie", "film", "commercial", "watch")))
-tmod_slda <- textmodel_seededlda(dfmat_corpus, dict, residual = TRUE, min_termfreq = 10)
+tmod_slda <- seededlda::textmodel_seededlda(clean_dfm, 
+                                            dict, 
+                                            residual = TRUE, 
+                                            min_termfreq = 5)
 terms(tmod_slda)
 ```
 
-Now, we can extract files and create a data frame of topics and documents. This shows what topic is dominant in which file in tabular form.  
+Now, we extract files and create a data frame of topics and documents. This shows what topic is dominant in which file in tabular form.  
 
 ```{r}
 files <- stringr::str_replace_all(names(topics(tmod_slda)), ".*/(.*?).txt", "\\1")
-cleancontent <- corpus_clean
+cleancontent <- corpus
 topics <- topics(tmod_slda)
 # generate data frame
 df <- data.frame(files, cleancontent, topics) %>%
