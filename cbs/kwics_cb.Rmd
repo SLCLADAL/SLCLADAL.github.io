@@ -16,39 +16,39 @@ options(warn=-1)  # do not show warnings or messages
 # activate packages
 library(quanteda) # for concordancing
 library(dplyr)    # for table processing
+library(stringr)  # for text processing
 library(writexl)  # for saving data
 ```
 
+## Loading and processing textual data
 
+For this tutorial, we will use Lewis Caroll's  *Alice's Adventures in Wonderland*. You can use the code below to load this text into R (but you have to have access to the internet to do so).
 
-## Using your own data
-
-
-
-<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-
-Here, you can **use your own data**. To use your own data, click on the folder called `MyTexts` (it is in the menu to the left of the screen) and then simply drag and drop your txt-files into the folder. When you then execute the code chunk below, you will upload your own data and you can then use it in this notebook.<br>
-<br>
-You can upload <b>only txt-files</b> (simple unformatted files created in or saved by a text editor)! The notebook assumes that you upload some form of text data - not tabular data! <br>
-<br>
-</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<br>
-
-
-```{r}
-# load function that helps loading texts
-source("https://slcladal.github.io/rscripts/loadtxts.R")
-# load texts
-text <- loadtxts("notebooks/MyTexts")
-# inspect the structure of the text object
-str(text)
+```{r skwic2, warning=F, message=F}
+text <- base::readRDS(url("https://slcladal.github.io/data/alice.rda", "rb"))
+# inspect data
+text %>%
+  as.data.frame() %>%
+  head()
 ```
+
+The table above shows that the example text requires formatting so that we can use it. Therefore, we collapse it into a single object (or text) and remove superfluous white spaces.
+
+
+```{r skwic3, message=F, warning=F}
+text <- text %>%
+  # collapse lines into a single  text
+  paste0(collapse = " ") %>%
+  # remove superfluous white spaces
+  str_squish()
+# inspect data
+text %>%
+  substr(start=1, stop=1000) %>%
+  as.data.frame() 
+```
+
+The result confirms that the entire text is now combined into a single character object. 
+
 
 ## Creating simple concordances
 
@@ -67,7 +67,7 @@ Now we can extract concordances using the `kwic` function from the `quanteda` pa
 <div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>You can easily change and adapt the concordance. For instance, you can search for a different word or phrase by substituting *the* with the word or phrase as the pattern. Additionally, if you wish to widen the context window, just replace the '5' with '10'. This adjustment will extend the context around the keyword by 5 additional words in both the preceding and following context. </b><br>
+<b>You can easily change and adapt the concordance. For instance, you can search for a different word or phrase by substituting *alice* with the word or phrase as the pattern. Additionally, if you wish to widen the context window, just replace the '5' with '10'. This adjustment will extend the context around the keyword by 5 additional words in both the preceding and following context. </b><br>
 </p>
 <p style='margin-left:1em;'>
 </p></span>
@@ -81,7 +81,7 @@ mykwic <- kwic(
   # tokenise and define text
   tokens(text), 
   # define target word (this is called the "search pattern")
-  pattern = phrase("the"),
+  pattern = phrase("alice"),
   # 5 words before and after
   window = 5,
   # no regex
@@ -101,24 +101,401 @@ mykwic %>%
 
 ## Exporting concordances
 
-To export a concordance table as an MS Excel spreadsheet, we use `write_xlsx`. Be aware that we use the `here` function to  save the file in the current working directory.
+To export or save a concordance table as an MS Excel spreadsheet, you can use the `write_xlsx` function from the `writexl` package as shown below. Be aware that we use the `here` function from the `here` package to define where we want to save the file (in this case this will be in the current working directory. If you work with Rproj files in RStudio - as you should - then the current working directory is the directory or folder where your Rproj file is).
 
 ```{r eval = F, warning=F, message=F}
 # save data for MyOutput folder
-write_xlsx(mykwic, here::here("notebooks/MyOutput/mykwic.xlsx"))
+write_xlsx(mykwic, here::here("mykwic.xlsx"))
 ```
 
-<div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>You will find the generated MS Excel spreadsheet named *mykwic.xlsx* in the `MyOutput` folder (located on the left side of the screen).</b> <br><br>Simply double-click the `MyOutput` folder icon, then right-click on the *mykwic.xlsx* file, and choose Download from the dropdown menu to download the file. <br>
-</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
+We can easily extract the frequency of the search term (*alice*) using the `nrow` or the `length` functions which provide the number of rows of a tables (`nrow`) or the length of a vector (`length`).
 
-<br>
+```{r basekwic4}
+nrow(mykwic)
+```
 
+
+```{r basekwic5}
+length(mykwic$keyword)
+```
+
+The results show that there are `r length(mykwic$keyword)` instances of the search term (*alice*) but we can also find out how often different variants (lower case versus upper case) of the search term were found using the `table` function. This is especially useful when searches involve many different search terms (while it is, admittedly, less useful in the present example). 
+
+```{r basekwic6}
+table(mykwic$keyword)
+```
+
+To get a better understanding of the use of a word, it is often useful to extract more context. This is easily done by increasing size of the context window. To do this, we specify the `window` argument of the `kwic` function. In the example below, we set the context window size to 10 words/elements rather than using the default (which is 5 word/elements).
+
+
+```{r basekwic8, message=F, warning=F}
+mykwic_long <- quanteda::kwic(
+  # define text
+  quanteda::tokens(text), 
+  # define search pattern
+  pattern = phrase("alice"), 
+  # define context window size
+  window = 10) %>%
+  # make it a data frame
+  as.data.frame()
+# inspect data
+mykwic_long %>%
+  head(10)
+```
+
+
+## Searches using regular expressions
+
+Regular expressions allow you to search for abstract patterns rather than concrete words or phrases which provides you with an extreme flexibility in what you can retrieve. A regular expression (in short also called *regex* or *regexp*) is a special sequence of characters that stand for are that describe a pattern. You can think of regular expressions as very powerful combinations of wildcards or as wildcards on steroids. For example, the sequence `[a-z]{1,3}` is a regular expression that stands for one up to three lower case characters and if you searched for this regular expression, you would get, for instance, *is*, *a*, *an*, *of*, *the*, *my*, *our*, *etc*, and many other short words as results.
+
+Check out [this tutorial](https://ladal.edu.au/regex.html) to get more information on regular expression in R.
+
+To include regular expressions in your KWIC searches, you include them in your search pattern and set the argument `valuetype` to `"regex"`. The search pattern `"\\balic.*|\\bhatt.*"` retrieves elements that contain `alic` and `hatt` followed by any characters and where the `a` in `alic` and the `h` in `hatt` are at a word boundary, i.e. where they are the first letters of a word. Hence, our search would not retrieve words like *malice* or *shatter*. The `|` is an operator (like `+`, `-`, or `*`) that stands for *or*.
+
+```{r rkwic6, message=FALSE, warning=FALSE}
+# define search patterns
+patterns <- c("\\balic.*|\\bhatt.*")
+kwic_regex <- quanteda::kwic(
+  # define text
+  quanteda::tokens(text), 
+  # define search pattern
+  patterns, 
+  # define valuetype
+  valuetype = "regex") %>%
+  # make it a data frame
+  as.data.frame()
+# inspect data
+kwic_regex %>%
+  head() 
+```
+
+
+## Piping concordances
+
+Quite often, we only want to retrieve patterns if they occur in a certain context. For instance, we might be interested in instances of *alice* but only if the preceding word is *poor* or *little*. Such conditional concordances could be extracted using regular expressions but they are easier to retrieve by piping. Piping is done using the `%>%` function from the `dplyr` package and the piping sequence can be translated as *and then*. We can then filter those concordances that contain *natural* using the `filter` function from the `dplyr` package. Note the the `$` stands for the end of a string so that *natural$* means that *natural* is the last element in the string that is preceding the keyword.
+
+```{r pipekwic7, echo=T, eval = T, message=FALSE, warning=FALSE}
+kwic_pipe <- quanteda::kwic(x = quanteda::tokens(text), pattern = "alice") %>%
+  as.data.frame() %>%
+  dplyr::filter(stringr::str_detect(pre, "poor$|little$"))
+# inspect data
+kwic_pipe %>%
+  head() 
+```
+
+Piping is a very useful helper function and it is very frequently used in R - not only in the context of text processing but in all data science related domains.
+
+## Arranging concordances and adding frequency information
+
+When inspecting concordances, it is useful to re-order the concordances so that they do not appear in the order that they appeared in the text or texts but by the context. To reorder concordances, we can use the `arrange` function from the `dplyr` package which takes the column according to which we want to re-arrange the data as it main argument. 
+
+In the example below, we extract all instances of *alice* and then arrange the instances according to the content of the `post` column in alphabetical.
+
+```{r orderkwic2, echo=T, eval = T, message=FALSE, warning=FALSE}
+kwic_ordered <- quanteda::kwic(x = quanteda::tokens(text), pattern = "alice") %>%
+  as.data.frame() %>%
+  dplyr::arrange(post)
+# inspect data
+kwic_ordered %>%
+  head()
+```
+
+
+Arranging concordances according to alphabetical properties may, however, not be the most useful option. A more useful option may be to arrange concordances according to the frequency of co-occurring terms or collocates. In order to do this, we need to extract the co-occurring words and calculate their frequency. We can do this by combining the  `mutate`, `group_by`, `n()` functions from the `dplyr` package with the `str_remove_all` function from the `stringr` package. Then, we arrange the concordances by the frequency of the collocates in descending order (that is why we put a `-` in the arrange function). In order to do this, we need to 
+
+1. create a new variable or column which represents the word that co-occurs with, or, as in the example below, immediately follows the search term. In the example below, we use the `mutate` function to create a new column called `post_word`. We then use the `str_remove_all` function to remove everything except for the word that immediately follows the search term (we simply remove everything and including a white space).
+
+2. group the data by the word that immediately follows the search term.
+
+3. create a new column called `post_word_freq` which represents the frequencies of all the words that immediately follow the search term.
+
+4. arrange the concordances by the frequency of the collocates in descending order.
+
+```{r orderkwic4, echo=T, eval = T, message=FALSE, warning=FALSE}
+kwic_ordered_coll <- quanteda::kwic(
+  # define text
+  x = quanteda::tokens(text), 
+  # define search pattern
+  pattern = "alice") %>%
+  # make it a data frame
+  as.data.frame() %>%
+  # extract word following the keyword
+  dplyr::mutate(post_word = str_remove_all(post, " .*")) %>%
+  # group following words
+  dplyr::group_by(post_word) %>%
+  # extract frequencies of the following words
+  dplyr::mutate(post_word_freq = n()) %>%
+  # arrange/order by the frequency of the following word
+  dplyr::arrange(-post_word_freq)
+# inspect data
+kwic_ordered_coll %>%
+  head() 
+```
+
+We add more columns according to which we could arrange the concordance following the same schema. For example, we could add another column that represented the frequency of words that immediately preceded the search term and then arrange according to this column.
+
+## Ordering by subsequent elements
+
+In this section, we will extract the three words following the keyword (*alice*) and organize the concordances by the frequencies of the following words. We begin by inspecting the first 6 lines of the concordance of *alice*.
+
+```{r, message=FALSE, warning=FALSE}
+head(mykwic)
+```
+
+Next, we take the concordances and create a clean post column that is all in lower case and that does not contain any punctuation.
+
+
+```{r, message=FALSE, warning=FALSE}
+mykwic %>%
+  # create new CleanPost
+  dplyr::mutate(CleanPost = stringr::str_remove_all(post, "[:punct:]"),
+                CleanPost = stringr::str_squish(CleanPost),
+                CleanPost = tolower(CleanPost))-> mykwic_following
+# inspect
+head(mykwic_following)
+```
+
+In a next step, we extract the 1^st^, 2^nd^, and 3^rd^ words following the keyword.
+
+
+```{r, message=FALSE, warning=FALSE}
+mykwic_following %>%
+  # extract first element after keyword
+  dplyr::mutate(FirstWord = stringr::str_remove_all(CleanPost, " .*")) %>%
+  # extract second element after keyword
+  dplyr::mutate(SecWord = stringr::str_remove(CleanPost, ".*? "),
+                SecWord = stringr::str_remove_all(SecWord, " .*")) %>%
+  # extract third element after keyword
+  dplyr::mutate(ThirdWord = stringr::str_remove(CleanPost, ".*? "),
+                ThirdWord = stringr::str_remove(ThirdWord, ".*? "),
+                ThirdWord = stringr::str_remove_all(ThirdWord, " .*")) -> mykwic_following
+# inspect
+head(mykwic_following)
+```
+
+Next, we calculate the frequencies of the subsequent words and order in descending order from the  1^st^ to the 3^rd^ word following the keyword.
+
+```{r, message=FALSE, warning=FALSE}
+mykwic_following %>%
+  # calculate frequency of following words
+  # 1st word
+  dplyr::group_by(FirstWord) %>%
+  dplyr::mutate(FreqW1 = n()) %>%
+  # 2nd word
+  dplyr::group_by(SecWord) %>%
+  dplyr::mutate(FreqW2 = n()) %>%
+  # 3rd word
+  dplyr::group_by(ThirdWord) %>%
+  dplyr::mutate(FreqW3 = n()) %>%
+  # ungroup
+  dplyr::ungroup() %>%
+  # arrange by following words
+  dplyr::arrange(-FreqW1, -FreqW2, -FreqW3) -> mykwic_following
+# inspect results
+head(mykwic_following, 10)
+```
+
+The results now show the concordance arranged by the frequency of the words following the keyword.
+
+## Concordances from transcriptions
+
+As many analyses use transcripts as their primary data and because transcripts have features that require additional processing, we will now perform concordancing based on on transcripts. As a first step, we load five example transcripts that represent the first five files from the Irish component of the [International Corpus of English](https://www.ice-corpora.uzh.ch/en.html).
+
+```{r trans2, echo=T, eval = T, message=FALSE, warning=FALSE}
+# define corpus files
+files <- paste("https://slcladal.github.io/data/ICEIrelandSample/S1A-00", 1:5, ".txt", sep = "")
+# load corpus files
+transcripts <- sapply(files, function(x){
+  x <- readLines(x)
+  })
+# inspect data
+transcripts[[1]][1:10] %>%
+  as.data.frame()
+```
+
+The first ten lines shown above let us know that, after the header (`<S1A-001 Riding>`) and the symbol which indicates the start of the transcript (`<I>`), each utterance is preceded by a sequence which indicates the section, file, and speaker (e.g. `<S1A-001$A>`). The first utterance is thus uttered by speaker `A` in file `001` of section `S1A`. In addition, there are several sequences that provide meta-linguistic information which indicate the beginning of a speech unit (`<#>`), pauses (`<,>`), and laughter (`<&> laughter </&>`).
+
+To perform the concordancing, we need to change the format of the transcripts because the `kwic` function only works on character, corpus, tokens object- in their present form, the transcripts represent a list which contains vectors of strings. To change the format, we collapse the individual utterances into a single character vector for each transcript.
+
+```{r trans4, echo=T, eval = T, message=FALSE, warning=FALSE}
+transcripts_collapsed <- sapply(files, function(x){
+  # read-in text
+  x <- readLines(x)
+  # paste all lines together
+  x <- paste0(x, collapse = " ")
+  # remove superfluous white spaces
+  x <- str_squish(x)
+})
+# inspect data
+transcripts_collapsed %>%
+    substr(start=1, stop=500) %>%
+  as.data.frame()
+```
+
+
+We can now extract the concordances.
+
+```{r trans6, echo=T, eval = T, message=FALSE, warning=FALSE}
+kwic_trans <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed), 
+  # define search pattern
+  pattern = phrase("you know")) %>%
+  # make it a data frame
+  as.data.frame()
+# inspect data
+kwic_trans %>%
+  head() 
+```
+
+The results show that each non-alphanumeric character is counted as a single word which reduces the context of the keyword substantially. Also, the *docname* column contains the full path to the data which make it hard to parse the content of the table. To address the first issue, we specify the tokenizer that we will use to not disrupt the annotation too much. In addition, we clean the *docname* column and extract only the file name. Lastly, we will expand the context window to 10 so that we have a better understanding of the context in which the phrase was used.
+
+```{r trans8, echo=T, eval = T, message=FALSE, warning=FALSE}
+kwic_trans <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"), 
+  # define search
+  pattern = phrase("you know"),
+  # extend context
+  window = 10) %>%
+  # make it a data frame
+  as.data.frame() %>%
+  # clean docnames
+  dplyr::mutate(docname = str_replace_all(docname, ".*/([A-Z][0-9][A-Z]-[0-9]{1,3}).txt", "\\1"))
+# inspect data
+kwic_trans %>%
+  head() 
+```
+
+
+Extending the context can also be used to identify the speaker that has uttered the search pattern that we are interested in. We will do just that as this is a common task in linguistics analyses.
+
+To extract speakers, we need to follow these steps:
+
+1. Create normal concordances of the pattern that we are interested in.
+
+2. Generate concordances of the pattern that we are interested in with a substantially enlarged context window size.
+
+3. Extract the speakers from the enlarged context window size.
+
+4. Add the speakers to the normal concordances using the `left-join` function from the `dplyr` package.
+
+```{r trans10,  message=FALSE, warning=FALSE}
+kwic_normal <- quanteda::kwic(
+  # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"), 
+  # define search
+  pattern = phrase("you know")) %>%
+  as.data.frame()
+kwic_speaker <- quanteda::kwic(
+    # tokenize transcripts
+  quanteda::tokens(transcripts_collapsed, what = "fasterword"), 
+  # define search
+  pattern = phrase("you know"), 
+  # extend search window
+  window = 500) %>%
+  # convert to data frame
+  as.data.frame() %>%
+  # extract speaker (comes after $ and before >)
+  dplyr::mutate(speaker = stringr::str_replace_all(pre, ".*\\$(.*?)>.*", "\\1")) %>%
+  # extract speaker
+  dplyr::pull(speaker)
+# add speaker to normal kwic
+kwic_combined <- kwic_normal %>%
+  # add speaker
+  dplyr::mutate(speaker = kwic_speaker) %>%
+  # simplify docname
+  dplyr::mutate(docname = stringr::str_replace_all(docname, ".*/([A-Z][0-9][A-Z]-[0-9]{1,3}).txt", "\\1")) %>%
+  # remove superfluous columns
+  dplyr::select(-to, -from, -pattern)
+# inspect data
+kwic_combined %>%
+  as.data.frame() %>%
+  head()
+```
+
+The resulting table shows that we have successfully extracted the speakers (identified by the letters in the `speaker` column) and cleaned the file names (in the `docnames` column).
+
+## Customizing concordances
+
+As R represents a fully-fledged programming environment, we can, of course, also write our own, customized concordance function. The code below shows how you could go about doing so. Note, however, that this function only works if you enter more than a single file. 
+
+```{r customkwic2, message=F, warning=F}
+mykwic <- function(txts, pattern, context) {
+  # activate packages
+  require(stringr)
+  # list files
+  txts <- txts[stringr::str_detect(txts, pattern)]
+  conc <- sapply(txts, function(x) {
+    # determine length of text
+        lngth <- as.vector(unlist(nchar(x)))
+    # determine position of hits
+    idx <- str_locate_all(x, pattern)
+    idx <- idx[[1]]
+    ifelse(nrow(idx) >= 1, idx <- idx, return(NA))
+    # define start position of hit
+    token.start <- idx[,1]
+    # define end position of hit
+    token.end <- idx[,2]
+    # define start position of preceding context
+    pre.start <- ifelse(token.start-context < 1, 1, token.start-context)
+    # define end position of preceding context
+    pre.end <- token.start-1
+    # define start position of subsequent context
+    post.start <- token.end+1
+    # define end position of subsequent context
+    post.end <- ifelse(token.end+context > lngth, lngth, token.end+context)
+    # extract the texts defined by the positions
+    PreceedingContext <- substring(x, pre.start, pre.end)
+    Token <- substring(x, token.start, token.end)
+    SubsequentContext <- substring(x, post.start, post.end)
+    Id <- 1:length(Token)
+    conc <- cbind(Id, PreceedingContext, Token, SubsequentContext)
+    # return concordance
+    return(conc)
+    })
+  concdf <- do.call(rbind, conc) %>%
+    as.data.frame()
+  return(concdf)
+}
+```
+
+We can now try if this function works by searching for the sequence *you know* in the transcripts that we have loaded earlier. One difference between the `kwic` function provided by the `quanteda` package and the customized concordance function used here is that the `kwic` function uses the number of words to define the context window, while the `mykwic` function uses the number of characters or symbols instead (which is why we use a notably higher number to define the context window).
+
+```{r customkwic4, message=F, warning=F}
+kwic_youknow <- mykwic(transcripts_collapsed, "you know", 50)
+# inspect data
+kwic_youknow %>%
+  as.data.frame() %>%
+  head() 
+```
+
+As this concordance function only works for more than one text, we split the text into chapters and assign each section a name.
+
+
+```{r customkwic6, message=FALSE, warning=FALSE}
+# read in text
+text_split <- text %>%
+  stringr::str_squish() %>%
+  stringr::str_split("[CHAPTER]{7,7} [XVI]{1,7}\\. ") %>%
+  unlist()
+text_split <- text_split[which(nchar(text_split) > 2000)]
+# add names
+names(text_split) <- paste0("text", 1:length(text_split))
+# inspect data
+nchar(text_split)
+```
+
+Now that we have named elements, we can search for the pattern *poor alice*. We also need to clean the concordance as some sections do not contain any instances of the search pattern. To clean the data, we select only the columns `File`, `PreceedingContext`, `Token`, and `SubsequentContext` and then remove all rows where information is missing. 
+
+```{r customkwic8, message=FALSE, warning=FALSE}
+mykwic_pooralice <- mykwic(text_split, "poor Alice", 50)
+# inspect data
+mykwic_pooralice %>%
+  as.data.frame()
+```
+
+You can go ahead and modify the customized concordance function to suit your needs. 
 
 
 
