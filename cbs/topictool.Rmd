@@ -31,15 +31,31 @@ str(corpus)
 ```
 
 
+```{r warning=F, message=F}
+library(dplyr)
+library(stringr)
+fls <- list.files(here::here("data/ICEIrelandS1A"), full.names = T)
+corpus <- sapply(fls, function(x){
+  x <- scan(x, what = "char", quiet = T) %>%
+    paste0(collapse = " ") %>%
+    stringr::str_remove_all("<.*?>") %>%
+    stringr::str_squish()
+})
+str(corpus)
+```
+
+
 ## Cleaning and tokenising
 
-We start by cleaning the corpus data (by removing tags, artefacts and non-alpha-numeric characters) and then splitting the clean corpora into individual words.
+We start by cleaning the corpus data (by removing tags, artefacts and non-alpha-numeric characters), then splitting the clean corpora into individual words, and creating a document-frequency matrix.
 
 ```{r cleancorusp}
 # load function that helps loading texts
 source("https://slcladal.github.io/rscripts/preptop.R")
-# clean corpus
+# clean corpus and convert to dfm
 clean_dfm <- preptop(corpus)
+# inspect 
+clean_dfm[1:5, 1:5]
 ```
 
 
@@ -55,7 +71,7 @@ Now that we have cleaned the data, we can perform the topic modelling. This cons
 <div class="warning" style='padding:0.1em; background-color: rgba(215,209,204,.3); color:#51247a'>
 <span>
 <p style='margin-top:1em; text-align:center'>
-<b>In the code below, the default is to look for 10 topics but you will need to vary and adapt the number of topics (k) for your data and check what topics are in your data.</b>
+<b>In the code below, the default is to look for 5 topics but you will need to vary and adapt the number of topics (k) for your data and check what topics are in your data.</b>
 <br>
 </p></span>
 </div>
@@ -66,11 +82,11 @@ Now that we have cleaned the data, we can perform the topic modelling. This cons
 
 
 ```{r}
-# generate model: change k to different numbers, e.g. 5 or 15 and look for consistencies in the keywords for the topics below.
-tmlda <- topicmodels::LDA(clean_dfm, k = 10, control = list(seed = 1234))
+# generate model: change k to different numbers, e.g. 10 or 15 and look for consistencies in the keywords for the topics below.
+tmlda <- topicmodels::LDA(clean_dfm, k = 5, control = list(seed = 1234))
 ```
 
-Now that the topic model has been generated, we can inspect what trems correlate most stronly with which topic. The code chunk below will show the top 10 terms for each topic.
+Now that the topic model has been generated, we can inspect which terms correlate most strongly with each topic. The code chunk below will display the top 10 terms for each topic.
 
 ```{r}
 # load function that tabulates top terms of topics
@@ -153,13 +169,16 @@ Now, we perform a supervised LDA. Here we use the keywords extracted based on th
 
 ```{r}
 # semisupervised LDA
-dict <- dictionary(list(Computer = c("computers", "information", "machine", "computer"),
-                        Education = c("students", "courses", "education", "university"),
-                        Movies = c("movie", "film", "commercial", "watch")))
+dict <- dictionary(list(Topic01 = c("computer", "information", "technology"),
+                        Topic02 = c("students", "courses", "education"),
+                        Topic03 = c("movie", "film", "watch"),
+                        Topic04 = c("women", "feminist", "equality"),
+                        Topic05 = c("money", "investment", "finance")))
 tmod_slda <- seededlda::textmodel_seededlda(clean_dfm, 
                                             dict, 
                                             residual = TRUE, 
-                                            min_termfreq = 5)
+                                            min_termfreq = 2)
+# inspect
 terms(tmod_slda)
 ```
 
