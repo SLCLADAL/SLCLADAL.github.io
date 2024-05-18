@@ -39,7 +39,7 @@ The entire R Notebook for the tutorial can be downloaded [**here**](https://slcl
 <br>
 
 
-This tutorial builds heavily on and uses materials from  [this tutorial](https://tm4ss.github.io/docs/Tutorial_6_Topic_Models.html) on web crawling and scraping using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and covers many more very useful text mining methods. an alternative and equally recommendable introduction to topic modeling with R is, of course, @silge2017text.
+This tutorial builds heavily on and uses materials from [@silge2017text, chapter 6] (see [here](https://www.tidytextmining.com/topicmodeling)) and  [this tutorial](https://tm4ss.github.io/docs/Tutorial_6_Topic_Models.html) on topic modelling using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and covers many more very useful text mining methods. 
 
 <div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
 <span>
@@ -51,14 +51,36 @@ This tutorial builds heavily on and uses materials from  [this tutorial](https:/
 
 <br>
 
+Topic models refers to a suit of methods employed to uncover latent structures within a corpus of text. These models operate on the premise of identifying abstract *topics* that recur across documents. In essence, topic models sift through the textual data to discern recurring patterns of word co-occurrence, revealing underlying semantic themes [@busso2022operation; ]. This technique is particularly prevalent in text mining, where it serves to unveil hidden semantic structures in large volumes of textual data.
 
-Topic models are a common procedure in In machine learning and natural language processing. Topic models represent a type of statistical model that is use to discover more or less abstract *topics* in a given selection of documents. Topic models are particularly common in text mining  to unearth hidden semantic structures in textual data. Topics can be conceived of as networks of collocation terms that, because of the co-occurrence across documents, can be assumed to refer to the same semantic domain (or topic). This assumes that, if a document is about a certain topic, one would expect words, that are related to that topic, to appear in the document more often than in documents that deal with other topics. For instance, *dog* and *bone* will appear more often in documents about dogs whereas *cat* and *meow* will appear in documents about cats. Terms like *the* and *is* will, however, appear approximately equally in both. 
+Conceptually, topics can be understood as clusters of co-occurring terms, indicative of shared semantic domains within the text. The underlying assumption is that if a document pertains to a specific topic, words related to that topic will exhibit higher frequency compared to documents addressing other subjects. For example, in documents discussing dogs, terms like *dog* and *bone* are likely to feature prominently, while in documents focusing on cats, *cat* and *meow* would be more prevalent. Meanwhile, ubiquitous terms such as *the* and *is* are expected to occur with similar frequency across diverse topics, serving as noise rather than indicative signals of topic specificity.
 
-Topic models are also referred to as probabilistic topic models, which refers to statistical algorithms for discovering the latent semantic structures of an extensive text body. Given the availability of vast amounts of textual data, topic models can help to organize and offer insights and assist in understanding large collections of unstructured text. 
+Various methods exist for determining topics within topic models. For instance, @gerlach2018network and @hyland2021multilayer advocate for an approach grounded in stochastic block models. However, most applications of topic models use Latent Dirichlet Allocation (LDA) [@blei2003latent] or Structural Topic Modeling  [@roberts2016navigating].
 
-## Preparation and session set up{-}
+LDA, in particular, emerges as a widely embraced technique for fitting topic models. It operates by treating each document as a blend of topics and each topic as a blend of words. Consequently, documents can exhibit content overlaps, akin to the fluidity observed in natural language usage, rather than being strictly segregated into distinct groups.
 
-This tutorial is based on R. If you have not installed R or are new to it, you will find an introduction to and more information how to use R [here](https://slcladal.github.io/intror.html). For this tutorials, we need to install certain *packages* from an R *library* so that the scripts shown below are executed without errors. Before turning to the code below, please install the packages by running the code below this paragraph. If you have already installed the packages mentioned below, then you can skip ahead and ignore this section. To install the necessary packages, simply run the following code - it may take some time (between 1 and 5 minutes to install all of the packages so you do not need to worry if it takes some time).
+@gillings2022interpretation state that topic modelling is based on the following key assumptions:
+
+* The corpus comprises a substantial number of documents.  
+* A topic is delineated as a set of words with varying probabilities of occurrence across the documents.  
+* Each document exhibits diverse degrees of association with multiple topics.  
+* The collection is structured by underlying topics, which are finite in number, organizing the corpus.  
+
+Given the availability of vast amounts of textual data, topic models can help to organize and offer insights and assist in understanding large collections of unstructured text and they are widely used in natural language processing and computational text analytics. However, the use of topic modelling in discourse studies has received criticism [@brookes2019utility] due to the following issues: 
+
+1. **Thematic Coherence**: While topic modeling can group texts into *topics*, the degree of thematic coherence varies. Some topics may be thematically coherent, but others may lack cohesion or accuracy in capturing the underlying themes present in the texts.
+
+2. **Nuanced Perspective**: Compared to more traditional approaches to discourse analysis, topic modeling often provides a less nuanced perspective on the data. The automatically generated topics may overlook subtle nuances and intricacies present in the texts, leading to a less accurate representation of the discourse.
+
+3. **Distance from Reality**: @brookes2019utility suggest that the insights derived from topic modeling may not fully capture the "reality" of the texts. The topics generated by the model may not accurately reflect the complex nature of the discourse, leading to potential misinterpretations or oversimplifications of the data.
+
+4. **Utility for Discourse Analysts**: While topic modeling may offer a method for organizing and studying sizable data sets, @brookes2019utility questions the utility for discourse analysts and suggests that traditional discourse analysis methods consistently provide a more nuanced and accurate perspective on the data compared to topic modeling approaches.
+
+This criticism is certainly valid if topic modeling is solely reliant on a purely data-driven approach without human intervention. In this tutorial, we will demonstrate how to combine data-driven topic modeling with human-supervised seeded methods to arrive at more reliable and accurate topics.
+
+**Preparation and session set up**
+
+This tutorial is conducted within the R environment. If you're new to R or haven't installed it yet, you can find an introduction to R and further instructions on how to use it [here](https://ladal.edu.au/intror.html). To ensure smooth execution of the scripts provided in this tutorial, it's necessary to install specific packages from the R library. Before proceeding to the code examples, please ensure you've installed these packages by running the code provided below. If you've already installed the required packages, feel free to skip ahead and disregard this section. To install the necessary packages, simply execute the following code. Please note that installation may take some time (usually between 1 and 5 minutes), so there's no need to be concerned if it takes a while.
 
 ```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
 # install packages
@@ -86,19 +108,23 @@ Next, we activate the packages.
 options(stringsAsFactors = F)         # no automatic data transformation
 options("scipen" = 100, "digits" = 4) # suppress math annotation
 # load packages
-library(knitr) 
-library(kableExtra) 
-library(DT)
+#library(knitr) 
+#library(kableExtra) 
+#library(DT)
 library(tm)
+library(dplyr)
+library(stringr)
 library(topicmodels)
-library(reshape2)
+library(quanteda)
+library(tidytext)
+#library(reshape2)
 library(ggplot2)
-library(wordcloud)
-library(pals)
-library(SnowballC)
-library(lda)
-library(ldatuning)
-library(flextable)
+#library(wordcloud)
+#library(pals)
+#library(SnowballC)
+#library(lda)
+#library(ldatuning)
+#library(flextable)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -108,29 +134,95 @@ Once you have installed R and RStudio and once you have initiated the session by
 
 # Topic Modelling{-}
 
-The process starts as usual with the reading of the corpus data. For this tutorial we will analyze *State of the Union Addresses* (SOTU) by US presidents and investigate how the topics that were addressed in the SOTU speeches changeover time. The 231 SOTU addresses are rather long documents. Documents lengths clearly affects the results of topic modeling. For very short texts (e.g. Twitter posts) or very long texts (e.g. books), it can make sense to concatenate/split single documents to receive longer/shorter textual units for modeling.
+In this tutorial, we'll explore a two-step approach to topic modeling. Initially, we'll employ an unsupervised method to generate a preliminary topic model, uncovering inherent topics within the data. Subsequently, we'll introduce a human-supervised, seeded model, informed by the outcomes of the initial data-driven approach. Following this (recommended) procedure, we'll then delve into an alternative purely data-driven approach.
 
-For the SOTU speeches for instance, we infer the model based on paragraphs instead of entire speeches. By manual inspection / qualitative inspection of the results you can check if this procedure yields better (interpretable) topics. In `sotu_paragraphs.csv`, we provide a paragraph separated version of the speeches.
+Our tutorial begins by gathering the necessary corpus data. We'll be focusing on analyzing the *State of the Union Addresses* (SOTU) delivered by US presidents, with the aim of understanding how the addressed topics have evolved over time. Given the length of these addresses (amounting to 231 in total), it's important to acknowledge that document length can influence topic modeling outcomes. In cases where texts are exceptionally short (like Twitter posts) or long (such as books), adjusting the document units for modeling purposes can be beneficial—either by combining or splitting them accordingly.
 
-For text preprocessing, we remove stopwords, since they tend to occur as "noise" in the estimated topics of the LDA model.
+To tailor our approach to the SOTU speeches, we've chosen to model at the paragraph level instead of analyzing entire speeches at once. This allows for a more detailed analysis, potentially leading to clearer and more interpretable topics. We've provided a data set named `sotu_paragraphs.rda`, which contains the speeches segmented into paragraphs for easier analysis.
+
+In terms of preprocessing the data (cleaning it and making it ready for analysis), we convert the text to lower case, remove stopwords words (like *the* and *and* as they often add noise to the topic modeling process, making it harder to identify meaningful topics), we remove punctuation and numbers, and we stem the text data.
 
 ```{r tm2, message=FALSE, warning=FALSE}
 # load data
 textdata <- base::readRDS(url("https://slcladal.github.io/data/sotu_paragraphs.rda", "rb"))
-# load stopwords
-english_stopwords <- readLines("https://slcladal.github.io/resources/stopwords_en.txt", encoding = "UTF-8")
 # create corpus object
-corpus <- Corpus(DataframeSource(textdata))
-# Preprocessing chain
-processedCorpus <- tm_map(corpus, content_transformer(tolower))
-processedCorpus <- tm_map(processedCorpus, removeWords, english_stopwords)
-processedCorpus <- tm_map(processedCorpus, removePunctuation, preserve_intra_word_dashes = TRUE)
-processedCorpus <- tm_map(processedCorpus, removeNumbers)
-processedCorpus <- tm_map(processedCorpus, stemDocument, language = "en")
-processedCorpus <- tm_map(processedCorpus, stripWhitespace)
+tm::Corpus(DataframeSource(textdata)) %>%
+  # convert to lower case
+  tm::tm_map(content_transformer(tolower))  %>%
+  # remove superfluous white spaces
+  tm::tm_map(stripWhitespace)  %>%
+  # remove stop words
+  tm::tm_map(removeWords, quanteda::stopwords()) %>% 
+  # remove punctuation
+  tm::tm_map(removePunctuation, preserve_intra_word_dashes = TRUE) %>%
+  # remove numbers
+  tm::tm_map(removeNumbers) %>% 
+  # stemming
+  tm::tm_map(stemDocument, language = "en") -> textcorpus
+# inspect data
+str(textcorpus)
 ```
 
-## Model calculation{-}
+```{r}
+# load data
+txts <- base::readRDS(url("https://slcladal.github.io/data/sotu_paragraphs.rda", "rb")) 
+txts$text %>%
+  # tokenise
+  quanteda::tokens(remove_punct = TRUE,       # remove punctuation 
+                   remove_symbols = TRUE,     # remove symbols 
+                   remove_number = TRUE) %>%  # remove numbers
+  # remove stop words
+  quanteda::tokens_select(pattern = stopwords("en"), selection = "remove") %>%
+  # stemming
+  quanteda::tokens_wordstem() %>%
+  # convert to document-frequency matrix
+  dfm(tolower = T) -> ctxts
+# add docvars
+docvars(ctxts, "president") <- txts$president
+docvars(ctxts, "date") <- txts$date
+docvars(ctxts, "speechid") <- txts$speech_doc_id
+docvars(ctxts, "docid") <- txts$doc_id
+# clean data
+ctxts <- dfm_subset(ctxts, ntoken(ctxts) > 0)
+# inspect data
+ctxts[1:5, 1:5]
+```
+
+## Human-in-the-loop Topic Modelling {-}
+
+Now that we have loaded and prepared the data for analysis, we follow the two-step approach where we, first, we perform an unsupervised LDA to check what topics are present in our data. Then, we perform a supervised LDA (based on the results of the unsupervised LDA) to identify meaningful topics in our data. For the supervised LDA, we define so-called *seed terms* that help in generating coherent topics.
+
+In the initial data-driven step, we vary the number of topic the LDA algorithms looks for until we identify coherent topics in the data.
+
+```{r}
+# generate model: change k to different numbers, e.g. 10 or 20 and look for consistencies in the keywords for the topics below.
+topicmodels::LDA(ctxts, k = 15, control = list(seed = 1234)) -> ddlda
+```
+
+```{r}
+# extract topics
+ddlda_topics <- tidy(ddlda, matrix = "beta")
+# inspect
+head(ddlda_topics, 45)
+```
+
+
+
+```{r}
+ddlda_top_terms <- ddlda_topics %>%
+  dplyr::group_by(topic) %>%
+  slice_max(beta, n = 10) %>% 
+  dplyr::ungroup() %>%
+  dplyr::arrange(topic, -beta)
+# inspect
+ddlda_top_terms
+```
+
+
+
+## Data-driven Topic Modelling {-}
+
+### Model calculation{-}
 
 After the preprocessing, we have two corpus objects: `processedCorpus`, on which we calculate an LDA topic model [@blei2003lda]. To this end, *stopwords*, i.e. function words that have relational rather than content meaning,  were removed, words were stemmed and converted to lowercase letters and special characters were removed. The second corpus object `corpus` serves to be able to view the original texts and thus to facilitate a qualitative control of the topic model results.
 

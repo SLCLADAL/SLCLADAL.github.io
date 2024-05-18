@@ -1,0 +1,694 @@
+---
+title: "Topic Modeling with R"
+author: "Martin Schweinberger"
+date: "2024-05-17"
+output:
+  bookdown::html_document2
+bibliography: bibliography.bib
+link-citations: yes
+---
+
+
+```{r uq1, echo=F, fig.cap="", message=FALSE, warning=FALSE, out.width='100%'}
+knitr::include_graphics("https://slcladal.github.io/images/uq1.jpg")
+```
+
+# Introduction{-}
+
+This tutorial introduces topic modeling using R. 
+
+```{r diff, echo=FALSE, out.width= "15%", out.extra='style="float:right; padding:10px"'}
+knitr::include_graphics("https://slcladal.github.io/images/gy_chili.jpg")
+```
+
+This tutorial is aimed at beginners and intermediate users of R with the aim of showcasing how to perform basic topic modeling on textual data using R and how to visualize the results of such a model. The aim is not to provide a fully-fledged analysis but rather to show and exemplify selected useful methods associated with topic modeling. 
+
+
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+The entire R Notebook for the tutorial can be downloaded [**here**](https://slcladal.github.io/content/topic.Rmd).  If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file. <br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftopicmodels_cb.ipynb%26branch%3Dmain)<br>
+[**Click this link to open an interactive version of this tutorial on MyBinder.org**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Ftopicmodels_cb.ipynb%26branch%3Dmain). <br> This interactive Jupyter notebook allows you to execute code yourself and you can also change and edit the notebook, e.g. you can change code and upload your own data. <br>
+</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+
+This tutorial builds heavily on and uses materials from [@silge2017text, chapter 6] (see [here](https://www.tidytextmining.com/topicmodeling)) and  [this tutorial](https://tm4ss.github.io/docs/Tutorial_6_Topic_Models.html) on topic modelling using R by Andreas Niekler and Gregor Wiedemann [see @WN17]. [The tutorial](https://tm4ss.github.io/docs/index.html) by Andreas Niekler and Gregor Wiedemann is more thorough, goes into more detail than this tutorial, and covers many more very useful text mining methods. 
+
+<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
+<span>
+<p style='margin-top:1em; text-align:center'>
+**Topic models aim to find topics (which are operationalized as bundles of correlating terms) in documents to see what the texts are about.**</p>
+<p style='margin-left:1em;'>
+</p></span>
+</div>
+
+<br>
+
+Topic models refers to a suit of methods employed to uncover latent structures within a corpus of text. These models operate on the premise of identifying abstract *topics* that recur across documents. In essence, topic models sift through the textual data to discern recurring patterns of word co-occurrence, revealing underlying semantic themes [@busso2022operation; ]. This technique is particularly prevalent in text mining, where it serves to unveil hidden semantic structures in large volumes of textual data.
+
+Conceptually, topics can be understood as clusters of co-occurring terms, indicative of shared semantic domains within the text. The underlying assumption is that if a document pertains to a specific topic, words related to that topic will exhibit higher frequency compared to documents addressing other subjects. For example, in documents discussing dogs, terms like *dog* and *bone* are likely to feature prominently, while in documents focusing on cats, *cat* and *meow* would be more prevalent. Meanwhile, ubiquitous terms such as *the* and *is* are expected to occur with similar frequency across diverse topics, serving as noise rather than indicative signals of topic specificity.
+
+Various methods exist for determining topics within topic models. For instance, @gerlach2018network and @hyland2021multilayer advocate for an approach grounded in stochastic block models. However, most applications of topic models use Latent Dirichlet Allocation (LDA) [@blei2003latent] or Structural Topic Modeling  [@roberts2016navigating].
+
+LDA, in particular, emerges as a widely embraced technique for fitting topic models. It operates by treating each document as a blend of topics and each topic as a blend of words. Consequently, documents can exhibit content overlaps, akin to the fluidity observed in natural language usage, rather than being strictly segregated into distinct groups.
+
+@gillings2022interpretation state that topic modelling is based on the following key assumptions:
+
+* The corpus comprises a substantial number of documents.  
+* A topic is delineated as a set of words with varying probabilities of occurrence across the documents.  
+* Each document exhibits diverse degrees of association with multiple topics.  
+* The collection is structured by underlying topics, which are finite in number, organizing the corpus.  
+
+Given the availability of vast amounts of textual data, topic models can help to organize and offer insights and assist in understanding large collections of unstructured text and they are widely used in natural language processing and computational text analytics. However, the use of topic modelling in discourse studies has received criticism [@brookes2019utility] due to the following issues: 
+
+1. **Thematic Coherence**: While topic modeling can group texts into *topics*, the degree of thematic coherence varies. Some topics may be thematically coherent, but others may lack cohesion or accuracy in capturing the underlying themes present in the texts.
+
+2. **Nuanced Perspective**: Compared to more traditional approaches to discourse analysis, topic modeling often provides a less nuanced perspective on the data. The automatically generated topics may overlook subtle nuances and intricacies present in the texts, leading to a less accurate representation of the discourse.
+
+3. **Distance from Reality**: @brookes2019utility suggest that the insights derived from topic modeling may not fully capture the "reality" of the texts. The topics generated by the model may not accurately reflect the complex nature of the discourse, leading to potential misinterpretations or oversimplifications of the data.
+
+4. **Utility for Discourse Analysts**: While topic modeling may offer a method for organizing and studying sizable data sets, @brookes2019utility questions the utility for discourse analysts and suggests that traditional discourse analysis methods consistently provide a more nuanced and accurate perspective on the data compared to topic modeling approaches.
+
+This criticism is certainly valid if topic modeling is solely reliant on a purely data-driven approach without human intervention. In this tutorial, we will demonstrate how to combine data-driven topic modeling with human-supervised seeded methods to arrive at more reliable and accurate topics.
+
+**Preparation and session set up**
+
+This tutorial is conducted within the R environment. If you're new to R or haven't installed it yet, you can find an introduction to R and further instructions on how to use it [here](https://ladal.edu.au/intror.html). To ensure smooth execution of the scripts provided in this tutorial, it's necessary to install specific packages from the R library. Before proceeding to the code examples, please ensure you've installed these packages by running the code provided below. If you've already installed the required packages, feel free to skip ahead and disregard this section. To install the necessary packages, simply execute the following code. Please note that installation may take some time (usually between 1 and 5 minutes), so there's no need to be concerned if it takes a while.
+
+```{r prep1, echo=T, eval = F, message=FALSE, warning=FALSE}
+# install packages
+install.packages("dplyr")
+install.packages("flextable")
+install.packages("ggplot2")
+install.packages("lda")
+install.packages("ldatuning")
+install.packages("quanteda")
+install.packages("RColorBrewer")
+install.packages("reshape2")
+install.packages("slam")
+install.packages("stringr")
+install.packages("tidyr")
+install.packages("tidytext")
+install.packages("tm")
+install.packages("topicmodels")
+install.packages("wordcloud")
+# install klippy for copy-to-clipboard button in code chunks
+install.packages("remotes")
+remotes::install_github("rlesur/klippy")
+```
+
+Next, we activate the packages. 
+
+```{r prep2, message=FALSE, warning=FALSE}
+# set options
+options(stringsAsFactors = F)         # no automatic data transformation
+options("scipen" = 100, "digits" = 4) # suppress math annotation
+# load packages
+library(dplyr)
+library(flextable)
+library(ggplot2)
+library(lda)
+library(ldatuning)
+library(quanteda)
+library(RColorBrewer)
+library(reshape2)
+library(slam)
+library(stringr)
+library(tidyr)
+library(tidytext)
+library(tm)
+library(topicmodels)
+library(wordcloud)
+# activate klippy for copy-to-clipboard button
+klippy::klippy()
+```
+
+Once you have installed R and RStudio and once you have initiated the session by executing the code shown above, you are good to go.
+
+
+# Topic Modelling{-}
+
+In this tutorial, we'll explore a two-step approach to topic modeling. Initially, we'll employ an unsupervised method to generate a preliminary topic model, uncovering inherent topics within the data. Subsequently, we'll introduce a human-supervised, seeded model, informed by the outcomes of the initial data-driven approach. Following this (recommended) procedure, we'll then delve into an alternative purely data-driven approach.
+
+Our tutorial begins by gathering the necessary corpus data. We'll be focusing on analyzing the *State of the Union Addresses* (SOTU) delivered by US presidents, with the aim of understanding how the addressed topics have evolved over time. Given the length of these addresses (amounting to 231 in total), it's important to acknowledge that document length can influence topic modeling outcomes. In cases where texts are exceptionally short (like Twitter posts) or long (such as books), adjusting the document units for modeling purposes can be beneficial—either by combining or splitting them accordingly.
+
+To tailor our approach to the SOTU speeches, we've chosen to model at the paragraph level instead of analyzing entire speeches at once. This allows for a more detailed analysis, potentially leading to clearer and more interpretable topics. We've provided a data set named `sotu_paragraphs.rda`, which contains the speeches segmented into paragraphs for easier analysis.
+
+
+## Human-in-the-loop Topic Modelling {-}
+
+In this human-in-the-loop approach to topic modelling which mainly uses and combines the `quanteda` package [@benoit2018quanteda], the `topicmodels` package [@topicmodels2024package; @topicmodels2011pub], and the `seededlda` package [@seededlda2024]  Now that we have cleaned the data, we can perform the topic modelling. This consists of two steps:
+
+1. First, we perform an unsupervised LDA. We do this to check what topics are in our corpus. 
+
+2. Then, we perform a supervised LDA (based on the results of the unsupervised LDA) to identify meaningful topics in our data. For the supervised LDA, we define so-called *seed terms* that help in generating coherent topics.
+
+### Loading and preparing data {-}
+
+When preparing the data for analysis, we employ several preprocessing steps to ensure its cleanliness and readiness for analysis. Initially, we load the data and then remove punctuation, symbols, and numerical characters. Additionally, we eliminate common stop words, such as *the* and *and*, which can introduce noise and hinder the topic modeling process. To standardize the text, we convert it to lowercase and, lastly, we apply stemming to reduce words to their base form.
+
+```{r loaddata}
+# load data
+txts <- base::readRDS(url("https://slcladal.github.io/data/sotu_paragraphs.rda", "rb")) 
+txts$text %>%
+  # tokenise
+  quanteda::tokens(remove_punct = TRUE,       # remove punctuation 
+                   remove_symbols = TRUE,     # remove symbols 
+                   remove_number = TRUE) %>%  # remove numbers
+  # remove stop words
+  quanteda::tokens_select(pattern = stopwords("en"), selection = "remove") %>%
+  # stemming
+  quanteda::tokens_wordstem() %>%
+  # convert to document-frequency matrix
+  quanteda::dfm(tolower = T) -> ctxts
+# add docvars
+docvars(ctxts, "president") <- txts$president
+docvars(ctxts, "date") <- txts$date
+docvars(ctxts, "speechid") <- txts$speech_doc_id
+docvars(ctxts, "docid") <- txts$doc_id
+# clean data
+ctxts <- dfm_subset(ctxts, ntoken(ctxts) > 0)
+# inspect data
+ctxts[1:5, 1:5]
+```
+
+### Initial unsupervised topic model{-}
+
+Now that we have loaded and prepared the data for analysis, we will follow a two-step approach. 
+
+1. First, we perform an unsupervised topic model using Latent Dirichlet Allocation (LDA) to identify the topics present in our data. This initial step helps us understand the broad themes and structure within the data set. 
+
+2. Then, based on the results of the unsupervised topic model, we conduct a supervised topic model using LDA to refine and identify more meaningful topics in our data.
+
+This combined approach allows us to leverage both data-driven insights and expert supervision to enhance the accuracy and interpretability of the topics.
+
+In the initial  step that implements a unsupervised, data-driven topic model, we vary the number of topics the LDA algorithm looks for until we identify coherent topics in the data. We use the `LDA` function from the `topicmodels` package instead of the `textmodel_lda` function from the `seededlda` package because the former allows us to include a seed. Including a seed ensures that the results of this unsupervised topic model are reproducible, which is not the case if we do not seed the model, as each model will produce different results without setting a seed.
+
+```{r datadrivenlda}
+# generate model: change k to different numbers, e.g. 10 or 20 and look for consistencies in the keywords for the topics below.
+topicmodels::LDA(ctxts, k = 15, control = list(seed = 1234)) -> ddlda
+```
+
+Now that we have generated an initial data-driven model, the next step is to inspect it to evaluate its performance and understand the topics it has identified. To do this, we need to examine the terms associated with each detected topic. By analyzing these terms, we can gain insights into the themes represented by each topic and assess the coherence and relevance of the model's output.
+
+```{r cleanbetatopics}
+# define number of topics
+ntopics = 15
+# define number of terms
+nterms = 10
+# generate table
+tidytext::tidy(ddlda, matrix = "beta") %>%
+  dplyr::group_by(topic) %>%
+  dplyr::slice_max(beta, n = nterms) %>% 
+  dplyr::ungroup() %>%
+  dplyr::arrange(topic, -beta) %>%
+  dplyr::mutate(term = paste(term, " (", round(beta, 3), ")", sep = ""),
+                topic = paste("topic", topic),
+                topic = factor(topic, levels = c(paste("topic", 1:ntopics))),
+                top = rep(paste("top", 1:nterms), nrow(.)/nterms),
+                top = factor(top, levels = c(paste("top", 1:nterms)))) %>%
+  dplyr::select(-beta) %>%
+  tidyr::spread(topic, term) -> ddlda_top_terms
+ddlda_top_terms
+```
+
+In a real analysis, we would re-run the unsupervised model multiple times, adjusting the number of topics that the Latent Dirichlet Allocation (LDA) algorithm "looks for." For each iteration, we would inspect the key terms associated with the identified topics to check their thematic consistency. This evaluation helps us determine whether the results of the topic model make sense and accurately reflect the themes present in the data. By varying the number of topics and examining the corresponding key terms, we can identify the optimal number of topics that best represent the underlying themes in our data set. However, we will skip re-running the model here, as this is just a tutorial intended to showcase the process rather than a comprehensive analysis.
+
+To obtain a comprehensive table of terms and their association strengths with topics (the beta values), follow the steps outlined below. This table can help verify if the data contains thematically distinct topics. Additionally, visualizations and statistical modeling can be employed to compare the distinctness of topics and determine the ideal number of topics. However, I strongly recommend not solely relying on statistical measures when identifying the optimal number of topics. In my experience, human intuition is still essential for evaluating topic coherence and consistency.
+
+
+```{r extractbeta}
+# extract topics
+ddlda_topics <- tidy(ddlda, matrix = "beta")
+# inspect
+head(ddlda_topics, 20)
+```
+
+The purpose of this initial step, in which we generate data-driven unsupervised topic models, is to identify the number of coherent topics present in the data and to determine the key terms associated with these topics. These key terms will then be used as seed terms in the next step: the supervised, seeded topic model. This approach ensures that the supervised model is grounded in the actual thematic structure of the data set, enhancing the accuracy and relevance of the identified topics.
+
+### Supervised, seeded topic model{-}
+
+To implement the supervised, seeded topic model, we start by creating a dictionary containing the seed terms we have identified in the first step.
+
+To check terms (to see if ), you can use the following code chunk:
+```{r checkterms}
+ddlda_topics %>%  select(term) %>% unique() %>% filter(str_detect(term, "agri"))
+```
+
+
+
+```{r seededlda}
+# semisupervised LDA
+dict <- dictionary(list(military = c("armi", "war", "militari", "conflict"),
+                        liberty = c("freedom", "liberti", "free"),
+                        nation = c("nation", "countri", "citizen"),
+                        law = c("law", "court", "prison"),
+                        treaty = c("claim", "treati", "negoti"),
+                        indian = c("indian", "tribe", "territori"),
+                        labor = c("labor", "work", "condit"),
+                        money = c("bank", "silver", "gold", "currenc", "money"),
+                        finance = c("debt", "invest", "financ"),
+                        wealth = c("prosper", "peac", "wealth"),
+                        industry = c("produc", "industri", "manufactur"),
+                        navy = c("navi", "ship", "vessel", "naval"),
+                        consitution = c("constitut", "power", "state"),
+                        agriculture = c("agricultur", "grow", "land"),
+                        office = c("office", "serv", "duti")))
+tmod_slda <- seededlda::textmodel_seededlda(ctxts, 
+                                            dict, 
+                                            residual = TRUE, 
+                                            min_termfreq = 2)
+# inspect
+seededlda::terms(tmod_slda)
+```
+
+Now, we extract files and create a data frame of topics and documents. This shows what topic is dominant in which file in tabular form.  
+
+```{r dataframe}
+# generate data frame
+data.frame(tmod_slda$data$date, tmod_slda$data$president, seededlda::topics(tmod_slda)) %>%
+  dplyr::rename(Date = 1,
+                President = 2,
+                Topic = 3) %>%
+  dplyr::mutate(Date = stringr::str_remove_all(Date, "-.*"),
+                Date = stringr::str_replace_all(Date, ".$", "0")) %>%
+  dplyr::mutate_if(is.character, factor) -> topic_df
+# inspect
+head(topic_df)
+```
+
+Using the table (or data frame) we have just created, we can visualize the use of topics over time.
+
+
+
+```{r vis}
+topic_df %>%
+  dplyr::group_by(Date, Topic) %>%
+  dplyr::summarise(freq = n()) %>%
+  ggplot(aes(x = Date, y = freq, fill = Topic)) +
+  geom_bar(stat="identity", position="fill", color = "black") + 
+  theme_bw() +
+  labs(x = "Decade") +
+  scale_fill_manual(values = rev(colorRampPalette(brewer.pal(8, "RdBu"))(ntopics+1))) +
+  scale_y_continuous(name ="Percent of paragraphs", labels = seq(0, 100, 25))
+```
+
+The figure illustrates the relative frequency of topics over time in the State of the Union (SOTU) texts. Notably, paragraphs discussing the topic of "office," characterized by key terms such as *office*, *serv*, and *duti*, have become less prominent over time. This trend suggests a decreasing emphasis on this particular theme, as evidenced by the diminishing number of paragraphs dedicated to it.
+
+## Data-driven Topic Modelling {-}
+
+In this part of the tutorial, we show an alternative approaches for performing data-driven topic modelling using LDA. 
+
+### Loading and preparing data {-}
+
+When readying the data for analysis, we follow consistent pre-processing steps, employing the `tm` package [@tm2024package; @tm2008pub] for efficient data preparation and cleaning. First, we load the data and convert it into a corpus object. Next, we convert the text to lowercase, eliminating superfluous white spaces, and removing stop words. Subsequently, we proceed to strip the data of punctuation, symbols, and numerical characters. Finally, we apply stemming to standardize words to their base form, ensuring uniformity throughout the data set.
+
+
+```{r tm2, message=FALSE, warning=FALSE}
+# load data
+textdata <- base::readRDS(url("https://slcladal.github.io/data/sotu_paragraphs.rda", "rb"))
+# create corpus object
+tm::Corpus(DataframeSource(textdata)) %>%
+  # convert to lower case
+  tm::tm_map(content_transformer(tolower))  %>%
+  # remove superfluous white spaces
+  tm::tm_map(stripWhitespace)  %>%
+  # remove stop words
+  tm::tm_map(removeWords, quanteda::stopwords()) %>% 
+  # remove punctuation
+  tm::tm_map(removePunctuation, preserve_intra_word_dashes = TRUE) %>%
+  # remove numbers
+  tm::tm_map(removeNumbers) %>% 
+  # stemming
+  tm::tm_map(stemDocument, language = "en") -> textcorpus
+# inspect data
+str(textcorpus)
+```
+
+### Model calculation{-}
+
+Here's the improved and expanded version of the paragraph:
+
+After preprocessing, we have a clean corpus object called `textcorpus`, which we use to calculate the unsupervised Latent Dirichlet Allocation (LDA) topic model [@blei2003lda]. To perform this calculation, we first create a Document-Term Matrix (DTM) from the `textcorpus`. In this step, we ensure that only terms with a certain minimum frequency in the corpus are included (we set the minimum frequency to 5). This selection process not only speeds up the model calculation but also helps improve the model's accuracy by focusing on more relevant and frequently occurring terms. By filtering out less common terms, we reduce noise and enhance the coherence of the topics identified by the LDA model.
+
+```{r tm3a}
+# compute document term matrix with terms >= minimumFrequency
+minimumFrequency <- 5
+DTM <- tm::DocumentTermMatrix(textcorpus, 
+                              control = list(bounds = list(global = c(minimumFrequency, Inf))))
+# inspect the number of documents and terms in the DTM
+dim(DTM)
+```
+
+Due to vocabulary pruning, some rows in our Document-Term Matrix (DTM) may end up being empty. Latent Dirichlet Allocation (LDA) cannot handle empty rows, so we must remove these documents from both the DTM and the corresponding metadata. This step ensures that the topic modeling process runs smoothly without encountering errors caused by empty documents. Additionally, removing these empty rows helps maintain the integrity of our analysis by focusing only on documents that contain meaningful content.
+
+```{r tm3a2}
+sel_idx <- slam::row_sums(DTM) > 0
+DTM <- DTM[sel_idx, ]
+textdata <- textdata[sel_idx, ]
+# inspect the number of documents and terms in the DTM
+dim(DTM)
+``` 
+
+The output shows that we have removed 22 documents (8833 - 8811) from the DTM.
+
+As an unsupervised machine learning method, topic models are well-suited for exploring data. The primary goal of calculating topic models is to determine the proportionate composition of a fixed number of topics within the documents of a collection. Experimenting with different parameters is essential to identify the most suitable settings for your analysis needs.
+
+For parameterized models such as Latent Dirichlet Allocation (LDA), the number of topics `K` is the most critical parameter to define in advance. Selecting the optimal `K` depends on various factors. If `K` is too small, the collection is divided into a few very general semantic contexts. Conversely, if `K` is too large, the collection is divided into too many topics, leading to overlaps and some topics being barely interpretable. Finding the right balance is key to achieving meaningful and coherent topics in your analysis.
+
+An alternative to deciding on a set number of topics is to extract parameters form a models using a rage of number of topics. This approach can be useful when the number of topics is not theoretically motivated or based on closer, qualitative inspection of the data. In the example below, the determination of the optimal number of topics follows @murzintcev2020idealtopics, but we only use two metrics (`CaoJuan2009` and `Deveaud2014`) - it is highly recommendable to inspect the results of the four metrics available for the `FindTopicsNumber` function  which are `Griffiths2004` [see @griffiths2004integrating], `CaoJuan2009` [see @cao2009density], `Arun2010` [see @arun2010finding], and `Deveaud2014` [see @deveaud2014accurate]). 
+
+```{r tm3b, message=FALSE, warning=FALSE}
+# create models with different number of topics
+result <- ldatuning::FindTopicsNumber(
+  DTM,
+  topics = seq(from = 2, to = 20, by = 1),
+  metrics = c("CaoJuan2009",  "Deveaud2014"),
+  method = "Gibbs",
+  control = list(seed = 77),
+  verbose = TRUE
+)
+```
+
+
+We can now plot the results. In this case, we have only use two methods `CaoJuan2009` and `Griffith2004`. The best number of topics shows low values for `CaoJuan2009` and high values for `Griffith2004` (optimally, several methods should converge and show peaks and dips respectively for a certain number of topics).
+
+```{r tm3c, message=FALSE, warning=FALSE}
+FindTopicsNumber_plot(result)
+```
+
+
+For our first analysis, however, we choose a thematic "resolution" of `K = 20` topics. In contrast to a resolution of 100 or more, this number of topics can be evaluated qualitatively very easy.
+
+```{r tm4}
+# number of topics
+K <- 20
+# set random number generator seed
+set.seed(9161)
+# compute the LDA model, inference via 1000 iterations of Gibbs sampling
+topicModel <- topicmodels::LDA(DTM, K, method="Gibbs", control=list(iter = 500, verbose = 25))
+# save results
+tmResult <- posterior(topicModel)
+# save theta values
+theta <- tmResult$topics
+# save beta values
+beta <- tmResult$terms
+# reset topic names
+topicNames <- apply(terms(topicModel, 5), 2, paste, collapse = " ")
+```
+
+Depending on the size of the vocabulary, the collection size and the number K, the inference of topic models can take a very long time. This calculation may take several minutes. If it takes too long, reduce the vocabulary in the DTM by increasing the minimum frequency in the previous step.
+
+
+Let's take a look at the 10 most likely terms within the term probabilities `beta` of the inferred topics.
+
+```{r tm6}
+# create a data frame from the topic model data
+tidytext::tidy(topicModel, matrix = "beta") %>% 
+  # ensure topics are factors with specific levels
+  dplyr::mutate(topic = paste0("topic", as.character(topic)),
+                topic = factor(topic, levels = paste0("topic", 1:20))) %>%
+  # group the data by topic
+  dplyr::group_by(topic) %>%
+  # arrange terms within each topic by beta value (ascending)
+  dplyr::arrange(topic, -beta) %>% 
+  # select the top 10 terms with the highest beta values for each topic
+  dplyr::top_n(10) %>%
+  # add beta to term
+  dplyr::mutate(term = paste0(term, " (", round(beta, 3), ")")) %>%
+  # remove the beta column as it is now part of the term string
+  dplyr::select(-beta) %>%  
+  # ungroup the data frame
+  dplyr::ungroup() %>%
+  # create an id column for each term's position within the topic
+  dplyr::mutate(id = rep(1:10, 20)) %>%  
+  # pivot the data to a wider format with topics as columns
+  tidyr::pivot_wider(names_from = topic, values_from = term) -> topterms  
+# inspect
+topterms
+```
+
+For the next steps, we want to give the topics more descriptive names than just numbers. Therefore, we simply concatenate the five most likely terms of each topic to a string that represents a pseudo-name for each topic. We aim to achieve a  meaningful order of top terms for each topic by re-ranking them using a specific scoring method [@Chang2009].
+
+
+```{r tm8}
+topicNames <- apply(terms(topicModel, 5), 2, paste, collapse = " ")
+# inspect first 3 topic names
+topicNames[1:3]
+```
+
+### Visualization of Words and Topics{-}
+
+Although wordclouds may not be optimal for scientific purposes they can provide a quick visual overview of a set of terms. Let's look at some topics as wordcloud.
+
+In the following code, you can change the variable **topicToViz** with values between 1 and 20 to display other topics.
+
+``` {r wordcloud, fig.width=4, fig.height=4, fig.align='center', message=FALSE, warning=F}
+# visualize topics as word cloud
+# choose topic of interest by a term contained in its name
+topicToViz <- grep('mexico', topicNames)[1] 
+# select to 50 most probable terms from the topic by sorting the term-topic-probability vector in decreasing order
+top50terms <- sort(tmResult$terms[topicToViz,], decreasing=TRUE)[1:50]
+words <- names(top50terms)
+# extract the probabilities of each of the 50 terms
+probabilities <- sort(tmResult$terms[topicToViz,], decreasing=TRUE)[1:50]
+# visualize the terms as wordcloud
+mycolors <- brewer.pal(8, "Dark2")
+wordcloud(words, probabilities, random.order = FALSE, color = mycolors)
+```
+
+Let us now look more closely at the distribution of topics within individual documents. To this end, we visualize the distribution in 3 sample documents.
+
+Let us first take a look at the contents of three sample documents:
+
+```{r tm9}
+exampleIds <- c(2, 100, 200)
+# first 400 characters of file 2
+stringr::str_sub(txts$text[2], 1, 400)
+# first 400 characters of file 100
+stringr::str_sub(txts$text[100], 1, 400)
+# first 400 characters of file 200
+stringr::str_sub(txts$text[200], 1, 400)
+```
+
+After looking into the documents, we visualize the topic distributions within the documents.
+
+``` {r vis2, results="hide", warning=FALSE, message=FALSE, fig.width=10, fig.height=6, fig.align='center'}
+N <- length(exampleIds)  # Number of example documents
+
+# Get topic proportions from example documents
+topicProportionExamples <- theta[exampleIds,]
+colnames(topicProportionExamples) <- topicNames
+
+# Reshape data for visualization
+reshape2::melt(cbind(data.frame(topicProportionExamples), 
+                                     document = factor(1:N)),
+                               variable.name = "topic", 
+                               id.vars = "document") %>%  
+  # create bar plot using ggplot2
+  ggplot(aes(topic, value, fill = document), ylab = "Proportion") +
+  # plot bars
+  geom_bar(stat="identity") +  
+  # rotate x-axis labels
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  # flip coordinates to create horizontal bar plot
+  coord_flip() +  
+  # facet by document
+  facet_wrap(~ document, ncol = N)  
+
+```
+
+### Topic distributions{-}
+
+The figure above illustrates how topics are distributed within a document according to the model. In the current model, all three documents exhibit at least a small percentage of each topic.
+
+The topic distribution within a document can be controlled using the *alpha* parameter of the model. Higher alpha priors result in an even distribution of topics within a document, while lower alpha priors ensure that the inference process concentrates the probability mass on a few topics for each document.
+
+In the previous model calculation, the alpha prior was automatically estimated to fit the data, achieving the highest overall probability for the model. However, this automatic estimate may not align with the results that an analyst desires. Depending on our analysis goals, we might prefer a more concentrated (peaky) or more evenly distributed set of topics in the model.
+
+Next, let us change the alpha prior to a lower value to observe how this adjustment affects the topic distributions in the model. To do this, we first extarct the alpha value of teh previous model.
+
+```{r tm11}
+# see alpha from previous model
+attr(topicModel, "alpha") 
+```
+The alpha value of the previous model was `attr(topicModel, "alpha")`. So now, we set a much lower value (0.2) when we generate a new model. 
+
+```{r tm12}
+# generate new LDA model with low alpha
+topicModel2 <- LDA(DTM, K, method="Gibbs", 
+                   control=list(iter = 500, verbose = 25, alpha = 0.2))
+# save results
+tmResult <- posterior(topicModel2)
+# save theta values
+theta <- tmResult$topics
+# save beta values
+beta <- tmResult$terms
+# reset topic names
+topicNames <- apply(terms(topicModel, 5), 2, paste, collapse = " ")
+```
+
+```{r}
+topicNames <- apply(terms(topicModel, 5), 2, paste, collapse = " ")
+topicNames
+```
+
+
+
+Now visualize the topic distributions in the three documents again. What are the differences in the distribution structure?
+
+``` {r vis3, results="hide", echo=T, warning=FALSE, message=FALSE, fig.width=10, fig.height=6, fig.align='center'}
+# get topic proportions form example documents
+topicProportionExamples <- theta[exampleIds,]
+colnames(topicProportionExamples) <- topicNames
+vizDataFrame <- reshape2::melt(cbind(data.frame(topicProportionExamples),
+                                     document = factor(1:N)), 
+                               variable.name = "topic", 
+                               id.vars = "document") 
+# plot alpha distribution 
+ggplot(data = vizDataFrame, aes(topic, value, fill = document), ylab = "proportion") + 
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +  
+  coord_flip() +
+  facet_wrap(~ document, ncol = N)
+```
+
+The figure above now shows that the documents are more clearly assigned to specific topics. The difference in the probability of a document belonging to a particular topic is much more distinct, indicating a stronger association between documents and their respective dominant topics.
+
+By adjusting the alpha parameter to a lower value, we have concentrated the probability mass on fewer topics for each document. This change makes the topic distribution within documents less even and more peaked, resulting in documents being more distinctly associated with specific topics.
+
+This adjustment can be particularly useful when analyzing data sets where we expect documents to focus on a few key themes rather than covering a broad range of topics. It allows for a clearer interpretation of the primary topics discussed in each document, enhancing the overall clarity and interpretability of the topic model.
+
+
+### Topic ranking{-}
+
+Determining the defining topics within a collection is a crucial step in topic modeling, as it helps to organize and interpret the underlying themes effectively. There are several approaches to uncover these topics and arrange them in a meaningful order. Here, we present two different methods: **Ordering Topics by Probability** and **Counting Primary Topic Appearances**. These two approaches complement each other and, when used together, can provide a comprehensive understanding of the defining topics within a collection. By combining the probabilistic ranking with the frequency count of primary topics, we can achieve a more nuanced and accurate interpretation of the underlying themes in the data.
+
+#### Approach 1: Ordering Topics by Probability{-}
+
+This approach involves ranking topics based on their overall probability within the given collection. By examining the distribution of words across topics and documents, we can identify which topics are more dominant and relevant. This method helps to highlight the most significant themes within the data.
+
+```{r tm14}
+# mean probabilities over all paragraphs
+topicProportions <- colSums(theta) / nDocs(DTM)  
+# assign the topic names we created before
+names(topicProportions) <- topicNames     
+# show summed proportions in decreased order
+soP <- sort(topicProportions, decreasing = TRUE)
+# inspect ordering
+paste(round(soP, 5), ":", names(soP))
+```
+
+We recognize some topics that are way more likely to occur in the corpus than others. These describe rather general thematic coherence. Other topics correspond more to specific contents. 
+
+#### Approach 2: Counting Primary Topic Appearances{-}
+
+Another method is to count how often a topic appears as the primary topic within individual paragraphs or documents. This approach focuses on the frequency with which each topic takes precedence in the text, providing insight into which topics are most commonly addressed and therefore, potentially more important.
+
+```{r tm16}
+countsOfPrimaryTopics <- rep(0, K)
+names(countsOfPrimaryTopics) <- topicNames
+for (i in 1:nDocs(DTM)) {
+  topicsPerDoc <- theta[i, ] # select topic distribution for document i
+  # get first element position from ordered list
+  primaryTopic <- order(topicsPerDoc, decreasing = TRUE)[1] 
+  countsOfPrimaryTopics[primaryTopic] <- countsOfPrimaryTopics[primaryTopic] + 1
+}
+# sort by primary topic
+so <- sort(countsOfPrimaryTopics, decreasing = TRUE)
+# show ordering
+paste(so, ":", names(so))
+```
+
+Sorting topics by the Rank-1 method highlights topics with specific thematic coherences, placing them at the upper ranks of the list. This sorting approach is valuable for several subsequent analysis steps:
+
+* *Semantic Interpretation of Topics*: By examining topics ranked higher in the list, researchers can gain insights into the most salient and distinctive themes present in the collection. Understanding these topics facilitates their semantic interpretation and allows for deeper exploration of the underlying content.
+
+* *Analysis of Time Series*: Examining the temporal evolution of the most important topics over time can reveal trends, patterns, and shifts in discourse. Researchers can track how the prominence of certain topics fluctuates over different time periods, providing valuable context for understanding changes in the subject matter.
+
+* *Filtering Based on Sub-Topics*: The sorted list of topics can serve as a basis for filtering the original collection to focus on specific sub-topics of interest. Researchers can selectively extract documents or passages related to particular themes, enabling targeted analysis and investigation of niche areas within the broader context.
+
+By leveraging the Rank-1 method to sort topics, researchers can enhance their understanding of the thematic landscape within the collection and facilitate subsequent analytical tasks aimed at extracting meaningful insights and knowledge.
+
+### Filtering documents{-}
+
+The inclusion of topic probabilities for each document or paragraph in a topic model enables its application for thematic filtering of a collection. This filtering process involves selecting only those documents that surpass a predetermined threshold of probability for specific topics. For instance, we may choose to retain documents containing a particular topic, such as topic 'X', with a probability exceeding 20 percent.
+
+In the subsequent steps, we will implement this filtering approach to select documents based on their topical content and visualize the resulting document distribution over time. This analysis will provide insights into the prevalence and distribution of specific themes within the collection, allowing for a more targeted exploration of relevant topics across different temporal intervals.
+
+```{r tm18}
+topicToFilter <- 6  # you can set this manually ...
+# ... or have it selected by a term in the topic name (e.g. 'children')
+topicToFilter <- grep('children', topicNames)[1] 
+topicThreshold <- 0.2
+selectedDocumentIndexes <- which(theta[, topicToFilter] >= topicThreshold)
+filteredCorpus <- txts$text[selectedDocumentIndexes]
+# show length of filtered corpus
+filteredCorpus
+``` 
+
+Our filtered corpus contains `r length(filteredCorpus)` documents related to the topic `r topicToFilter` to at least 20 %.
+
+### Topic proportions over time{-}
+
+In the final step, we offer a comprehensive overview of the topics present in the data across different time periods. To achieve this, we aggregate the mean topic proportions per decade for all State of the Union (SOTU) speeches. These aggregated topic proportions provide a distilled representation of the prevalent themes over time and can be effectively visualized, such as through a bar plot. This visualization offers valuable insights into the evolving discourse captured within the SOTU speeches, highlighting overarching trends and shifts in thematic emphasis across decades. 
+
+```{r vis4, fig.width=9, fig.height=6, fig.align='center', warning=F, message=F}
+# append decade information for aggregation
+textdata$decade <- paste0(substr(textdata$date, 0, 3), "0")
+# get mean topic proportions per decade
+topic_proportion_per_decade <- aggregate(theta, by = list(decade = textdata$decade), mean)
+# set topic names to aggregated columns
+colnames(topic_proportion_per_decade)[2:(K+1)] <- topicNames
+# reshape data frame and generate plot
+reshape2::melt(topic_proportion_per_decade, id.vars = "decade") %>%
+  ggplot(aes(x=decade, y=value, fill=variable)) +
+  geom_bar(stat = "identity") + 
+  labs(y = "Proportion", x = "Decade")  +
+  scale_fill_manual(values = rev(colorRampPalette(brewer.pal(8, "RdBu"))(20))) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The visualization shows that topics around the relation between the federal government and the states as well as inner conflicts clearly dominate the first decades. Security issues and the economy are the most important topics of recent SOTU addresses.
+
+# Citation & Session Info {-}
+
+Schweinberger, Martin. 2024. *Topic Modeling with R*. Brisbane: The University of Queensland. url: https://slcladal.github.io/topic.html (Version 2024.05.17).
+
+
+```
+@manual{schweinberger2024topic,
+  author = {Schweinberger, Martin},
+  title = {Topic Modeling with R},
+  note = {https://ladal.edu.au/topic.html},
+  year = {2024},
+  organization = "The University of Queensland, Australia. School of Languages and Cultures},
+  address = {Brisbane},
+  edition = {2024.05.17}
+}
+```
+
+
+```{r fin}
+sessionInfo()
+```
+
+
+
+***
+
+[Back to top](#introduction)
+
+[Back to HOME](https://ladal.edu.au)
+
+***
+
+
+# References{-}
