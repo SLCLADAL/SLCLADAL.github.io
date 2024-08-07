@@ -10,8 +10,9 @@ link-citations: yes
 
 # Introduction 
 
-This tutorial shows how to perform topic modelling using R. The entire R markdown document for the tutorial can be downloaded [here]("https://slcladal.github.io/content/ATAP_TopMod_Markdown.Rmd").
-The tutorial requires you to install and load a couple of packages (also called libraries) to analyze linguistic data. To help you, we directly include the commands to do so in the script and walk you through it step by step.
+This tutorial represents a case study on how to perform topic modelling on literary data using R. The entire R markdown document for the tutorial can be downloaded [here]("https://slcladal.github.io/content/topmod_dickens.Rmd"). The LADAL tutorial introducing topic modeling which provides more background is available [here](https://ladal.edu.au/topic.html).
+
+The tutorial requires you to install and load a couple of packages (in Python, these packages are also called libraries) to analyze linguistic data. To help you, we directly include the commands in the script and walk you through it step by step.
 
 <div class="warning" style='padding:0.1em; background-color:rgba(215,209,204,.3); color:#51247a'>
 <span>
@@ -28,8 +29,8 @@ To be able to follow this tutorial, we suggest you check out and familiarize you
 </ul>
 </p>
 <p style='margin-top:1em; text-align:center'>
-Click [**here**](https://ladal.edu.au/content/topmod_dickens.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibliography.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252F_dickens_cb.ipynb%26branch%3Dmain)<br>
+Click [**here**](https://ladal.edu.au/content/topmod_dickens.Rmd)^[If you want to render the R Notebook on your machine, i.e. knitting the document to html or a pdf, you need to make sure that you have R and RStudio installed and you also need to download the [**bibliography file**](https://slcladal.github.io/content/bibtex.bib) and store it in the same folder where you store the Rmd file.] to download the **entire R Notebook** for this tutorial.<br><br>
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252Fdickens_cb.ipynb%26branch%3Dmain)<br>
 Click [**here**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-environment/main?urlpath=git-pull%3Frepo%3Dhttps%253A%252F%252Fgithub.com%252FSLCLADAL%252Finteractive-notebooks%26urlpath%3Dlab%252Ftree%252Finteractive-notebooks%252Fnotebooks%252F_dickens_cb.ipynb%26branch%3Dmain) to open an interactive Jupyter notebook that allows you to execute, change, and edit the code as well as to upload your own data. <br>
 </p>
 <p style='margin-left:1em;'>
@@ -42,9 +43,9 @@ Click [**here**](https://mybinder.org/v2/gh/SLCLADAL/interactive-notebooks-envir
 
 ## Motivation
 
-There is an incredible amount of text that has been archived all over the world. Probably, there is more text being produced on any given day than a single person can ever hope to read. What are linguists and other language-oriented scholars - be that from perspectives historical, literary, sociological or beyond - going to do with this embarrassment of riches? Change field, focus on a particular niche of language or begin using automated language methods, most likely. If you belong to the latter category, and have yet to acquaint yourself with topic modelling, welcome.
+There is an incredible amount of text that has been archived all over the world. Probably, there is more text being produced on any given day than a single person can ever hope to read. What are linguists and other language-oriented scholars - be that from  historical, literary, sociological or beyond perspectives - going to do with this embarrassment of riches? Change field, focus on a particular niche of language or begin using automated language methods, most likely. If you belong to the latter category, and have yet to acquaint yourself with topic modelling, welcome.
 
-So how does topic modelling help us get to grips with large quantities of texts (or the Great Unread, as Tangherlini and Leonard appropriately call it)? What it certainly does not do, is read or analyze a single sentence, let alone a corpus of texts for you. It is more useful to think of it as "a lens that allows researchers working on a problem to view a relevant textual corpus in a different light and at a different scale" [@mohr2013introduction 560].
+So how does topic modelling help us get to grips with large quantities of texts (or the Great Unread, as @tangherlini2013trawling appropriately call it)? What it certainly does not do, is read or analyze a single sentence, let alone a corpus of texts for you. It is more useful to think of it as "a lens that allows researchers working on a problem to view a relevant textual corpus in a different light and at a different scale" [@mohr2013introduction 560].
 
 ## Basic Idea of Topic Modelling
 
@@ -74,6 +75,7 @@ If all of these look new, run the following lines of code:
 #install.packages("udpipe", repos = "http://cran.us.r-project.org")
 #install.packages("data.table", repos = "http://cran.us.r-project.org")
 #install.packages("future.apply", repos = "http://cran.us.r-project.org")
+#install.packages("flextable", repos = "http://cran.us.r-project.org")
 ```
 
 This may take a minute or three. Installing packages is only necessary once, so if you are working with this script, or your own, you won't need to run these installation commands more than once. In your script, you can *mute* a command - basically telling R not to execute it - by placing a #-symbol in front of it, like so:
@@ -98,6 +100,7 @@ library(tm)
 library(udpipe)
 library(data.table)
 library(future.apply)
+library(flextable)
 ```
 
 ## Installing a language model
@@ -145,39 +148,53 @@ First, we can check out which of Dickens' texts are available on Gutenberg:
 dickens <- gutenberg_works(author == "Dickens, Charles")
 ```
 
-The command accesses a table of Gutenberg work metadata, in this case specifically only for works authored by one *Dickens, Charles”. We save this table to a variable called, tellingly, *dickens”. Let's take a look at it:
+The command accesses a table of Gutenberg work metadata, in this case specifically only for works authored by one *Dickens, Charles*. We save this table to a variable called, tellingly, *dickens*. Let's take a look at it:
 
 ```{r}
 dickens
 ```
 
-At first glance, we can see that there are 74 texts by Dickens on Gutenberg, and that to each of these texts there is some metadate like the Gutenberg ID, the language, the rights. This information is stored in a tibble, an object that does not cram the console with its entire length, but actually stops itself at ten rows. While this is helpful in situations where you have millions of rows, here it is more hindrance than help - we see some of the texts we're looking for, but not all of them. To display all of the rows and find our texts, we need the output to display all 74 rows. This can be achieved like so:
+At first glance, we can see that there are `r nrow(dickens)` texts by Dickens on Gutenberg, and that to each of these texts there is some metadate like the Gutenberg ID, the language, the rights. This information is stored in a tibble, an object that does not cram the console with its entire length, but actually stops itself at ten rows. While this is helpful in situations where you have millions of rows, here it is more hindrance than help - we see some of the texts we're looking for, but not all of them. To display all of the rows and find our texts, we need the output to display all `r nrow(dickens)` rows. This can be achieved like so:
 
 ```{r}
-print(dickens, n=74)
+print(dickens, n=nrow(dickens)) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "All items on Project Gutenberg by Charles Dickens.")  %>%
+  flextable::border_outer()
 ```
 
 Now we have the complete output, we can go and identify the IDs of the works we're interested in. We find that:
 
-* 46 = A Christmas Carol  
-* 98 = A Tale of Two Cities  
+* 19337 = A Christmas Carol  
+* 564 = The Mystery of Edwin Drood  
 * 580 = The Pickwick Papers  
-* 730 = Oliver Twist  
+* 46675 = Oliver Twist  
 * 766 = David Copperfield  
-* 786 = Hard Times  
+* 821 = Dombey and Son  
 * 967 = Nicholas Nickleby  
-* 1400 = Great Expectations  
+* 1023 = Bleak House  
 
 We could either download each of the texts individually, but that would be a hassle. Instead, we can save all of the ID numbers in a new variable, which we'll call `list_dickens`:
 
 ```{r}
-list_dickens <- c(46, 98, 580, 730, 766, 786, 967, 1400)
+list_dickens <- c(19337, 564, 580, 46675, 766, 821, 967, 1023)
 ```
 
-This allows us to download all of the texts in one go:
+This allows us to download all of the texts in one go (and clean it by removing empty text elements using the `filter()` function from the `dplyr` package):
 
 ```{r}
-dickens_corpus <- gutenberg_download(list_dickens, meta_fields = "title")
+# download data from Project Gutenberg
+dickens_corpus <- gutenberg_download(list_dickens, 
+                                     meta_fields = "title", 
+                                     mirror = "http://mirror.csclub.uwaterloo.ca/gutenberg") %>%
+  # remove empty rows
+  dplyr::filter(text != "")
 ```
 
 With this, we download the eight novels, saving them to a data frame with one row per line per work, as well as the additional metadata of the title of each work. If one were working with works by different authors, it might make sense to include the author names - but since we don't, we won't.
@@ -185,10 +202,20 @@ With this, we download the eight novels, saving them to a data frame with one ro
 Taking a look at the `dickens_corpus` object is not yet very meaningful:
 
 ```{r}
-dickens_corpus
+dickens_corpus %>%
+  head(10) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the Dickens data.")  %>%
+  flextable::border_outer()
 ```
 
-We can see the title of *A Christmas Carol*, with one line per row, but beyond that, not yet too much. So let's get to the data processing that will allow us to do a bit of meaningful work with these texts.
+We can see the title of *The Mystery of Edwin Drood*, with one line per row, and the table of contents included, but beyond that, not yet too much. So let's get to the data processing that will allow us to do a bit of meaningful work with these texts.
 
 # Data Processing
 
@@ -196,27 +223,37 @@ Now that we have loaded the data, we need to prepare it for the analysis (the to
 
 ## Pre-Processing, Part 1
 
-The first step of the pre-processing requires us to transform the texts we stored under `dickens_corpus` and clean it by removing empty text elements using the `filter()` function from the `dplyr` package. Then, we replace sentence punctuation marks (.?!) with the sequence "qwerty". Next, we group the data by title using `group_by()` (also a function from the `dplyr` package) and we then we reframe the data so that each row represents one sentence. During the reframing, we split the text into sentences by splitting the text by the "qwerty" sequence we just added, we remove upper case sequences, and we remove upper case letters except for capital *i* (I). This should result in a table where each sentence represents one row. 
+The first step of the pre-processing requires us to transform the texts we stored under `dickens_corpus`. First, we group the data by title using `group_by()` (also a function from the `dplyr` package) and we then we reframe the data so that each row represents one sentence. During the reframing, we split the text into sentences using the `tokenize_sentence` function from the `quanteda` package. Then, we remove upper case sequences, and we remove upper case letters except for capital *i* (I). This should result in a table where each sentence represents one row. 
 
 ```{r}
 dickens_corpus %>%
-  dplyr::filter(text != "") %>%
-  dplyr::mutate(text = stringr::str_replace_all(text, "([[:digit:][:lower:]])((\\.|\\?\\!))", "\\1\\2qwerty")) %>%
   dplyr::group_by(title) %>%
+  # combine text of each novel
   dplyr::reframe(text = paste0(text, collapse = " "),
-                 text = unlist(strsplit(text, "qwerty")),
+                 # remove capitalized words
                  text = stringr::str_remove_all(text, "[:upper:]{2,}"),
+                 # remove individual capitalized letters
                  text = stringr::str_replace_all(text, " [A:H,J:Z] ", " "),
+                 text = unlist(quanteda::tokenize_sentence(text)),
                  text = stringr::str_squish(text)) -> dickens_corpus
 ```
 
 To check if the splitting into sentences has worked, let's have a look at the transformed `dickens_corpus`:
 
 ```{r}
-head(dickens_corpus$text, 10)
+head(dickens_corpus$text, 10) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the data.")  %>%
+  flextable::border_outer()
 ```
 
-As we can see, we are left with a data frame consisting of many rows and 2 columns with each row representing one sentence. Unfortunately, the sentence tokenisation has not worked perfectly as we see that in the first row, the title and author (*A Ghost Story of Christmas by Charles Dickens*) it still attached to the first sentence.
+As we can see, we are left with each row representing one sentence. Unfortunately, the sentence tokenisation has not worked perfectly as we see that in the first row, the place of publication and the preface is  still part of the data.
 
 To get a sense of the current structure of the corpus, we can take a look at the titles, in the form of a table:
 
@@ -263,26 +300,45 @@ dickens_corpus$text %>%
 # loading
 # you can directly load the parsed dickens data by executing this chunk
 dickens_parsed  <- base::readRDS(url("https://slcladal.github.io/data/dickens_parsed.rda", "rb"))
+# inspect data
+dickens_parsed %>%
+  as.data.frame() %>%
+  head(10) %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 lines of the data.")  %>%
+  flextable::border_outer()
 ```
 
-As you see, we take the *text* variable of the `dickens_corpus`, split it into sentences using the `tokenize_sentence()` function from the `quanteda` transform it with the command `spacy_parse` and assign it to a new variable, `dickens_parsed`. What the command does is tokenize and tag the texts, returning a data-table of the result. The corpus is thus transformed from an object that has a sentence in each row, to one where each word has its own row. More importantly, though, each word is assigned a part of speech tag. Parsing text with udpipe also include lemmatization and more complex tags like noun phrases, but for our purposes, part of speech tags give enough information.
+What the code chunk does is tokenize and tag the texts, returning a data-table of the result. The corpus is thus transformed from an object that has a sentence in each row, to one where each word has its own row. More importantly, though, each word is assigned a part of speech tag. Parsing text with `udpipe` also include lemmatization and more complex tags like noun phrases, but for our purposes, part of speech tags give enough information.
 
-Once the parsing process is finished, we can terminate the Python process that we initiated above, since it uses up a lot of memory in the background:
-
-Now, let's take a look at the structure of our new variable, `dickens_parsed`:
+Once the parsing process is finished, we can take a look at the structure of our new variable, `dickens_parsed`:
 
 ```{r}
 str(dickens_parsed)
 ```
 
-We are now dealing with a data frame that contains 1,996,275 observations (rows) of 7 variables (columns). Roughly two million words for eight novels sounds about right. Of course, if we want to be sure that we didn't lose anything on the way thus far, we could go back to the Gutenberg information to see whether we have the correct amount of words. But we'll carry on with the assumption that everything worked fine so far.
+We are now dealing with a data frame that contains `r nrow(dickens_parsed)` observations (rows) of `r ncol(dickens_parsed)` variables (columns). Roughly two million words for eight novels sounds about right. Of course, if we want to be sure that we didn't lose anything on the way thus far, we could go back to the Gutenberg information to see whether we have the correct amount of words. But we'll carry on with the assumption that everything worked fine so far.
 
-The structure of the parsed corpus is very different from the structure of the corpus as it was before. Among the columns, we find the doc-, sentence- and token-ids, the tokens and their lemma, the part of speech tag and the entity. Most of this, we will ignore for the current purpose. What we need to get the corpus into processable form are the part of speech tags.
+The structure of the parsed corpus is very different from the structure of the corpus as it was before. Among the columns, we find the doc_id, sentence_id and token-ids, the tokens and their lemma, the part of speech tag and the entity. Most of this, we will ignore for the current purpose. What we need to get the corpus into processable form are the part of speech tags.
 
 So let's look at the first few entries:
 
 ```{r}
-head(dickens_parsed, n=15)
+head(dickens_parsed, n=15) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 lines of the parsed data.")  %>%
+  flextable::border_outer()
 ```
 
 In these 15 rows we already see both the uses and the drawbacks of what we are about to do. In rows 7 and 8 we find the words *Charles* and *Dickens*, respectively. These get identified correctly as proper nouns. Looking at rows 3 and 5, however, we see that also *Christmas* and *Carol* get identified as proper nouns (PROPN in the upos column). While Carol is a name, here it clearly does not refer to a person, but to a type of music that was typically sung around Christmas in the olden days. The reason for the mislabelling of these words is rather, ahem, prosaic: as part of the title, they are both spelt with capital letters, which to the parser indicates that they are proper nouns. And the reason this presents a problem is because we are going to remove all proper nouns.
@@ -331,7 +387,16 @@ We get 1,916,359 rows, which means that only roughly 88,000 tokens had been clas
 It's also worth checking briefly whether it was actually successful at removing what we wanted to remove:
 
 ```{r}
-head(no_prop_dickens, n=15)
+head(no_prop_dickens, n=15) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 15 lines of the parsed data after removing proper nouns.")  %>%
+  flextable::border_outer()
 ```
 
 The first fifteen rows certainly indicate a success: gone is *Christmas* and *Carol*, gone is *Charles* and *Dickens*. Certain other features that are also not helpful for interpreting the content of the corpus currently remain, most prominently punctuation. Let's take care of this.
@@ -359,7 +424,16 @@ no_prop_dickens %>%
 We assign the contents of the `no_prop_dickens` object a new variable `toks`, coercing the contents into a token object. With this, we get rid of a lot of excess information that is not relevant for the next steps. Let's take a look:
 
 ```{r}
-head(toks, n=10)
+head(toks, n=10) %>%
+  as.data.frame() %>%
+  flextable() %>%
+  flextable::set_table_properties(width = .95, layout = "autofit") %>%
+  flextable::theme_zebra() %>%
+  flextable::fontsize(size = 12) %>%
+  flextable::fontsize(size = 12, part = "header") %>%
+  flextable::align_text_col(align = "center") %>%
+  flextable::set_caption(caption = "First 10 sentences of the cleaned data.")  %>%
+  flextable::border_outer()
 ```
 
 The corpus now looks a lot like it did before we started with the pre-processing: we see that again each sentence occupies one document. The obvious difference is that all the proper nouns are gone - as we intended.
@@ -417,7 +491,7 @@ list_toks <- unlist(toks, use.names = F)
 Now, we basically have Dickens novels as a long list of individual words, without a proper name:
 
 ```{r}
-head(list_toks, n=15)
+head(list_toks, n=15) 
 ```
 
 Now, we are faced with choosing the size of the text chunks we want to feed into our model. There is no best practice of how to choose the chunk size, which means that there is some trial and error involved here. Basically we want chunks that are large enough to allow for meaningful co-occurrences to be observed, but small enough that co-occurrences that get identified by the model are meaningful in some way. One way to get there is to use paragraphs, as they are a meaningful unit of discourse. But we do not have paragraphs in our corpus.
@@ -446,7 +520,7 @@ r <- rep(1:ceiling(n/chunk), each = chunk)[1:n]
 
 This takes a bit of unpacking. The `rep()` function replicates the values in the brackets. But what are we feeding it there? The centerpiece is in the fraction `n/chunk`, a simple calculation which states that, given the length (n) of our corpus, if we want chunks of 1,000 words each, there will be 717 chunks. We set this value (716.412, to be precise) as the ceiling. In effect, we are setting a range between 1 and 717. The next element, `each = chunk`, tells us how frequently each element in the range is to be repeated. Finally, with the specifications in the square brackets, we say that this process should be carried out for the whole length of our corpus. Confused yet?
 
-If we simply were to run this command, instead of assigning it to the object `r``, as we do above, the output would be a list of 1,000 repetitions of `1`, followed by 1,000 repetitions of `2` and so on, until we get to 1,000 repetitions of `716` and finally some repetitions of `717`. 
+If we simply were to run this command, instead of assigning it to the object `r`, as we do above, the output would be a list of 1,000 repetitions of `1`, followed by 1,000 repetitions of `2` and so on, until we get to 1,000 repetitions of `716` and finally some repetitions of `717`. 
 
 Have a look at the variable r, for instance with the table function:
 
