@@ -14,7 +14,8 @@ keystats <- function(x){
     dplyr::mutate(Rws = nrow(.)) %>%   
     # work row-wise
     dplyr::rowwise() %>%
-    dplyr::mutate(R1 = text1+text2,
+    dplyr::mutate(O11 = ifelse(O11 == 0, O11+0.1, O11),
+                  R1 = text1+text2,
                   R2 = N - R1,
                   O11 = text1,
                   O12 = R1-O11,

@@ -13,7 +13,8 @@ assocstats <- function(x, term){
     # work row-wise
     dplyr::rowwise() %>%
     # add N
-    dplyr::mutate(N = sum(O11, O12, O21, O22),
+    dplyr::mutate(O11 = ifelse(O11 == 0, O11+0.1, O11),
+                  N = sum(O11, O12, O21, O22),
                   R1 = O11 + O12,
                   R2 = O21 + O22,
                   C1 = O11 + O21,
