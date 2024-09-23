@@ -58,8 +58,7 @@ assocstats <- function(x, term){
                   MS = min((O11/C1), (O11/R1)),
                   t.score = (O11 - E11) / sqrt(O11),
                   z.score = (O11 - E11) / sqrt(E11),
-                  PMI = log2( (O11 / N) / ((O11+O12) / N) * 
-                                ((O11+O21) / N) ),
+                  PMI = log2( (O11 / N) / ( C1 / N * R1 / N )),
                   DeltaP12 = (O11 / (O11 + O12)) - (O21 / (O21 + O22)),
                   DeltaP21 =  (O11 / (O11 + O21)) - (O21 / (O12 + O22)),
                   DP = (O11 / R1) - (O21 / R2),
