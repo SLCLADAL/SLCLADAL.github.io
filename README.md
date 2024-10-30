@@ -14,7 +14,7 @@ Since the primary concern of the LADAL is to introduce computational methods tha
 
 - introductions to quantitative reasoning and basic concepts in empirical language studies.
 
-- introductions to R as programming environment for processing natural language data.
+- introductions to R as a programming environment for processing natural language data.
 
 - tutorials on data visualization and data analytics (statistics and machine learning).
 
@@ -35,11 +35,11 @@ To get in touch, please feel free to contact us via email and stay up to date by
 
 # Audience
 
-The LADAL resources are aimed at researchers in HASS (Humanities, Arts, and the Social Sciences) and we aspire to attract complete novices as well as expert users. And, while the focus of the LADAL website is placed on handling data that represents natural language, anyone who has an interest in quantitative methods, data visualization, statistics, or R is welcome to explore this webpage.
+The LADAL resources are aimed at researchers in HASS (Humanities, Arts, and the Social Sciences) and we aspire to attract complete novices as well as expert users. While the focus of the LADAL website is placed on handling data that represents natural language, anyone who has an interest in quantitative methods, data visualization, statistics, or R is welcome to explore this webpage.
 
 # License & Citation
 
-The LADAL website was created by Martin Schweinberger. It was freely released under GNU General Public License, Version 3, June 2007. 
+The LADAL website was created by Martin Schweinberger. It is freely released under GNU General Public License, Version 3, June 2007. 
 
 ![CC BY-SA](https://slcladal.github.io/images/license.png)
 
