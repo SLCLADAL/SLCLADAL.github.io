@@ -66,16 +66,17 @@ install.packages("rnaturalearth")
 install.packages("rnaturalearthdata")
 install.packages("ggmap")
 install.packages("leaflet")
-install.packages("maptools")
-install.packages("rgdal")
 install.packages("scales")
 install.packages("maps")
 install.packages("here")
-install.packages("rgeos")
 install.packages("oz")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
+devtools::install_github("cran/maptools")
+devtools::install_github("cran/rgeos")
+devtools::install_github("freysimon/TigR")
+#install.packages("rgdal", repos="https://cloud.r-project.org/")
 ```
 
 Now that we have installed the packages, we activate them as shown below.
@@ -94,10 +95,10 @@ library(rnaturalearth)
 library(ggmap)
 library(leaflet)
 library(maptools)
-library(rgdal)
 library(scales)
 library(rgeos)
 library(oz)
+library(TigR)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -460,105 +461,19 @@ I stored the shape file in my `data` folder which then allows me to access the s
 
 
 ```{r shp1, message=F, warning=F}
-australia <- rgdal::readOGR(here::here("data/shapes", "AshmoreAndCartierIslands.shp"),
-                            layer='AshmoreAndCartierIslands', stringsAsFactors = F)
+australia <- read_sf(here::here("data/shapes", "AshmoreAndCartierIslands.shp"),
+                            layer='AshmoreAndCartierIslands')
+
 ```
 
 We can now generate a first map based on the shape file we downloaded.
 
-```{r shp2, message=F, warning=F}
-# plot australia based on shp file
-ggplot() + 
-  geom_polygon(data = australia, 
-               aes(x = long, y = lat, group = group),
-               colour = "black", fill = "gray90") +
+```{r}
+ggplot(australia) +
+  geom_sf(colour = "black", fill = "gray90") +
   theme_void()
 ```
 
-Next, we convert the data set into a tidy format.
-
-```{r shp3, message=F, warning=F}
-# convert the data into tidy format
-australia_tidy <- broom::tidy(australia, region = "name")
-# inspect data
-head(australia_tidy)
-```
-
-
-Now, we extract the names of the states and territories as well as the longitudes and latitudes where we want to display the labels. Then, we display the information on the map.
-
-```{r shp5, message=FALSE, warning=FALSE}
-# extract names of states and their long and lat
-australia_states <- australia_tidy %>%
-  dplyr::group_by(id) %>%
-  dplyr::summarise(long = mean(long),
-                   lat = mean(lat))
-```
-
-
-We can now generate a map based on the shp-file. In addition, we define colors for the states and territories and customize the map.
-
-```{r shp5c, message=FALSE, warning=FALSE}
-# define colors
-clrs <- viridis_pal()(15)
-# plot map
-p <- ggplot() +
-  # plot map
-  geom_polygon(data = australia_tidy, 
-               aes(x = long, y = lat, group = group, fill = id, alpha = .75), 
-               asp = 1, colour = "gray50") +
-  # add text
-  geom_text(data = australia_states, aes(x = long, y = lat, label = id), 
-            size = 3, color = "gray20", fontface = "bold", 
-            check_overlap = T) +
-  geom_text(data= world_points,aes(x=X, y=Y, label=name),
-            color = "gray20", fontface = "bold", check_overlap = T, size = 5) +
-  # color states
-  scale_fill_manual(values = clrs) +
-  # define theme and axes
-  theme_void() +
-  scale_x_continuous(name = "Longitude", limits = c(110, 160)) +
-  scale_y_continuous(name = "Latitude", limits = c(-45, -10)) +
-  theme(panel.grid.major = element_line(color = "gray60", 
-                                         linetype = "dashed", 
-                                         size = 0.25),
-        # define background color
-        panel.background = element_rect(fill = "aliceblue"),
-        legend.position = "none")+ 
-  # add compass
-  annotation_north_arrow(location = "tl", which_north = "true", 
-                         style = north_arrow_fancy_orienteering)
-# show plot
-p
-```
-
-You can create customized polygons by defining longitudes and latitudes. In fact, you can generate very complex polygons like this. However, in this example, we only create a very basic one as a poof-of-concept.
-
-```{r shp6, message=FALSE, warning=FALSE}
-# create data frame with longitude and latitude values
-lat <- c(-25, -27.5, -25, -30, -30, -35, -25)
-long <- c(150, 140, 130, 135, 140, 147.5, 150)
-mypolygon <- as.data.frame(cbind(long, lat))
-# inspect data
-mypolygon
-```
-
-We can now plot out polygon over the map produced above.
-
-```{r shp10, message=F, warning=F}
-p + 
-  geom_polygon(data=mypolygon,
-               aes(x = long, y = lat),
-               alpha = 0.2, 
-               colour = "gray20", 
-               fill = "red") +
-  ggplot2::annotate("text", 
-                    x = mean(long),
-                    y = mean(lat),
-                    label = "My Polygon Area", 
-                    colour="white", 
-                    size=3)
-```
 
 
 We will end this introduction here but if you want to want to learn more, check out the detailed resources for geospatial data visualization using R can be found [here](https://keen-swartz-3146c4.netlify.app/) or [here](https://geocompr.robinlovelace.net/index.html).
