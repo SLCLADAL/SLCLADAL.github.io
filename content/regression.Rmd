@@ -182,6 +182,9 @@ install.packages("tibble")
 install.packages("dplyr")
 install.packages("vcd")
 install.packages("vip")
+install.packages("gridExtra")
+install.packages("performance")
+install.packages("see")
 # install klippy for copy-to-clipboard button in code chunks
 install.packages("remotes")
 remotes::install_github("rlesur/klippy")
@@ -218,6 +221,9 @@ library(stringr)
 library(tibble)
 library(vcd)
 library(vip)
+library(gridExtra)
+library(performance)
+library(see)
 # activate klippy for copy-to-clipboard button
 klippy::klippy()
 ```
@@ -732,7 +738,7 @@ p4 <- ggplot(mlrdata, aes(status, money)) +
   guides(fill = "none") +
   theme_bw()
 # show plots
-vip::grid.arrange(grobs = list(p1, p2, p3, p4), widths = c(1, 1), layout_matrix = rbind(c(1, 2), c(3, 4)))
+gridExtra::grid.arrange(grobs = list(p1, p2, p3, p4), widths = c(1, 1), layout_matrix = rbind(c(1, 2), c(3, 4)))
 ```
 
 The upper left figure consists of a boxplot which shows how much money was spent by relationship status. The figure suggests that men spend more on women if they are not in a relationship. The next figure shows the relationship between the money spend on presents and whether or not the men were interested in the women.
@@ -848,9 +854,30 @@ Anova(m0.mlr, m2.mlr, type = "III")
 
 The comparison between the two model confirms that the minimal adequate model performs significantly better (makes significantly more accurate estimates of the outcome variable) compared with the baseline model.
 
+
+
+### Model diagnostics {-}
+
+We now check the model performance using the `model_performance()` function and to diagnose the model, we are using the `check_model()` function from the `performance` package [@ludeke2021performance]. 
+
+
+We start by checking the performance of the null-model against the performance values of the final minimal adequate model. Ideally, the final minimal adequate model would show higher explanatory power (higher R2 values) and better parsimony (lower AIC and AICc as well as BIC values).
+
+```{r}
+performance::model_performance(m0.mlr)
+performance::model_performance(m2.mlr)
+```
+
+
+The output confirms that the final minimal adequate model performs substantively better than the null model (higher explanatory power and better parsimony). We now diagnose the model using the `check_model()` function.
+
+```{r}
+performance::check_model(m2.mlr)
+```
+
 ### Outlier Detection{-}
 
-After implementing the multiple regression, we now need to look for outliers and perform the model diagnostics by testing whether removing data points disproportionately decreases model fit. To begin with, we generate diagnostic plots.
+In a next step, we now need to look for outliers check whether removing data points disproportionately decreases model fit. To begin with, we generate diagnostic plots.
 
 ```{r mlr11, message=F, warning=F}
 # generate plots
@@ -1008,11 +1035,11 @@ p6 <- ggplot(mlrdata, aes(fitted, studentized.residuals)) +
   labs(x = "Fitted Values",
        y = "Studentized Residual")
 # plot 7
-p7 <- qplot(sample = mlrdata$studentized.residuals, stat="qq") +
+p7 <- qplot(sample = mlrdata$studentized.residuals) +
   theme_bw(base_size = 8) +
   labs(x = "Theoretical Values",
        y = "Observed Values")
-vip::grid.arrange(p5, p6, p7, nrow = 1)
+gridExtra::grid.arrange(p5, p6, p7, nrow = 1)
 ```
 
 The new diagnostic plots do not indicate outliers that require removal. With respect to such data points the following parameters should be considered:
@@ -1530,7 +1557,7 @@ We can use the `plot_model` function from the `sjPlot` package [@sjPlot] to visu
 efp1 <- plot_model(lr.glm, type = "pred", terms = c("Age"), axis.lim = c(0, 1)) 
 # predicted percentage
 efp2 <- plot_model(lr.glm, type = "pred", terms = c("Gender"), axis.lim = c(0, 1)) 
-grid.arrange(efp1, efp2, nrow = 1)
+gridExtra::grid.arrange(efp1, efp2, nrow = 1)
 ```
 
 And we can also combine the visualization of the effects in a single plot as shown below.
@@ -2427,7 +2454,7 @@ p3 <- ggplot(lmmdata, aes(Prepositions)) +
   geom_histogram() +
   theme_bw() + 
   labs(y = "Count", x = "Frequency (Prepositions)")
-grid.arrange(grobs = list(p1, p2, p3), widths = c(1, 1), layout_matrix = rbind(c(1, 1), c(2, 3)))
+gridExtra::grid.arrange(grobs = list(p1, p2, p3), widths = c(1, 1), layout_matrix = rbind(c(1, 1), c(2, 3)))
 ```
 
 
@@ -2446,7 +2473,7 @@ p5 <- ggplot(lmmdata, aes(Region, Prepositions)) +
   labs(x = "Region", y = "Prepositions per 1,000 words") +
   geom_smooth(method = "lm")  + 
   theme_bw()
-grid.arrange(p4, p5, nrow = 1)
+gridExtra::grid.arrange(p4, p5, nrow = 1)
 ```
 
 ```{r lmm6, message=FALSE, warning=FALSE}
@@ -2756,7 +2783,10 @@ ggplot(lmmdata, aes(DateUnscaled, Predicted)) +
 
 ### Model Diagnostics{-}
 
-We now create diagnostic plots. What we wish to see in the diagnostic plots is a cloud of dots in the middle of the window without any structure. What we do not want to see is a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) [@pinheiro2000mixedmodels 182].
+
+
+In addition, we generate diagnostic plots. What we wish to see in the diagnostic plots is a cloud of dots in the middle of the window without any structure. What we do not want to see is a funnel-shaped cloud because this indicates an increase of the errors/residuals with an increase of the predictor(s) (because this would indicate heteroscedasticity) [@pinheiro2000mixedmodels 182].
+
 
 ```{r lmm22}
 # start plotting
@@ -2808,36 +2838,8 @@ summary(m5.lme)
 sjPlot::tab_model(m5.lme)
 ```
 
-***
 
-<br>
-
-<div class="warning" style='padding:0.1em; background-color:#f2f2f2; color:#51247a'>
-<span>
-<p style='margin-top:1em; text-align:center'>
-<b>NOTE</b><br><br>The R^2^ values of the summary table are incorrect (as indicated by the missing conditional R^2^ value). The more appropriate conditional and marginal coefficient of determination for generalized mixed-effect models can be extracted using the `r.squaredGLMM` function from the `MuMIn` package [@MuMIn].</p>
-<p style='margin-left:1em;'>
-</p></span>
-</div>
-
-<br>
-
-
-The respective call for the model is:
-
-```{r lmm28b}
-r.squaredGLMM(m5.lme)
-```
-
-
-We can use the `reports` package [@report] to summarize the analysis.
-
-
-```{r lme_report, message=F, warning = F}
-report::report(m5.lme)
-```
-
-We can use this output to write up a final report: 
+We can now use the information extracted above to write up a final report: 
 
 A mixed-effect linear regression model which contained the genre of texts as random effect was fit to the data in a step-wise-step up procedure. Due to the presence of outliers in the data, weights were included into the model which led to a significantly improved model fit compared to an un-weight model ($\chi$^2^(2): 39.17, p: 0.0006). The final minimal adequate model performed significantly better than an intercept-only base-line model ($\chi$^2^(1): 12.44, p =.0004) and showed that the frequency of prepositions increases significantly but only marginally with the date of composition (Estimate: 0.02, CI: 0.01-0.03, p < .001, marginal R^2^ =  0.0174, conditional R^2^ =  0.4324). Neither the region where the text was composed nor a higher order interaction between genre and region significantly correlated with the use of prepositions in the data. 
 
@@ -3384,7 +3386,7 @@ p11 <- ggplot(countdata, aes(x = Language, y = diag_data$Pearson)) +
   geom_boxplot() +
   labs(y = "Pearson") + 
   theme(axis.text.x = element_text(angle=90))
-grid.arrange(p9, p10, p11, nrow = 1)
+gridExtra::grid.arrange(p9, p10, p11, nrow = 1)
 ```
 
 The diagnostic plots show problems as the dots in the first two plots are not random but show a pattern in the lower left corner. In addition, the variance of English (left boxplot) is notable larger than the variance of Russian (right boxplot). As a final step, we plot the predicted vales of the model to check if the predictions make sense.
@@ -3605,7 +3607,7 @@ p11 <- ggplot(countdata, aes(x = Language, y = diag_data$Pearson)) +
   geom_boxplot() +
   labs(y = "Pearson") + 
   theme(axis.text.x = element_text(angle=90))
-grid.arrange(p9, p10, p11, nrow = 1)
+gridExtra::grid.arrange(p9, p10, p11, nrow = 1)
 ```
 
 The diagnostics show patterning similar to the one we saw with the Poisson model which suggest that the negative binomial model is also not an optimal model for our data. We continue by plotting the predicted values and, subsequently, summarize the analysis. 
